@@ -38,20 +38,23 @@ Voltex는 Rust로 작성되는 AAA급 3D 게임 엔진이다.
 - 각 레이어는 바로 아래 레이어에만 의존한다.
 - 레이어를 건너뛰는 의존은 허용하지 않는다.
 - 같은 레이어 내 모듈 간 순환 의존을 금지한다.
+- **예외**: `voltex_math`는 기반 유틸리티로서 모든 레이어에서 직접 의존 가능하다.
 
 ---
 
 ## 외부 라이브러리 vs 자체 구현
 
-### 외부 라이브러리 (2개만 사용)
+### 외부 라이브러리 (Rust crate 의존: 2개만 사용)
 
 | 라이브러리 | 버전 | 역할 | 라이선스 |
 |-----------|------|------|---------|
-| winit | latest | 크로스플랫폼 윈도우 생성, 키보드/마우스/터치 입력 | Apache 2.0 |
-| wgpu | latest | Vulkan/DX12/Metal/WebGPU 그래픽스 API 추상화 | MIT / Apache 2.0 |
+| winit | 0.30.x | 크로스플랫폼 윈도우 생성, 키보드/마우스/터치 입력 | Apache 2.0 |
+| wgpu | 24.x | Vulkan/DX12/Metal/WebGPU 그래픽스 API 추상화 | MIT / Apache 2.0 |
 
 - 라이선스 의무: 출처 표기, 변경 명시 (Apache 2.0)
 - 상업적 사용 자유, 로열티 없음, 소스 공개 의무 없음
+- 개발 전용 의존(테스트, 벤치마크 등: criterion, glam 등)은 런타임에 포함되지 않으므로 이 제한에서 제외
+- OS/시스템 API (Win32, CoreAudio, ALSA 등)와 C 라이브러리 (liblua)는 FFI를 통해 직접 호출하며, Rust crate 의존에 포함하지 않는다
 
 ### 자체 구현
 
@@ -66,7 +69,7 @@ Voltex는 Rust로 작성되는 AAA급 3D 게임 엔진이다.
 | 오디오 시스템 | 사운드 로딩/재생, 3D 공간 오디오, 믹서 |
 | AI | 내비메시 생성, A* 패스파인딩 |
 | 네트워킹 | 클라이언트-서버 아키텍처, UDP 기반 |
-| 스크립팅 | Lua 바인딩 또는 자체 스크립트 언어 (추후 결정) |
+| 스크립팅 | Lua 바인딩 (자체 FFI 래퍼로 Lua C API 호출) |
 
 ---
 
@@ -175,7 +178,8 @@ while running {
 
 #### 2-4. 텍스처
 
-- PNG/JPG 이미지 디코딩 (자체 구현 또는 최소한의 디코더)
+- PNG 디코더 자체 구현 (deflate + 필터링)
+- JPG 디코더 자체 구현 (Huffman + DCT, baseline JPEG만 지원)
 - GPU 텍스처 업로드
 - 샘플러 설정 (필터링, 래핑)
 
@@ -298,14 +302,16 @@ while running {
 
 #### 6-1. 오디오 백엔드
 
-- 플랫폼별 오디오 출력 (WASAPI/CoreAudio/ALSA)
-- 또는 `cpal` crate를 최소한으로 사용 (PCM 출력만)
+- 플랫폼별 오디오 출력 자체 구현
+  - Windows: WASAPI
+  - macOS: CoreAudio
+  - Linux: ALSA / PulseAudio
 - 오디오 스레드 분리
 
 #### 6-2. 사운드 재생
 
 - WAV 파서 자체 구현
-- OGG/Vorbis 디코더 (추후)
+- OGG/Vorbis 디코더 자체 구현 (추후)
 - 재생, 일시정지, 정지, 볼륨, 루프
 
 #### 6-3. 3D 오디오
@@ -323,7 +329,7 @@ while running {
 
 ---
 
-### Phase 7: 고급 렌더링
+### Phase 7: 고급 렌더링 (Stretch Goal)
 
 **목표**: AAA급 비주얼 퀄리티에 도달한다.
 
@@ -335,10 +341,9 @@ while running {
 
 #### 7-2. Global Illumination
 
-- Screen-Space GI (SSGI) 또는
-- Voxel-based GI (VXGI) 또는
-- Light Probe 기반 GI
-- (구현 시점에 기술 선택)
+단계적으로 구현한다:
+1. **Light Probes** (먼저) — 베이크 기반, 구현 난이도 낮음, 정적 씬에 효과적
+2. **SSGI** (다음) — 스크린 스페이스 기반, 동적 GI, 포스트 프로세싱 파이프라인과 자연스럽게 통합
 
 #### 7-3. 레이트레이싱
 
@@ -358,9 +363,11 @@ while running {
 
 **Phase 7 완료 기준**: 디퍼드 렌더링으로 수백 개의 라이트를 처리하고, GI/RT/포스트 프로세싱이 적용된 씬이 AAA 수준으로 보인다.
 
+> **Core Deliverable 경계**: Phase 1~6이 핵심 산출물이다. Phase 7~8은 핵심이 완성된 후 진행하는 확장 목표이며, 구현 계획은 Phase 6 완료 시점에 재평가한다.
+
 ---
 
-### Phase 8: 확장
+### Phase 8: 확장 (Stretch Goal)
 
 **목표**: 엔진을 완전한 게임 개발 도구로 확장한다.
 
@@ -379,13 +386,13 @@ while running {
 
 #### 8-3. 스크립팅
 
-- Lua 바인딩 또는 자체 스크립트 언어
+- Lua 바인딩 (자체 FFI 래퍼로 Lua C API 호출)
 - 핫 리로드 지원
 - 엔진 API 노출 (엔티티 생성/삭제, 컴포넌트 접근 등)
 
 #### 8-4. 에디터 (GUI)
 
-- egui 또는 자체 UI 시스템
+- 자체 Immediate Mode UI 시스템 (voltex_renderer 위에 구축)
 - 씬 뷰포트 (3D 뷰)
 - 엔티티 인스펙터
 - 에셋 브라우저
@@ -442,6 +449,6 @@ Cargo 워크스페이스로 관리하며, 각 crate는 독립적으로 빌드/�
 
 ## 라이선스
 
-- Voltex 엔진 코드: 추후 결정 (MIT, Apache 2.0, 또는 독점)
+- Voltex 엔진 코드: MIT / Apache 2.0 이중 라이선스 (Rust 생태계 관례)
 - 외부 의존: winit (Apache 2.0), wgpu (MIT / Apache 2.0)
 - 라이선스 고지 파일을 `THIRD_PARTY_LICENSES` 에 유지한다
