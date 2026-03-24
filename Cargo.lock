@@ -718,6 +718,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "ibl_demo"
+version = "0.1.0"
+dependencies = [
+ "bytemuck",
+ "env_logger",
+ "log",
+ "pollster",
+ "voltex_math",
+ "voltex_platform",
+ "voltex_renderer",
+ "wgpu",
+ "winit",
+]
+
+[[package]]
 name = "indexmap"
 version = "2.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"

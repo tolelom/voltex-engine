@@ -12,6 +12,7 @@ use voltex_renderer::{
     Mesh, GpuTexture, MaterialUniform, generate_sphere, create_pbr_pipeline, obj,
     ShadowMap, ShadowUniform, ShadowPassUniform, SHADOW_MAP_SIZE,
     create_shadow_pipeline, shadow_pass_bind_group_layout,
+    IblResources, pbr_texture_bind_group_layout, create_pbr_texture_bind_group,
 };
 use wgpu::util::DeviceExt;
 
@@ -36,7 +37,9 @@ struct AppState {
     light_buffer: wgpu::Buffer,
     material_buffer: wgpu::Buffer,
     camera_light_bind_group: wgpu::BindGroup,
-    _texture: GpuTexture,
+    _albedo_tex: GpuTexture,
+    _normal_tex: (wgpu::Texture, wgpu::TextureView, wgpu::Sampler),
+    pbr_texture_bind_group: wgpu::BindGroup,
     material_bind_group: wgpu::BindGroup,
     // Shadow resources
     shadow_map: ShadowMap,
@@ -44,6 +47,8 @@ struct AppState {
     shadow_bind_group: wgpu::BindGroup,
     shadow_pass_buffer: wgpu::Buffer,
     shadow_pass_bind_group: wgpu::BindGroup,
+    _ibl: IblResources,
+    ibl_bind_group: wgpu::BindGroup,
     // Misc
     input: InputState,
     timer: GameTimer,
@@ -184,7 +189,7 @@ impl ApplicationHandler for ShadowDemoApp {
 
         // Bind group layouts
         let cl_layout = camera_light_bind_group_layout(&gpu.device);
-        let tex_layout = GpuTexture::bind_group_layout(&gpu.device);
+        let pbr_tex_layout = pbr_texture_bind_group_layout(&gpu.device);
         let mat_layout = MaterialUniform::bind_group_layout(&gpu.device);
 
         // Camera+Light bind group
@@ -207,8 +212,23 @@ impl ApplicationHandler for ShadowDemoApp {
             ],
         });
 
-        // Texture (white 1x1)
-        let texture = GpuTexture::white_1x1(&gpu.device, &gpu.queue, &tex_layout);
+        // PBR texture bind group (albedo + normal)
+        let old_tex_layout = GpuTexture::bind_group_layout(&gpu.device);
+        let albedo_tex = GpuTexture::white_1x1(&gpu.device, &gpu.queue, &old_tex_layout);
+        let normal_tex = GpuTexture::flat_normal_1x1(&gpu.device, &gpu.queue);
+        let pbr_texture_bind_group = create_pbr_texture_bind_group(
+            &gpu.device,
+            &pbr_tex_layout,
+            &albedo_tex.view,
+            &albedo_tex.sampler,
+            &normal_tex.1,
+            &normal_tex.2,
+        );
+
+        // IBL resources
+        let ibl = IblResources::new(&gpu.device, &gpu.queue);
+        let ibl_layout = IblResources::bind_group_layout(&gpu.device);
+        let ibl_bind_group = ibl.create_bind_group(&gpu.device, &ibl_layout);
 
         // Material bind group
         let material_bind_group = gpu.device.create_bind_group(&wgpu::BindGroupDescriptor {
@@ -272,9 +292,10 @@ impl ApplicationHandler for ShadowDemoApp {
             &gpu.device,
             gpu.surface_format,
             &cl_layout,
-            &tex_layout,
+            &pbr_tex_layout,
             &mat_layout,
             &shadow_layout,
+            &ibl_layout,
         );
 
         self.state = Some(AppState {
@@ -290,13 +311,17 @@ impl ApplicationHandler for ShadowDemoApp {
             light_buffer,
             material_buffer,
             camera_light_bind_group,
-            _texture: texture,
+            _albedo_tex: albedo_tex,
+            _normal_tex: normal_tex,
+            pbr_texture_bind_group,
             material_bind_group,
             shadow_map,
             shadow_uniform_buffer,
             shadow_bind_group,
             shadow_pass_buffer,
             shadow_pass_bind_group,
+            _ibl: ibl,
+            ibl_bind_group,
             input: InputState::new(),
             timer: GameTimer::new(60),
             cam_aligned_size,
@@ -557,8 +582,9 @@ impl ApplicationHandler for ShadowDemoApp {
                     });
 
                     render_pass.set_pipeline(&state.pbr_pipeline);
-                    render_pass.set_bind_group(1, &state._texture.bind_group, &[]);
+                    render_pass.set_bind_group(1, &state.pbr_texture_bind_group, &[]);
                     render_pass.set_bind_group(3, &state.shadow_bind_group, &[]);
+                    render_pass.set_bind_group(4, &state.ibl_bind_group, &[]);
 
                     for i in 0..NUM_OBJECTS {
                         let cam_offset = (i as u32) * state.cam_aligned_size;

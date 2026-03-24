@@ -14,6 +14,7 @@ members = [
     "examples/pbr_demo",
     "examples/multi_light_demo",
     "examples/shadow_demo",
+    "examples/ibl_demo",
 ]
 
 [workspace.dependencies]
