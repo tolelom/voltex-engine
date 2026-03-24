@@ -10,6 +10,7 @@ use voltex_platform::{VoltexWindow, WindowConfig, InputState, GameTimer};
 use voltex_renderer::{
     GpuContext, Camera, FpsController, CameraUniform, LightsUniform, LightData,
     Mesh, GpuTexture, MaterialUniform, generate_sphere, create_pbr_pipeline,
+    ShadowMap, ShadowUniform,
 };
 use wgpu::util::DeviceExt;
 
@@ -34,6 +35,8 @@ struct AppState {
     camera_light_bind_group: wgpu::BindGroup,
     _texture: GpuTexture,
     material_bind_group: wgpu::BindGroup,
+    shadow_bind_group: wgpu::BindGroup,
+    _shadow_map: ShadowMap,
     input: InputState,
     timer: GameTimer,
     cam_aligned_size: u32,
@@ -171,6 +174,26 @@ impl ApplicationHandler for PbrDemoApp {
             }],
         });
 
+        // Shadow resources (dummy — shadows disabled)
+        let shadow_map = ShadowMap::new(&gpu.device);
+        let shadow_layout = ShadowMap::bind_group_layout(&gpu.device);
+        let shadow_uniform = ShadowUniform {
+            light_view_proj: [[0.0; 4]; 4],
+            shadow_map_size: 0.0,
+            shadow_bias: 0.0,
+            _padding: [0.0; 2],
+        };
+        let shadow_uniform_buffer = gpu.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Shadow Uniform Buffer"),
+            contents: bytemuck::cast_slice(&[shadow_uniform]),
+            usage: wgpu::BufferUsages::UNIFORM,
+        });
+        let shadow_bind_group = shadow_map.create_bind_group(
+            &gpu.device,
+            &shadow_layout,
+            &shadow_uniform_buffer,
+        );
+
         // PBR pipeline
         let pipeline = create_pbr_pipeline(
             &gpu.device,
@@ -178,6 +201,7 @@ impl ApplicationHandler for PbrDemoApp {
             &cl_layout,
             &tex_layout,
             &mat_layout,
+            &shadow_layout,
         );
 
         self.state = Some(AppState {
@@ -193,6 +217,8 @@ impl ApplicationHandler for PbrDemoApp {
             camera_light_bind_group,
             _texture: texture,
             material_bind_group,
+            shadow_bind_group,
+            _shadow_map: shadow_map,
             input: InputState::new(),
             timer: GameTimer::new(60),
             cam_aligned_size,
@@ -429,6 +455,7 @@ impl ApplicationHandler for PbrDemoApp {
 
                     render_pass.set_pipeline(&state.pipeline);
                     render_pass.set_bind_group(1, &state._texture.bind_group, &[]);
+                    render_pass.set_bind_group(3, &state.shadow_bind_group, &[]);
                     render_pass.set_vertex_buffer(0, state.mesh.vertex_buffer.slice(..));
                     render_pass.set_index_buffer(
                         state.mesh.index_buffer.slice(..),

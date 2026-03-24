@@ -161,6 +161,19 @@ impl Mat4 {
         }
     }
 
+    /// Orthographic projection (wgpu NDC: z [0,1])
+    pub fn orthographic(left: f32, right: f32, bottom: f32, top: f32, near: f32, far: f32) -> Self {
+        let rml = right - left;
+        let tmb = top - bottom;
+        let fmn = far - near;
+        Self::from_cols(
+            [2.0 / rml, 0.0, 0.0, 0.0],
+            [0.0, 2.0 / tmb, 0.0, 0.0],
+            [0.0, 0.0, -1.0 / fmn, 0.0],
+            [-(right + left) / rml, -(top + bottom) / tmb, -near / fmn, 1.0],
+        )
+    }
+
     /// Return the transpose of this matrix.
     pub fn transpose(&self) -> Self {
         let c = &self.cols;
@@ -314,7 +327,18 @@ mod tests {
         }
     }
 
-    // 8. as_slice — identity diagonal
+    // 8. Orthographic projection
+    #[test]
+    fn test_orthographic() {
+        let proj = Mat4::orthographic(-10.0, 10.0, -10.0, 10.0, 0.1, 100.0);
+        // Center point should map to (0, 0, ~0)
+        let p = proj * Vec4::new(0.0, 0.0, -0.1, 1.0);
+        let ndc = Vec3::new(p.x / p.w, p.y / p.w, p.z / p.w);
+        assert!(approx_eq(ndc.x, 0.0));
+        assert!(approx_eq(ndc.y, 0.0));
+    }
+
+    // 9. as_slice — identity diagonal
     #[test]
     fn test_as_slice() {
         let slice = Mat4::IDENTITY.as_slice();

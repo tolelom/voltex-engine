@@ -990,6 +990,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "multi_light_demo"
+version = "0.1.0"
+dependencies = [
+ "bytemuck",
+ "env_logger",
+ "log",
+ "pollster",
+ "voltex_math",
+ "voltex_platform",
+ "voltex_renderer",
+ "wgpu",
+ "winit",
+]
+
+[[package]]
 name = "naga"
 version = "28.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1695,6 +1710,21 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
+]
+
+[[package]]
+name = "shadow_demo"
+version = "0.1.0"
+dependencies = [
+ "bytemuck",
+ "env_logger",
+ "log",
+ "pollster",
+ "voltex_math",
+ "voltex_platform",
+ "voltex_renderer",
+ "wgpu",
+ "winit",
 ]
 
 [[package]]
