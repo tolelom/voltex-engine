@@ -11,6 +11,7 @@ members = [
     "examples/many_cubes",
     "examples/hierarchy_demo",
     "examples/asset_demo",
+    "examples/pbr_demo",
 ]
 
 [workspace.dependencies]

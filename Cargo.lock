@@ -158,6 +158,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "asset_demo"
+version = "0.1.0"
+dependencies = [
+ "bytemuck",
+ "env_logger",
+ "log",
+ "pollster",
+ "voltex_asset",
+ "voltex_ecs",
+ "voltex_math",
+ "voltex_platform",
+ "voltex_renderer",
+ "wgpu",
+ "winit",
+]
+
+[[package]]
 name = "atomic-waker"
 version = "1.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -685,6 +702,22 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dfa686283ad6dd069f105e5ab091b04c62850d3e4cf5d67debad1933f55023df"
 
 [[package]]
+name = "hierarchy_demo"
+version = "0.1.0"
+dependencies = [
+ "bytemuck",
+ "env_logger",
+ "log",
+ "pollster",
+ "voltex_ecs",
+ "voltex_math",
+ "voltex_platform",
+ "voltex_renderer",
+ "wgpu",
+ "winit",
+]
+
+[[package]]
 name = "indexmap"
 version = "2.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -893,6 +926,22 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "62bb907fe88d54d8d9ce32a3cceab4218ed2f6b7d35617cafe9adf84e43919cb"
 dependencies = [
  "libc",
+]
+
+[[package]]
+name = "many_cubes"
+version = "0.1.0"
+dependencies = [
+ "bytemuck",
+ "env_logger",
+ "log",
+ "pollster",
+ "voltex_ecs",
+ "voltex_math",
+ "voltex_platform",
+ "voltex_renderer",
+ "wgpu",
+ "winit",
 ]
 
 [[package]]
@@ -1308,6 +1357,21 @@ name = "paste"
 version = "1.0.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "57c0d7b74b563b49d38dae00a0c37d4d6de9b432382b2892f0574ddcae73fd0a"
+
+[[package]]
+name = "pbr_demo"
+version = "0.1.0"
+dependencies = [
+ "bytemuck",
+ "env_logger",
+ "log",
+ "pollster",
+ "voltex_math",
+ "voltex_platform",
+ "voltex_renderer",
+ "wgpu",
+ "winit",
+]
 
 [[package]]
 name = "percent-encoding"
@@ -1912,6 +1976,17 @@ name = "version_check"
 version = "0.9.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
+
+[[package]]
+name = "voltex_asset"
+version = "0.1.0"
+
+[[package]]
+name = "voltex_ecs"
+version = "0.1.0"
+dependencies = [
+ "voltex_math",
+]
 
 [[package]]
 name = "voltex_math"
