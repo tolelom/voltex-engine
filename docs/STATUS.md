@@ -1,0 +1,95 @@
+# Voltex Engine - 작업 현황
+
+## 완료된 Phase
+
+### Phase 1: Foundation (삼각형 렌더링)
+- voltex_math: Vec3
+- voltex_platform: VoltexWindow, InputState, GameTimer
+- voltex_renderer: GpuContext, Vertex, shader, pipeline
+- examples/triangle
+
+### Phase 2: Rendering Basics
+- voltex_math: Vec2, Vec4, Mat4 (transforms, look_at, perspective, orthographic)
+- voltex_renderer: MeshVertex(+tangent), Mesh, depth buffer, OBJ parser, Camera, FpsController
+- voltex_renderer: Blinn-Phong shader, BMP texture loader, GpuTexture
+- examples/model_viewer
+
+### Phase 3a: ECS
+- voltex_ecs: Entity(id+generation), SparseSet<T>, World(type-erased storage)
+- voltex_ecs: query<T>, query2<A,B>, Transform component
+- examples/many_cubes (400 entities, dynamic UBO)
+
+### Phase 3b: Scene Graph
+- voltex_ecs: Parent/Children hierarchy, add_child/remove_child/despawn_recursive
+- voltex_ecs: WorldTransform propagation (top-down)
+- voltex_ecs: Scene serialization (.vscn text format), Tag component
+- examples/hierarchy_demo (solar system)
+
+### Phase 3c: Asset Manager
+- voltex_asset: Handle<T>(generation), AssetStorage<T>(ref counting), Assets(type-erased)
+- examples/asset_demo
+
+### Phase 4a: PBR Rendering
+- voltex_renderer: MaterialUniform (base_color, metallic, roughness, ao)
+- voltex_renderer: Cook-Torrance BRDF shader (GGX NDF + Smith geometry + Fresnel-Schlick)
+- voltex_renderer: Procedural UV sphere generator
+- voltex_renderer: PBR pipeline (3→4 bind groups)
+- examples/pbr_demo (7x7 metallic/roughness sphere grid)
+
+### Phase 4b-1: Multi-Light
+- voltex_renderer: LightData (Directional/Point/Spot), LightsUniform (MAX_LIGHTS=16)
+- PBR shader: multi-light loop, point attenuation, spot cone falloff
+- examples/multi_light_demo (orbiting colored point lights)
+
+### Phase 4b-2: Shadow Mapping
+- voltex_renderer: ShadowMap (2048x2048 depth), ShadowUniform, ShadowPassUniform
+- Shadow depth-only shader + pipeline (front-face cull, depth bias)
+- PBR shader: shadow map sampling + 3x3 PCF
+- examples/shadow_demo (directional light shadows)
+
+### Phase 4c: Normal Map + IBL
+- MeshVertex: tangent[4] added, computed in OBJ parser + sphere generator
+- voltex_renderer: BRDF LUT (CPU Monte Carlo, 256x256), IblResources
+- PBR shader: TBN normal mapping, procedural sky IBL, split-sum approximation
+- Texture bind group: albedo + normal map (pbr_texture_bind_group_layout)
+- IBL merged into shadow bind group (group 3) due to max_bind_groups=4
+- examples/ibl_demo
+
+## Crate 구조
+
+```
+crates/
+├── voltex_math      — Vec2, Vec3, Vec4, Mat4
+├── voltex_platform  — VoltexWindow, InputState, GameTimer
+├── voltex_renderer  — GPU, Mesh, OBJ, Camera, Material, PBR, Shadow, IBL, Sphere
+├── voltex_ecs       — Entity, SparseSet, World, Transform, Hierarchy, Scene, WorldTransform
+└── voltex_asset     — Handle<T>, AssetStorage<T>, Assets
+```
+
+## 테스트: 105개 전부 통과
+
+- voltex_asset: 14
+- voltex_ecs: 39
+- voltex_math: 29 (28 + orthographic)
+- voltex_platform: 3
+- voltex_renderer: 20
+
+## Examples (8개)
+
+- triangle — Phase 1 삼각형
+- model_viewer — OBJ 큐브 + Blinn-Phong
+- many_cubes — 400 ECS 엔티티 렌더링
+- hierarchy_demo — 태양계 씬 그래프
+- asset_demo — Handle 기반 에셋 관리
+- pbr_demo — metallic/roughness 구체 그리드
+- multi_light_demo — 다중 색상 라이트
+- shadow_demo — Directional Light 그림자
+- ibl_demo — Normal map + IBL
+
+## 다음: Phase 5 (물리 엔진)
+
+스펙 참조: `docs/superpowers/specs/2026-03-24-voltex-engine-design.md`
+
+## 간소화/미뤄진 항목
+
+상세: `docs/DEFERRED.md`
