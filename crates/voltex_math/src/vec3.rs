@@ -1,0 +1,158 @@
+use std::ops::{Add, Sub, Mul, Neg};
+
+/// 3D vector (f32)
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Vec3 {
+    pub x: f32,
+    pub y: f32,
+    pub z: f32,
+}
+
+impl Vec3 {
+    pub const ZERO: Self = Self { x: 0.0, y: 0.0, z: 0.0 };
+    pub const ONE: Self = Self { x: 1.0, y: 1.0, z: 1.0 };
+    pub const X: Self = Self { x: 1.0, y: 0.0, z: 0.0 };
+    pub const Y: Self = Self { x: 0.0, y: 1.0, z: 0.0 };
+    pub const Z: Self = Self { x: 0.0, y: 0.0, z: 1.0 };
+
+    pub const fn new(x: f32, y: f32, z: f32) -> Self {
+        Self { x, y, z }
+    }
+
+    pub fn dot(self, rhs: Self) -> f32 {
+        self.x * rhs.x + self.y * rhs.y + self.z * rhs.z
+    }
+
+    pub fn cross(self, rhs: Self) -> Self {
+        Self {
+            x: self.y * rhs.z - self.z * rhs.y,
+            y: self.z * rhs.x - self.x * rhs.z,
+            z: self.x * rhs.y - self.y * rhs.x,
+        }
+    }
+
+    pub fn length_squared(self) -> f32 {
+        self.dot(self)
+    }
+
+    pub fn length(self) -> f32 {
+        self.length_squared().sqrt()
+    }
+
+    pub fn normalize(self) -> Self {
+        let len = self.length();
+        Self {
+            x: self.x / len,
+            y: self.y / len,
+            z: self.z / len,
+        }
+    }
+}
+
+impl Add for Vec3 {
+    type Output = Self;
+    fn add(self, rhs: Self) -> Self {
+        Self { x: self.x + rhs.x, y: self.y + rhs.y, z: self.z + rhs.z }
+    }
+}
+
+impl Sub for Vec3 {
+    type Output = Self;
+    fn sub(self, rhs: Self) -> Self {
+        Self { x: self.x - rhs.x, y: self.y - rhs.y, z: self.z - rhs.z }
+    }
+}
+
+impl Mul<f32> for Vec3 {
+    type Output = Self;
+    fn mul(self, rhs: f32) -> Self {
+        Self { x: self.x * rhs, y: self.y * rhs, z: self.z * rhs }
+    }
+}
+
+impl Neg for Vec3 {
+    type Output = Self;
+    fn neg(self) -> Self {
+        Self { x: -self.x, y: -self.y, z: -self.z }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_new() {
+        let v = Vec3::new(1.0, 2.0, 3.0);
+        assert_eq!(v.x, 1.0);
+        assert_eq!(v.y, 2.0);
+        assert_eq!(v.z, 3.0);
+    }
+
+    #[test]
+    fn test_zero() {
+        let v = Vec3::ZERO;
+        assert_eq!(v.x, 0.0);
+        assert_eq!(v.y, 0.0);
+        assert_eq!(v.z, 0.0);
+    }
+
+    #[test]
+    fn test_add() {
+        let a = Vec3::new(1.0, 2.0, 3.0);
+        let b = Vec3::new(4.0, 5.0, 6.0);
+        let c = a + b;
+        assert_eq!(c, Vec3::new(5.0, 7.0, 9.0));
+    }
+
+    #[test]
+    fn test_sub() {
+        let a = Vec3::new(4.0, 5.0, 6.0);
+        let b = Vec3::new(1.0, 2.0, 3.0);
+        let c = a - b;
+        assert_eq!(c, Vec3::new(3.0, 3.0, 3.0));
+    }
+
+    #[test]
+    fn test_scalar_mul() {
+        let v = Vec3::new(1.0, 2.0, 3.0);
+        let r = v * 2.0;
+        assert_eq!(r, Vec3::new(2.0, 4.0, 6.0));
+    }
+
+    #[test]
+    fn test_dot() {
+        let a = Vec3::new(1.0, 2.0, 3.0);
+        let b = Vec3::new(4.0, 5.0, 6.0);
+        assert_eq!(a.dot(b), 32.0);
+    }
+
+    #[test]
+    fn test_cross() {
+        let a = Vec3::new(1.0, 0.0, 0.0);
+        let b = Vec3::new(0.0, 1.0, 0.0);
+        let c = a.cross(b);
+        assert_eq!(c, Vec3::new(0.0, 0.0, 1.0));
+    }
+
+    #[test]
+    fn test_length() {
+        let v = Vec3::new(3.0, 4.0, 0.0);
+        assert!((v.length() - 5.0).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn test_normalize() {
+        let v = Vec3::new(3.0, 0.0, 0.0);
+        let n = v.normalize();
+        assert!((n.length() - 1.0).abs() < 1e-6);
+        assert_eq!(n, Vec3::new(1.0, 0.0, 0.0));
+    }
+
+    #[test]
+    fn test_neg() {
+        let v = Vec3::new(1.0, -2.0, 3.0);
+        let n = -v;
+        assert_eq!(n, Vec3::new(-1.0, 2.0, -3.0));
+    }
+}

@@ -1,2 +1,7 @@
-// Voltex Platform - Phase 1
-// Modules will be added in Task 3
+pub mod window;
+pub mod input;
+pub mod game_loop;
+
+pub use window::{VoltexWindow, WindowConfig};
+pub use input::InputState;
+pub use game_loop::GameTimer;
