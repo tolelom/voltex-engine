@@ -5,6 +5,7 @@ members = [
     "crates/voltex_platform",
     "crates/voltex_renderer",
     "crates/voltex_ecs",
+    "crates/voltex_asset",
     "examples/triangle",
     "examples/model_viewer",
     "examples/many_cubes",
@@ -16,6 +17,7 @@ voltex_math = { path = "crates/voltex_math" }
 voltex_platform = { path = "crates/voltex_platform" }
 voltex_renderer = { path = "crates/voltex_renderer" }
 voltex_ecs = { path = "crates/voltex_ecs" }
+voltex_asset = { path = "crates/voltex_asset" }
 wgpu = "28.0"
 winit = "0.30"
 bytemuck = { version = "1", features = ["derive"] }
