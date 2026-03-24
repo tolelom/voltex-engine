@@ -49,7 +49,7 @@ Voltex는 Rust로 작성되는 AAA급 3D 게임 엔진이다.
 | 라이브러리 | 버전 | 역할 | 라이선스 |
 |-----------|------|------|---------|
 | winit | 0.30.x | 크로스플랫폼 윈도우 생성, 키보드/마우스/터치 입력 | Apache 2.0 |
-| wgpu | 24.x | Vulkan/DX12/Metal/WebGPU 그래픽스 API 추상화 | MIT / Apache 2.0 |
+| wgpu | 28.x | Vulkan/DX12/Metal/WebGPU 그래픽스 API 추상화 | MIT / Apache 2.0 |
 
 - 라이선스 의무: 출처 표기, 변경 명시 (Apache 2.0)
 - 상업적 사용 자유, 로열티 없음, 소스 공개 의무 없음
