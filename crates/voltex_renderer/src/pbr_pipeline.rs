@@ -7,6 +7,7 @@ pub fn create_pbr_pipeline(
     camera_light_layout: &wgpu::BindGroupLayout,
     texture_layout: &wgpu::BindGroupLayout,
     material_layout: &wgpu::BindGroupLayout,
+    shadow_layout: &wgpu::BindGroupLayout,
 ) -> wgpu::RenderPipeline {
     let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
         label: Some("PBR Shader"),
@@ -15,7 +16,7 @@ pub fn create_pbr_pipeline(
 
     let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
         label: Some("PBR Pipeline Layout"),
-        bind_group_layouts: &[camera_light_layout, texture_layout, material_layout],
+        bind_group_layouts: &[camera_light_layout, texture_layout, material_layout, shadow_layout],
         immediate_size: 0,
     });
 

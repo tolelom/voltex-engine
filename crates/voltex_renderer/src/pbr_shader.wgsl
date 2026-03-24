@@ -37,6 +37,16 @@ struct MaterialUniform {
 
 @group(2) @binding(0) var<uniform> material: MaterialUniform;
 
+struct ShadowUniform {
+    light_view_proj: mat4x4<f32>,
+    shadow_map_size: f32,
+    shadow_bias: f32,
+};
+
+@group(3) @binding(0) var t_shadow: texture_depth_2d;
+@group(3) @binding(1) var s_shadow: sampler_comparison;
+@group(3) @binding(2) var<uniform> shadow: ShadowUniform;
+
 struct VertexInput {
     @location(0) position: vec3<f32>,
     @location(1) normal: vec3<f32>,
@@ -48,6 +58,7 @@ struct VertexOutput {
     @location(0) world_normal: vec3<f32>,
     @location(1) world_pos: vec3<f32>,
     @location(2) uv: vec2<f32>,
+    @location(3) light_space_pos: vec4<f32>,
 };
 
 @vertex
@@ -58,6 +69,7 @@ fn vs_main(model_v: VertexInput) -> VertexOutput {
     out.world_normal = (camera.model * vec4<f32>(model_v.normal, 0.0)).xyz;
     out.clip_position = camera.view_proj * world_pos;
     out.uv = model_v.uv;
+    out.light_space_pos = shadow.light_view_proj * world_pos;
     return out;
 }
 
@@ -165,6 +177,44 @@ fn compute_light_contribution(
     return (kd * albedo / 3.14159265358979 + specular) * radiance * NdotL;
 }
 
+fn calculate_shadow(light_space_pos: vec4<f32>) -> f32 {
+    // If shadow_map_size == 0, shadow is disabled
+    if shadow.shadow_map_size == 0.0 {
+        return 1.0;
+    }
+
+    let proj_coords = light_space_pos.xyz / light_space_pos.w;
+
+    // wgpu NDC: x,y [-1,1], z [0,1]
+    let shadow_uv = vec2<f32>(
+        proj_coords.x * 0.5 + 0.5,
+        -proj_coords.y * 0.5 + 0.5,
+    );
+    let current_depth = proj_coords.z;
+
+    if shadow_uv.x < 0.0 || shadow_uv.x > 1.0 || shadow_uv.y < 0.0 || shadow_uv.y > 1.0 {
+        return 1.0;
+    }
+    if current_depth > 1.0 || current_depth < 0.0 {
+        return 1.0;
+    }
+
+    // 3x3 PCF
+    let texel_size = 1.0 / shadow.shadow_map_size;
+    var shadow_val = 0.0;
+    for (var x = -1; x <= 1; x++) {
+        for (var y = -1; y <= 1; y++) {
+            let offset = vec2<f32>(f32(x), f32(y)) * texel_size;
+            shadow_val += textureSampleCompare(
+                t_shadow, s_shadow,
+                shadow_uv + offset,
+                current_depth - shadow.shadow_bias,
+            );
+        }
+    }
+    return shadow_val / 9.0;
+}
+
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let tex_color = textureSample(t_diffuse, s_diffuse, in.uv);
@@ -180,13 +230,18 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let F0 = mix(vec3<f32>(0.04, 0.04, 0.04), albedo, metallic);
 
     // Accumulate contribution from all active lights
+    let shadow_factor = calculate_shadow(in.light_space_pos);
     var Lo = vec3<f32>(0.0);
     let light_count = min(lights_uniform.count, 16u);
     for (var i = 0u; i < light_count; i++) {
-        Lo += compute_light_contribution(
+        var contribution = compute_light_contribution(
             lights_uniform.lights[i],
             N, V, in.world_pos, F0, albedo, metallic, roughness,
         );
+        if lights_uniform.lights[i].light_type == 0u {
+            contribution = contribution * shadow_factor;
+        }
+        Lo += contribution;
     }
 
     // Ambient term
