@@ -11,6 +11,8 @@ pub mod sphere;
 pub mod pbr_pipeline;
 pub mod shadow;
 pub mod shadow_pipeline;
+pub mod brdf_lut;
+pub mod ibl;
 
 pub use gpu::{GpuContext, DEPTH_FORMAT};
 pub use light::{CameraUniform, LightUniform, LightData, LightsUniform, MAX_LIGHTS, LIGHT_DIRECTIONAL, LIGHT_POINT, LIGHT_SPOT};
@@ -22,3 +24,4 @@ pub use sphere::generate_sphere;
 pub use pbr_pipeline::create_pbr_pipeline;
 pub use shadow::{ShadowMap, ShadowUniform, ShadowPassUniform, SHADOW_MAP_SIZE, SHADOW_FORMAT};
 pub use shadow_pipeline::{create_shadow_pipeline, shadow_pass_bind_group_layout};
+pub use ibl::IblResources;
