@@ -6,9 +6,15 @@ pub mod texture;
 pub mod vertex;
 pub mod mesh;
 pub mod camera;
+pub mod material;
+pub mod sphere;
+pub mod pbr_pipeline;
 
 pub use gpu::{GpuContext, DEPTH_FORMAT};
 pub use light::{CameraUniform, LightUniform};
 pub use mesh::Mesh;
 pub use camera::{Camera, FpsController};
 pub use texture::GpuTexture;
+pub use material::MaterialUniform;
+pub use sphere::generate_sphere;
+pub use pbr_pipeline::create_pbr_pipeline;
