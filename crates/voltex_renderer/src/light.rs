@@ -117,9 +117,11 @@ impl LightData {
 #[repr(C)]
 #[derive(Copy, Clone, Debug, Pod, Zeroable)]
 pub struct LightsUniform {
-    pub lights: [LightData; MAX_LIGHTS],
-    pub count: u32,
-    pub ambient_color: [f32; 3],
+    pub lights: [LightData; MAX_LIGHTS],  // 1024 bytes
+    pub count: u32,                        // 4 bytes
+    pub _pad_count: [f32; 3],              // 12 bytes (align ambient_color to 16-byte for WGSL vec3)
+    pub ambient_color: [f32; 3],           // 12 bytes at offset 1040
+    pub _pad_end: f32,                     // 4 bytes → total 1056 (matches WGSL)
 }
 
 impl LightsUniform {
@@ -127,7 +129,9 @@ impl LightsUniform {
         Self {
             lights: [LightData::zeroed(); MAX_LIGHTS],
             count: 0,
+            _pad_count: [0.0; 3],
             ambient_color: [0.03, 0.03, 0.03],
+            _pad_end: 0.0,
         }
     }
 
