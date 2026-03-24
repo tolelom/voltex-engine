@@ -11,7 +11,7 @@ pub mod sphere;
 pub mod pbr_pipeline;
 
 pub use gpu::{GpuContext, DEPTH_FORMAT};
-pub use light::{CameraUniform, LightUniform};
+pub use light::{CameraUniform, LightUniform, LightData, LightsUniform, MAX_LIGHTS, LIGHT_DIRECTIONAL, LIGHT_POINT, LIGHT_SPOT};
 pub use mesh::Mesh;
 pub use camera::{Camera, FpsController};
 pub use texture::GpuTexture;
