@@ -29,7 +29,16 @@ pub fn generate_sphere(radius: f32, sectors: u32, stacks: u32) -> (Vec<MeshVerte
                 i as f32 / stacks as f32,
             ];
 
-            vertices.push(MeshVertex { position, normal, uv });
+            // Tangent follows the longitude direction (increasing sector angle) in XZ plane
+            let tangent_x = -sector_angle.sin();
+            let tangent_z = sector_angle.cos();
+
+            vertices.push(MeshVertex {
+                position,
+                normal,
+                uv,
+                tangent: [tangent_x, 0.0, tangent_z, 1.0],
+            });
         }
     }
 

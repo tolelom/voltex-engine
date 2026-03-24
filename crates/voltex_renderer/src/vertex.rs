@@ -32,6 +32,7 @@ pub struct MeshVertex {
     pub position: [f32; 3],
     pub normal: [f32; 3],
     pub uv: [f32; 2],
+    pub tangent: [f32; 4],
 }
 
 impl MeshVertex {
@@ -45,14 +46,19 @@ impl MeshVertex {
                 format: wgpu::VertexFormat::Float32x3,
             },
             wgpu::VertexAttribute {
-                offset: std::mem::size_of::<[f32; 3]>() as wgpu::BufferAddress,
+                offset: 12,
                 shader_location: 1,
                 format: wgpu::VertexFormat::Float32x3,
             },
             wgpu::VertexAttribute {
-                offset: (std::mem::size_of::<[f32; 3]>() * 2) as wgpu::BufferAddress,
+                offset: 24,
                 shader_location: 2,
                 format: wgpu::VertexFormat::Float32x2,
+            },
+            wgpu::VertexAttribute {
+                offset: 32,
+                shader_location: 3,
+                format: wgpu::VertexFormat::Float32x4,
             },
         ],
     };

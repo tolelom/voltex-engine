@@ -118,6 +118,7 @@ pub fn parse_obj(source: &str) -> ObjData {
                         position,
                         normal,
                         uv,
+                        tangent: [0.0; 4],
                     });
                     vertex_map.insert(key, new_idx);
                     new_idx
@@ -127,7 +128,74 @@ pub fn parse_obj(source: &str) -> ObjData {
         }
     }
 
+    compute_tangents(&mut vertices, &indices);
+
     ObjData { vertices, indices }
+}
+
+pub fn compute_tangents(vertices: &mut [MeshVertex], indices: &[u32]) {
+    // Accumulate tangent per vertex from triangles
+    let mut tangents = vec![[0.0f32; 3]; vertices.len()];
+    let mut bitangents = vec![[0.0f32; 3]; vertices.len()];
+
+    for tri in indices.chunks(3) {
+        if tri.len() < 3 { continue; }
+        let i0 = tri[0] as usize;
+        let i1 = tri[1] as usize;
+        let i2 = tri[2] as usize;
+
+        let v0 = vertices[i0]; let v1 = vertices[i1]; let v2 = vertices[i2];
+
+        let edge1 = [v1.position[0]-v0.position[0], v1.position[1]-v0.position[1], v1.position[2]-v0.position[2]];
+        let edge2 = [v2.position[0]-v0.position[0], v2.position[1]-v0.position[1], v2.position[2]-v0.position[2]];
+        let duv1 = [v1.uv[0]-v0.uv[0], v1.uv[1]-v0.uv[1]];
+        let duv2 = [v2.uv[0]-v0.uv[0], v2.uv[1]-v0.uv[1]];
+
+        let det = duv1[0]*duv2[1] - duv2[0]*duv1[1];
+        if det.abs() < 1e-8 { continue; }
+        let f = 1.0 / det;
+
+        let t = [
+            f * (duv2[1]*edge1[0] - duv1[1]*edge2[0]),
+            f * (duv2[1]*edge1[1] - duv1[1]*edge2[1]),
+            f * (duv2[1]*edge1[2] - duv1[1]*edge2[2]),
+        ];
+        let b = [
+            f * (-duv2[0]*edge1[0] + duv1[0]*edge2[0]),
+            f * (-duv2[0]*edge1[1] + duv1[0]*edge2[1]),
+            f * (-duv2[0]*edge1[2] + duv1[0]*edge2[2]),
+        ];
+
+        for &idx in &[i0, i1, i2] {
+            tangents[idx] = [tangents[idx][0]+t[0], tangents[idx][1]+t[1], tangents[idx][2]+t[2]];
+            bitangents[idx] = [bitangents[idx][0]+b[0], bitangents[idx][1]+b[1], bitangents[idx][2]+b[2]];
+        }
+    }
+
+    // Orthogonalize and compute handedness
+    for (i, v) in vertices.iter_mut().enumerate() {
+        let n = v.normal;
+        let t = tangents[i];
+        // Gram-Schmidt orthogonalize: T' = normalize(T - N * dot(N, T))
+        let n_dot_t = n[0]*t[0] + n[1]*t[1] + n[2]*t[2];
+        let ortho = [t[0]-n[0]*n_dot_t, t[1]-n[1]*n_dot_t, t[2]-n[2]*n_dot_t];
+        let len = (ortho[0]*ortho[0] + ortho[1]*ortho[1] + ortho[2]*ortho[2]).sqrt();
+        if len > 1e-8 {
+            let normalized = [ortho[0]/len, ortho[1]/len, ortho[2]/len];
+            // Handedness: sign of dot(cross(N, T'), B)
+            let cross = [
+                n[1]*normalized[2] - n[2]*normalized[1],
+                n[2]*normalized[0] - n[0]*normalized[2],
+                n[0]*normalized[1] - n[1]*normalized[0],
+            ];
+            let b = bitangents[i];
+            let dot_b = cross[0]*b[0] + cross[1]*b[1] + cross[2]*b[2];
+            let w = if dot_b < 0.0 { -1.0 } else { 1.0 };
+            v.tangent = [normalized[0], normalized[1], normalized[2], w];
+        } else {
+            v.tangent = [1.0, 0.0, 0.0, 1.0]; // fallback
+        }
+    }
 }
 
 /// Parse a face vertex token of the form "v", "v/vt", "v//vn", or "v/vt/vn".
