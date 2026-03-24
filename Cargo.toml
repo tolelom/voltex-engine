@@ -8,6 +8,7 @@ members = [
     "examples/triangle",
     "examples/model_viewer",
     "examples/many_cubes",
+    "examples/hierarchy_demo",
 ]
 
 [workspace.dependencies]
