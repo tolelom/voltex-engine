@@ -12,6 +12,7 @@ members = [
     "examples/hierarchy_demo",
     "examples/asset_demo",
     "examples/pbr_demo",
+    "examples/multi_light_demo",
 ]
 
 [workspace.dependencies]

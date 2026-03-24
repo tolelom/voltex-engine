@@ -8,7 +8,7 @@ use winit::{
 use voltex_math::{Vec3, Mat4};
 use voltex_platform::{VoltexWindow, WindowConfig, InputState, GameTimer};
 use voltex_renderer::{
-    GpuContext, Camera, FpsController, CameraUniform, LightUniform,
+    GpuContext, Camera, FpsController, CameraUniform, LightsUniform, LightData,
     Mesh, GpuTexture, MaterialUniform, generate_sphere, create_pbr_pipeline,
 };
 use wgpu::util::DeviceExt;
@@ -99,13 +99,9 @@ impl ApplicationHandler for PbrDemoApp {
         let camera = Camera::new(Vec3::new(0.0, 0.0, 12.0), aspect);
         let fps_controller = FpsController::new();
 
-        // Light: direction [-1, -1, -1], color white, ambient 0.1
-        let light_uniform = LightUniform {
-            direction: [-1.0, -1.0, -1.0],
-            _padding1: 0.0,
-            color: [1.0, 1.0, 1.0],
-            ambient_strength: 0.1,
-        };
+        // Light: direction [-1, -1, -1], color white, intensity 1.0
+        let mut lights_uniform = LightsUniform::new();
+        lights_uniform.add_light(LightData::directional([-1.0, -1.0, -1.0], [1.0, 1.0, 1.0], 1.0));
 
         // Camera dynamic uniform buffer (one CameraUniform per sphere)
         let camera_buffer = gpu.device.create_buffer(&wgpu::BufferDescriptor {
@@ -117,7 +113,7 @@ impl ApplicationHandler for PbrDemoApp {
 
         let light_buffer = gpu.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Light Uniform Buffer"),
-            contents: bytemuck::cast_slice(&[light_uniform]),
+            contents: bytemuck::cast_slice(&[lights_uniform]),
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         });
 
@@ -365,16 +361,12 @@ impl ApplicationHandler for PbrDemoApp {
                     .write_buffer(&state.material_buffer, 0, &mat_staging);
 
                 // Write light uniform
-                let light_uniform = LightUniform {
-                    direction: [-1.0, -1.0, -1.0],
-                    _padding1: 0.0,
-                    color: [1.0, 1.0, 1.0],
-                    ambient_strength: 0.1,
-                };
+                let mut lights_uniform = LightsUniform::new();
+                lights_uniform.add_light(LightData::directional([-1.0, -1.0, -1.0], [1.0, 1.0, 1.0], 1.0));
                 state.gpu.queue.write_buffer(
                     &state.light_buffer,
                     0,
-                    bytemuck::cast_slice(&[light_uniform]),
+                    bytemuck::cast_slice(&[lights_uniform]),
                 );
 
                 // Render
