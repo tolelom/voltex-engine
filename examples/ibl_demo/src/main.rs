@@ -41,7 +41,6 @@ struct AppState {
     shadow_bind_group: wgpu::BindGroup,
     _shadow_map: ShadowMap,
     _ibl: IblResources,
-    ibl_bind_group: wgpu::BindGroup,
     input: InputState,
     timer: GameTimer,
     cam_aligned_size: u32,
@@ -179,8 +178,6 @@ impl ApplicationHandler for IblDemoApp {
 
         // IBL resources
         let ibl = IblResources::new(&gpu.device, &gpu.queue);
-        let ibl_layout = IblResources::bind_group_layout(&gpu.device);
-        let ibl_bind_group = ibl.create_bind_group(&gpu.device, &ibl_layout);
 
         // Material bind group
         let material_bind_group = gpu.device.create_bind_group(&wgpu::BindGroupDescriptor {
@@ -216,6 +213,8 @@ impl ApplicationHandler for IblDemoApp {
             &gpu.device,
             &shadow_layout,
             &shadow_uniform_buffer,
+            &ibl.brdf_lut_view,
+            &ibl.brdf_lut_sampler,
         );
 
         // PBR pipeline
@@ -226,7 +225,6 @@ impl ApplicationHandler for IblDemoApp {
             &pbr_tex_layout,
             &mat_layout,
             &shadow_layout,
-            &ibl_layout,
         );
 
         self.state = Some(AppState {
@@ -247,7 +245,6 @@ impl ApplicationHandler for IblDemoApp {
             shadow_bind_group,
             _shadow_map: shadow_map,
             _ibl: ibl,
-            ibl_bind_group,
             input: InputState::new(),
             timer: GameTimer::new(60),
             cam_aligned_size,
@@ -490,7 +487,6 @@ impl ApplicationHandler for IblDemoApp {
                     render_pass.set_pipeline(&state.pipeline);
                     render_pass.set_bind_group(1, &state.pbr_texture_bind_group, &[]);
                     render_pass.set_bind_group(3, &state.shadow_bind_group, &[]);
-                    render_pass.set_bind_group(4, &state.ibl_bind_group, &[]);
                     render_pass.set_vertex_buffer(0, state.mesh.vertex_buffer.slice(..));
                     render_pass.set_index_buffer(
                         state.mesh.index_buffer.slice(..),

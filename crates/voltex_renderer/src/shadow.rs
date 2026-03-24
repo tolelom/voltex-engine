@@ -78,6 +78,24 @@ impl ShadowMap {
                     },
                     count: None,
                 },
+                // binding 3: BRDF LUT texture
+                wgpu::BindGroupLayoutEntry {
+                    binding: 3,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Texture {
+                        multisampled: false,
+                        view_dimension: wgpu::TextureViewDimension::D2,
+                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                    },
+                    count: None,
+                },
+                // binding 4: BRDF LUT sampler
+                wgpu::BindGroupLayoutEntry {
+                    binding: 4,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                    count: None,
+                },
             ],
         })
     }
@@ -87,6 +105,8 @@ impl ShadowMap {
         device: &wgpu::Device,
         layout: &wgpu::BindGroupLayout,
         shadow_uniform_buffer: &wgpu::Buffer,
+        brdf_lut_view: &wgpu::TextureView,
+        brdf_lut_sampler: &wgpu::Sampler,
     ) -> wgpu::BindGroup {
         device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("Shadow Bind Group"),
@@ -103,6 +123,14 @@ impl ShadowMap {
                 wgpu::BindGroupEntry {
                     binding: 2,
                     resource: shadow_uniform_buffer.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 3,
+                    resource: wgpu::BindingResource::TextureView(brdf_lut_view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 4,
+                    resource: wgpu::BindingResource::Sampler(brdf_lut_sampler),
                 },
             ],
         })

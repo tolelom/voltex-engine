@@ -48,9 +48,8 @@ struct ShadowUniform {
 @group(3) @binding(0) var t_shadow: texture_depth_2d;
 @group(3) @binding(1) var s_shadow: sampler_comparison;
 @group(3) @binding(2) var<uniform> shadow: ShadowUniform;
-
-@group(4) @binding(0) var t_brdf_lut: texture_2d<f32>;
-@group(4) @binding(1) var s_brdf_lut: sampler;
+@group(3) @binding(3) var t_brdf_lut: texture_2d<f32>;
+@group(3) @binding(4) var s_brdf_lut: sampler;
 
 struct VertexInput {
     @location(0) position: vec3<f32>,
