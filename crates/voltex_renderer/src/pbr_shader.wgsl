@@ -34,6 +34,8 @@ struct MaterialUniform {
 
 @group(1) @binding(0) var t_diffuse: texture_2d<f32>;
 @group(1) @binding(1) var s_diffuse: sampler;
+@group(1) @binding(2) var t_normal: texture_2d<f32>;
+@group(1) @binding(3) var s_normal: sampler;
 
 @group(2) @binding(0) var<uniform> material: MaterialUniform;
 
@@ -47,10 +49,14 @@ struct ShadowUniform {
 @group(3) @binding(1) var s_shadow: sampler_comparison;
 @group(3) @binding(2) var<uniform> shadow: ShadowUniform;
 
+@group(4) @binding(0) var t_brdf_lut: texture_2d<f32>;
+@group(4) @binding(1) var s_brdf_lut: sampler;
+
 struct VertexInput {
     @location(0) position: vec3<f32>,
     @location(1) normal: vec3<f32>,
     @location(2) uv: vec2<f32>,
+    @location(3) tangent: vec4<f32>,
 };
 
 struct VertexOutput {
@@ -59,6 +65,8 @@ struct VertexOutput {
     @location(1) world_pos: vec3<f32>,
     @location(2) uv: vec2<f32>,
     @location(3) light_space_pos: vec4<f32>,
+    @location(4) world_tangent: vec3<f32>,
+    @location(5) world_bitangent: vec3<f32>,
 };
 
 @vertex
@@ -70,6 +78,13 @@ fn vs_main(model_v: VertexInput) -> VertexOutput {
     out.clip_position = camera.view_proj * world_pos;
     out.uv = model_v.uv;
     out.light_space_pos = shadow.light_view_proj * world_pos;
+
+    let T = normalize((camera.model * vec4<f32>(model_v.tangent.xyz, 0.0)).xyz);
+    let N_out = normalize((camera.model * vec4<f32>(model_v.normal, 0.0)).xyz);
+    let B = cross(N_out, T) * model_v.tangent.w;
+    out.world_tangent = T;
+    out.world_bitangent = B;
+
     return out;
 }
 
@@ -215,6 +230,23 @@ fn calculate_shadow(light_space_pos: vec4<f32>) -> f32 {
     return shadow_val / 9.0;
 }
 
+// Procedural environment sampling for IBL
+fn sample_environment(direction: vec3<f32>, roughness: f32) -> vec3<f32> {
+    let t = direction.y * 0.5 + 0.5;
+    var env: vec3<f32>;
+    if direction.y > 0.0 {
+        let horizon = vec3<f32>(0.6, 0.6, 0.5);
+        let sky = vec3<f32>(0.3, 0.5, 0.9);
+        env = mix(horizon, sky, pow(direction.y, 0.4));
+    } else {
+        let horizon = vec3<f32>(0.6, 0.6, 0.5);
+        let ground = vec3<f32>(0.1, 0.08, 0.06);
+        env = mix(horizon, ground, pow(-direction.y, 0.4));
+    }
+    let avg = vec3<f32>(0.3, 0.35, 0.4);
+    return mix(env, avg, roughness * roughness);
+}
+
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let tex_color = textureSample(t_diffuse, s_diffuse, in.uv);
@@ -223,7 +255,19 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let roughness = material.roughness;
     let ao = material.ao;
 
-    let N = normalize(in.world_normal);
+    // Normal mapping via TBN matrix
+    let T = normalize(in.world_tangent);
+    let B = normalize(in.world_bitangent);
+    let N_geom = normalize(in.world_normal);
+
+    // Sample normal map (tangent space normal)
+    let normal_sample = textureSample(t_normal, s_normal, in.uv).rgb;
+    let tangent_normal = normal_sample * 2.0 - 1.0;
+
+    // TBN matrix transforms tangent space -> world space
+    let TBN = mat3x3<f32>(T, B, N_geom);
+    let N = normalize(TBN * tangent_normal);
+
     let V = normalize(camera.camera_pos - in.world_pos);
 
     // F0: base reflectivity; 0.04 for dielectrics, albedo for metals
@@ -244,8 +288,22 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         Lo += contribution;
     }
 
-    // Ambient term
-    let ambient = lights_uniform.ambient_color * albedo * ao;
+    // IBL ambient term
+    let NdotV_ibl = max(dot(N, V), 0.0);
+    let R = reflect(-V, N);
+
+    // Diffuse IBL
+    let irradiance = sample_environment(N, 1.0);
+    let F_env = fresnel_schlick(NdotV_ibl, F0);
+    let kd_ibl = (vec3<f32>(1.0) - F_env) * (1.0 - metallic);
+    let diffuse_ibl = kd_ibl * albedo * irradiance;
+
+    // Specular IBL
+    let prefiltered = sample_environment(R, roughness);
+    let brdf_val = textureSample(t_brdf_lut, s_brdf_lut, vec2<f32>(NdotV_ibl, roughness));
+    let specular_ibl = prefiltered * (F0 * brdf_val.r + vec3<f32>(brdf_val.g));
+
+    let ambient = (diffuse_ibl + specular_ibl) * ao;
 
     var color = ambient + Lo;
 
