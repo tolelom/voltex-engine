@@ -926,6 +926,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "model_viewer"
+version = "0.1.0"
+dependencies = [
+ "bytemuck",
+ "env_logger",
+ "log",
+ "pollster",
+ "voltex_math",
+ "voltex_platform",
+ "voltex_renderer",
+ "wgpu",
+ "winit",
+]
+
+[[package]]
 name = "naga"
 version = "28.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"

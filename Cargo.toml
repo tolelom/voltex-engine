@@ -5,6 +5,7 @@ members = [
     "crates/voltex_platform",
     "crates/voltex_renderer",
     "examples/triangle",
+    "examples/model_viewer",
 ]
 
 [workspace.dependencies]
