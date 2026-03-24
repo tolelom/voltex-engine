@@ -16,6 +16,8 @@ use wgpu::util::DeviceExt;
 /// App-level component: index into the mesh list.
 struct MeshHandle(#[allow(dead_code)] u32);
 
+const MAX_ENTITIES: usize = 1024;
+
 struct ManyCubesApp {
     state: Option<AppState>,
 }
@@ -37,6 +39,7 @@ struct AppState {
     timer: GameTimer,
     world: World,
     time: f32,
+    uniform_alignment: u32,
 }
 
 fn camera_light_bind_group_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
@@ -48,8 +51,10 @@ fn camera_light_bind_group_layout(device: &wgpu::Device) -> wgpu::BindGroupLayou
                 visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
                 ty: wgpu::BindingType::Buffer {
                     ty: wgpu::BufferBindingType::Uniform,
-                    has_dynamic_offset: false,
-                    min_binding_size: None,
+                    has_dynamic_offset: true,
+                    min_binding_size: wgpu::BufferSize::new(
+                        std::mem::size_of::<CameraUniform>() as u64
+                    ),
                 },
                 count: None,
             },
@@ -78,12 +83,17 @@ impl ApplicationHandler for ManyCubesApp {
         let window = VoltexWindow::new(event_loop, &config);
         let gpu = GpuContext::new(window.handle.clone());
 
+        // Dynamic uniform buffer alignment
+        let uniform_alignment = gpu.device.limits().min_uniform_buffer_offset_alignment;
+        let uniform_size = std::mem::size_of::<CameraUniform>() as u32;
+        let aligned_size = ((uniform_size + uniform_alignment - 1) / uniform_alignment) * uniform_alignment;
+
         // Parse OBJ
         let obj_src = include_str!("../../../assets/cube.obj");
         let obj_data = obj::parse_obj(obj_src);
         let mesh = Mesh::new(&gpu.device, &obj_data.vertices, &obj_data.indices);
 
-        // Camera at (0, 15, 25) looking down at the grid
+        // Camera
         let aspect = gpu.config.width as f32 / gpu.config.height as f32;
         let mut camera = Camera::new(Vec3::new(0.0, 15.0, 25.0), aspect);
         camera.pitch = -0.5;
@@ -94,10 +104,12 @@ impl ApplicationHandler for ManyCubesApp {
         let camera_uniform = CameraUniform::new();
         let light_uniform = LightUniform::new();
 
-        let camera_buffer = gpu.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Camera Uniform Buffer"),
-            contents: bytemuck::cast_slice(&[camera_uniform]),
+        // Dynamic uniform buffer: room for MAX_ENTITIES camera uniforms
+        let camera_buffer = gpu.device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("Camera Dynamic Uniform Buffer"),
+            size: (aligned_size as usize * MAX_ENTITIES) as u64,
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
         });
 
         let light_buffer = gpu.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -110,14 +122,18 @@ impl ApplicationHandler for ManyCubesApp {
         let cl_layout = camera_light_bind_group_layout(&gpu.device);
         let tex_layout = GpuTexture::bind_group_layout(&gpu.device);
 
-        // Bind groups
+        // Bind group: camera binding uses dynamic offset, size = one CameraUniform
         let camera_light_bind_group = gpu.device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("Camera+Light Bind Group"),
             layout: &cl_layout,
             entries: &[
                 wgpu::BindGroupEntry {
                     binding: 0,
-                    resource: camera_buffer.as_entire_binding(),
+                    resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
+                        buffer: &camera_buffer,
+                        offset: 0,
+                        size: wgpu::BufferSize::new(std::mem::size_of::<CameraUniform>() as u64),
+                    }),
                 },
                 wgpu::BindGroupEntry {
                     binding: 1,
@@ -126,10 +142,8 @@ impl ApplicationHandler for ManyCubesApp {
             ],
         });
 
-        // Default white texture
         let texture = GpuTexture::white_1x1(&gpu.device, &gpu.queue, &tex_layout);
 
-        // Pipeline
         let render_pipeline = pipeline::create_mesh_pipeline(
             &gpu.device,
             gpu.surface_format,
@@ -168,6 +182,7 @@ impl ApplicationHandler for ManyCubesApp {
             timer: GameTimer::new(60),
             world,
             time: 0.0,
+            uniform_alignment: aligned_size,
         });
     }
 
@@ -225,16 +240,14 @@ impl ApplicationHandler for ManyCubesApp {
             }
 
             WindowEvent::RedrawRequested => {
-                // 1. Tick timer
                 state.timer.tick();
                 let dt = state.timer.frame_dt();
 
-                // 2. Read input state BEFORE begin_frame clears it
+                // Input
                 if state.input.is_mouse_button_pressed(winit::event::MouseButton::Right) {
                     let (dx, dy) = state.input.mouse_delta();
                     state.fps_controller.process_mouse(&mut state.camera, dx, dy);
                 }
-
                 let mut forward = 0.0f32;
                 let mut right = 0.0f32;
                 let mut up = 0.0f32;
@@ -245,29 +258,49 @@ impl ApplicationHandler for ManyCubesApp {
                 if state.input.is_key_pressed(KeyCode::Space) { up += 1.0; }
                 if state.input.is_key_pressed(KeyCode::ShiftLeft) { up -= 1.0; }
                 state.fps_controller.process_movement(&mut state.camera, forward, right, up, dt);
-
-                // 3. Clear per-frame input state for next frame
                 state.input.begin_frame();
 
-                // 4. Accumulate time for rotation
                 state.time += dt;
 
-                // Update view_proj and light (shared across all entities)
+                // Pre-compute all entity uniforms and write to dynamic buffer
                 let view_proj = state.camera.view_projection();
-                state.camera_uniform.view_proj = view_proj.cols;
-                state.camera_uniform.camera_pos = [
+                let cam_pos = [
                     state.camera.position.x,
                     state.camera.position.y,
                     state.camera.position.z,
                 ];
 
+                let entities = state.world.query2::<Transform, MeshHandle>();
+                let aligned = state.uniform_alignment as usize;
+
+                // Build staging data: one CameraUniform per entity, padded to alignment
+                let total_bytes = entities.len() * aligned;
+                let mut staging = vec![0u8; total_bytes];
+
+                for (i, (_, transform, _)) in entities.iter().enumerate() {
+                    let mut uniform = state.camera_uniform;
+                    uniform.view_proj = view_proj.cols;
+                    uniform.camera_pos = cam_pos;
+
+                    let mut t = **transform;
+                    t.rotation.y = state.time * 0.5 + t.position.x * 0.1 + t.position.z * 0.1;
+                    uniform.model = t.matrix().cols;
+
+                    let bytes = bytemuck::bytes_of(&uniform);
+                    let offset = i * aligned;
+                    staging[offset..offset + bytes.len()].copy_from_slice(bytes);
+                }
+
+                state.gpu.queue.write_buffer(&state.camera_buffer, 0, &staging);
+
+                // Write light uniform
                 state.gpu.queue.write_buffer(
                     &state.light_buffer,
                     0,
                     bytemuck::cast_slice(&[state.light_uniform]),
                 );
 
-                // 5. Render
+                // Render
                 let output = match state.gpu.surface.get_current_texture() {
                     Ok(t) => t,
                     Err(wgpu::SurfaceError::Lost) => {
@@ -296,10 +329,7 @@ impl ApplicationHandler for ManyCubesApp {
                             depth_slice: None,
                             ops: wgpu::Operations {
                                 load: wgpu::LoadOp::Clear(wgpu::Color {
-                                    r: 0.1,
-                                    g: 0.1,
-                                    b: 0.15,
-                                    a: 1.0,
+                                    r: 0.1, g: 0.1, b: 0.15, a: 1.0,
                                 }),
                                 store: wgpu::StoreOp::Store,
                             },
@@ -317,9 +347,7 @@ impl ApplicationHandler for ManyCubesApp {
                         multiview_mask: None,
                     });
 
-                    // Set pipeline and bind groups ONCE
                     render_pass.set_pipeline(&state.pipeline);
-                    render_pass.set_bind_group(0, &state.camera_light_bind_group, &[]);
                     render_pass.set_bind_group(1, &state._texture.bind_group, &[]);
                     render_pass.set_vertex_buffer(0, state.mesh.vertex_buffer.slice(..));
                     render_pass.set_index_buffer(
@@ -327,21 +355,14 @@ impl ApplicationHandler for ManyCubesApp {
                         wgpu::IndexFormat::Uint32,
                     );
 
-                    // Per-entity draw: query ECS for all (Transform, MeshHandle) pairs
-                    let entities = state.world.query2::<Transform, MeshHandle>();
-                    for (_entity, transform, _mesh_handle) in &entities {
-                        // Compute model matrix with time-based Y rotation
-                        let model = transform.matrix()
-                            * Mat4::rotation_y(state.time * 0.5);
-                        state.camera_uniform.model = model.cols;
-
-                        // Write updated uniform to GPU buffer
-                        state.gpu.queue.write_buffer(
-                            &state.camera_buffer,
+                    // Draw each entity with its dynamic offset
+                    for (i, _) in entities.iter().enumerate() {
+                        let dynamic_offset = (i as u32) * state.uniform_alignment;
+                        render_pass.set_bind_group(
                             0,
-                            bytemuck::cast_slice(&[state.camera_uniform]),
+                            &state.camera_light_bind_group,
+                            &[dynamic_offset],
                         );
-
                         render_pass.draw_indexed(0..state.mesh.num_indices, 0, 0..1);
                     }
                 }
