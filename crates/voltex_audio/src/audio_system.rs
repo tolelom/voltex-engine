@@ -4,6 +4,7 @@ use std::sync::{Arc, mpsc};
 use std::thread;
 
 use crate::{AudioClip, PlayingSound, mix_sounds};
+use crate::spatial::{Listener, SpatialParams};
 
 // ---------------------------------------------------------------------------
 // AudioCommand
@@ -16,6 +17,19 @@ pub enum AudioCommand {
         clip_index: usize,
         volume: f32,
         looping: bool,
+    },
+    /// Start playing a clip with 3D spatial parameters.
+    Play3d {
+        clip_index: usize,
+        volume: f32,
+        looping: bool,
+        spatial: SpatialParams,
+    },
+    /// Update the listener position and orientation.
+    SetListener {
+        position: voltex_math::Vec3,
+        forward: voltex_math::Vec3,
+        right: voltex_math::Vec3,
     },
     /// Stop all instances of a clip.
     Stop { clip_index: usize },
@@ -63,6 +77,16 @@ impl AudioSystem {
             volume,
             looping,
         });
+    }
+
+    /// Start playing a clip with 3D spatial audio parameters.
+    pub fn play_3d(&self, clip_index: usize, volume: f32, looping: bool, spatial: SpatialParams) {
+        let _ = self.sender.send(AudioCommand::Play3d { clip_index, volume, looping, spatial });
+    }
+
+    /// Update the listener position and orientation for 3D audio.
+    pub fn set_listener(&self, position: voltex_math::Vec3, forward: voltex_math::Vec3, right: voltex_math::Vec3) {
+        let _ = self.sender.send(AudioCommand::SetListener { position, forward, right });
     }
 
     /// Stop all instances of the specified clip.
@@ -126,6 +150,7 @@ fn audio_thread_windows(rx: mpsc::Receiver<AudioCommand>, clips: Arc<Vec<AudioCl
 
     let mut playing: Vec<PlayingSound> = Vec::new();
     let mut output: Vec<f32> = Vec::new();
+    let mut listener = Listener::default();
 
     loop {
         // Process all pending commands (non-blocking)
@@ -135,6 +160,12 @@ fn audio_thread_windows(rx: mpsc::Receiver<AudioCommand>, clips: Arc<Vec<AudioCl
                     match cmd {
                         AudioCommand::Play { clip_index, volume, looping } => {
                             playing.push(PlayingSound::new(clip_index, volume, looping));
+                        }
+                        AudioCommand::Play3d { clip_index, volume, looping, spatial } => {
+                            playing.push(PlayingSound::new_3d(clip_index, volume, looping, spatial));
+                        }
+                        AudioCommand::SetListener { position, forward, right } => {
+                            listener = Listener { position, forward, right };
                         }
                         AudioCommand::Stop { clip_index } => {
                             playing.retain(|s| s.clip_index != clip_index);
@@ -168,6 +199,7 @@ fn audio_thread_windows(rx: mpsc::Receiver<AudioCommand>, clips: Arc<Vec<AudioCl
                 device_sample_rate,
                 device_channels,
                 buffer_frames,
+                &listener,
             );
 
             if let Err(e) = device.write_samples(&output) {
