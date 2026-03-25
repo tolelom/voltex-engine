@@ -6,6 +6,9 @@ pub mod hierarchy;
 pub mod world_transform;
 pub mod scene;
 pub mod scheduler;
+pub mod json;
+pub mod component_registry;
+pub mod binary_scene;
 
 pub use entity::{Entity, EntityAllocator};
 pub use sparse_set::SparseSet;
@@ -13,5 +16,7 @@ pub use world::World;
 pub use transform::Transform;
 pub use hierarchy::{Parent, Children, add_child, remove_child, despawn_recursive, roots};
 pub use world_transform::{WorldTransform, propagate_transforms};
-pub use scene::{Tag, serialize_scene, deserialize_scene};
+pub use scene::{Tag, serialize_scene, deserialize_scene, serialize_scene_json, deserialize_scene_json};
 pub use scheduler::{Scheduler, System};
+pub use component_registry::ComponentRegistry;
+pub use binary_scene::{serialize_scene_binary, deserialize_scene_binary};
