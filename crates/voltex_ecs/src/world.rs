@@ -227,6 +227,54 @@ impl World {
         }
         result
     }
+
+    pub fn has_component<T: 'static>(&self, entity: Entity) -> bool {
+        self.storage::<T>().map_or(false, |s| s.contains(entity))
+    }
+
+    /// Query entities that have component T AND also have component W.
+    pub fn query_with<T: 'static, W: 'static>(&self) -> Vec<(Entity, &T)> {
+        let t_storage = match self.storage::<T>() {
+            Some(s) => s,
+            None => return Vec::new(),
+        };
+        let mut result = Vec::new();
+        for (entity, data) in t_storage.iter() {
+            if self.has_component::<W>(entity) {
+                result.push((entity, data));
+            }
+        }
+        result
+    }
+
+    /// Query entities that have component T but NOT component W.
+    pub fn query_without<T: 'static, W: 'static>(&self) -> Vec<(Entity, &T)> {
+        let t_storage = match self.storage::<T>() {
+            Some(s) => s,
+            None => return Vec::new(),
+        };
+        let mut result = Vec::new();
+        for (entity, data) in t_storage.iter() {
+            if !self.has_component::<W>(entity) {
+                result.push((entity, data));
+            }
+        }
+        result
+    }
+
+    /// Query entities with components A and B, that also have component W.
+    pub fn query2_with<A: 'static, B: 'static, W: 'static>(&self) -> Vec<(Entity, &A, &B)> {
+        self.query2::<A, B>().into_iter()
+            .filter(|(e, _, _)| self.has_component::<W>(*e))
+            .collect()
+    }
+
+    /// Query entities with components A and B, that do NOT have component W.
+    pub fn query2_without<A: 'static, B: 'static, W: 'static>(&self) -> Vec<(Entity, &A, &B)> {
+        self.query2::<A, B>().into_iter()
+            .filter(|(e, _, _)| !self.has_component::<W>(*e))
+            .collect()
+    }
 }
 
 impl Default for World {
@@ -386,6 +434,96 @@ mod tests {
         let results = world.query4::<Position, Velocity, Health, Tag>();
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].0, e0);
+    }
+
+    #[test]
+    fn test_has_component() {
+        let mut world = World::new();
+        let e = world.spawn();
+        world.add(e, Position { x: 1.0, y: 2.0 });
+        assert!(world.has_component::<Position>(e));
+        assert!(!world.has_component::<Velocity>(e));
+    }
+
+    #[test]
+    fn test_query_with() {
+        let mut world = World::new();
+        let e0 = world.spawn();
+        let e1 = world.spawn();
+        let e2 = world.spawn();
+        world.add(e0, Position { x: 1.0, y: 0.0 });
+        world.add(e0, Velocity { dx: 1.0, dy: 0.0 });
+        world.add(e1, Position { x: 2.0, y: 0.0 });
+        // e1 has Position but no Velocity
+        world.add(e2, Position { x: 3.0, y: 0.0 });
+        world.add(e2, Velocity { dx: 3.0, dy: 0.0 });
+
+        let results = world.query_with::<Position, Velocity>();
+        assert_eq!(results.len(), 2);
+        let entities: Vec<Entity> = results.iter().map(|(e, _)| *e).collect();
+        assert!(entities.contains(&e0));
+        assert!(entities.contains(&e2));
+        assert!(!entities.contains(&e1));
+    }
+
+    #[test]
+    fn test_query_without() {
+        let mut world = World::new();
+        let e0 = world.spawn();
+        let e1 = world.spawn();
+        let e2 = world.spawn();
+        world.add(e0, Position { x: 1.0, y: 0.0 });
+        world.add(e0, Velocity { dx: 1.0, dy: 0.0 });
+        world.add(e1, Position { x: 2.0, y: 0.0 });
+        // e1 has Position but no Velocity — should be included
+        world.add(e2, Position { x: 3.0, y: 0.0 });
+        world.add(e2, Velocity { dx: 3.0, dy: 0.0 });
+
+        let results = world.query_without::<Position, Velocity>();
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].0, e1);
+    }
+
+    #[test]
+    fn test_query2_with() {
+        #[derive(Debug, PartialEq)]
+        struct Health(i32);
+
+        let mut world = World::new();
+        let e0 = world.spawn();
+        world.add(e0, Position { x: 1.0, y: 0.0 });
+        world.add(e0, Velocity { dx: 1.0, dy: 0.0 });
+        world.add(e0, Health(100));
+
+        let e1 = world.spawn();
+        world.add(e1, Position { x: 2.0, y: 0.0 });
+        world.add(e1, Velocity { dx: 2.0, dy: 0.0 });
+        // e1 has no Health
+
+        let results = world.query2_with::<Position, Velocity, Health>();
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].0, e0);
+    }
+
+    #[test]
+    fn test_query2_without() {
+        #[derive(Debug, PartialEq)]
+        struct Health(i32);
+
+        let mut world = World::new();
+        let e0 = world.spawn();
+        world.add(e0, Position { x: 1.0, y: 0.0 });
+        world.add(e0, Velocity { dx: 1.0, dy: 0.0 });
+        world.add(e0, Health(100));
+
+        let e1 = world.spawn();
+        world.add(e1, Position { x: 2.0, y: 0.0 });
+        world.add(e1, Velocity { dx: 2.0, dy: 0.0 });
+        // e1 has no Health
+
+        let results = world.query2_without::<Position, Velocity, Health>();
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].0, e1);
     }
 
     #[test]

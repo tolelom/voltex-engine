@@ -5,6 +5,7 @@ pub mod transform;
 pub mod hierarchy;
 pub mod world_transform;
 pub mod scene;
+pub mod scheduler;
 
 pub use entity::{Entity, EntityAllocator};
 pub use sparse_set::SparseSet;
@@ -13,3 +14,4 @@ pub use transform::Transform;
 pub use hierarchy::{Parent, Children, add_child, remove_child, despawn_recursive, roots};
 pub use world_transform::{WorldTransform, propagate_transforms};
 pub use scene::{Tag, serialize_scene, deserialize_scene};
+pub use scheduler::{Scheduler, System};
