@@ -125,6 +125,12 @@
 - voltex_ai: A* pathfinding on triangle graph (center-point path)
 - voltex_ai: Steering behaviors (seek, flee, arrive, wander, follow_path)
 
+### Phase 8-3: Lua Scripting
+- voltex_script: Lua 5.4 내장 빌드 (cc crate)
+- voltex_script: Lua C API FFI 바인딩
+- voltex_script: LuaState 안전 래퍼 (exec, exec_file, register_fn, globals)
+- voltex_script: 기본 바인딩 (voltex_print)
+
 ### Phase 8-2: Networking Foundation
 - voltex_net: Packet protocol (Connect, Accept, Disconnect, Ping, Pong, UserData)
 - voltex_net: Binary serialization/deserialization
@@ -144,10 +150,11 @@ crates/
 ├── voltex_physics   — Collider, ContactPoint, BvhTree, RigidBody, detect_collisions, physics_step, raycast
 ├── voltex_audio     — AudioClip, WAV parser, mixing, WASAPI backend, AudioSystem, MixGroup, spatial
 ├── voltex_ai        — NavMesh, A* pathfinding, steering behaviors
-└── voltex_net       — UDP packets, NetServer, NetClient
+├── voltex_net       — UDP packets, NetServer, NetClient
+└── voltex_script    — Lua 5.4 FFI, LuaState, scripting bindings
 ```
 
-## 테스트: 236개 전부 통과
+## 테스트: 245개 전부 통과
 
 - voltex_asset: 14
 - voltex_audio: 35 (audio_clip 2 + wav 5 + mixing 11 + audio_system 2 + spatial 8 + mix_group 7)
@@ -157,6 +164,7 @@ crates/
 - voltex_platform: 3
 - voltex_ai: 15 (navmesh 4 + pathfinding 5 + steering 6)
 - voltex_net: 8 (packet 7 + integration 1)
+- voltex_script: 9 (state 8 + bindings 1)
 - voltex_renderer: 33 (20 + SSGI 3 + RT 3 + bloom 3 + tonemap 4)
 
 ## Examples (11개)
@@ -173,7 +181,7 @@ crates/
 - audio_demo — 사인파 오디오 재생
 - deferred_demo — 디퍼드 렌더링 + 다중 포인트 라이트
 
-## 다음: Phase 8-3 (스크립팅) / 8-4 (에디터) — Stretch Goal
+## 다음: Phase 8-4 (에디터) — Stretch Goal
 
 스펙 참조: `docs/superpowers/specs/2026-03-24-voltex-engine-design.md`
 
