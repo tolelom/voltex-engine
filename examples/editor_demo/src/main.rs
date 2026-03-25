@@ -127,6 +127,7 @@ impl ApplicationHandler for EditorDemoApp {
                 // Begin UI frame
                 state.ui.begin_frame(mx as f32, my as f32, mouse_down);
 
+
                 // Draw widgets inside a panel
                 state.ui.begin_panel("Debug", 10.0, 10.0, 250.0, 400.0);
                 state.ui.text("Voltex Editor Demo");
