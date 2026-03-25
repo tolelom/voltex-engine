@@ -1,3 +1,5 @@
+pub mod json_parser;
+pub mod gltf;
 pub mod deflate;
 pub mod png;
 pub mod jpg;
@@ -56,3 +58,4 @@ pub use bloom::{BloomResources, BloomUniform, mip_sizes, BLOOM_MIP_COUNT};
 pub use tonemap::{TonemapUniform, aces_tonemap};
 pub use png::parse_png;
 pub use jpg::parse_jpg;
+pub use gltf::{parse_gltf, GltfData, GltfMesh, GltfMaterial};
