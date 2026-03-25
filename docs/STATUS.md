@@ -68,24 +68,29 @@
 - voltex_physics: Impulse-based collision response + positional correction (Baumgarte)
 - voltex_physics: physics_step (integrate → detect → resolve)
 
+### Phase 5-3: Raycasting
+- voltex_math: Ray type (origin, direction, at)
+- voltex_physics: ray_vs_aabb, ray_vs_sphere, ray_vs_box
+- voltex_physics: raycast(world, ray, max_dist) BVH-accelerated ECS integration
+
 ## Crate 구조
 
 ```
 crates/
-├── voltex_math      — Vec2, Vec3, Vec4, Mat4, AABB
+├── voltex_math      — Vec2, Vec3, Vec4, Mat4, AABB, Ray
 ├── voltex_platform  — VoltexWindow, InputState, GameTimer
 ├── voltex_renderer  — GPU, Mesh, OBJ, Camera, Material, PBR, Shadow, IBL, Sphere
 ├── voltex_ecs       — Entity, SparseSet, World, Transform, Hierarchy, Scene, WorldTransform
 ├── voltex_asset     — Handle<T>, AssetStorage<T>, Assets
-└── voltex_physics   — Collider, ContactPoint, BvhTree, RigidBody, detect_collisions, physics_step
+└── voltex_physics   — Collider, ContactPoint, BvhTree, RigidBody, detect_collisions, physics_step, raycast
 ```
 
-## 테스트: 147개 전부 통과
+## 테스트: 165개 전부 통과
 
 - voltex_asset: 14
 - voltex_ecs: 39
-- voltex_math: 35 (29 + AABB 6)
-- voltex_physics: 36 (collider 2 + narrow 11 + bvh 5 + collision 7 + rigid_body 3 + integrator 3 + solver 5)
+- voltex_math: 37 (29 + AABB 6 + Ray 2)
+- voltex_physics: 52 (collider 2 + narrow 11 + bvh 5 + collision 7 + rigid_body 3 + integrator 3 + solver 5 + ray 10 + raycast 6)
 - voltex_platform: 3
 - voltex_renderer: 20
 
@@ -101,7 +106,7 @@ crates/
 - shadow_demo — Directional Light 그림자
 - ibl_demo — Normal map + IBL
 
-## 다음: Phase 5-3 (레이캐스팅)
+## 다음: Phase 6 (오디오 시스템)
 
 스펙 참조: `docs/superpowers/specs/2026-03-24-voltex-engine-design.md`
 

@@ -3,7 +3,6 @@ use voltex_ecs::Transform;
 use voltex_math::{Vec3, Ray};
 
 use crate::collider::Collider;
-use crate::bvh::BvhTree;
 use crate::ray as ray_tests;
 
 #[derive(Debug, Clone, Copy)]

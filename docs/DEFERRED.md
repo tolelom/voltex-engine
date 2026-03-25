@@ -56,6 +56,12 @@
 - **Sequential Impulse 솔버** — 단일 반복 충돌 응답만. 다중 물체 쌓기 불안정.
 - **Sleep/Island 시스템** — 정지 물체 최적화 미구현.
 
+## Phase 5-3
+
+- **Ray vs Plane, Triangle, Mesh** — 콜라이더 기반만 지원. 메시 레벨 레이캐스트 미구현.
+- **raycast_all (다중 hit)** — 가장 가까운 hit만 반환.
+- **BVH 조기 종료 최적화** — 모든 리프 검사 후 최소 t 선택. front-to-back 순회 미구현.
+
 ## 렌더링 한계
 
 - **per-entity dynamic UBO** — 수천 개 이상은 인스턴싱 필요.
