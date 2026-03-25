@@ -5,9 +5,11 @@ pub mod mixing;
 pub mod wasapi;
 pub mod audio_system;
 pub mod spatial;
+pub mod mix_group;
 
 pub use audio_clip::AudioClip;
 pub use wav::{parse_wav, generate_wav_bytes};
 pub use mixing::{PlayingSound, mix_sounds};
 pub use audio_system::AudioSystem;
 pub use spatial::{Listener, SpatialParams, distance_attenuation, stereo_pan, compute_spatial_gains};
+pub use mix_group::{MixGroup, MixerState};
