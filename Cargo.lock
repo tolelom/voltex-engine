@@ -2152,6 +2152,8 @@ name = "voltex_script"
 version = "0.1.0"
 dependencies = [
  "cc",
+ "voltex_ecs",
+ "voltex_math",
 ]
 
 [[package]]
