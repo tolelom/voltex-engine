@@ -62,6 +62,14 @@
 - **raycast_all (다중 hit)** — 가장 가까운 hit만 반환.
 - **BVH 조기 종료 최적화** — 모든 리프 검사 후 최소 t 선택. front-to-back 순회 미구현.
 
+## Phase 8-1
+
+- **자동 내비메시 생성** — Recast 스타일 복셀화 미구현. 수동 정의만.
+- **String Pulling (Funnel)** — 삼각형 중심점 경로만. 최적 경로 스무딩 미구현.
+- **동적 장애물 회피** — 정적 내비메시만. 런타임 장애물 미처리.
+- **ECS 통합** — AI 컴포넌트 미구현. 함수 직접 호출.
+- **내비메시 직렬화** — 미구현.
+
 ## Phase 7-4
 
 - **TAA** — Temporal Anti-Aliasing 미구현. Motion vector 필요.
