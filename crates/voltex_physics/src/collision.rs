@@ -6,6 +6,7 @@ use crate::collider::Collider;
 use crate::contact::ContactPoint;
 use crate::bvh::BvhTree;
 use crate::narrow;
+use crate::gjk;
 
 pub fn detect_collisions(world: &World) -> Vec<ContactPoint> {
     // 1. Gather entities with Transform + Collider
@@ -53,6 +54,10 @@ pub fn detect_collisions(world: &World) -> Vec<ContactPoint> {
             }
             (Collider::Box { half_extents: ha }, Collider::Box { half_extents: hb }) => {
                 narrow::box_vs_box(pos_a, *ha, pos_b, *hb)
+            }
+            // Any combination involving Capsule uses GJK/EPA
+            (Collider::Capsule { .. }, _) | (_, Collider::Capsule { .. }) => {
+                gjk::gjk_epa(&col_a, pos_a, &col_b, pos_b)
             }
         };
 

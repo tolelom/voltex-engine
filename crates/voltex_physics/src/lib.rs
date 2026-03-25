@@ -3,6 +3,7 @@ pub mod ray;
 pub mod collider;
 pub mod contact;
 pub mod narrow;
+pub mod gjk;
 pub mod collision;
 pub mod rigid_body;
 pub mod integrator;
