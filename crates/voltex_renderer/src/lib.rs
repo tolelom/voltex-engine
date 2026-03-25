@@ -19,6 +19,9 @@ pub mod deferred_pipeline;
 pub mod ssgi;
 pub mod rt_accel;
 pub mod rt_shadow;
+pub mod hdr;
+pub mod bloom;
+pub mod tonemap;
 
 pub use gpu::{GpuContext, DEPTH_FORMAT};
 pub use light::{CameraUniform, LightUniform, LightData, LightsUniform, MAX_LIGHTS, LIGHT_DIRECTIONAL, LIGHT_POINT, LIGHT_SPOT};
@@ -43,3 +46,6 @@ pub use deferred_pipeline::{
 pub use ssgi::{SsgiResources, SsgiUniform, SSGI_OUTPUT_FORMAT};
 pub use rt_accel::{RtAccel, RtInstance, BlasMeshData, mat4_to_tlas_transform};
 pub use rt_shadow::{RtShadowResources, RtShadowUniform, RT_SHADOW_FORMAT};
+pub use hdr::{HdrTarget, HDR_FORMAT};
+pub use bloom::{BloomResources, BloomUniform, mip_sizes, BLOOM_MIP_COUNT};
+pub use tonemap::{TonemapUniform, aces_tonemap};
