@@ -23,6 +23,7 @@ members = [
     "crates/voltex_net",
     "crates/voltex_script",
     "crates/voltex_editor",
+    "examples/editor_demo",
 ]
 
 [workspace.dependencies]
