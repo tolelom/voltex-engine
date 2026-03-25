@@ -2,10 +2,11 @@ mod arena;
 mod camera;
 mod game;
 mod player;
+mod projectile;
 
 use winit::{
     application::ApplicationHandler,
-    event::WindowEvent,
+    event::{MouseButton, WindowEvent},
     event_loop::{ActiveEventLoop, EventLoop},
     keyboard::{KeyCode, PhysicalKey},
     window::WindowId,
@@ -393,15 +394,32 @@ impl ApplicationHandler for SurvivorApp {
                 // Update game logic
                 state.game.update(&state.input, dt);
 
+                // Mouse aim + shooting
+                let aspect = state.gpu.config.width as f32 / state.gpu.config.height as f32;
+                let (mx, my) = state.input.mouse_position();
+                let screen_w = state.gpu.config.width as f32;
+                let screen_h = state.gpu.config.height as f32;
+                if let Some(world_pos) =
+                    mouse_to_world_xz(mx as f32, my as f32, screen_w, screen_h, &state.camera, aspect)
+                {
+                    let aim = world_pos - state.game.player.position;
+                    let aim_xz = Vec3::new(aim.x, 0.0, aim.z);
+                    if aim_xz.length_squared() > 0.01 {
+                        let aim_dir = aim_xz.normalize();
+                        if state.input.is_mouse_button_pressed(MouseButton::Left) {
+                            state.game.try_shoot(aim_dir);
+                        }
+                    }
+                }
+
                 // Camera follows player
                 state.camera.target = state.game.player.position;
 
-                let aspect = state.gpu.config.width as f32 / state.gpu.config.height as f32;
-
-                // Build per-frame model/material lists: arena entities + player
+                // Build per-frame model/material lists: arena entities + player + projectiles
                 let player_pos = state.game.player.position;
                 let player_model = Mat4::translation(player_pos.x, player_pos.y + 0.5, player_pos.z);
-                let num_entities = ARENA_ENTITIES + 1; // arena + player
+                let num_projectiles = state.game.projectiles.len().min(MAX_ENTITIES - ARENA_ENTITIES - 1);
+                let num_entities = ARENA_ENTITIES + 1 + num_projectiles;
 
                 // ----- Compute light VP for shadows -----
                 let light_dir = Vec3::new(-1.0, -2.0, -1.0).normalize();
@@ -420,8 +438,13 @@ impl ApplicationHandler for SurvivorApp {
                 for i in 0..num_entities {
                     let model = if i < ARENA_ENTITIES {
                         state.models[i]
-                    } else {
+                    } else if i == ARENA_ENTITIES {
                         player_model
+                    } else {
+                        let pi = i - ARENA_ENTITIES - 1;
+                        let p = &state.game.projectiles[pi];
+                        Mat4::translation(p.position.x, p.position.y, p.position.z)
+                            * Mat4::scale(0.3, 0.3, 0.3)
                     };
                     let sp_uniform = ShadowPassUniform {
                         light_vp_model: (light_vp * model).cols,
@@ -449,9 +472,16 @@ impl ApplicationHandler for SurvivorApp {
                     let (model, color, metallic, roughness) = if i < ARENA_ENTITIES {
                         let (c, m, r) = state.materials[i];
                         (state.models[i], c, m, r)
-                    } else {
+                    } else if i == ARENA_ENTITIES {
                         // Player: blue sphere
                         (player_model, [0.2, 0.4, 1.0, 1.0], 0.3, 0.5)
+                    } else {
+                        // Projectile: yellow sphere
+                        let pi = i - ARENA_ENTITIES - 1;
+                        let p = &state.game.projectiles[pi];
+                        let m = Mat4::translation(p.position.x, p.position.y, p.position.z)
+                            * Mat4::scale(0.3, 0.3, 0.3);
+                        (m, [1.0, 0.9, 0.1, 1.0], 0.1, 0.4)
                     };
 
                     let cam_uniform = CameraUniform {
@@ -585,6 +615,10 @@ impl ApplicationHandler for SurvivorApp {
                     }
                     // Player sphere
                     draw_shadow!(shadow_pass, state.player_mesh, ARENA_ENTITIES);
+                    // Projectiles
+                    for pi in 0..num_projectiles {
+                        draw_shadow!(shadow_pass, state.player_mesh, ARENA_ENTITIES + 1 + pi);
+                    }
                 }
 
                 // ===== Pass 2: Color (PBR) =====
@@ -632,6 +666,10 @@ impl ApplicationHandler for SurvivorApp {
                     }
                     // Player sphere
                     draw_color!(render_pass, state.player_mesh, ARENA_ENTITIES);
+                    // Projectiles
+                    for pi in 0..num_projectiles {
+                        draw_color!(render_pass, state.player_mesh, ARENA_ENTITIES + 1 + pi);
+                    }
                 }
 
                 state.gpu.queue.submit(std::iter::once(encoder.finish()));
@@ -647,6 +685,60 @@ impl ApplicationHandler for SurvivorApp {
             state.window.request_redraw();
         }
     }
+}
+
+fn mouse_to_world_xz(
+    mouse_x: f32,
+    mouse_y: f32,
+    screen_w: f32,
+    screen_h: f32,
+    camera: &QuarterViewCamera,
+    aspect: f32,
+) -> Option<Vec3> {
+    // Convert mouse to NDC (-1..1)
+    let ndc_x = (mouse_x / screen_w) * 2.0 - 1.0;
+    let ndc_y = 1.0 - (mouse_y / screen_h) * 2.0; // flip Y
+
+    let cam_pos = camera.eye_position();
+
+    // Construct ray direction from camera through screen point
+    let fov = 45.0_f32.to_radians();
+    let half_h = (fov / 2.0).tan();
+    let half_w = half_h * aspect;
+
+    // Camera basis vectors
+    let forward = camera.target - cam_pos;
+    if forward.length_squared() < 1e-12 {
+        return None;
+    }
+    let forward = forward.normalize();
+    let right_vec = forward.cross(Vec3::Y);
+    if right_vec.length_squared() < 1e-12 {
+        return None;
+    }
+    let right_vec = right_vec.normalize();
+    let up = right_vec.cross(forward);
+
+    let ray_dir_unnorm = forward + right_vec * (ndc_x * half_w) + up * (ndc_y * half_h);
+    if ray_dir_unnorm.length_squared() < 1e-12 {
+        return None;
+    }
+    let ray_dir = ray_dir_unnorm.normalize();
+
+    // Intersect with Y=0 plane
+    if ray_dir.y.abs() < 1e-6 {
+        return None;
+    }
+    let t = -cam_pos.y / ray_dir.y;
+    if t < 0.0 {
+        return None;
+    }
+
+    Some(Vec3::new(
+        cam_pos.x + ray_dir.x * t,
+        0.0,
+        cam_pos.z + ray_dir.z * t,
+    ))
 }
 
 fn main() {
