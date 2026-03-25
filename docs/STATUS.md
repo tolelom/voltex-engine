@@ -99,6 +99,13 @@
 - voltex_renderer: Deferred pipeline (gbuffer + lighting bind group layouts)
 - examples/deferred_demo (5x5 sphere grid + 8 orbiting point lights)
 
+### Phase 7-2: SSGI (Screen-Space Global Illumination)
+- voltex_renderer: SsgiResources (hemisphere kernel 64 samples, 4x4 noise, output texture)
+- voltex_renderer: SSGI shader (SSAO + color bleeding in one fullscreen pass)
+- voltex_renderer: SSGI pipeline + bind group layouts
+- voltex_renderer: Lighting pass SSGI integration (ambient * ssgi_ao + indirect)
+- deferred_demo updated with 3-pass rendering (GBuffer → SSGI → Lighting)
+
 ## Crate 구조
 
 ```
@@ -112,7 +119,7 @@ crates/
 └── voltex_audio     — AudioClip, WAV parser, mixing, WASAPI backend, AudioSystem, MixGroup, spatial
 ```
 
-## 테스트: 200개 전부 통과
+## 테스트: 203개 전부 통과
 
 - voltex_asset: 14
 - voltex_audio: 35 (audio_clip 2 + wav 5 + mixing 11 + audio_system 2 + spatial 8 + mix_group 7)
@@ -120,7 +127,7 @@ crates/
 - voltex_math: 37 (29 + AABB 6 + Ray 2)
 - voltex_physics: 52 (collider 2 + narrow 11 + bvh 5 + collision 7 + rigid_body 3 + integrator 3 + solver 5 + ray 10 + raycast 6)
 - voltex_platform: 3
-- voltex_renderer: 20
+- voltex_renderer: 23 (20 + SSGI 3)
 
 ## Examples (11개)
 
@@ -136,7 +143,7 @@ crates/
 - audio_demo — 사인파 오디오 재생
 - deferred_demo — 디퍼드 렌더링 + 다중 포인트 라이트
 
-## 다음: Phase 7-2 (Global Illumination) — Stretch Goal
+## 다음: Phase 7-3 (레이트레이싱) / 7-4 (포스트 프로세싱) — Stretch Goal
 
 스펙 참조: `docs/superpowers/specs/2026-03-24-voltex-engine-design.md`
 

@@ -62,6 +62,13 @@
 - **raycast_all (다중 hit)** — 가장 가까운 hit만 반환.
 - **BVH 조기 종료 최적화** — 모든 리프 검사 후 최소 t 선택. front-to-back 순회 미구현.
 
+## Phase 7-2
+
+- **Bilateral Blur** — SSGI 노이즈 제거 블러 미구현. 4x4 노이즈 타일링만.
+- **반해상도 렌더링** — 풀 해상도에서 SSGI 실행. 성능 최적화 미적용.
+- **Temporal Accumulation** — 프레임 간 누적 미구현. 매 프레임 독립 계산.
+- **Light Probes** — 베이크 기반 GI 미구현.
+
 ## Phase 7-1
 
 - **투명 오브젝트** — 디퍼드에서 처리 불가. 별도 포워드 패스 필요.
