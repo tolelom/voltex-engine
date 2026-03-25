@@ -181,6 +181,13 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1505bd5d3d116872e7271a6d4e16d81d0c8570876c8de68093a09ac269d8aac0"
 
 [[package]]
+name = "audio_demo"
+version = "0.1.0"
+dependencies = [
+ "voltex_audio",
+]
+
+[[package]]
 name = "autocfg"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2027,6 +2034,13 @@ name = "voltex_asset"
 version = "0.1.0"
 
 [[package]]
+name = "voltex_audio"
+version = "0.1.0"
+dependencies = [
+ "voltex_math",
+]
+
+[[package]]
 name = "voltex_ecs"
 version = "0.1.0"
 dependencies = [
@@ -2036,6 +2050,14 @@ dependencies = [
 [[package]]
 name = "voltex_math"
 version = "0.1.0"
+
+[[package]]
+name = "voltex_physics"
+version = "0.1.0"
+dependencies = [
+ "voltex_ecs",
+ "voltex_math",
+]
 
 [[package]]
 name = "voltex_platform"
