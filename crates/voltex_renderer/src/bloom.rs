@@ -38,7 +38,7 @@ impl BloomResources {
     pub fn new(device: &wgpu::Device, width: u32, height: u32) -> Self {
         let mip_views = create_mip_views(device, width, height);
 
-        let uniform = BloomUniform::default();
+        let _uniform = BloomUniform::default();
         let uniform_buffer = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("Bloom Uniform Buffer"),
             size: std::mem::size_of::<BloomUniform>() as u64,
