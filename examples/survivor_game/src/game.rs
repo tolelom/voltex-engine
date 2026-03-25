@@ -2,12 +2,15 @@ use voltex_math::Vec3;
 use voltex_platform::InputState;
 use crate::player::Player;
 use crate::projectile::Projectile;
+use crate::enemy::Enemy;
+use crate::wave::WaveSystem;
 
 pub struct GameState {
     pub player: Player,
     pub projectiles: Vec<Projectile>,
+    pub enemies: Vec<Enemy>,
+    pub wave: WaveSystem,
     pub score: u32,
-    pub wave: u32,
     pub game_over: bool,
 }
 
@@ -16,8 +19,9 @@ impl GameState {
         Self {
             player: Player::new(),
             projectiles: Vec::new(),
+            enemies: Vec::new(),
+            wave: WaveSystem::new(),
             score: 0,
-            wave: 1,
             game_over: false,
         }
     }
@@ -42,5 +46,23 @@ impl GameState {
             proj.update(dt);
         }
         self.projectiles.retain(|p| p.is_alive());
+
+        // Wave system spawns
+        let alive_count = self.enemies.iter().filter(|e| e.alive).count();
+        let spawns = self.wave.update(dt, alive_count);
+        for pos in spawns {
+            self.enemies.push(Enemy::new(pos));
+        }
+
+        // Update enemies (chase player)
+        let player_pos = self.player.position;
+        for enemy in &mut self.enemies {
+            if enemy.alive {
+                enemy.update(player_pos, dt);
+            }
+        }
+
+        // Remove dead enemies
+        self.enemies.retain(|e| e.alive);
     }
 }

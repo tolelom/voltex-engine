@@ -1,8 +1,10 @@
 mod arena;
 mod camera;
+mod enemy;
 mod game;
 mod player;
 mod projectile;
+mod wave;
 
 use winit::{
     application::ApplicationHandler,
@@ -415,11 +417,13 @@ impl ApplicationHandler for SurvivorApp {
                 // Camera follows player
                 state.camera.target = state.game.player.position;
 
-                // Build per-frame model/material lists: arena entities + player + projectiles
+                // Build per-frame model/material lists: arena entities + player + projectiles + enemies
                 let player_pos = state.game.player.position;
                 let player_model = Mat4::translation(player_pos.x, player_pos.y + 0.5, player_pos.z);
                 let num_projectiles = state.game.projectiles.len().min(MAX_ENTITIES - ARENA_ENTITIES - 1);
-                let num_entities = ARENA_ENTITIES + 1 + num_projectiles;
+                let base_enemy_idx = ARENA_ENTITIES + 1 + num_projectiles;
+                let num_enemies = state.game.enemies.len().min(MAX_ENTITIES.saturating_sub(base_enemy_idx));
+                let num_entities = base_enemy_idx + num_enemies;
 
                 // ----- Compute light VP for shadows -----
                 let light_dir = Vec3::new(-1.0, -2.0, -1.0).normalize();
@@ -440,11 +444,16 @@ impl ApplicationHandler for SurvivorApp {
                         state.models[i]
                     } else if i == ARENA_ENTITIES {
                         player_model
-                    } else {
+                    } else if i < base_enemy_idx {
                         let pi = i - ARENA_ENTITIES - 1;
                         let p = &state.game.projectiles[pi];
                         Mat4::translation(p.position.x, p.position.y, p.position.z)
                             * Mat4::scale(0.3, 0.3, 0.3)
+                    } else {
+                        let ei = i - base_enemy_idx;
+                        let e = &state.game.enemies[ei];
+                        Mat4::translation(e.position.x, e.position.y, e.position.z)
+                            * Mat4::scale(0.4, 0.4, 0.4)
                     };
                     let sp_uniform = ShadowPassUniform {
                         light_vp_model: (light_vp * model).cols,
@@ -475,13 +484,20 @@ impl ApplicationHandler for SurvivorApp {
                     } else if i == ARENA_ENTITIES {
                         // Player: blue sphere
                         (player_model, [0.2, 0.4, 1.0, 1.0], 0.3, 0.5)
-                    } else {
+                    } else if i < base_enemy_idx {
                         // Projectile: yellow sphere
                         let pi = i - ARENA_ENTITIES - 1;
                         let p = &state.game.projectiles[pi];
                         let m = Mat4::translation(p.position.x, p.position.y, p.position.z)
                             * Mat4::scale(0.3, 0.3, 0.3);
                         (m, [1.0, 0.9, 0.1, 1.0], 0.1, 0.4)
+                    } else {
+                        // Enemy: red sphere
+                        let ei = i - base_enemy_idx;
+                        let e = &state.game.enemies[ei];
+                        let m = Mat4::translation(e.position.x, e.position.y, e.position.z)
+                            * Mat4::scale(0.4, 0.4, 0.4);
+                        (m, [1.0, 0.15, 0.1, 1.0], 0.2, 0.6)
                     };
 
                     let cam_uniform = CameraUniform {
@@ -619,6 +635,10 @@ impl ApplicationHandler for SurvivorApp {
                     for pi in 0..num_projectiles {
                         draw_shadow!(shadow_pass, state.player_mesh, ARENA_ENTITIES + 1 + pi);
                     }
+                    // Enemies
+                    for ei in 0..num_enemies {
+                        draw_shadow!(shadow_pass, state.player_mesh, base_enemy_idx + ei);
+                    }
                 }
 
                 // ===== Pass 2: Color (PBR) =====
@@ -669,6 +689,10 @@ impl ApplicationHandler for SurvivorApp {
                     // Projectiles
                     for pi in 0..num_projectiles {
                         draw_color!(render_pass, state.player_mesh, ARENA_ENTITIES + 1 + pi);
+                    }
+                    // Enemies
+                    for ei in 0..num_enemies {
+                        draw_color!(render_pass, state.player_mesh, base_enemy_idx + ei);
                     }
                 }
 
