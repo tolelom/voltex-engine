@@ -62,6 +62,12 @@
 - voltex_physics: Narrow phase — sphere_vs_sphere, sphere_vs_box, box_vs_box (SAT)
 - voltex_physics: detect_collisions(world) ECS integration
 
+### Phase 5-2: Rigid Body Simulation
+- voltex_physics: RigidBody (mass, velocity, restitution), PhysicsConfig
+- voltex_physics: Semi-implicit Euler integration
+- voltex_physics: Impulse-based collision response + positional correction (Baumgarte)
+- voltex_physics: physics_step (integrate → detect → resolve)
+
 ## Crate 구조
 
 ```
@@ -71,15 +77,15 @@ crates/
 ├── voltex_renderer  — GPU, Mesh, OBJ, Camera, Material, PBR, Shadow, IBL, Sphere
 ├── voltex_ecs       — Entity, SparseSet, World, Transform, Hierarchy, Scene, WorldTransform
 ├── voltex_asset     — Handle<T>, AssetStorage<T>, Assets
-└── voltex_physics   — Collider, ContactPoint, BvhTree, detect_collisions
+└── voltex_physics   — Collider, ContactPoint, BvhTree, RigidBody, detect_collisions, physics_step
 ```
 
-## 테스트: 136개 전부 통과
+## 테스트: 147개 전부 통과
 
 - voltex_asset: 14
 - voltex_ecs: 39
 - voltex_math: 35 (29 + AABB 6)
-- voltex_physics: 25 (collider 2 + narrow 11 + bvh 5 + collision 7)
+- voltex_physics: 36 (collider 2 + narrow 11 + bvh 5 + collision 7 + rigid_body 3 + integrator 3 + solver 5)
 - voltex_platform: 3
 - voltex_renderer: 20
 
@@ -95,7 +101,7 @@ crates/
 - shadow_demo — Directional Light 그림자
 - ibl_demo — Normal map + IBL
 
-## 다음: Phase 5-2 (리지드바디 시뮬레이션)
+## 다음: Phase 5-3 (레이캐스팅)
 
 스펙 참조: `docs/superpowers/specs/2026-03-24-voltex-engine-design.md`
 

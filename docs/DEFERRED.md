@@ -49,6 +49,13 @@
 - **Incremental BVH 업데이트** — 매 프레임 전체 rebuild. 성능 이슈 시 incremental update 적용.
 - **연속 충돌 감지 (CCD)** — 이산 충돌만. 빠른 물체의 터널링 미처리.
 
+## Phase 5-2
+
+- **각속도/회전 물리** — angular_velocity 필드만 존재, 적분 미구현. 관성 텐서 필요.
+- **마찰 (Coulomb)** — 미구현. 물체가 미끄러짐 없이 반발만.
+- **Sequential Impulse 솔버** — 단일 반복 충돌 응답만. 다중 물체 쌓기 불안정.
+- **Sleep/Island 시스템** — 정지 물체 최적화 미구현.
+
 ## 렌더링 한계
 
 - **per-entity dynamic UBO** — 수천 개 이상은 인스턴싱 필요.
