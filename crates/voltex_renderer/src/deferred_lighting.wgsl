@@ -303,13 +303,8 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let ssgi_indirect = ssgi_data.gba;
     let ambient = (diffuse_ibl + specular_ibl) * ao * ssgi_ao + ssgi_indirect;
 
-    var color = ambient + Lo;
-
-    // Reinhard tone mapping
-    color = color / (color + vec3<f32>(1.0));
-
-    // Gamma correction
-    color = pow(color, vec3<f32>(1.0 / 2.2));
+    // Output raw HDR linear colour; tonemap is applied in a separate tonemap pass.
+    let color = ambient + Lo;
 
     return vec4<f32>(color, alpha);
 }

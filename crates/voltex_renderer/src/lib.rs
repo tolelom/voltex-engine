@@ -42,6 +42,8 @@ pub use deferred_pipeline::{
     lighting_gbuffer_bind_group_layout, lighting_lights_bind_group_layout, lighting_shadow_bind_group_layout,
     ssgi_gbuffer_bind_group_layout, ssgi_data_bind_group_layout, create_ssgi_pipeline,
     rt_shadow_gbuffer_bind_group_layout, rt_shadow_data_bind_group_layout, create_rt_shadow_pipeline,
+    bloom_bind_group_layout, create_bloom_downsample_pipeline, create_bloom_upsample_pipeline,
+    tonemap_bind_group_layout, create_tonemap_pipeline,
 };
 pub use ssgi::{SsgiResources, SsgiUniform, SSGI_OUTPUT_FORMAT};
 pub use rt_accel::{RtAccel, RtInstance, BlasMeshData, mat4_to_tlas_transform};
