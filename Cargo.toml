@@ -24,6 +24,7 @@ members = [
     "crates/voltex_script",
     "crates/voltex_editor",
     "examples/editor_demo",
+    "examples/survivor_game",
 ]
 
 [workspace.dependencies]
