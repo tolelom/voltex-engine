@@ -28,10 +28,15 @@ pub struct GpuContext {
 
 impl GpuContext {
     pub fn new(window: Arc<Window>) -> Self {
-        pollster::block_on(Self::new_async(window))
+        pollster::block_on(Self::new_async(window, wgpu::Features::empty()))
     }
 
-    async fn new_async(window: Arc<Window>) -> Self {
+    /// Create a GpuContext requesting additional device features (e.g. ray tracing).
+    pub fn new_with_features(window: Arc<Window>, features: wgpu::Features) -> Self {
+        pollster::block_on(Self::new_async(window, features))
+    }
+
+    async fn new_async(window: Arc<Window>, extra_features: wgpu::Features) -> Self {
         let size = window.inner_size();
 
         let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor {
@@ -50,11 +55,19 @@ impl GpuContext {
             .await
             .expect("Failed to find a suitable GPU adapter");
 
+        // When extra features are requested (e.g. ray tracing), use adapter limits
+        // so RT-specific limits (max_acceleration_structures_per_shader_stage, etc.) are satisfied.
+        let required_limits = if extra_features.is_empty() {
+            wgpu::Limits::default()
+        } else {
+            adapter.limits()
+        };
+
         let (device, queue) = adapter
             .request_device(&wgpu::DeviceDescriptor {
                 label: Some("Voltex Device"),
-                required_features: wgpu::Features::empty(),
-                required_limits: wgpu::Limits::default(),
+                required_features: extra_features,
+                required_limits,
                 memory_hints: Default::default(),
                 ..Default::default()
             })

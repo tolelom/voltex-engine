@@ -19,7 +19,8 @@ use voltex_renderer::{
     pbr_texture_bind_group_layout, create_pbr_texture_bind_group,
     SsgiResources, SsgiUniform,
     ssgi_gbuffer_bind_group_layout, ssgi_data_bind_group_layout, create_ssgi_pipeline,
-
+    RtAccel, RtInstance, BlasMeshData, RtShadowResources, RtShadowUniform,
+    rt_shadow_gbuffer_bind_group_layout, rt_shadow_data_bind_group_layout, create_rt_shadow_pipeline,
 };
 use wgpu::util::DeviceExt;
 use bytemuck::{Pod, Zeroable};
@@ -79,6 +80,17 @@ struct AppState {
     light_buffer: wgpu::Buffer,
     cam_pos_buffer: wgpu::Buffer,
 
+    // RT Shadow resources
+    rt_accel: RtAccel,
+    rt_shadow: RtShadowResources,
+    rt_shadow_pipeline: wgpu::ComputePipeline,
+    rt_shadow_gb_bg: wgpu::BindGroup,
+    rt_shadow_data_bg: wgpu::BindGroup,
+    rt_shadow_gb_layout: wgpu::BindGroupLayout,
+    rt_shadow_data_layout: wgpu::BindGroupLayout,
+    #[allow(dead_code)]
+    vertex_count: u32,
+
     // Layouts needed for rebuild on resize
     gbuffer_layout: wgpu::BindGroupLayout,
     shadow_layout: wgpu::BindGroupLayout,
@@ -106,16 +118,25 @@ impl ApplicationHandler for DeferredDemoApp {
             ..Default::default()
         };
         let window = VoltexWindow::new(event_loop, &config);
-        let gpu = GpuContext::new(window.handle.clone());
+        let gpu = GpuContext::new_with_features(
+            window.handle.clone(),
+            wgpu::Features::EXPERIMENTAL_RAY_QUERY,
+        );
 
         // Dynamic uniform buffer alignment
         let alignment = gpu.device.limits().min_uniform_buffer_offset_alignment;
         let cam_aligned_size = align_up(std::mem::size_of::<CameraUniform>() as u32, alignment);
         let mat_aligned_size = align_up(std::mem::size_of::<MaterialUniform>() as u32, alignment);
 
-        // Generate sphere mesh
+        // Generate sphere mesh (with BLAS_INPUT usage for ray tracing)
         let (vertices, indices) = generate_sphere(0.4, 32, 16);
-        let mesh = Mesh::new(&gpu.device, &vertices, &indices);
+        let vertex_count = vertices.len() as u32;
+        let mesh = Mesh::new_with_usage(
+            &gpu.device,
+            &vertices,
+            &indices,
+            wgpu::BufferUsages::BLAS_INPUT,
+        );
 
         // Camera
         let aspect = gpu.config.width as f32 / gpu.config.height as f32;
@@ -248,6 +269,58 @@ impl ApplicationHandler for DeferredDemoApp {
         });
 
         // ---------------------------------------------------------------
+        // RT Shadow: build acceleration structures
+        // ---------------------------------------------------------------
+        let blas_mesh = BlasMeshData {
+            vertex_buffer: &mesh.vertex_buffer,
+            index_buffer: &mesh.index_buffer,
+            vertex_count,
+            index_count: mesh.num_indices,
+        };
+
+        // Build TLAS instances — one per sphere in the grid, all sharing the same BLAS
+        let half_grid = (GRID_SIZE as f32 - 1.0) * SPACING * 0.5;
+        let rt_instances: Vec<RtInstance> = (0..GRID_SIZE)
+            .flat_map(|row| {
+                (0..GRID_SIZE).map(move |col| {
+                    let x = col as f32 * SPACING - half_grid;
+                    let y = row as f32 * SPACING - half_grid;
+                    let model = Mat4::translation(x, y, 0.0);
+                    RtInstance {
+                        transform: *model.as_slice(),
+                        blas_index: 0,
+                    }
+                })
+            })
+            .collect();
+
+        let mut rt_encoder = gpu.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+            label: Some("RT Accel Build Encoder"),
+        });
+        let rt_accel = RtAccel::new(&gpu.device, &mut rt_encoder, &[blas_mesh], &rt_instances);
+        gpu.queue.submit(std::iter::once(rt_encoder.finish()));
+
+        // RT Shadow resources
+        let rt_shadow = RtShadowResources::new(&gpu.device, gpu.config.width, gpu.config.height);
+
+        // RT Shadow pipeline + bind groups
+        let rt_shadow_gb_layout = rt_shadow_gbuffer_bind_group_layout(&gpu.device);
+        let rt_shadow_data_layout = rt_shadow_data_bind_group_layout(&gpu.device);
+        let rt_shadow_pipeline = create_rt_shadow_pipeline(&gpu.device, &rt_shadow_gb_layout, &rt_shadow_data_layout);
+
+        let rt_shadow_gb_bg = create_rt_shadow_gbuffer_bg(
+            &gpu.device,
+            &rt_shadow_gb_layout,
+            &gbuffer,
+        );
+        let rt_shadow_data_bg = create_rt_shadow_data_bg(
+            &gpu.device,
+            &rt_shadow_data_layout,
+            &rt_accel,
+            &rt_shadow,
+        );
+
+        // ---------------------------------------------------------------
         // Lighting pass bind group layouts
         // ---------------------------------------------------------------
         let gbuffer_layout = lighting_gbuffer_bind_group_layout(&gpu.device);
@@ -333,6 +406,17 @@ impl ApplicationHandler for DeferredDemoApp {
             ..Default::default()
         });
 
+        let rt_shadow_filtering_sampler = gpu.device.create_sampler(&wgpu::SamplerDescriptor {
+            label: Some("RT Shadow Filtering Sampler"),
+            address_mode_u: wgpu::AddressMode::ClampToEdge,
+            address_mode_v: wgpu::AddressMode::ClampToEdge,
+            address_mode_w: wgpu::AddressMode::ClampToEdge,
+            mag_filter: wgpu::FilterMode::Linear,
+            min_filter: wgpu::FilterMode::Linear,
+            mipmap_filter: wgpu::MipmapFilterMode::Nearest,
+            ..Default::default()
+        });
+
         let shadow_bind_group = create_shadow_bind_group(
             &gpu.device,
             &shadow_layout,
@@ -341,6 +425,8 @@ impl ApplicationHandler for DeferredDemoApp {
             &ibl,
             &ssgi,
             &ssgi_filtering_sampler,
+            &rt_shadow,
+            &rt_shadow_filtering_sampler,
         );
 
         // Lighting pipeline
@@ -371,6 +457,14 @@ impl ApplicationHandler for DeferredDemoApp {
             ssgi_data_bind_group,
             ssgi_gb_layout,
             ssgi_data_layout,
+            rt_accel,
+            rt_shadow,
+            rt_shadow_pipeline,
+            rt_shadow_gb_bg,
+            rt_shadow_data_bg,
+            rt_shadow_gb_layout,
+            rt_shadow_data_layout,
+            vertex_count,
             lighting_pipeline,
             fullscreen_vb,
             gbuffer_bind_group,
@@ -470,9 +564,35 @@ impl ApplicationHandler for DeferredDemoApp {
                         &ssgi_nearest_sampler,
                     );
 
-                    // Recreate shadow bind group (ssgi output_view changed)
+                    // Resize RT shadow output texture
+                    state.rt_shadow.resize(&state.gpu.device, size.width, size.height);
+
+                    // Recreate RT shadow bind groups (gbuffer + rt_shadow views changed)
+                    state.rt_shadow_gb_bg = create_rt_shadow_gbuffer_bg(
+                        &state.gpu.device,
+                        &state.rt_shadow_gb_layout,
+                        &state.gbuffer,
+                    );
+                    state.rt_shadow_data_bg = create_rt_shadow_data_bg(
+                        &state.gpu.device,
+                        &state.rt_shadow_data_layout,
+                        &state.rt_accel,
+                        &state.rt_shadow,
+                    );
+
+                    // Recreate shadow bind group (ssgi output_view + rt_shadow changed)
                     let ssgi_filtering_sampler = state.gpu.device.create_sampler(&wgpu::SamplerDescriptor {
                         label: Some("SSGI Filtering Sampler"),
+                        address_mode_u: wgpu::AddressMode::ClampToEdge,
+                        address_mode_v: wgpu::AddressMode::ClampToEdge,
+                        address_mode_w: wgpu::AddressMode::ClampToEdge,
+                        mag_filter: wgpu::FilterMode::Linear,
+                        min_filter: wgpu::FilterMode::Linear,
+                        mipmap_filter: wgpu::MipmapFilterMode::Nearest,
+                        ..Default::default()
+                    });
+                    let rt_shadow_filtering_sampler = state.gpu.device.create_sampler(&wgpu::SamplerDescriptor {
+                        label: Some("RT Shadow Filtering Sampler"),
                         address_mode_u: wgpu::AddressMode::ClampToEdge,
                         address_mode_v: wgpu::AddressMode::ClampToEdge,
                         address_mode_w: wgpu::AddressMode::ClampToEdge,
@@ -489,6 +609,8 @@ impl ApplicationHandler for DeferredDemoApp {
                         &state._ibl,
                         &state.ssgi,
                         &ssgi_filtering_sampler,
+                        &state.rt_shadow,
+                        &rt_shadow_filtering_sampler,
                     );
                 }
             }
@@ -776,7 +898,38 @@ impl ApplicationHandler for DeferredDemoApp {
                     rpass.draw(0..3, 0..1);
                 }
 
-                // ---- Pass 3: Lighting (fullscreen) ----
+                // ---- Pass 3: RT Shadow (compute) ----
+                {
+                    // Light direction from the directional light
+                    let light_dir = Vec3::new(-0.5, -1.0, -0.5).normalize();
+                    let rt_uniform = RtShadowUniform {
+                        light_direction: [light_dir.x, light_dir.y, light_dir.z],
+                        _pad0: 0.0,
+                        width: state.gpu.config.width,
+                        height: state.gpu.config.height,
+                        _pad1: [0; 2],
+                    };
+                    state.gpu.queue.write_buffer(
+                        &state.rt_shadow.uniform_buffer,
+                        0,
+                        bytemuck::bytes_of(&rt_uniform),
+                    );
+
+                    let mut cpass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
+                        label: Some("RT Shadow Pass"),
+                        ..Default::default()
+                    });
+                    cpass.set_pipeline(&state.rt_shadow_pipeline);
+                    cpass.set_bind_group(0, &state.rt_shadow_gb_bg, &[]);
+                    cpass.set_bind_group(1, &state.rt_shadow_data_bg, &[]);
+                    cpass.dispatch_workgroups(
+                        (state.gpu.config.width + 7) / 8,
+                        (state.gpu.config.height + 7) / 8,
+                        1,
+                    );
+                }
+
+                // ---- Pass 4: Lighting (fullscreen) ----
                 {
                     let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                         label: Some("Lighting Pass"),
@@ -889,7 +1042,7 @@ fn create_ssgi_gbuffer_bind_group(
     })
 }
 
-/// Helper: create the shadow + IBL + SSGI bind group (7 entries).
+/// Helper: create the shadow + IBL + SSGI + RT shadow bind group (9 entries).
 fn create_shadow_bind_group(
     device: &wgpu::Device,
     layout: &wgpu::BindGroupLayout,
@@ -898,9 +1051,11 @@ fn create_shadow_bind_group(
     ibl: &IblResources,
     ssgi: &SsgiResources,
     ssgi_sampler: &wgpu::Sampler,
+    rt_shadow: &RtShadowResources,
+    rt_shadow_sampler: &wgpu::Sampler,
 ) -> wgpu::BindGroup {
     device.create_bind_group(&wgpu::BindGroupDescriptor {
-        label: Some("Lighting Shadow+IBL+SSGI Bind Group"),
+        label: Some("Lighting Shadow+IBL+SSGI+RTShadow Bind Group"),
         layout,
         entries: &[
             wgpu::BindGroupEntry {
@@ -930,6 +1085,63 @@ fn create_shadow_bind_group(
             wgpu::BindGroupEntry {
                 binding: 6,
                 resource: wgpu::BindingResource::Sampler(ssgi_sampler),
+            },
+            wgpu::BindGroupEntry {
+                binding: 7,
+                resource: wgpu::BindingResource::TextureView(&rt_shadow.shadow_view),
+            },
+            wgpu::BindGroupEntry {
+                binding: 8,
+                resource: wgpu::BindingResource::Sampler(rt_shadow_sampler),
+            },
+        ],
+    })
+}
+
+/// Helper: create the RT shadow G-Buffer bind group (position + normal).
+fn create_rt_shadow_gbuffer_bg(
+    device: &wgpu::Device,
+    layout: &wgpu::BindGroupLayout,
+    gbuffer: &GBuffer,
+) -> wgpu::BindGroup {
+    device.create_bind_group(&wgpu::BindGroupDescriptor {
+        label: Some("RT Shadow GBuffer Bind Group"),
+        layout,
+        entries: &[
+            wgpu::BindGroupEntry {
+                binding: 0,
+                resource: wgpu::BindingResource::TextureView(&gbuffer.position_view),
+            },
+            wgpu::BindGroupEntry {
+                binding: 1,
+                resource: wgpu::BindingResource::TextureView(&gbuffer.normal_view),
+            },
+        ],
+    })
+}
+
+/// Helper: create the RT shadow data bind group (TLAS + shadow output + uniform).
+fn create_rt_shadow_data_bg(
+    device: &wgpu::Device,
+    layout: &wgpu::BindGroupLayout,
+    rt_accel: &RtAccel,
+    rt_shadow: &RtShadowResources,
+) -> wgpu::BindGroup {
+    device.create_bind_group(&wgpu::BindGroupDescriptor {
+        label: Some("RT Shadow Data Bind Group"),
+        layout,
+        entries: &[
+            wgpu::BindGroupEntry {
+                binding: 0,
+                resource: wgpu::BindingResource::AccelerationStructure(&rt_accel.tlas),
+            },
+            wgpu::BindGroupEntry {
+                binding: 1,
+                resource: wgpu::BindingResource::TextureView(&rt_shadow.shadow_view),
+            },
+            wgpu::BindGroupEntry {
+                binding: 2,
+                resource: rt_shadow.uniform_buffer.as_entire_binding(),
             },
         ],
     })
