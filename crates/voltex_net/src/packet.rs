@@ -5,6 +5,10 @@ const TYPE_DISCONNECT: u8 = 3;
 const TYPE_PING: u8 = 4;
 const TYPE_PONG: u8 = 5;
 const TYPE_USER_DATA: u8 = 6;
+const TYPE_RELIABLE: u8 = 7;
+const TYPE_ACK: u8 = 8;
+const TYPE_SNAPSHOT: u8 = 9;
+const TYPE_SNAPSHOT_DELTA: u8 = 10;
 
 /// Header size: type_id(1) + payload_len(2 LE) + reserved(1) = 4 bytes
 const HEADER_SIZE: usize = 4;
@@ -18,6 +22,10 @@ pub enum Packet {
     Ping { timestamp: u64 },
     Pong { timestamp: u64 },
     UserData { client_id: u32, data: Vec<u8> },
+    Reliable { sequence: u16, data: Vec<u8> },
+    Ack { sequence: u16 },
+    Snapshot { tick: u32, data: Vec<u8> },
+    SnapshotDelta { base_tick: u32, tick: u32, data: Vec<u8> },
 }
 
 impl Packet {
@@ -112,6 +120,38 @@ impl Packet {
                 let data = payload[4..].to_vec();
                 Ok(Packet::UserData { client_id, data })
             }
+            TYPE_RELIABLE => {
+                if payload.len() < 2 {
+                    return Err("Reliable payload too short".to_string());
+                }
+                let sequence = u16::from_le_bytes([payload[0], payload[1]]);
+                let data = payload[2..].to_vec();
+                Ok(Packet::Reliable { sequence, data })
+            }
+            TYPE_ACK => {
+                if payload.len() < 2 {
+                    return Err("Ack payload too short".to_string());
+                }
+                let sequence = u16::from_le_bytes([payload[0], payload[1]]);
+                Ok(Packet::Ack { sequence })
+            }
+            TYPE_SNAPSHOT => {
+                if payload.len() < 4 {
+                    return Err("Snapshot payload too short".to_string());
+                }
+                let tick = u32::from_le_bytes([payload[0], payload[1], payload[2], payload[3]]);
+                let data = payload[4..].to_vec();
+                Ok(Packet::Snapshot { tick, data })
+            }
+            TYPE_SNAPSHOT_DELTA => {
+                if payload.len() < 8 {
+                    return Err("SnapshotDelta payload too short".to_string());
+                }
+                let base_tick = u32::from_le_bytes([payload[0], payload[1], payload[2], payload[3]]);
+                let tick = u32::from_le_bytes([payload[4], payload[5], payload[6], payload[7]]);
+                let data = payload[8..].to_vec();
+                Ok(Packet::SnapshotDelta { base_tick, tick, data })
+            }
             _ => Err(format!("Unknown packet type_id: {}", type_id)),
         }
     }
@@ -124,6 +164,10 @@ impl Packet {
             Packet::Ping { .. } => TYPE_PING,
             Packet::Pong { .. } => TYPE_PONG,
             Packet::UserData { .. } => TYPE_USER_DATA,
+            Packet::Reliable { .. } => TYPE_RELIABLE,
+            Packet::Ack { .. } => TYPE_ACK,
+            Packet::Snapshot { .. } => TYPE_SNAPSHOT,
+            Packet::SnapshotDelta { .. } => TYPE_SNAPSHOT_DELTA,
         }
     }
 
@@ -144,6 +188,26 @@ impl Packet {
             Packet::UserData { client_id, data } => {
                 let mut buf = Vec::with_capacity(4 + data.len());
                 buf.extend_from_slice(&client_id.to_le_bytes());
+                buf.extend_from_slice(data);
+                buf
+            }
+            Packet::Reliable { sequence, data } => {
+                let mut buf = Vec::with_capacity(2 + data.len());
+                buf.extend_from_slice(&sequence.to_le_bytes());
+                buf.extend_from_slice(data);
+                buf
+            }
+            Packet::Ack { sequence } => sequence.to_le_bytes().to_vec(),
+            Packet::Snapshot { tick, data } => {
+                let mut buf = Vec::with_capacity(4 + data.len());
+                buf.extend_from_slice(&tick.to_le_bytes());
+                buf.extend_from_slice(data);
+                buf
+            }
+            Packet::SnapshotDelta { base_tick, tick, data } => {
+                let mut buf = Vec::with_capacity(8 + data.len());
+                buf.extend_from_slice(&base_tick.to_le_bytes());
+                buf.extend_from_slice(&tick.to_le_bytes());
                 buf.extend_from_slice(data);
                 buf
             }
@@ -197,6 +261,36 @@ mod tests {
         roundtrip(Packet::UserData {
             client_id: 3,
             data: vec![0xDE, 0xAD, 0xBE, 0xEF],
+        });
+    }
+
+    #[test]
+    fn test_reliable_roundtrip() {
+        roundtrip(Packet::Reliable {
+            sequence: 42,
+            data: vec![0xCA, 0xFE],
+        });
+    }
+
+    #[test]
+    fn test_ack_roundtrip() {
+        roundtrip(Packet::Ack { sequence: 100 });
+    }
+
+    #[test]
+    fn test_snapshot_roundtrip() {
+        roundtrip(Packet::Snapshot {
+            tick: 999,
+            data: vec![1, 2, 3],
+        });
+    }
+
+    #[test]
+    fn test_snapshot_delta_roundtrip() {
+        roundtrip(Packet::SnapshotDelta {
+            base_tick: 10,
+            tick: 15,
+            data: vec![4, 5, 6],
         });
     }
 
