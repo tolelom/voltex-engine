@@ -1,0 +1,15 @@
+[package]
+name = "deferred_demo"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+voltex_math.workspace = true
+voltex_platform.workspace = true
+voltex_renderer.workspace = true
+wgpu.workspace = true
+winit.workspace = true
+bytemuck.workspace = true
+pollster.workspace = true
+env_logger.workspace = true
+log.workspace = true

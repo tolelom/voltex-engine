@@ -15,6 +15,7 @@ members = [
     "examples/multi_light_demo",
     "examples/shadow_demo",
     "examples/ibl_demo",
+    "examples/deferred_demo",
     "crates/voltex_physics",
     "crates/voltex_audio",
     "examples/audio_demo",
