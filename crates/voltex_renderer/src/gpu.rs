@@ -63,12 +63,20 @@ impl GpuContext {
             adapter.limits()
         };
 
+        let experimental = if extra_features.is_empty() {
+            wgpu::ExperimentalFeatures::disabled()
+        } else {
+            // Safety: we acknowledge experimental features may have bugs
+            unsafe { wgpu::ExperimentalFeatures::enabled() }
+        };
+
         let (device, queue) = adapter
             .request_device(&wgpu::DeviceDescriptor {
                 label: Some("Voltex Device"),
                 required_features: extra_features,
                 required_limits,
                 memory_hints: Default::default(),
+                experimental_features: experimental,
                 ..Default::default()
             })
             .await

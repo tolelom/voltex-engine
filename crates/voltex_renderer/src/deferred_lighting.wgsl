@@ -267,7 +267,9 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let F0 = mix(vec3<f32>(0.04, 0.04, 0.04), albedo, metallic);
 
     // Shadow: sample RT shadow texture (1.0 = lit, 0.0 = shadowed)
-    let shadow_factor = textureSample(t_rt_shadow, s_rt_shadow, uv).r;
+    let rt_dims = textureDimensions(t_rt_shadow);
+    let rt_coord = vec2<i32>(vec2<f32>(uv.x * f32(rt_dims.x), uv.y * f32(rt_dims.y)));
+    let shadow_factor = textureLoad(t_rt_shadow, rt_coord, 0).r;
 
     // Accumulate contribution from all active lights
     var Lo = vec3<f32>(0.0);

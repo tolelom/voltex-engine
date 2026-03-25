@@ -427,13 +427,13 @@ impl ApplicationHandler for DeferredDemoApp {
             ..Default::default()
         });
 
-        let rt_shadow_filtering_sampler = gpu.device.create_sampler(&wgpu::SamplerDescriptor {
-            label: Some("RT Shadow Filtering Sampler"),
+        let rt_shadow_nearest_sampler = gpu.device.create_sampler(&wgpu::SamplerDescriptor {
+            label: Some("RT Shadow Nearest Sampler"),
             address_mode_u: wgpu::AddressMode::ClampToEdge,
             address_mode_v: wgpu::AddressMode::ClampToEdge,
             address_mode_w: wgpu::AddressMode::ClampToEdge,
-            mag_filter: wgpu::FilterMode::Linear,
-            min_filter: wgpu::FilterMode::Linear,
+            mag_filter: wgpu::FilterMode::Nearest,
+            min_filter: wgpu::FilterMode::Nearest,
             mipmap_filter: wgpu::MipmapFilterMode::Nearest,
             ..Default::default()
         });
@@ -447,7 +447,7 @@ impl ApplicationHandler for DeferredDemoApp {
             &ssgi,
             &ssgi_filtering_sampler,
             &rt_shadow,
-            &rt_shadow_filtering_sampler,
+            &rt_shadow_nearest_sampler,
         );
 
         // Lighting pipeline — now renders to HDR format instead of surface
@@ -696,13 +696,13 @@ impl ApplicationHandler for DeferredDemoApp {
                         mipmap_filter: wgpu::MipmapFilterMode::Nearest,
                         ..Default::default()
                     });
-                    let rt_shadow_filtering_sampler = state.gpu.device.create_sampler(&wgpu::SamplerDescriptor {
-                        label: Some("RT Shadow Filtering Sampler"),
+                    let rt_shadow_nearest_sampler = state.gpu.device.create_sampler(&wgpu::SamplerDescriptor {
+                        label: Some("RT Shadow Nearest Sampler"),
                         address_mode_u: wgpu::AddressMode::ClampToEdge,
                         address_mode_v: wgpu::AddressMode::ClampToEdge,
                         address_mode_w: wgpu::AddressMode::ClampToEdge,
-                        mag_filter: wgpu::FilterMode::Linear,
-                        min_filter: wgpu::FilterMode::Linear,
+                        mag_filter: wgpu::FilterMode::Nearest,
+                        min_filter: wgpu::FilterMode::Nearest,
                         mipmap_filter: wgpu::MipmapFilterMode::Nearest,
                         ..Default::default()
                     });
@@ -715,7 +715,7 @@ impl ApplicationHandler for DeferredDemoApp {
                         &state.ssgi,
                         &ssgi_filtering_sampler,
                         &state.rt_shadow,
-                        &rt_shadow_filtering_sampler,
+                        &rt_shadow_nearest_sampler,
                     );
 
                     // Resize HDR target

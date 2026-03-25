@@ -1,3 +1,5 @@
+enable wgpu_ray_query;
+
 // RT Shadow compute shader.
 // Reads world-space position and normal from the G-Buffer, then fires a
 // shadow ray against the TLAS to determine per-pixel visibility.
@@ -51,27 +53,24 @@ fn cs_main(@builtin(global_invocation_id) gid: vec3<u32>) {
     let ray_origin = world_pos + N * 0.01;
     let ray_dir    = normalize(-uniforms.light_direction);
 
-    // Ray query: check for any occluder between surface and "infinity"
-    var rq: ray_query;
-    rayQueryInitialize(
-        &rq,
-        tlas,
-        RayDesc(
-            RAY_FLAG_TERMINATE_ON_FIRST_HIT | RAY_FLAG_SKIP_CLOSEST_HIT_SHADER,
-            0xFF,
-            0.0001,
-            1.0e6,
-            ray_origin,
-            ray_dir,
-        ),
-    );
+    // Build ray descriptor
+    var desc: RayDesc;
+    desc.flags = RAY_FLAG_TERMINATE_ON_FIRST_HIT;
+    desc.cull_mask = 0xFFu;
+    desc.tmin = 0.001;
+    desc.tmax = 1000.0;
+    desc.origin = ray_origin;
+    desc.dir = ray_dir;
 
-    // Advance until the query is done (with TERMINATE_ON_FIRST_HIT this is at most one step)
+    // Ray query
+    var rq: ray_query;
+    rayQueryInitialize(&rq, tlas, desc);
     while rayQueryProceed(&rq) {}
 
-    // If anything was hit, the pixel is in shadow
+    // Check result
+    let intersection = rayQueryGetCommittedIntersection(&rq);
     var shadow: f32 = 1.0;
-    if rayQueryGetCommittedIntersectionType(&rq) != RAY_QUERY_INTERSECTION_NONE {
+    if intersection.kind != RAY_QUERY_INTERSECTION_NONE {
         shadow = 0.0;
     }
 

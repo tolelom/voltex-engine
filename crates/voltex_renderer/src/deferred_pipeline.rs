@@ -274,22 +274,22 @@ pub fn lighting_shadow_bind_group_layout(device: &wgpu::Device) -> wgpu::BindGro
                 ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
                 count: None,
             },
-            // binding 7: RT shadow texture (R32Float → filterable float)
+            // binding 7: RT shadow texture (R32Float → non-filterable)
             wgpu::BindGroupLayoutEntry {
                 binding: 7,
                 visibility: wgpu::ShaderStages::FRAGMENT,
                 ty: wgpu::BindingType::Texture {
-                    sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                    sample_type: wgpu::TextureSampleType::Float { filterable: false },
                     view_dimension: wgpu::TextureViewDimension::D2,
                     multisampled: false,
                 },
                 count: None,
             },
-            // binding 8: filtering sampler for RT shadow texture
+            // binding 8: non-filtering sampler for RT shadow texture
             wgpu::BindGroupLayoutEntry {
                 binding: 8,
                 visibility: wgpu::ShaderStages::FRAGMENT,
-                ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::NonFiltering),
                 count: None,
             },
         ],
