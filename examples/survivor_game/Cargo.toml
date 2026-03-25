@@ -11,5 +11,7 @@ wgpu.workspace = true
 winit.workspace = true
 bytemuck.workspace = true
 pollster.workspace = true
+voltex_editor.workspace = true
+voltex_audio.workspace = true
 env_logger.workspace = true
 log.workspace = true

@@ -23,6 +23,8 @@ use voltex_renderer::{
     IblResources, pbr_texture_bind_group_layout, create_pbr_texture_bind_group,
     generate_sphere,
 };
+use voltex_editor::{UiContext, UiRenderer};
+use voltex_audio::{AudioClip, AudioSystem};
 use wgpu::util::DeviceExt;
 
 use arena::{generate_arena, arena_model_matrices};
@@ -31,6 +33,16 @@ use game::GameState;
 
 const ARENA_ENTITIES: usize = 5; // 1 floor + 4 obstacles
 const MAX_ENTITIES: usize = 100; // pre-allocate for future enemies/projectiles
+
+fn generate_sine(freq: f32, duration: f32, sample_rate: u32) -> AudioClip {
+    let samples = (sample_rate as f32 * duration) as usize;
+    let mut data = Vec::with_capacity(samples);
+    for i in 0..samples {
+        let t = i as f32 / sample_rate as f32;
+        data.push((t * freq * std::f32::consts::TAU).sin() * 0.3);
+    }
+    AudioClip::new(data, sample_rate, 1)
+}
 
 struct SurvivorApp {
     state: Option<AppState>,
@@ -65,6 +77,11 @@ struct AppState {
     shadow_pass_buffer: wgpu::Buffer,
     shadow_pass_bind_group: wgpu::BindGroup,
     _ibl: IblResources,
+    // UI
+    ui: UiContext,
+    ui_renderer: UiRenderer,
+    // Audio
+    audio: Option<AudioSystem>,
     // Misc
     input: InputState,
     timer: GameTimer,
@@ -300,6 +317,22 @@ impl ApplicationHandler for SurvivorApp {
             &shadow_layout,
         );
 
+        // ---- UI ----
+        let screen_w = gpu.config.width as f32;
+        let screen_h = gpu.config.height as f32;
+        let ui = UiContext::new(screen_w, screen_h);
+        let ui_renderer = UiRenderer::new(
+            &gpu.device,
+            &gpu.queue,
+            gpu.surface_format,
+            &ui.font,
+        );
+
+        // ---- Audio ----
+        let shoot_clip = generate_sine(440.0, 0.05, 44100);
+        let kill_clip = generate_sine(220.0, 0.1, 44100);
+        let audio = AudioSystem::new(vec![shoot_clip, kill_clip]).ok();
+
         self.state = Some(AppState {
             window,
             gpu,
@@ -323,6 +356,9 @@ impl ApplicationHandler for SurvivorApp {
             shadow_pass_buffer,
             shadow_pass_bind_group,
             _ibl: ibl,
+            ui,
+            ui_renderer,
+            audio,
             input: InputState::new(),
             timer: GameTimer::new(60),
             cam_aligned_size,
@@ -393,14 +429,20 @@ impl ApplicationHandler for SurvivorApp {
                 let dt = state.timer.frame_dt();
                 state.input.begin_frame();
 
+                // Restart on R when game over
+                if state.game.game_over && state.input.is_key_just_pressed(KeyCode::KeyR) {
+                    state.game = GameState::new();
+                }
+
                 // Update game logic
-                state.game.update(&state.input, dt);
+                let events = state.game.update(&state.input, dt);
 
                 // Mouse aim + shooting
                 let aspect = state.gpu.config.width as f32 / state.gpu.config.height as f32;
                 let (mx, my) = state.input.mouse_position();
                 let screen_w = state.gpu.config.width as f32;
                 let screen_h = state.gpu.config.height as f32;
+                let mut shot_fired = false;
                 if let Some(world_pos) =
                     mouse_to_world_xz(mx as f32, my as f32, screen_w, screen_h, &state.camera, aspect)
                 {
@@ -409,8 +451,18 @@ impl ApplicationHandler for SurvivorApp {
                     if aim_xz.length_squared() > 0.01 {
                         let aim_dir = aim_xz.normalize();
                         if state.input.is_mouse_button_pressed(MouseButton::Left) {
-                            state.game.try_shoot(aim_dir);
+                            shot_fired = state.game.try_shoot(aim_dir);
                         }
+                    }
+                }
+
+                // Play audio SFX
+                if let Some(ref audio) = state.audio {
+                    if shot_fired {
+                        audio.play(0, 0.3, false);
+                    }
+                    if events.enemies_killed > 0 {
+                        audio.play(1, 0.5, false);
                     }
                 }
 
@@ -482,8 +534,19 @@ impl ApplicationHandler for SurvivorApp {
                         let (c, m, r) = state.materials[i];
                         (state.models[i], c, m, r)
                     } else if i == ARENA_ENTITIES {
-                        // Player: blue sphere
-                        (player_model, [0.2, 0.4, 1.0, 1.0], 0.3, 0.5)
+                        // Player: blue sphere (flash white when invincible)
+                        let player_color = if state.game.player.invincible_timer > 0.0 {
+                            // Blink effect
+                            let blink = (state.game.player.invincible_timer * 10.0).sin();
+                            if blink > 0.0 {
+                                [1.0, 1.0, 1.0, 1.0]
+                            } else {
+                                [0.2, 0.4, 1.0, 1.0]
+                            }
+                        } else {
+                            [0.2, 0.4, 1.0, 1.0]
+                        };
+                        (player_model, player_color, 0.3, 0.5)
                     } else if i < base_enemy_idx {
                         // Projectile: yellow sphere
                         let pi = i - ARENA_ENTITIES - 1;
@@ -694,6 +757,44 @@ impl ApplicationHandler for SurvivorApp {
                     for ei in 0..num_enemies {
                         draw_color!(render_pass, state.player_mesh, base_enemy_idx + ei);
                     }
+                }
+
+                // ===== Pass 3: UI Overlay =====
+                {
+                    let mouse_down = state.input.is_mouse_button_pressed(MouseButton::Left);
+                    state.ui.begin_frame(mx as f32, my as f32, mouse_down);
+
+                    // Top-left: game info
+                    state.ui.text(&format!("HP: {}/{}", state.game.player.hp, state.game.player.max_hp));
+                    state.ui.text(&format!("Wave: {}", state.game.wave.wave_number));
+                    state.ui.text(&format!("Score: {}", state.game.score));
+                    state.ui.text(&format!("Enemies: {}", state.game.enemies.len()));
+
+                    if state.game.game_over {
+                        state.ui.begin_panel(
+                            "Game Over",
+                            screen_w / 2.0 - 120.0,
+                            screen_h / 2.0 - 60.0,
+                            240.0,
+                            120.0,
+                        );
+                        state.ui.text("GAME OVER");
+                        state.ui.text(&format!("Final Score: {}", state.game.score));
+                        state.ui.text("Press R to restart");
+                        state.ui.end_panel();
+                    }
+
+                    state.ui.end_frame();
+
+                    state.ui_renderer.render(
+                        &state.gpu.device,
+                        &state.gpu.queue,
+                        &mut encoder,
+                        &color_view,
+                        &state.ui.draw_list,
+                        screen_w,
+                        screen_h,
+                    );
                 }
 
                 state.gpu.queue.submit(std::iter::once(encoder.finish()));
