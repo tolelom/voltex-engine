@@ -1,6 +1,16 @@
 use std::ffi::{CStr, CString};
 use crate::ffi;
 
+/// Represents a value that can be passed to/from Lua.
+#[derive(Debug, Clone, PartialEq)]
+pub enum LuaValue {
+    Nil,
+    Bool(bool),
+    Number(f64),
+    String(String),
+    Table(Vec<(String, LuaValue)>),
+}
+
 pub struct LuaState {
     state: *mut ffi::lua_State,
 }
@@ -109,6 +119,186 @@ impl LuaState {
         }
     }
 
+    /// Push a LuaValue onto the Lua stack.
+    pub fn push_value(&self, value: &LuaValue) {
+        unsafe {
+            match value {
+                LuaValue::Nil => ffi::lua_pushnil(self.state),
+                LuaValue::Bool(b) => ffi::lua_pushboolean(self.state, if *b { 1 } else { 0 }),
+                LuaValue::Number(n) => ffi::lua_pushnumber(self.state, *n),
+                LuaValue::String(s) => {
+                    let cs = CString::new(s.as_str()).unwrap();
+                    ffi::lua_pushstring(self.state, cs.as_ptr());
+                }
+                LuaValue::Table(pairs) => {
+                    let borrowed: Vec<(&str, LuaValue)> = pairs.iter()
+                        .map(|(k, v)| (k.as_str(), v.clone()))
+                        .collect();
+                    self.push_table(&borrowed);
+                }
+            }
+        }
+    }
+
+    /// Push a Rust slice of key-value pairs as a Lua table onto the stack.
+    pub fn push_table(&self, pairs: &[(&str, LuaValue)]) {
+        unsafe {
+            ffi::lua_createtable(self.state, 0, pairs.len() as i32);
+            for (key, val) in pairs {
+                self.push_value(val);
+                let ckey = CString::new(*key).unwrap();
+                ffi::lua_setfield(self.state, -2, ckey.as_ptr());
+            }
+        }
+    }
+
+    /// Read a Lua table at the given stack index into key-value pairs.
+    pub fn read_table(&self, index: i32) -> Result<Vec<(String, LuaValue)>, String> {
+        unsafe {
+            if ffi::lua_type(self.state, index) != ffi::LUA_TTABLE {
+                return Err("expected table".to_string());
+            }
+            let abs_idx = if index < 0 {
+                ffi::lua_gettop(self.state) + index + 1
+            } else {
+                index
+            };
+            let mut result = Vec::new();
+            ffi::lua_pushnil(self.state); // first key
+            while ffi::lua_next(self.state, abs_idx) != 0 {
+                // key at -2, value at -1
+                let key = self.read_stack_as_string(-2);
+                let val = self.read_stack_value(-1);
+                result.push((key, val));
+                ffi::lua_pop(self.state, 1); // pop value, keep key for next iteration
+            }
+            Ok(result)
+        }
+    }
+
+    /// Push a Vec3 as a Lua table {x=, y=, z=}.
+    pub fn push_vec3(&self, v: [f32; 3]) {
+        let pairs: Vec<(&str, LuaValue)> = vec![
+            ("x", LuaValue::Number(v[0] as f64)),
+            ("y", LuaValue::Number(v[1] as f64)),
+            ("z", LuaValue::Number(v[2] as f64)),
+        ];
+        self.push_table(&pairs);
+    }
+
+    /// Read a Vec3 table from the stack. Supports {x=, y=, z=} named fields
+    /// or {[1]=, [2]=, [3]=} array-style fields.
+    pub fn read_vec3(&self, index: i32) -> Result<[f32; 3], String> {
+        unsafe {
+            if ffi::lua_type(self.state, index) != ffi::LUA_TTABLE {
+                return Err("expected table for vec3".to_string());
+            }
+            let abs_idx = if index < 0 {
+                ffi::lua_gettop(self.state) + index + 1
+            } else {
+                index
+            };
+
+            // Try named fields first
+            let cx = CString::new("x").unwrap();
+            let cy = CString::new("y").unwrap();
+            let cz = CString::new("z").unwrap();
+
+            let tx = ffi::lua_getfield(self.state, abs_idx, cx.as_ptr());
+            if tx == ffi::LUA_TNUMBER {
+                let mut isnum = 0;
+                let x = ffi::lua_tonumberx(self.state, -1, &mut isnum) as f32;
+                ffi::lua_pop(self.state, 1);
+
+                ffi::lua_getfield(self.state, abs_idx, cy.as_ptr());
+                let y = ffi::lua_tonumberx(self.state, -1, &mut isnum) as f32;
+                ffi::lua_pop(self.state, 1);
+
+                ffi::lua_getfield(self.state, abs_idx, cz.as_ptr());
+                let z = ffi::lua_tonumberx(self.state, -1, &mut isnum) as f32;
+                ffi::lua_pop(self.state, 1);
+
+                return Ok([x, y, z]);
+            }
+            ffi::lua_pop(self.state, 1);
+
+            // Try array-style {v[1], v[2], v[3]}
+            let mut vals = [0.0f32; 3];
+            for i in 0..3 {
+                ffi::lua_rawgeti(self.state, abs_idx, (i + 1) as ffi::lua_Integer);
+                let mut isnum = 0;
+                vals[i] = ffi::lua_tonumberx(self.state, -1, &mut isnum) as f32;
+                ffi::lua_pop(self.state, 1);
+                if isnum == 0 {
+                    return Err("vec3 array element is not a number".to_string());
+                }
+            }
+            Ok(vals)
+        }
+    }
+
+    /// Read a value from the Lua stack at the given index.
+    pub fn read_stack_value(&self, index: i32) -> LuaValue {
+        unsafe {
+            match ffi::lua_type(self.state, index) {
+                ffi::LUA_TNIL => LuaValue::Nil,
+                ffi::LUA_TBOOLEAN => {
+                    LuaValue::Bool(ffi::lua_toboolean(self.state, index) != 0)
+                }
+                ffi::LUA_TNUMBER => {
+                    let mut isnum = 0;
+                    let n = ffi::lua_tonumberx(self.state, index, &mut isnum);
+                    LuaValue::Number(n)
+                }
+                ffi::LUA_TSTRING => {
+                    let ptr = ffi::lua_tostring(self.state, index);
+                    if ptr.is_null() {
+                        LuaValue::Nil
+                    } else {
+                        LuaValue::String(CStr::from_ptr(ptr).to_string_lossy().into_owned())
+                    }
+                }
+                ffi::LUA_TTABLE => {
+                    // Read recursively
+                    self.read_table(index).map(LuaValue::Table).unwrap_or(LuaValue::Nil)
+                }
+                _ => LuaValue::Nil,
+            }
+        }
+    }
+
+    /// Read the stack value at index as a string key (for table iteration).
+    fn read_stack_as_string(&self, index: i32) -> String {
+        unsafe {
+            match ffi::lua_type(self.state, index) {
+                ffi::LUA_TSTRING => {
+                    let ptr = ffi::lua_tostring(self.state, index);
+                    if ptr.is_null() {
+                        String::new()
+                    } else {
+                        CStr::from_ptr(ptr).to_string_lossy().into_owned()
+                    }
+                }
+                ffi::LUA_TNUMBER => {
+                    let mut isnum = 0;
+                    let n = ffi::lua_tonumberx(self.state, index, &mut isnum);
+                    // Format integer keys without decimal
+                    if n == (n as i64) as f64 {
+                        format!("{}", n as i64)
+                    } else {
+                        format!("{}", n)
+                    }
+                }
+                _ => String::new(),
+            }
+        }
+    }
+
+    /// Re-execute a Lua script file on the existing state (hot reload).
+    pub fn reload_file(&mut self, path: &str) -> Result<(), String> {
+        self.exec_file(path)
+    }
+
     /// Raw Lua state pointer (for advanced use).
     pub fn raw(&self) -> *mut ffi::lua_State {
         self.state
@@ -193,5 +383,123 @@ mod tests {
         lua.register_fn("add_ten", lua_add_ten);
         lua.exec("result = add_ten(5)").unwrap();
         assert_eq!(lua.get_global_number("result"), Some(15.0));
+    }
+
+    #[test]
+    fn test_push_read_table_roundtrip() {
+        let lua = LuaState::new();
+        let pairs: Vec<(&str, LuaValue)> = vec![
+            ("name", LuaValue::String("test".into())),
+            ("value", LuaValue::Number(42.0)),
+            ("active", LuaValue::Bool(true)),
+        ];
+        lua.push_table(&pairs);
+        unsafe { crate::ffi::lua_setglobal(lua.state, b"tbl\0".as_ptr() as *const _); }
+        lua.exec("result_name = tbl.name; result_val = tbl.value").unwrap();
+        assert_eq!(lua.get_global_string("result_name"), Some("test".to_string()));
+        assert_eq!(lua.get_global_number("result_val"), Some(42.0));
+    }
+
+    #[test]
+    fn test_read_table_from_lua() {
+        let lua = LuaState::new();
+        lua.exec("test_table = { greeting = 'hello', count = 7 }").unwrap();
+        unsafe {
+            let name = std::ffi::CString::new("test_table").unwrap();
+            crate::ffi::lua_getglobal(lua.state, name.as_ptr());
+            let table = lua.read_table(-1).unwrap();
+            crate::ffi::lua_pop(lua.state, 1);
+
+            let has_greeting = table.iter().any(|(k, v)| {
+                k == "greeting" && *v == LuaValue::String("hello".into())
+            });
+            let has_count = table.iter().any(|(k, v)| {
+                k == "count" && *v == LuaValue::Number(7.0)
+            });
+            assert!(has_greeting, "table should contain greeting='hello'");
+            assert!(has_count, "table should contain count=7");
+        }
+    }
+
+    #[test]
+    fn test_nested_table() {
+        let lua = LuaState::new();
+        lua.exec("nested = { inner = { val = 99 } }").unwrap();
+        unsafe {
+            let name = std::ffi::CString::new("nested").unwrap();
+            crate::ffi::lua_getglobal(lua.state, name.as_ptr());
+            let table = lua.read_table(-1).unwrap();
+            crate::ffi::lua_pop(lua.state, 1);
+
+            let inner = table.iter().find(|(k, _)| k == "inner");
+            assert!(inner.is_some());
+            if let Some((_, LuaValue::Table(inner_pairs))) = inner {
+                let has_val = inner_pairs.iter().any(|(k, v)| {
+                    k == "val" && *v == LuaValue::Number(99.0)
+                });
+                assert!(has_val);
+            } else {
+                panic!("inner should be a table");
+            }
+        }
+    }
+
+    #[test]
+    fn test_vec3_named_roundtrip() {
+        let lua = LuaState::new();
+        lua.push_vec3([1.0, 2.5, 3.0]);
+        unsafe { crate::ffi::lua_setglobal(lua.state, b"v\0".as_ptr() as *const _); }
+
+        // Read it back
+        unsafe {
+            crate::ffi::lua_getglobal(lua.state, b"v\0".as_ptr() as *const _);
+            let v = lua.read_vec3(-1).unwrap();
+            crate::ffi::lua_pop(lua.state, 1);
+            assert_eq!(v, [1.0, 2.5, 3.0]);
+        }
+    }
+
+    #[test]
+    fn test_vec3_from_lua_named() {
+        let lua = LuaState::new();
+        lua.exec("v = { x = 10, y = 20, z = 30 }").unwrap();
+        unsafe {
+            crate::ffi::lua_getglobal(lua.state, b"v\0".as_ptr() as *const _);
+            let v = lua.read_vec3(-1).unwrap();
+            crate::ffi::lua_pop(lua.state, 1);
+            assert_eq!(v, [10.0, 20.0, 30.0]);
+        }
+    }
+
+    #[test]
+    fn test_vec3_from_lua_array() {
+        let lua = LuaState::new();
+        lua.exec("v = { 4, 5, 6 }").unwrap();
+        unsafe {
+            crate::ffi::lua_getglobal(lua.state, b"v\0".as_ptr() as *const _);
+            let v = lua.read_vec3(-1).unwrap();
+            crate::ffi::lua_pop(lua.state, 1);
+            assert_eq!(v, [4.0, 5.0, 6.0]);
+        }
+    }
+
+    #[test]
+    fn test_hot_reload() {
+        let dir = std::env::temp_dir().join("voltex_script_reload_test");
+        let _ = std::fs::create_dir_all(&dir);
+        let path = dir.join("reload_test.lua");
+
+        // Initial script
+        std::fs::write(&path, "counter = 1").unwrap();
+        let mut lua = LuaState::new();
+        lua.exec_file(path.to_str().unwrap()).unwrap();
+        assert_eq!(lua.get_global_number("counter"), Some(1.0));
+
+        // Modified script
+        std::fs::write(&path, "counter = counter + 10").unwrap();
+        lua.reload_file(path.to_str().unwrap()).unwrap();
+        assert_eq!(lua.get_global_number("counter"), Some(11.0));
+
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

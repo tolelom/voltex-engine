@@ -8,8 +8,13 @@ pub type lua_CFunction = unsafe extern "C" fn(*mut lua_State) -> c_int;
 
 // Constants
 pub const LUA_OK: c_int = 0;
+pub const LUA_YIELD: c_int = 1;
+pub const LUA_TNIL: c_int = 0;
+pub const LUA_TBOOLEAN: c_int = 1;
 pub const LUA_TNUMBER: c_int = 3;
 pub const LUA_TSTRING: c_int = 4;
+pub const LUA_TTABLE: c_int = 5;
+pub const LUA_TFUNCTION: c_int = 6;
 pub const LUA_MULTRET: c_int = -1;
 
 extern "C" {
@@ -26,21 +31,41 @@ extern "C" {
     pub fn lua_gettop(L: *mut lua_State) -> c_int;
     pub fn lua_settop(L: *mut lua_State, idx: c_int);
     pub fn lua_type(L: *mut lua_State, idx: c_int) -> c_int;
+    pub fn lua_pushvalue(L: *mut lua_State, idx: c_int);
 
     // Push
     pub fn lua_pushnumber(L: *mut lua_State, n: lua_Number);
+    pub fn lua_pushinteger(L: *mut lua_State, n: lua_Integer);
     pub fn lua_pushstring(L: *mut lua_State, s: *const c_char) -> *const c_char;
     pub fn lua_pushcclosure(L: *mut lua_State, f: lua_CFunction, n: c_int);
     pub fn lua_pushlightuserdata(L: *mut lua_State, p: *mut c_void);
+    pub fn lua_pushboolean(L: *mut lua_State, b: c_int);
+    pub fn lua_pushnil(L: *mut lua_State);
 
     // Get
     pub fn lua_tonumberx(L: *mut lua_State, idx: c_int, isnum: *mut c_int) -> lua_Number;
     pub fn lua_tolstring(L: *mut lua_State, idx: c_int, len: *mut usize) -> *const c_char;
     pub fn lua_touserdata(L: *mut lua_State, idx: c_int) -> *mut c_void;
+    pub fn lua_toboolean(L: *mut lua_State, idx: c_int) -> c_int;
+    pub fn lua_tointegerx(L: *mut lua_State, idx: c_int, isnum: *mut c_int) -> lua_Integer;
+
+    // Table
+    pub fn lua_createtable(L: *mut lua_State, narr: c_int, nrec: c_int);
+    pub fn lua_setfield(L: *mut lua_State, idx: c_int, k: *const c_char);
+    pub fn lua_getfield(L: *mut lua_State, idx: c_int, k: *const c_char) -> c_int;
+    pub fn lua_next(L: *mut lua_State, idx: c_int) -> c_int;
+    pub fn lua_rawgeti(L: *mut lua_State, idx: c_int, n: lua_Integer) -> c_int;
+    pub fn lua_rawseti(L: *mut lua_State, idx: c_int, n: lua_Integer);
 
     // Globals
     pub fn lua_getglobal(L: *mut lua_State, name: *const c_char) -> c_int;
     pub fn lua_setglobal(L: *mut lua_State, name: *const c_char);
+
+    // Coroutine
+    pub fn lua_newthread(L: *mut lua_State) -> *mut lua_State;
+    pub fn lua_resume(L: *mut lua_State, from: *mut lua_State, nargs: c_int, nresults: *mut c_int) -> c_int;
+    pub fn lua_xmove(from: *mut lua_State, to: *mut lua_State, n: c_int);
+    pub fn lua_status(L: *mut lua_State) -> c_int;
 }
 
 // Helper: lua_pcall macro equivalent
