@@ -12,11 +12,16 @@
 - voltex_math: Vec2, Vec4, Mat4 (transforms, look_at, perspective, orthographic)
 - voltex_renderer: MeshVertex(+tangent), Mesh, depth buffer, OBJ parser, Camera, FpsController
 - voltex_renderer: Blinn-Phong shader, BMP texture loader, GpuTexture
+- voltex_renderer: PNG decoder (deflate + filter reconstruction)
+- voltex_renderer: JPG decoder (Baseline JPEG: Huffman, IDCT, MCU, YCbCr, subsampling)
+- voltex_renderer: glTF 2.0 / GLB parser (JSON parser, accessor extraction, PBR material)
 - examples/model_viewer
 
 ### Phase 3a: ECS
 - voltex_ecs: Entity(id+generation), SparseSet<T>, World(type-erased storage)
-- voltex_ecs: query<T>, query2<A,B>, Transform component
+- voltex_ecs: query<T>, query2<A,B>, query3, query4, Transform component
+- voltex_ecs: query_with/query_without, query2_with/query2_without (With/Without filters)
+- voltex_ecs: System trait, Scheduler (ordered execution)
 - examples/many_cubes (400 entities, dynamic UBO)
 
 ### Phase 3b: Scene Graph
@@ -163,19 +168,19 @@ crates/
 └── voltex_editor    — IMGUI framework, UiRenderer, widgets
 ```
 
-## 테스트: 255개 전부 통과
+## 테스트: 324개 전부 통과
 
 - voltex_asset: 14
 - voltex_audio: 35 (audio_clip 2 + wav 5 + mixing 11 + audio_system 2 + spatial 8 + mix_group 7)
-- voltex_ecs: 39
+- voltex_ecs: 50 (world 16 + sparse_set 8 + hierarchy 5 + scene 4 + world_transform 4 + entity 4 + transform 2 + scheduler 4 + query filter 3)
 - voltex_math: 37 (29 + AABB 6 + Ray 2)
-- voltex_physics: 52 (collider 2 + narrow 11 + bvh 5 + collision 7 + rigid_body 3 + integrator 3 + solver 5 + ray 10 + raycast 6)
+- voltex_physics: 64 (collider 2 + narrow 11 + bvh 5 + collision 7 + rigid_body 3 + integrator 3 + solver 5 + ray 10 + raycast 6 + gjk 12)
 - voltex_platform: 3
 - voltex_ai: 15 (navmesh 4 + pathfinding 5 + steering 6)
 - voltex_net: 8 (packet 7 + integration 1)
-- voltex_script: 9 (state 8 + bindings 1)
+- voltex_script: 11 (state 8 + bindings 1 + engine_api 2)
 - voltex_editor: 10 (font 2 + draw_list 3 + widgets 3 + layout 1 + renderer 1)
-- voltex_renderer: 33 (20 + SSGI 3 + RT 3 + bloom 3 + tonemap 4)
+- voltex_renderer: 77 (20 + SSGI 3 + RT 3 + bloom 3 + tonemap 4 + png 10 + jpg 11 + json_parser 10 + gltf 8 + deflate 5)
 
 ## Examples (12개)
 

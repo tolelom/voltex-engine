@@ -2,16 +2,20 @@
 
 ## Phase 2
 
-- **PNG 디코더 자체 구현** — deflate + 필터링. 현재 BMP만 지원.
-- **JPG 디코더 자체 구현** — Huffman + DCT. 현재 미구현.
-- **glTF 파서** — OBJ만 지원 중.
+- ~~**PNG 디코더 자체 구현**~~ ✅ `png.rs` + `deflate.rs` 구현 완료.
+- ~~**JPG 디코더 자체 구현**~~ ✅ `jpg.rs` Baseline JPEG (Huffman/IDCT/MCU/YCbCr) 구현 완료.
+- ~~**glTF 파서**~~ ✅ `gltf.rs` + `json_parser.rs` glTF 2.0 / GLB 구현 완료.
+- **JPG Progressive** — Baseline만 지원. Progressive JPEG 미구현.
+- **glTF 애니메이션/스킨** — 메시+머티리얼만 지원. 애니메이션, 스킨, 카메라, 라이트 확장 미구현.
 
 ## Phase 3a
 
 - **Archetype 기반 스토리지** → SparseSet 사용 중. 대규모 씬에서 성능 이슈 시 전환.
-- **시스템 스케줄러** — 의존성 기반 실행 순서/병렬 실행 미구현. 시스템은 함수 호출.
-- **쿼리 필터** — With, Without, Changed 미구현. query/query2만 존재.
-- **query3+** — query2까지만 있음.
+- ~~**시스템 스케줄러**~~ ✅ 순서 기반 Scheduler (System trait + FnMut blanket impl) 구현 완료.
+- ~~**쿼리 필터**~~ ✅ query_with/query_without, query2_with/query2_without 구현 완료. Changed 미구현.
+- ~~**query3+**~~ ✅ query3, query4 구현 완료.
+- **Changed 필터** — 컴포넌트 변경 감지 미구현. 프레임별 dirty flag 필요.
+- **의존성 기반 스케줄러** — 순서 기반만 구현. 읽기/쓰기 의존성 자동 정렬/병렬 실행 미구현.
 
 ## Phase 3b
 
@@ -44,15 +48,15 @@
 
 ## Phase 5-1
 
-- **Capsule, Convex Hull 콜라이더** — Sphere + Box만 구현. 추후 GJK/EPA와 함께 추가.
-- **OBB (회전된 박스) 충돌** — 축 정렬 AABB만 지원. OBB는 GJK/EPA로 대체 예정.
+- ~~**Capsule, Convex Hull 콜라이더**~~ ✅ Capsule + GJK/EPA 구현 완료. Convex Hull은 미구현.
+- ~~**OBB (회전된 박스) 충돌**~~ ✅ GJK/EPA로 대체 완료.
 - **Incremental BVH 업데이트** — 매 프레임 전체 rebuild. 성능 이슈 시 incremental update 적용.
 - **연속 충돌 감지 (CCD)** — 이산 충돌만. 빠른 물체의 터널링 미처리.
 
 ## Phase 5-2
 
 - **각속도/회전 물리** — angular_velocity 필드만 존재, 적분 미구현. 관성 텐서 필요.
-- **마찰 (Coulomb)** — 미구현. 물체가 미끄러짐 없이 반발만.
+- ~~**마찰 (Coulomb)**~~ ✅ Coulomb friction 구현 완료.
 - **Sequential Impulse 솔버** — 단일 반복 충돌 응답만. 다중 물체 쌓기 불안정.
 - **Sleep/Island 시스템** — 정지 물체 최적화 미구현.
 
@@ -75,7 +79,7 @@
 ## Phase 8-3
 
 - **핫 리로드** — 파일 변경 감지 + Lua state 재로드 미구현.
-- **엔진 API 노출** — ECS, 물리, 오디오 등 Lua에서 접근 불가.
+- ~~**엔진 API 노출**~~ ✅ 기본 엔진 API (spawn, position, entity_count) Lua 바인딩 구현 완료. 물리/오디오 API는 미구현.
 - **Lua 테이블 ↔ Rust 구조체** — 복잡한 데이터 변환 미구현.
 - **코루틴** — Lua 코루틴 래핑 미구현.
 - **샌드박싱** — Lua 보안 제한 미구현.
