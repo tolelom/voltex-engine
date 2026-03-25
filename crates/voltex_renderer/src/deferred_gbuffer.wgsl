@@ -20,6 +20,10 @@ struct MaterialUniform {
 @group(1) @binding(1) var s_albedo: sampler;
 @group(1) @binding(2) var t_normal: texture_2d<f32>;
 @group(1) @binding(3) var s_normal: sampler;
+@group(1) @binding(4) var t_orm: texture_2d<f32>;
+@group(1) @binding(5) var s_orm: sampler;
+@group(1) @binding(6) var t_emissive: texture_2d<f32>;
+@group(1) @binding(7) var s_emissive: sampler;
 
 @group(2) @binding(0) var<uniform> material: MaterialUniform;
 
@@ -84,11 +88,21 @@ fn fs_main(in: VertexOutput) -> GBufferOutput {
     let TBN = mat3x3<f32>(T, B, N_geom);
     let N = normalize(TBN * tangent_normal);
 
+    // Sample ORM texture: R=AO, G=Roughness, B=Metallic; multiply with material params
+    let orm_sample = textureSample(t_orm, s_orm, in.uv);
+    let ao = orm_sample.r * material.ao;
+    let roughness = orm_sample.g * material.roughness;
+    let metallic = orm_sample.b * material.metallic;
+
+    // Sample emissive texture and compute luminance
+    let emissive = textureSample(t_emissive, s_emissive, in.uv).rgb;
+    let emissive_lum = dot(emissive, vec3<f32>(0.299, 0.587, 0.114));
+
     var out: GBufferOutput;
     out.position = vec4<f32>(in.world_pos, 1.0);
     out.normal = vec4<f32>(N * 0.5 + 0.5, 1.0);
     out.albedo = vec4<f32>(albedo, material.base_color.a * tex_color.a);
-    out.material_data = vec4<f32>(material.metallic, material.roughness, material.ao, 1.0);
+    out.material_data = vec4<f32>(metallic, roughness, ao, emissive_lum);
 
     return out;
 }

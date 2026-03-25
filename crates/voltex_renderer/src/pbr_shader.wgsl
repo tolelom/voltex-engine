@@ -36,6 +36,10 @@ struct MaterialUniform {
 @group(1) @binding(1) var s_diffuse: sampler;
 @group(1) @binding(2) var t_normal: texture_2d<f32>;
 @group(1) @binding(3) var s_normal: sampler;
+@group(1) @binding(4) var t_orm: texture_2d<f32>;
+@group(1) @binding(5) var s_orm: sampler;
+@group(1) @binding(6) var t_emissive: texture_2d<f32>;
+@group(1) @binding(7) var s_emissive: sampler;
 
 @group(2) @binding(0) var<uniform> material: MaterialUniform;
 
@@ -250,9 +254,15 @@ fn sample_environment(direction: vec3<f32>, roughness: f32) -> vec3<f32> {
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let tex_color = textureSample(t_diffuse, s_diffuse, in.uv);
     let albedo = material.base_color.rgb * tex_color.rgb;
-    let metallic = material.metallic;
-    let roughness = material.roughness;
-    let ao = material.ao;
+
+    // Sample ORM texture: R=AO, G=Roughness, B=Metallic; multiply with material params
+    let orm_sample = textureSample(t_orm, s_orm, in.uv);
+    let ao = orm_sample.r * material.ao;
+    let roughness = orm_sample.g * material.roughness;
+    let metallic = orm_sample.b * material.metallic;
+
+    // Sample emissive texture
+    let emissive = textureSample(t_emissive, s_emissive, in.uv).rgb;
 
     // Normal mapping via TBN matrix
     let T = normalize(in.world_tangent);
@@ -304,7 +314,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
 
     let ambient = (diffuse_ibl + specular_ibl) * ao;
 
-    var color = ambient + Lo;
+    var color = ambient + Lo + emissive;
 
     // Reinhard tone mapping
     color = color / (color + vec3<f32>(1.0));

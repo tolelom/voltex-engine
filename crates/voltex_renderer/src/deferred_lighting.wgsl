@@ -260,6 +260,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let metallic = mat_sample.r;
     let roughness = mat_sample.g;
     let ao = mat_sample.b;
+    let emissive_lum = mat_sample.w;
 
     let V = normalize(camera_uniform.camera_pos - world_pos);
 
@@ -306,7 +307,10 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let ambient = (diffuse_ibl + specular_ibl) * ao * ssgi_ao + ssgi_indirect;
 
     // Output raw HDR linear colour; tonemap is applied in a separate tonemap pass.
-    let color = ambient + Lo;
+    var color = ambient + Lo;
+
+    // Add emissive contribution (luminance stored in G-Buffer, modulated by albedo)
+    color += albedo * emissive_lum;
 
     return vec4<f32>(color, alpha);
 }

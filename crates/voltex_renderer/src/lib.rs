@@ -32,7 +32,7 @@ pub use gpu::{GpuContext, DEPTH_FORMAT};
 pub use light::{CameraUniform, LightUniform, LightData, LightsUniform, MAX_LIGHTS, LIGHT_DIRECTIONAL, LIGHT_POINT, LIGHT_SPOT};
 pub use mesh::Mesh;
 pub use camera::{Camera, FpsController};
-pub use texture::{GpuTexture, pbr_texture_bind_group_layout, create_pbr_texture_bind_group};
+pub use texture::{GpuTexture, pbr_texture_bind_group_layout, create_pbr_texture_bind_group, pbr_full_texture_bind_group_layout, create_pbr_full_texture_bind_group};
 pub use material::MaterialUniform;
 pub use sphere::generate_sphere;
 pub use pbr_pipeline::create_pbr_pipeline;

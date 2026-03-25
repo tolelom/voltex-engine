@@ -12,7 +12,7 @@ use voltex_renderer::{
     Mesh, GpuTexture, MaterialUniform, generate_sphere, create_pbr_pipeline, obj,
     ShadowMap, ShadowUniform, ShadowPassUniform, SHADOW_MAP_SIZE,
     create_shadow_pipeline, shadow_pass_bind_group_layout,
-    IblResources, pbr_texture_bind_group_layout, create_pbr_texture_bind_group,
+    IblResources, pbr_full_texture_bind_group_layout, create_pbr_full_texture_bind_group,
 };
 use wgpu::util::DeviceExt;
 
@@ -39,6 +39,8 @@ struct AppState {
     camera_light_bind_group: wgpu::BindGroup,
     _albedo_tex: GpuTexture,
     _normal_tex: (wgpu::Texture, wgpu::TextureView, wgpu::Sampler),
+    _orm_tex: GpuTexture,
+    _emissive_tex: GpuTexture,
     pbr_texture_bind_group: wgpu::BindGroup,
     material_bind_group: wgpu::BindGroup,
     // Shadow resources
@@ -188,7 +190,7 @@ impl ApplicationHandler for ShadowDemoApp {
 
         // Bind group layouts
         let cl_layout = camera_light_bind_group_layout(&gpu.device);
-        let pbr_tex_layout = pbr_texture_bind_group_layout(&gpu.device);
+        let pbr_tex_layout = pbr_full_texture_bind_group_layout(&gpu.device);
         let mat_layout = MaterialUniform::bind_group_layout(&gpu.device);
 
         // Camera+Light bind group
@@ -211,17 +213,23 @@ impl ApplicationHandler for ShadowDemoApp {
             ],
         });
 
-        // PBR texture bind group (albedo + normal)
+        // PBR texture bind group (albedo + normal + ORM + emissive)
         let old_tex_layout = GpuTexture::bind_group_layout(&gpu.device);
         let albedo_tex = GpuTexture::white_1x1(&gpu.device, &gpu.queue, &old_tex_layout);
         let normal_tex = GpuTexture::flat_normal_1x1(&gpu.device, &gpu.queue);
-        let pbr_texture_bind_group = create_pbr_texture_bind_group(
+        let orm_tex = GpuTexture::white_1x1(&gpu.device, &gpu.queue, &old_tex_layout);
+        let emissive_tex = GpuTexture::black_1x1(&gpu.device, &gpu.queue, &old_tex_layout);
+        let pbr_texture_bind_group = create_pbr_full_texture_bind_group(
             &gpu.device,
             &pbr_tex_layout,
             &albedo_tex.view,
             &albedo_tex.sampler,
             &normal_tex.1,
             &normal_tex.2,
+            &orm_tex.view,
+            &orm_tex.sampler,
+            &emissive_tex.view,
+            &emissive_tex.sampler,
         );
 
         // IBL resources
@@ -311,6 +319,8 @@ impl ApplicationHandler for ShadowDemoApp {
             camera_light_bind_group,
             _albedo_tex: albedo_tex,
             _normal_tex: normal_tex,
+            _orm_tex: orm_tex,
+            _emissive_tex: emissive_tex,
             pbr_texture_bind_group,
             material_bind_group,
             shadow_map,
