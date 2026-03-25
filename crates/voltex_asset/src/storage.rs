@@ -103,6 +103,18 @@ impl<T> AssetStorage<T> {
             .unwrap_or(0)
     }
 
+    /// Replace the asset data without changing generation or ref_count.
+    /// Used for hot reload — existing handles remain valid.
+    pub fn replace_in_place(&mut self, handle: Handle<T>, new_asset: T) -> bool {
+        if let Some(Some(entry)) = self.entries.get_mut(handle.id as usize) {
+            if entry.generation == handle.generation {
+                entry.asset = new_asset;
+                return true;
+            }
+        }
+        false
+    }
+
     pub fn iter(&self) -> impl Iterator<Item = (Handle<T>, &T)> {
         self.entries
             .iter()
@@ -209,6 +221,27 @@ mod tests {
         assert_ne!(h1.generation, h2.generation);
         assert!(storage.get(h1).is_none());
         assert_eq!(storage.get(h2).unwrap().verts, 9);
+    }
+
+    #[test]
+    fn replace_in_place() {
+        let mut storage: AssetStorage<Mesh> = AssetStorage::new();
+        let h = storage.insert(Mesh { verts: 3 });
+        assert!(storage.replace_in_place(h, Mesh { verts: 99 }));
+        assert_eq!(storage.get(h).unwrap().verts, 99);
+        // Same handle still works — generation unchanged
+        assert_eq!(storage.ref_count(h), 1);
+    }
+
+    #[test]
+    fn replace_in_place_stale_handle() {
+        let mut storage: AssetStorage<Mesh> = AssetStorage::new();
+        let h = storage.insert(Mesh { verts: 3 });
+        storage.release(h);
+        let h2 = storage.insert(Mesh { verts: 10 });
+        // h is stale, replace should fail
+        assert!(!storage.replace_in_place(h, Mesh { verts: 99 }));
+        assert_eq!(storage.get(h2).unwrap().verts, 10);
     }
 
     #[test]
