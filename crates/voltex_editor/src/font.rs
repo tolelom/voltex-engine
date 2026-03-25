@@ -63,6 +63,10 @@ impl FontAtlas {
             }
         }
 
+        // Ensure pixel (0,0) is white (255) so solid-color rects can sample
+        // UV (0,0) and get full brightness for tinting.
+        pixels[0] = 255;
+
         FontAtlas {
             width,
             height,
