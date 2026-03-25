@@ -114,6 +114,119 @@ impl World {
         }
         result
     }
+
+    pub fn query3<A: 'static, B: 'static, C: 'static>(&self) -> Vec<(Entity, &A, &B, &C)> {
+        let a_storage = match self.storage::<A>() {
+            Some(s) => s,
+            None => return Vec::new(),
+        };
+        let b_storage = match self.storage::<B>() {
+            Some(s) => s,
+            None => return Vec::new(),
+        };
+        let c_storage = match self.storage::<C>() {
+            Some(s) => s,
+            None => return Vec::new(),
+        };
+
+        // Find the smallest storage to iterate
+        let a_len = a_storage.len();
+        let b_len = b_storage.len();
+        let c_len = c_storage.len();
+
+        let mut result = Vec::new();
+        if a_len <= b_len && a_len <= c_len {
+            for (entity, a) in a_storage.iter() {
+                if let (Some(b), Some(c)) = (b_storage.get(entity), c_storage.get(entity)) {
+                    result.push((entity, a, b, c));
+                }
+            }
+        } else if b_len <= a_len && b_len <= c_len {
+            for (entity, b) in b_storage.iter() {
+                if let (Some(a), Some(c)) = (a_storage.get(entity), c_storage.get(entity)) {
+                    result.push((entity, a, b, c));
+                }
+            }
+        } else {
+            for (entity, c) in c_storage.iter() {
+                if let (Some(a), Some(b)) = (a_storage.get(entity), b_storage.get(entity)) {
+                    result.push((entity, a, b, c));
+                }
+            }
+        }
+        result
+    }
+
+    pub fn query4<A: 'static, B: 'static, C: 'static, D: 'static>(
+        &self,
+    ) -> Vec<(Entity, &A, &B, &C, &D)> {
+        let a_storage = match self.storage::<A>() {
+            Some(s) => s,
+            None => return Vec::new(),
+        };
+        let b_storage = match self.storage::<B>() {
+            Some(s) => s,
+            None => return Vec::new(),
+        };
+        let c_storage = match self.storage::<C>() {
+            Some(s) => s,
+            None => return Vec::new(),
+        };
+        let d_storage = match self.storage::<D>() {
+            Some(s) => s,
+            None => return Vec::new(),
+        };
+
+        // Find the smallest storage to iterate
+        let a_len = a_storage.len();
+        let b_len = b_storage.len();
+        let c_len = c_storage.len();
+        let d_len = d_storage.len();
+
+        let mut result = Vec::new();
+        if a_len <= b_len && a_len <= c_len && a_len <= d_len {
+            for (entity, a) in a_storage.iter() {
+                if let (Some(b), Some(c), Some(d)) = (
+                    b_storage.get(entity),
+                    c_storage.get(entity),
+                    d_storage.get(entity),
+                ) {
+                    result.push((entity, a, b, c, d));
+                }
+            }
+        } else if b_len <= a_len && b_len <= c_len && b_len <= d_len {
+            for (entity, b) in b_storage.iter() {
+                if let (Some(a), Some(c), Some(d)) = (
+                    a_storage.get(entity),
+                    c_storage.get(entity),
+                    d_storage.get(entity),
+                ) {
+                    result.push((entity, a, b, c, d));
+                }
+            }
+        } else if c_len <= a_len && c_len <= b_len && c_len <= d_len {
+            for (entity, c) in c_storage.iter() {
+                if let (Some(a), Some(b), Some(d)) = (
+                    a_storage.get(entity),
+                    b_storage.get(entity),
+                    d_storage.get(entity),
+                ) {
+                    result.push((entity, a, b, c, d));
+                }
+            }
+        } else {
+            for (entity, d) in d_storage.iter() {
+                if let (Some(a), Some(b), Some(c)) = (
+                    a_storage.get(entity),
+                    b_storage.get(entity),
+                    c_storage.get(entity),
+                ) {
+                    result.push((entity, a, b, c, d));
+                }
+            }
+        }
+        result
+    }
 }
 
 impl Default for World {
@@ -220,6 +333,59 @@ mod tests {
         assert!(entities.contains(&e0));
         assert!(entities.contains(&e1));
         assert!(!entities.contains(&e2));
+    }
+
+    #[test]
+    fn test_query3() {
+        #[derive(Debug, PartialEq)]
+        struct Health(i32);
+
+        let mut world = World::new();
+        let e0 = world.spawn();
+        world.add(e0, Position { x: 1.0, y: 0.0 });
+        world.add(e0, Velocity { dx: 1.0, dy: 0.0 });
+        world.add(e0, Health(100));
+
+        let e1 = world.spawn();
+        world.add(e1, Position { x: 2.0, y: 0.0 });
+        world.add(e1, Velocity { dx: 2.0, dy: 0.0 });
+        // e1 has no Health
+
+        let results = world.query3::<Position, Velocity, Health>();
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].0, e0);
+    }
+
+    #[test]
+    fn test_query4() {
+        #[derive(Debug, PartialEq)]
+        struct Health(i32);
+
+        #[derive(Debug, PartialEq)]
+        struct Tag(u8);
+
+        let mut world = World::new();
+        let e0 = world.spawn();
+        world.add(e0, Position { x: 1.0, y: 0.0 });
+        world.add(e0, Velocity { dx: 1.0, dy: 0.0 });
+        world.add(e0, Health(100));
+        world.add(e0, Tag(1));
+
+        let e1 = world.spawn();
+        world.add(e1, Position { x: 2.0, y: 0.0 });
+        world.add(e1, Velocity { dx: 2.0, dy: 0.0 });
+        world.add(e1, Health(50));
+        // e1 has no Tag
+
+        let e2 = world.spawn();
+        world.add(e2, Position { x: 3.0, y: 0.0 });
+        world.add(e2, Velocity { dx: 3.0, dy: 0.0 });
+        world.add(e2, Tag(2));
+        // e2 has no Health
+
+        let results = world.query4::<Position, Velocity, Health, Tag>();
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].0, e0);
     }
 
     #[test]
