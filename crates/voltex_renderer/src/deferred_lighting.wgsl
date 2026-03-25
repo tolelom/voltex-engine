@@ -51,6 +51,8 @@ struct ShadowUniform {
 @group(2) @binding(4) var s_brdf_lut: sampler;
 @group(2) @binding(5) var t_ssgi: texture_2d<f32>;
 @group(2) @binding(6) var s_ssgi: sampler;
+@group(2) @binding(7) var t_rt_shadow: texture_2d<f32>;
+@group(2) @binding(8) var s_rt_shadow: sampler;
 
 // ── Vertex / Fragment structs ─────────────────────────────────────────────────
 
@@ -264,8 +266,8 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     // F0: base reflectivity; 0.04 for dielectrics, albedo for metals
     let F0 = mix(vec3<f32>(0.04, 0.04, 0.04), albedo, metallic);
 
-    // Shadow
-    let shadow_factor = calculate_shadow(world_pos);
+    // Shadow: sample RT shadow texture (1.0 = lit, 0.0 = shadowed)
+    let shadow_factor = textureSample(t_rt_shadow, s_rt_shadow, uv).r;
 
     // Accumulate contribution from all active lights
     var Lo = vec3<f32>(0.0);

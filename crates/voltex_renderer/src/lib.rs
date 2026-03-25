@@ -17,6 +17,8 @@ pub mod gbuffer;
 pub mod fullscreen_quad;
 pub mod deferred_pipeline;
 pub mod ssgi;
+pub mod rt_accel;
+pub mod rt_shadow;
 
 pub use gpu::{GpuContext, DEPTH_FORMAT};
 pub use light::{CameraUniform, LightUniform, LightData, LightsUniform, MAX_LIGHTS, LIGHT_DIRECTIONAL, LIGHT_POINT, LIGHT_SPOT};
@@ -36,5 +38,8 @@ pub use deferred_pipeline::{
     gbuffer_camera_bind_group_layout,
     lighting_gbuffer_bind_group_layout, lighting_lights_bind_group_layout, lighting_shadow_bind_group_layout,
     ssgi_gbuffer_bind_group_layout, ssgi_data_bind_group_layout, create_ssgi_pipeline,
+    rt_shadow_gbuffer_bind_group_layout, rt_shadow_data_bind_group_layout, create_rt_shadow_pipeline,
 };
 pub use ssgi::{SsgiResources, SsgiUniform, SSGI_OUTPUT_FORMAT};
+pub use rt_accel::{RtAccel, BlasMeshData, mat4_to_tlas_transform};
+pub use rt_shadow::{RtShadowResources, RtShadowUniform, RT_SHADOW_FORMAT};
