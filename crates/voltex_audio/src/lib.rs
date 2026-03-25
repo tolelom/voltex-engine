@@ -1,7 +1,11 @@
 pub mod audio_clip;
 pub mod wav;
 pub mod mixing;
+#[cfg(target_os = "windows")]
+pub mod wasapi;
+pub mod audio_system;
 
 pub use audio_clip::AudioClip;
 pub use wav::{parse_wav, generate_wav_bytes};
 pub use mixing::{PlayingSound, mix_sounds};
+pub use audio_system::AudioSystem;
