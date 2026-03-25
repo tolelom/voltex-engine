@@ -62,7 +62,42 @@ fn find_chunk(data: &[u8], id: &[u8; 4], start: usize) -> Option<(usize, u32)> {
 // Public API
 // ---------------------------------------------------------------------------
 
-/// Parse a PCM 16-bit WAV file from raw bytes into an [`AudioClip`].
+/// Read a 24-bit signed integer (little-endian) from 3 bytes and return as i32.
+fn read_i24_le(data: &[u8], offset: usize) -> Result<i32, String> {
+    if offset + 3 > data.len() {
+        return Err(format!("read_i24_le: offset {} out of bounds (len={})", offset, data.len()));
+    }
+    let lo = data[offset] as u32;
+    let mid = data[offset + 1] as u32;
+    let hi = data[offset + 2] as u32;
+    let unsigned = lo | (mid << 8) | (hi << 16);
+    // Sign-extend from 24-bit to 32-bit
+    if unsigned & 0x800000 != 0 {
+        Ok((unsigned | 0xFF000000) as i32)
+    } else {
+        Ok(unsigned as i32)
+    }
+}
+
+/// Read a 32-bit float (little-endian).
+fn read_f32_le(data: &[u8], offset: usize) -> Result<f32, String> {
+    if offset + 4 > data.len() {
+        return Err(format!("read_f32_le: offset {} out of bounds (len={})", offset, data.len()));
+    }
+    Ok(f32::from_le_bytes([
+        data[offset],
+        data[offset + 1],
+        data[offset + 2],
+        data[offset + 3],
+    ]))
+}
+
+/// Parse a WAV file from raw bytes into an [`AudioClip`].
+///
+/// Supported formats:
+/// - PCM 16-bit (format_tag=1, bits_per_sample=16)
+/// - PCM 24-bit (format_tag=1, bits_per_sample=24)
+/// - IEEE float 32-bit (format_tag=3, bits_per_sample=32)
 pub fn parse_wav(data: &[u8]) -> Result<AudioClip, String> {
     // Minimum viable WAV: RIFF(4) + size(4) + WAVE(4) = 12 bytes
     if data.len() < 12 {
@@ -86,10 +121,6 @@ pub fn parse_wav(data: &[u8]) -> Result<AudioClip, String> {
     }
 
     let format_tag = read_u16_le(data, fmt_offset)?;
-    if format_tag != 1 {
-        return Err(format!("Unsupported WAV format tag: {} (only PCM=1 is supported)", format_tag));
-    }
-
     let channels = read_u16_le(data, fmt_offset + 2)?;
     if channels != 1 && channels != 2 {
         return Err(format!("Unsupported channel count: {}", channels));
@@ -99,9 +130,16 @@ pub fn parse_wav(data: &[u8]) -> Result<AudioClip, String> {
     // byte_rate = fmt_offset + 8  (skip)
     // block_align = fmt_offset + 12 (skip)
     let bits_per_sample = read_u16_le(data, fmt_offset + 14)?;
-    if bits_per_sample != 16 {
-        return Err(format!("Unsupported bits per sample: {} (only 16-bit is supported)", bits_per_sample));
-    }
+
+    // Validate format_tag + bits_per_sample combination
+    let bytes_per_sample = match (format_tag, bits_per_sample) {
+        (1, 16) => 2,   // PCM 16-bit
+        (1, 24) => 3,   // PCM 24-bit
+        (3, 32) => 4,   // IEEE float 32-bit
+        (1, bps) => return Err(format!("Unsupported PCM bits per sample: {}", bps)),
+        (3, bps) => return Err(format!("Unsupported float bits per sample: {} (only 32-bit supported)", bps)),
+        (tag, _) => return Err(format!("Unsupported WAV format tag: {} (only PCM=1 and IEEE_FLOAT=3 are supported)", tag)),
+    };
 
     // --- data chunk ---
     let (data_offset, data_size) =
@@ -112,14 +150,30 @@ pub fn parse_wav(data: &[u8]) -> Result<AudioClip, String> {
         return Err("data chunk extends beyond end of file".to_string());
     }
 
-    // Each sample is 2 bytes (16-bit PCM).
-    let sample_count = data_size as usize / 2;
+    let sample_count = data_size as usize / bytes_per_sample;
     let mut samples = Vec::with_capacity(sample_count);
 
-    for i in 0..sample_count {
-        let raw = read_i16_le(data, data_offset + i * 2)?;
-        // Convert i16 [-32768, 32767] to f32 [-1.0, ~1.0]
-        samples.push(raw as f32 / 32768.0);
+    match (format_tag, bits_per_sample) {
+        (1, 16) => {
+            for i in 0..sample_count {
+                let raw = read_i16_le(data, data_offset + i * 2)?;
+                samples.push(raw as f32 / 32768.0);
+            }
+        }
+        (1, 24) => {
+            for i in 0..sample_count {
+                let raw = read_i24_le(data, data_offset + i * 3)?;
+                // 24-bit range: [-8388608, 8388607]
+                samples.push(raw as f32 / 8388608.0);
+            }
+        }
+        (3, 32) => {
+            for i in 0..sample_count {
+                let raw = read_f32_le(data, data_offset + i * 4)?;
+                samples.push(raw);
+            }
+        }
+        _ => unreachable!(),
     }
 
     Ok(AudioClip::new(samples, sample_rate, channels))
@@ -160,6 +214,87 @@ pub fn generate_wav_bytes(samples_f32: &[f32], sample_rate: u32) -> Vec<u8> {
         let clamped = s.clamp(-1.0, 1.0);
         let raw = (clamped * 32767.0) as i16;
         out.extend_from_slice(&raw.to_le_bytes());
+    }
+
+    out
+}
+
+/// Generate a minimal PCM 24-bit mono WAV file from f32 samples.
+/// Used for round-trip testing.
+pub fn generate_wav_bytes_24bit(samples_f32: &[f32], sample_rate: u32) -> Vec<u8> {
+    let channels: u16 = 1;
+    let bits_per_sample: u16 = 24;
+    let byte_rate = sample_rate * channels as u32 * bits_per_sample as u32 / 8;
+    let block_align: u16 = channels * bits_per_sample / 8;
+    let data_size = (samples_f32.len() * 3) as u32;
+    let riff_size = 4 + 8 + 16 + 8 + data_size;
+
+    let mut out: Vec<u8> = Vec::with_capacity(12 + 8 + 16 + 8 + data_size as usize);
+
+    // RIFF header
+    out.extend_from_slice(b"RIFF");
+    out.extend_from_slice(&riff_size.to_le_bytes());
+    out.extend_from_slice(b"WAVE");
+
+    // fmt chunk
+    out.extend_from_slice(b"fmt ");
+    out.extend_from_slice(&16u32.to_le_bytes());
+    out.extend_from_slice(&1u16.to_le_bytes()); // PCM
+    out.extend_from_slice(&channels.to_le_bytes());
+    out.extend_from_slice(&sample_rate.to_le_bytes());
+    out.extend_from_slice(&byte_rate.to_le_bytes());
+    out.extend_from_slice(&block_align.to_le_bytes());
+    out.extend_from_slice(&bits_per_sample.to_le_bytes());
+
+    // data chunk
+    out.extend_from_slice(b"data");
+    out.extend_from_slice(&data_size.to_le_bytes());
+
+    for &s in samples_f32 {
+        let clamped = s.clamp(-1.0, 1.0);
+        let raw = (clamped * 8388607.0) as i32;
+        // Write 3 bytes LE
+        out.push((raw & 0xFF) as u8);
+        out.push(((raw >> 8) & 0xFF) as u8);
+        out.push(((raw >> 16) & 0xFF) as u8);
+    }
+
+    out
+}
+
+/// Generate a minimal IEEE float 32-bit mono WAV file from f32 samples.
+/// Used for round-trip testing.
+pub fn generate_wav_bytes_f32(samples_f32: &[f32], sample_rate: u32) -> Vec<u8> {
+    let channels: u16 = 1;
+    let bits_per_sample: u16 = 32;
+    let byte_rate = sample_rate * channels as u32 * bits_per_sample as u32 / 8;
+    let block_align: u16 = channels * bits_per_sample / 8;
+    let data_size = (samples_f32.len() * 4) as u32;
+    let riff_size = 4 + 8 + 16 + 8 + data_size;
+
+    let mut out: Vec<u8> = Vec::with_capacity(12 + 8 + 16 + 8 + data_size as usize);
+
+    // RIFF header
+    out.extend_from_slice(b"RIFF");
+    out.extend_from_slice(&riff_size.to_le_bytes());
+    out.extend_from_slice(b"WAVE");
+
+    // fmt chunk
+    out.extend_from_slice(b"fmt ");
+    out.extend_from_slice(&16u32.to_le_bytes());
+    out.extend_from_slice(&3u16.to_le_bytes()); // IEEE_FLOAT
+    out.extend_from_slice(&channels.to_le_bytes());
+    out.extend_from_slice(&sample_rate.to_le_bytes());
+    out.extend_from_slice(&byte_rate.to_le_bytes());
+    out.extend_from_slice(&block_align.to_le_bytes());
+    out.extend_from_slice(&bits_per_sample.to_le_bytes());
+
+    // data chunk
+    out.extend_from_slice(b"data");
+    out.extend_from_slice(&data_size.to_le_bytes());
+
+    for &s in samples_f32 {
+        out.extend_from_slice(&s.to_le_bytes());
     }
 
     out
@@ -236,5 +371,108 @@ mod tests {
                 decoded
             );
         }
+    }
+
+    // -----------------------------------------------------------------------
+    // 24-bit PCM tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn parse_24bit_wav() {
+        let sample_rate = 44100u32;
+        let num_samples = 4410usize;
+        let samples: Vec<f32> = (0..num_samples)
+            .map(|i| (2.0 * std::f32::consts::PI * 440.0 * i as f32 / sample_rate as f32).sin())
+            .collect();
+
+        let wav_bytes = generate_wav_bytes_24bit(&samples, sample_rate);
+        let clip = parse_wav(&wav_bytes).expect("parse_wav 24-bit failed");
+
+        assert_eq!(clip.sample_rate, sample_rate);
+        assert_eq!(clip.channels, 1);
+        assert_eq!(clip.frame_count(), num_samples);
+    }
+
+    #[test]
+    fn roundtrip_24bit() {
+        let original: Vec<f32> = vec![0.0, 0.25, 0.5, -0.25, -0.5, 1.0, -1.0];
+        let wav_bytes = generate_wav_bytes_24bit(&original, 44100);
+        let clip = parse_wav(&wav_bytes).expect("roundtrip 24-bit parse failed");
+
+        assert_eq!(clip.samples.len(), original.len());
+        for (orig, decoded) in original.iter().zip(clip.samples.iter()) {
+            // 24-bit quantization error should be < 0.0001
+            assert!(
+                (orig - decoded).abs() < 0.0001,
+                "24-bit: orig={} decoded={}",
+                orig,
+                decoded
+            );
+        }
+    }
+
+    #[test]
+    fn accuracy_24bit() {
+        // 24-bit should be more accurate than 16-bit
+        let samples = vec![0.5f32];
+        let wav_bytes = generate_wav_bytes_24bit(&samples, 44100);
+        let clip = parse_wav(&wav_bytes).expect("parse failed");
+        // 0.5 * 8388607 = 4194303 -> 4194303 / 8388608 ≈ 0.49999988
+        assert!((clip.samples[0] - 0.5).abs() < 0.0001, "24-bit got {}", clip.samples[0]);
+    }
+
+    // -----------------------------------------------------------------------
+    // 32-bit float tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn parse_32bit_float_wav() {
+        let sample_rate = 44100u32;
+        let num_samples = 4410usize;
+        let samples: Vec<f32> = (0..num_samples)
+            .map(|i| (2.0 * std::f32::consts::PI * 440.0 * i as f32 / sample_rate as f32).sin())
+            .collect();
+
+        let wav_bytes = generate_wav_bytes_f32(&samples, sample_rate);
+        let clip = parse_wav(&wav_bytes).expect("parse_wav float32 failed");
+
+        assert_eq!(clip.sample_rate, sample_rate);
+        assert_eq!(clip.channels, 1);
+        assert_eq!(clip.frame_count(), num_samples);
+    }
+
+    #[test]
+    fn roundtrip_32bit_float() {
+        let original: Vec<f32> = vec![0.0, 0.25, 0.5, -0.25, -0.5, 1.0, -1.0];
+        let wav_bytes = generate_wav_bytes_f32(&original, 44100);
+        let clip = parse_wav(&wav_bytes).expect("roundtrip float32 parse failed");
+
+        assert_eq!(clip.samples.len(), original.len());
+        for (orig, decoded) in original.iter().zip(clip.samples.iter()) {
+            // 32-bit float should be exact
+            assert_eq!(*orig, *decoded, "float32: orig={} decoded={}", orig, decoded);
+        }
+    }
+
+    #[test]
+    fn accuracy_32bit_float() {
+        // 32-bit float should preserve exact values
+        let samples = vec![0.123456789f32, -0.987654321f32];
+        let wav_bytes = generate_wav_bytes_f32(&samples, 44100);
+        let clip = parse_wav(&wav_bytes).expect("parse failed");
+        assert_eq!(clip.samples[0], 0.123456789f32);
+        assert_eq!(clip.samples[1], -0.987654321f32);
+    }
+
+    #[test]
+    fn reject_unsupported_format_tag() {
+        // Create a WAV with format_tag=2 (ADPCM), which we don't support
+        let mut wav = generate_wav_bytes(&[0.0], 44100);
+        // format_tag is at byte 20-21 (RIFF(4)+size(4)+WAVE(4)+fmt(4)+chunk_size(4))
+        wav[20] = 2;
+        wav[21] = 0;
+        let result = parse_wav(&wav);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("Unsupported WAV format tag"));
     }
 }
