@@ -16,6 +16,7 @@ pub mod ibl;
 pub mod gbuffer;
 pub mod fullscreen_quad;
 pub mod deferred_pipeline;
+pub mod ssgi;
 
 pub use gpu::{GpuContext, DEPTH_FORMAT};
 pub use light::{CameraUniform, LightUniform, LightData, LightsUniform, MAX_LIGHTS, LIGHT_DIRECTIONAL, LIGHT_POINT, LIGHT_SPOT};
@@ -34,4 +35,6 @@ pub use deferred_pipeline::{
     create_gbuffer_pipeline, create_lighting_pipeline,
     gbuffer_camera_bind_group_layout,
     lighting_gbuffer_bind_group_layout, lighting_lights_bind_group_layout, lighting_shadow_bind_group_layout,
+    ssgi_gbuffer_bind_group_layout, ssgi_data_bind_group_layout, create_ssgi_pipeline,
 };
+pub use ssgi::{SsgiResources, SsgiUniform, SSGI_OUTPUT_FORMAT};
