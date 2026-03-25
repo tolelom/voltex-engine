@@ -15,6 +15,7 @@ members = [
     "examples/multi_light_demo",
     "examples/shadow_demo",
     "examples/ibl_demo",
+    "crates/voltex_physics",
 ]
 
 [workspace.dependencies]
@@ -23,6 +24,7 @@ voltex_platform = { path = "crates/voltex_platform" }
 voltex_renderer = { path = "crates/voltex_renderer" }
 voltex_ecs = { path = "crates/voltex_ecs" }
 voltex_asset = { path = "crates/voltex_asset" }
+voltex_physics = { path = "crates/voltex_physics" }
 wgpu = "28.0"
 winit = "0.30"
 bytemuck = { version = "1", features = ["derive"] }
