@@ -1,6 +1,18 @@
+use std::collections::HashMap;
 use crate::draw_list::DrawList;
 use crate::font::FontAtlas;
 use crate::layout::LayoutState;
+
+/// Key events the UI system understands.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Key {
+    Left,
+    Right,
+    Backspace,
+    Delete,
+    Home,
+    End,
+}
 
 pub struct UiContext {
     pub hot: Option<u64>,
@@ -12,11 +24,23 @@ pub struct UiContext {
     pub mouse_down: bool,
     pub mouse_clicked: bool,
     pub mouse_released: bool,
+    pub mouse_scroll: f32,
     pub screen_width: f32,
     pub screen_height: f32,
     pub font: FontAtlas,
     id_counter: u64,
     prev_mouse_down: bool,
+    // Text input state
+    pub focused_id: Option<u32>,
+    pub cursor_pos: usize,
+    input_chars: Vec<char>,
+    input_keys: Vec<Key>,
+    // Scroll panel state
+    pub scroll_offsets: HashMap<u32, f32>,
+    // Drag and drop state
+    pub dragging: Option<(u32, u64)>,
+    pub drag_start: (f32, f32),
+    pub(crate) drag_started: bool,
 }
 
 impl UiContext {
@@ -32,11 +56,20 @@ impl UiContext {
             mouse_down: false,
             mouse_clicked: false,
             mouse_released: false,
+            mouse_scroll: 0.0,
             screen_width: screen_w,
             screen_height: screen_h,
             font: FontAtlas::generate(),
             id_counter: 0,
             prev_mouse_down: false,
+            focused_id: None,
+            cursor_pos: 0,
+            input_chars: Vec::new(),
+            input_keys: Vec::new(),
+            scroll_offsets: HashMap::new(),
+            dragging: None,
+            drag_start: (0.0, 0.0),
+            drag_started: false,
         }
     }
 
@@ -60,9 +93,39 @@ impl UiContext {
         self.layout = LayoutState::new(0.0, 0.0);
     }
 
+    /// Feed a character input event (printable ASCII) for text input widgets.
+    pub fn input_char(&mut self, ch: char) {
+        if ch.is_ascii() && !ch.is_ascii_control() {
+            self.input_chars.push(ch);
+        }
+    }
+
+    /// Feed a key input event for text input widgets.
+    pub fn input_key(&mut self, key: Key) {
+        self.input_keys.push(key);
+    }
+
+    /// Set mouse scroll delta for this frame (positive = scroll up).
+    pub fn set_scroll(&mut self, delta: f32) {
+        self.mouse_scroll = delta;
+    }
+
+    /// Drain all pending input chars (consumed by text_input widget).
+    pub(crate) fn drain_chars(&mut self) -> Vec<char> {
+        std::mem::take(&mut self.input_chars)
+    }
+
+    /// Drain all pending key events (consumed by text_input widget).
+    pub(crate) fn drain_keys(&mut self) -> Vec<Key> {
+        std::mem::take(&mut self.input_keys)
+    }
+
     /// End the current frame.
     pub fn end_frame(&mut self) {
-        // Nothing for now — GPU submission will hook in here later.
+        self.mouse_scroll = 0.0;
+        // Clear any unconsumed input
+        self.input_chars.clear();
+        self.input_keys.clear();
     }
 
     /// Generate a new unique ID for this frame.

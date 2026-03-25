@@ -9,15 +9,27 @@ pub struct DrawVertex {
     pub color: [u8; 4],
 }
 
+/// A scissor rectangle for content clipping, in pixel coordinates.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ScissorRect {
+    pub x: u32,
+    pub y: u32,
+    pub w: u32,
+    pub h: u32,
+}
+
 pub struct DrawCommand {
     pub index_offset: u32,
     pub index_count: u32,
+    /// Optional scissor rect for clipping. None means no clipping.
+    pub scissor: Option<ScissorRect>,
 }
 
 pub struct DrawList {
     pub vertices: Vec<DrawVertex>,
     pub indices: Vec<u16>,
     pub commands: Vec<DrawCommand>,
+    scissor_stack: Vec<ScissorRect>,
 }
 
 impl DrawList {
@@ -26,6 +38,7 @@ impl DrawList {
             vertices: Vec::new(),
             indices: Vec::new(),
             commands: Vec::new(),
+            scissor_stack: Vec::new(),
         }
     }
 
@@ -33,6 +46,23 @@ impl DrawList {
         self.vertices.clear();
         self.indices.clear();
         self.commands.clear();
+        self.scissor_stack.clear();
+    }
+
+    /// Push a scissor rect onto the stack. All subsequent draw commands will
+    /// be clipped to this rectangle until `pop_scissor` is called.
+    pub fn push_scissor(&mut self, x: u32, y: u32, w: u32, h: u32) {
+        self.scissor_stack.push(ScissorRect { x, y, w, h });
+    }
+
+    /// Pop the current scissor rect from the stack.
+    pub fn pop_scissor(&mut self) {
+        self.scissor_stack.pop();
+    }
+
+    /// Returns the current scissor rect (top of stack), or None.
+    fn current_scissor(&self) -> Option<ScissorRect> {
+        self.scissor_stack.last().copied()
     }
 
     /// Add a solid-color rectangle. UV is (0,0) for solid color rendering.
@@ -67,6 +97,7 @@ impl DrawList {
         self.commands.push(DrawCommand {
             index_offset,
             index_count: 6,
+            scissor: self.current_scissor(),
         });
     }
 

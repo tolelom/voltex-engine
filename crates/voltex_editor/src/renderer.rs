@@ -286,8 +286,13 @@ impl UiRenderer {
             pass.set_vertex_buffer(0, vertex_buffer.slice(..));
             pass.set_index_buffer(index_buffer.slice(..), wgpu::IndexFormat::Uint16);
 
-            // Draw each command
+            // Draw each command (with optional scissor clipping)
             for cmd in &draw_list.commands {
+                if let Some(scissor) = &cmd.scissor {
+                    pass.set_scissor_rect(scissor.x, scissor.y, scissor.w, scissor.h);
+                } else {
+                    pass.set_scissor_rect(0, 0, screen_w as u32, screen_h as u32);
+                }
                 pass.draw_indexed(
                     cmd.index_offset..cmd.index_offset + cmd.index_count,
                     0,
