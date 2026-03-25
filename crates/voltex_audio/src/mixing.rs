@@ -1,5 +1,6 @@
 use crate::AudioClip;
 use crate::spatial::{Listener, SpatialParams, compute_spatial_gains};
+use crate::mix_group::{MixGroup, MixerState};
 
 /// Represents a sound currently being played back.
 pub struct PlayingSound {
@@ -13,6 +14,8 @@ pub struct PlayingSound {
     pub looping: bool,
     /// Optional 3D spatial parameters. None = 2D (no spatialization).
     pub spatial: Option<SpatialParams>,
+    /// Mix group this sound belongs to.
+    pub group: MixGroup,
 }
 
 impl PlayingSound {
@@ -23,11 +26,12 @@ impl PlayingSound {
             volume,
             looping,
             spatial: None,
+            group: MixGroup::Sfx,
         }
     }
 
     pub fn new_3d(clip_index: usize, volume: f32, looping: bool, spatial: SpatialParams) -> Self {
-        Self { clip_index, position: 0, volume, looping, spatial: Some(spatial) }
+        Self { clip_index, position: 0, volume, looping, spatial: Some(spatial), group: MixGroup::Sfx }
     }
 }
 
@@ -41,6 +45,7 @@ impl PlayingSound {
 /// - `device_channels`: output device channel count (1 or 2).
 /// - `frames`: number of output frames to fill.
 /// - `listener`: the listener for 3D spatialization.
+/// - `mixer`: the global mixer state providing per-group and master volumes.
 pub fn mix_sounds(
     output: &mut Vec<f32>,
     playing: &mut Vec<PlayingSound>,
@@ -49,6 +54,7 @@ pub fn mix_sounds(
     device_channels: u16,
     frames: usize,
     listener: &Listener,
+    mixer: &MixerState,
 ) {
     // Ensure output buffer is sized correctly and zeroed.
     let output_len = frames * device_channels as usize;
@@ -60,12 +66,16 @@ pub fn mix_sounds(
     for (sound_idx, sound) in playing.iter_mut().enumerate() {
         let clip = &clips[sound.clip_index];
 
+        // Apply group and master volume multiplier.
+        let group_vol = mixer.effective_volume(sound.group);
+        let base_volume = sound.volume * group_vol;
+
         // Compute per-channel effective volumes based on spatial params.
         let (vol_left, vol_right) = if let Some(ref spatial) = sound.spatial {
             let (atten, left_gain, right_gain) = compute_spatial_gains(listener, spatial);
-            (sound.volume * atten * left_gain, sound.volume * atten * right_gain)
+            (base_volume * atten * left_gain, base_volume * atten * right_gain)
         } else {
-            (sound.volume, sound.volume)
+            (base_volume, base_volume)
         };
 
         // Compute integer rate ratio for naive resampling.
@@ -152,6 +162,7 @@ mod tests {
     use super::*;
     use crate::AudioClip;
     use crate::spatial::{Listener, SpatialParams};
+    use crate::mix_group::{MixGroup, MixerState};
     use voltex_math::Vec3;
 
     fn make_mono_clip(value: f32, frames: usize, sample_rate: u32) -> AudioClip {
@@ -173,7 +184,7 @@ mod tests {
         let mut playing = vec![PlayingSound::new(0, 0.5, false)];
         let mut output = Vec::new();
 
-        mix_sounds(&mut output, &mut playing, &clips, 44100, 1, 10, &Listener::default());
+        mix_sounds(&mut output, &mut playing, &clips, 44100, 1, 10, &Listener::default(), &MixerState::new());
 
         // All output frames should be 0.5 (1.0 * 0.5 volume)
         assert_eq!(output.len(), 10);
@@ -195,7 +206,7 @@ mod tests {
         ];
         let mut output = Vec::new();
 
-        mix_sounds(&mut output, &mut playing, &clips, 44100, 1, 10, &Listener::default());
+        mix_sounds(&mut output, &mut playing, &clips, 44100, 1, 10, &Listener::default(), &MixerState::new());
 
         assert_eq!(output.len(), 10);
         for &s in &output {
@@ -216,7 +227,7 @@ mod tests {
         ];
         let mut output = Vec::new();
 
-        mix_sounds(&mut output, &mut playing, &clips, 44100, 1, 10, &Listener::default());
+        mix_sounds(&mut output, &mut playing, &clips, 44100, 1, 10, &Listener::default(), &MixerState::new());
 
         for &s in &output {
             assert!(s <= 1.0, "output {} exceeds 1.0 (clamp failed)", s);
@@ -231,7 +242,7 @@ mod tests {
         let mut playing = vec![PlayingSound::new(0, 1.0, false)];
         let mut output = Vec::new();
 
-        mix_sounds(&mut output, &mut playing, &clips, 44100, 1, 20, &Listener::default());
+        mix_sounds(&mut output, &mut playing, &clips, 44100, 1, 20, &Listener::default(), &MixerState::new());
 
         // Sound should have been removed
         assert!(playing.is_empty(), "non-looping sound was not removed");
@@ -244,7 +255,7 @@ mod tests {
         let mut playing = vec![PlayingSound::new(0, 1.0, true)];
         let mut output = Vec::new();
 
-        mix_sounds(&mut output, &mut playing, &clips, 44100, 1, 20, &Listener::default());
+        mix_sounds(&mut output, &mut playing, &clips, 44100, 1, 20, &Listener::default(), &MixerState::new());
 
         // Sound should still be in the list
         assert_eq!(playing.len(), 1, "looping sound was incorrectly removed");
@@ -259,7 +270,7 @@ mod tests {
         let mut playing = vec![PlayingSound::new(0, 1.0, false)];
         let mut output = Vec::new();
 
-        mix_sounds(&mut output, &mut playing, &clips, 44100, 2, 10, &Listener::default());
+        mix_sounds(&mut output, &mut playing, &clips, 44100, 2, 10, &Listener::default(), &MixerState::new());
 
         // output length = 10 frames * 2 channels = 20
         assert_eq!(output.len(), 20);
@@ -282,7 +293,7 @@ mod tests {
         let mut playing = vec![PlayingSound::new(0, 0.5, false)];
         let mut output = Vec::new();
 
-        mix_sounds(&mut output, &mut playing, &clips, 44100, 1, 10, &Listener::default());
+        mix_sounds(&mut output, &mut playing, &clips, 44100, 1, 10, &Listener::default(), &MixerState::new());
 
         assert_eq!(output.len(), 10);
         for &s in &output {
@@ -298,7 +309,7 @@ mod tests {
         let mut playing = vec![PlayingSound::new_3d(0, 1.0, false, spatial)];
         let mut output = Vec::new();
 
-        mix_sounds(&mut output, &mut playing, &clips, 44100, 2, 10, &Listener::default());
+        mix_sounds(&mut output, &mut playing, &clips, 44100, 2, 10, &Listener::default(), &MixerState::new());
 
         assert_eq!(output.len(), 20);
         for &s in &output {
@@ -315,12 +326,48 @@ mod tests {
         let mut playing = vec![PlayingSound::new_3d(0, 1.0, false, spatial)];
         let mut output = Vec::new();
 
-        mix_sounds(&mut output, &mut playing, &clips, 44100, 2, 10, &Listener::default());
+        mix_sounds(&mut output, &mut playing, &clips, 44100, 2, 10, &Listener::default(), &MixerState::new());
 
         assert_eq!(output.len(), 20);
         // Check first frame: left=output[0], right=output[1]
         let left = output[0];
         let right = output[1];
         assert!(right > left, "expected right > left for +X emitter, got left={}, right={}", left, right);
+    }
+
+    #[test]
+    fn group_volume_applied() {
+        // Sfx group at 0.5: output should be halved compared to default (1.0)
+        let clips = vec![make_mono_clip(1.0, 100, 44100)];
+        let mut playing = vec![PlayingSound::new(0, 1.0, false)];
+        let mut output = Vec::new();
+
+        let mut mixer = MixerState::new();
+        mixer.set_volume(MixGroup::Sfx, 0.5);
+
+        mix_sounds(&mut output, &mut playing, &clips, 44100, 1, 10, &Listener::default(), &mixer);
+
+        assert_eq!(output.len(), 10);
+        for &s in &output {
+            assert!((s - 0.5).abs() < 1e-6, "expected 0.5 (halved by Sfx group vol), got {}", s);
+        }
+    }
+
+    #[test]
+    fn master_zero_mutes_output() {
+        // Master volume at 0: all output must be silence
+        let clips = vec![make_mono_clip(1.0, 100, 44100)];
+        let mut playing = vec![PlayingSound::new(0, 1.0, false)];
+        let mut output = Vec::new();
+
+        let mut mixer = MixerState::new();
+        mixer.set_volume(MixGroup::Master, 0.0);
+
+        mix_sounds(&mut output, &mut playing, &clips, 44100, 1, 10, &Listener::default(), &mixer);
+
+        assert_eq!(output.len(), 10);
+        for &s in &output {
+            assert!(s.abs() < 1e-6, "expected silence with master=0, got {}", s);
+        }
     }
 }

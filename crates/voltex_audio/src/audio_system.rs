@@ -5,6 +5,7 @@ use std::thread;
 
 use crate::{AudioClip, PlayingSound, mix_sounds};
 use crate::spatial::{Listener, SpatialParams};
+use crate::mix_group::{MixGroup, MixerState};
 
 // ---------------------------------------------------------------------------
 // AudioCommand
@@ -37,6 +38,10 @@ pub enum AudioCommand {
     SetVolume { clip_index: usize, volume: f32 },
     /// Stop all currently playing sounds.
     StopAll,
+    /// Set volume for a mix group immediately.
+    SetGroupVolume { group: MixGroup, volume: f32 },
+    /// Fade a mix group to a target volume over a duration (seconds).
+    FadeGroup { group: MixGroup, target: f32, duration: f32 },
     /// Shut down the audio thread.
     Shutdown,
 }
@@ -103,6 +108,16 @@ impl AudioSystem {
     pub fn stop_all(&self) {
         let _ = self.sender.send(AudioCommand::StopAll);
     }
+
+    /// Set volume for a mix group immediately.
+    pub fn set_group_volume(&self, group: MixGroup, volume: f32) {
+        let _ = self.sender.send(AudioCommand::SetGroupVolume { group, volume });
+    }
+
+    /// Fade a mix group to a target volume over `duration` seconds.
+    pub fn fade_group(&self, group: MixGroup, target: f32, duration: f32) {
+        let _ = self.sender.send(AudioCommand::FadeGroup { group, target, duration });
+    }
 }
 
 impl Drop for AudioSystem {
@@ -151,8 +166,12 @@ fn audio_thread_windows(rx: mpsc::Receiver<AudioCommand>, clips: Arc<Vec<AudioCl
     let mut playing: Vec<PlayingSound> = Vec::new();
     let mut output: Vec<f32> = Vec::new();
     let mut listener = Listener::default();
+    let mut mixer = MixerState::new();
 
     loop {
+        // Advance mixer fades (~5 ms per iteration)
+        mixer.tick(0.005);
+
         // Process all pending commands (non-blocking)
         loop {
             match rx.try_recv() {
@@ -180,6 +199,12 @@ fn audio_thread_windows(rx: mpsc::Receiver<AudioCommand>, clips: Arc<Vec<AudioCl
                         AudioCommand::StopAll => {
                             playing.clear();
                         }
+                        AudioCommand::SetGroupVolume { group, volume } => {
+                            mixer.set_volume(group, volume);
+                        }
+                        AudioCommand::FadeGroup { group, target, duration } => {
+                            mixer.fade(group, target, duration);
+                        }
                         AudioCommand::Shutdown => {
                             return;
                         }
@@ -200,6 +225,7 @@ fn audio_thread_windows(rx: mpsc::Receiver<AudioCommand>, clips: Arc<Vec<AudioCl
                 device_channels,
                 buffer_frames,
                 &listener,
+                &mixer,
             );
 
             if let Err(e) = device.write_samples(&output) {
