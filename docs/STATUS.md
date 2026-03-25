@@ -113,6 +113,13 @@
 - voltex_renderer: Lighting pass RT shadow integration
 - deferred_demo updated with hardware RT shadows (4-pass: GBuffer → SSGI → RT Shadow → Lighting)
 
+### Phase 7-4: Post Processing (HDR + Bloom + ACES)
+- voltex_renderer: HdrTarget (Rgba16Float), Lighting → HDR output
+- voltex_renderer: BloomResources (5-level mip chain, downsample/upsample)
+- voltex_renderer: Bloom shader (bright extract + tent filter upsample)
+- voltex_renderer: Tonemap shader (ACES filmic + bloom merge + gamma)
+- deferred_demo updated with full post-processing (7 passes)
+
 ## Crate 구조
 
 ```
@@ -126,7 +133,7 @@ crates/
 └── voltex_audio     — AudioClip, WAV parser, mixing, WASAPI backend, AudioSystem, MixGroup, spatial
 ```
 
-## 테스트: 206개 전부 통과
+## 테스트: 213개 전부 통과
 
 - voltex_asset: 14
 - voltex_audio: 35 (audio_clip 2 + wav 5 + mixing 11 + audio_system 2 + spatial 8 + mix_group 7)
@@ -134,7 +141,7 @@ crates/
 - voltex_math: 37 (29 + AABB 6 + Ray 2)
 - voltex_physics: 52 (collider 2 + narrow 11 + bvh 5 + collision 7 + rigid_body 3 + integrator 3 + solver 5 + ray 10 + raycast 6)
 - voltex_platform: 3
-- voltex_renderer: 26 (20 + SSGI 3 + RT 3)
+- voltex_renderer: 33 (20 + SSGI 3 + RT 3 + bloom 3 + tonemap 4)
 
 ## Examples (11개)
 
@@ -150,7 +157,7 @@ crates/
 - audio_demo — 사인파 오디오 재생
 - deferred_demo — 디퍼드 렌더링 + 다중 포인트 라이트
 
-## 다음: Phase 7-4 (포스트 프로세싱) — Stretch Goal
+## 다음: Phase 8 (AI, 네트워킹, 스크립팅, 에디터) — Stretch Goal
 
 스펙 참조: `docs/superpowers/specs/2026-03-24-voltex-engine-design.md`
 

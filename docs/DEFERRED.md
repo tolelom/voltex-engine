@@ -62,6 +62,14 @@
 - **raycast_all (다중 hit)** — 가장 가까운 hit만 반환.
 - **BVH 조기 종료 최적화** — 모든 리프 검사 후 최소 t 선택. front-to-back 순회 미구현.
 
+## Phase 7-4
+
+- **TAA** — Temporal Anti-Aliasing 미구현. Motion vector 필요.
+- **SSR** — Screen-Space Reflections 미구현.
+- **Motion Blur, DOF** — 미구현.
+- **Auto Exposure** — 고정 exposure만. 적응형 노출 미구현.
+- **Bilateral Bloom Blur** — 단순 box/tent filter. Kawase blur 미적용.
+
 ## Phase 7-3
 
 - **RT Reflections** — 미구현. BLAS/TLAS 인프라 재사용 가능.
