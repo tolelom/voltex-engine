@@ -17,6 +17,7 @@ members = [
     "examples/ibl_demo",
     "crates/voltex_physics",
     "crates/voltex_audio",
+    "examples/audio_demo",
 ]
 
 [workspace.dependencies]
