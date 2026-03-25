@@ -144,6 +144,11 @@ pub struct ShadowUniform {
     pub shadow_map_size: f32,
     pub shadow_bias: f32,
     pub _padding: [f32; 2],
+    // Sky parameters (Hosek-Wilkie inspired)
+    pub sun_direction: [f32; 3],
+    pub turbidity: f32,
+    // L2 Spherical Harmonics coefficients: 9 RGB coefficients packed into 7 vec4s (28 floats)
+    pub sh_coefficients: [[f32; 4]; 7],
 }
 
 #[repr(C)]

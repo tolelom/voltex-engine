@@ -267,6 +267,9 @@ impl ApplicationHandler for SurvivorApp {
             shadow_map_size: SHADOW_MAP_SIZE as f32,
             shadow_bias: 0.005,
             _padding: [0.0; 2],
+            sun_direction: [0.5, -0.7, 0.5],
+            turbidity: 3.0,
+            sh_coefficients: [[0.0; 4]; 7],
         };
         let shadow_uniform_buffer =
             gpu.device
@@ -595,6 +598,9 @@ impl ApplicationHandler for SurvivorApp {
                     shadow_map_size: SHADOW_MAP_SIZE as f32,
                     shadow_bias: 0.005,
                     _padding: [0.0; 2],
+                    sun_direction: [0.5, -0.7, 0.5],
+                    turbidity: 3.0,
+                    sh_coefficients: [[0.0; 4]; 7],
                 };
                 state.gpu.queue.write_buffer(
                     &state.shadow_uniform_buffer,

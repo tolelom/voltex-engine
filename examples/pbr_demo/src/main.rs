@@ -207,6 +207,9 @@ impl ApplicationHandler for PbrDemoApp {
             shadow_map_size: 0.0,
             shadow_bias: 0.0,
             _padding: [0.0; 2],
+            sun_direction: [0.5, -0.7, 0.5],
+            turbidity: 3.0,
+            sh_coefficients: [[0.0; 4]; 7],
         };
         let shadow_uniform_buffer = gpu.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Shadow Uniform Buffer"),

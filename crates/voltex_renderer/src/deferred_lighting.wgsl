@@ -42,6 +42,10 @@ struct ShadowUniform {
     light_view_proj: mat4x4<f32>,
     shadow_map_size: f32,
     shadow_bias: f32,
+    _padding: vec2<f32>,
+    sun_direction: vec3<f32>,
+    turbidity: f32,
+    sh_coefficients: array<vec4<f32>, 7>,
 };
 
 @group(2) @binding(0) var t_shadow: texture_depth_2d;

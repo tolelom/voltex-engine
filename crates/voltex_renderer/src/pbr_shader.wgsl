@@ -47,6 +47,10 @@ struct ShadowUniform {
     light_view_proj: mat4x4<f32>,
     shadow_map_size: f32,
     shadow_bias: f32,
+    _padding: vec2<f32>,
+    sun_direction: vec3<f32>,
+    turbidity: f32,
+    sh_coefficients: array<vec4<f32>, 7>,
 };
 
 @group(3) @binding(0) var t_shadow: texture_depth_2d;
@@ -233,21 +237,78 @@ fn calculate_shadow(light_space_pos: vec4<f32>) -> f32 {
     return shadow_val / 9.0;
 }
 
-// Procedural environment sampling for IBL
+// Hosek-Wilkie inspired procedural sky model
 fn sample_environment(direction: vec3<f32>, roughness: f32) -> vec3<f32> {
-    let t = direction.y * 0.5 + 0.5;
+    let sun_dir = normalize(shadow.sun_direction);
+    let turb = clamp(shadow.turbidity, 1.5, 10.0);
+
     var env: vec3<f32>;
     if direction.y > 0.0 {
-        let horizon = vec3<f32>(0.6, 0.6, 0.5);
-        let sky = vec3<f32>(0.3, 0.5, 0.9);
-        env = mix(horizon, sky, pow(direction.y, 0.4));
+        // Rayleigh scattering: blue zenith, warm horizon
+        let zenith_color = vec3<f32>(0.15, 0.3, 0.8) * (1.0 / (turb * 0.15 + 0.5));
+        let horizon_color = vec3<f32>(0.7, 0.6, 0.5) * (1.0 + turb * 0.04);
+
+        let elevation = direction.y;
+        let sky_gradient = mix(horizon_color, zenith_color, pow(elevation, 0.4));
+
+        // Mie scattering: haze near sun direction
+        let cos_sun = max(dot(direction, sun_dir), 0.0);
+        let mie_strength = turb * 0.02;
+        let mie = mie_strength * pow(cos_sun, 8.0) * vec3<f32>(1.0, 0.9, 0.7);
+
+        // Sun disk: bright spot with falloff
+        let sun_disk = pow(max(cos_sun, 0.0), 2048.0) * vec3<f32>(10.0, 9.0, 7.0);
+
+        // Combine
+        env = sky_gradient + mie + sun_disk;
     } else {
-        let horizon = vec3<f32>(0.6, 0.6, 0.5);
-        let ground = vec3<f32>(0.1, 0.08, 0.06);
-        env = mix(horizon, ground, pow(-direction.y, 0.4));
+        // Ground: dark, warm
+        let horizon_color = vec3<f32>(0.6, 0.55, 0.45);
+        let ground_color = vec3<f32>(0.1, 0.08, 0.06);
+        env = mix(horizon_color, ground_color, pow(-direction.y, 0.4));
     }
+
+    // Roughness blur: blend toward average for rough surfaces
     let avg = vec3<f32>(0.3, 0.35, 0.4);
     return mix(env, avg, roughness * roughness);
+}
+
+// Evaluate L2 Spherical Harmonics at given normal direction
+// 9 SH coefficients (RGB) packed into 7 vec4s
+fn evaluate_sh(normal: vec3<f32>, coeffs: array<vec4<f32>, 7>) -> vec3<f32> {
+    let x = normal.x;
+    let y = normal.y;
+    let z = normal.z;
+
+    // SH basis functions (real, L2 order)
+    let Y00  = 0.282095;             // L=0, M=0
+    let Y1n1 = 0.488603 * y;         // L=1, M=-1
+    let Y10  = 0.488603 * z;         // L=1, M=0
+    let Y1p1 = 0.488603 * x;         // L=1, M=1
+    let Y2n2 = 1.092548 * x * y;     // L=2, M=-2
+    let Y2n1 = 1.092548 * y * z;     // L=2, M=-1
+    let Y20  = 0.315392 * (3.0 * z * z - 1.0); // L=2, M=0
+    let Y2p1 = 1.092548 * x * z;     // L=2, M=1
+    let Y2p2 = 0.546274 * (x * x - y * y); // L=2, M=2
+
+    // Unpack: coeffs[0].xyz = c0_rgb, coeffs[0].w = c1_r,
+    //         coeffs[1].xyz = c1_gb + c2_r, coeffs[1].w = c2_g, etc.
+    // Packing: 9 coeffs * 3 channels = 27 floats -> 7 vec4s (28 floats, last padded)
+    let c0 = vec3<f32>(coeffs[0].x, coeffs[0].y, coeffs[0].z);
+    let c1 = vec3<f32>(coeffs[0].w, coeffs[1].x, coeffs[1].y);
+    let c2 = vec3<f32>(coeffs[1].z, coeffs[1].w, coeffs[2].x);
+    let c3 = vec3<f32>(coeffs[2].y, coeffs[2].z, coeffs[2].w);
+    let c4 = vec3<f32>(coeffs[3].x, coeffs[3].y, coeffs[3].z);
+    let c5 = vec3<f32>(coeffs[3].w, coeffs[4].x, coeffs[4].y);
+    let c6 = vec3<f32>(coeffs[4].z, coeffs[4].w, coeffs[5].x);
+    let c7 = vec3<f32>(coeffs[5].y, coeffs[5].z, coeffs[5].w);
+    let c8 = vec3<f32>(coeffs[6].x, coeffs[6].y, coeffs[6].z);
+
+    return max(
+        c0 * Y00 + c1 * Y1n1 + c2 * Y10 + c3 * Y1p1 +
+        c4 * Y2n2 + c5 * Y2n1 + c6 * Y20 + c7 * Y2p1 + c8 * Y2p2,
+        vec3<f32>(0.0)
+    );
 }
 
 @fragment
@@ -301,8 +362,14 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let NdotV_ibl = max(dot(N, V), 0.0);
     let R = reflect(-V, N);
 
-    // Diffuse IBL
-    let irradiance = sample_environment(N, 1.0);
+    // Diffuse IBL: use SH irradiance if SH coefficients are set, else fallback to procedural
+    var irradiance: vec3<f32>;
+    let sh_test = shadow.sh_coefficients[0].x + shadow.sh_coefficients[0].y + shadow.sh_coefficients[0].z;
+    if abs(sh_test) > 0.0001 {
+        irradiance = evaluate_sh(N, shadow.sh_coefficients);
+    } else {
+        irradiance = sample_environment(N, 1.0);
+    }
     let F_env = fresnel_schlick(NdotV_ibl, F0);
     let kd_ibl = (vec3<f32>(1.0) - F_env) * (1.0 - metallic);
     let diffuse_ibl = kd_ibl * albedo * irradiance;

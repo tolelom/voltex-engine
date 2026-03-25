@@ -22,6 +22,7 @@ pub mod spot_shadow;
 pub mod frustum;
 pub mod brdf_lut;
 pub mod ibl;
+pub mod sh;
 pub mod gbuffer;
 pub mod fullscreen_quad;
 pub mod deferred_pipeline;
@@ -47,6 +48,7 @@ pub use point_shadow::{PointShadowMap, point_shadow_view_matrices, point_shadow_
 pub use spot_shadow::{SpotShadowMap, spot_shadow_matrix};
 pub use frustum::{Plane, Frustum, extract_frustum, sphere_vs_frustum, cull_lights};
 pub use ibl::IblResources;
+pub use sh::{compute_sh_coefficients, pack_sh_coefficients, evaluate_sh_cpu};
 pub use gbuffer::GBuffer;
 pub use fullscreen_quad::{create_fullscreen_vertex_buffer, FullscreenVertex};
 pub use deferred_pipeline::{
