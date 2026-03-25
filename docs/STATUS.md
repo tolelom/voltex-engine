@@ -73,6 +73,13 @@
 - voltex_physics: ray_vs_aabb, ray_vs_sphere, ray_vs_box
 - voltex_physics: raycast(world, ray, max_dist) BVH-accelerated ECS integration
 
+### Phase 6-1: Audio System Foundation
+- voltex_audio: WAV parser (PCM 16-bit, mono/stereo)
+- voltex_audio: AudioClip (f32 samples), mixing (volume, looping, channel conversion)
+- voltex_audio: WASAPI backend (Windows, shared mode, COM FFI)
+- voltex_audio: AudioSystem (channel-based audio thread, play/stop/volume)
+- examples/audio_demo (sine wave playback)
+
 ## Crate 구조
 
 ```
@@ -82,19 +89,21 @@ crates/
 ├── voltex_renderer  — GPU, Mesh, OBJ, Camera, Material, PBR, Shadow, IBL, Sphere
 ├── voltex_ecs       — Entity, SparseSet, World, Transform, Hierarchy, Scene, WorldTransform
 ├── voltex_asset     — Handle<T>, AssetStorage<T>, Assets
-└── voltex_physics   — Collider, ContactPoint, BvhTree, RigidBody, detect_collisions, physics_step, raycast
+├── voltex_physics   — Collider, ContactPoint, BvhTree, RigidBody, detect_collisions, physics_step, raycast
+└── voltex_audio     — AudioClip, WAV parser, mixing, WASAPI backend, AudioSystem
 ```
 
-## 테스트: 165개 전부 통과
+## 테스트: 180개 전부 통과
 
 - voltex_asset: 14
+- voltex_audio: 15 (audio_clip 2 + wav 5 + mixing 6 + audio_system 2)
 - voltex_ecs: 39
 - voltex_math: 37 (29 + AABB 6 + Ray 2)
 - voltex_physics: 52 (collider 2 + narrow 11 + bvh 5 + collision 7 + rigid_body 3 + integrator 3 + solver 5 + ray 10 + raycast 6)
 - voltex_platform: 3
 - voltex_renderer: 20
 
-## Examples (9개)
+## Examples (10개)
 
 - triangle — Phase 1 삼각형
 - model_viewer — OBJ 큐브 + Blinn-Phong
@@ -105,8 +114,9 @@ crates/
 - multi_light_demo — 다중 색상 라이트
 - shadow_demo — Directional Light 그림자
 - ibl_demo — Normal map + IBL
+- audio_demo — 사인파 오디오 재생
 
-## 다음: Phase 6 (오디오 시스템)
+## 다음: Phase 6-2 (3D 오디오)
 
 스펙 참조: `docs/superpowers/specs/2026-03-24-voltex-engine-design.md`
 

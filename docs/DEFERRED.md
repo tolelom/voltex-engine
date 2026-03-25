@@ -62,6 +62,14 @@
 - **raycast_all (다중 hit)** — 가장 가까운 hit만 반환.
 - **BVH 조기 종료 최적화** — 모든 리프 검사 후 최소 t 선택. front-to-back 순회 미구현.
 
+## Phase 6-1
+
+- **macOS/Linux 백엔드** — WASAPI(Windows)만 구현. CoreAudio, ALSA 미구현.
+- **OGG/Vorbis 디코더** — WAV PCM 16-bit만 지원.
+- **24-bit/32-bit WAV** — 16-bit만 파싱.
+- **ECS 통합** — AudioSource 컴포넌트 미구현. AudioSystem 직접 호출.
+- **비동기 로딩** — 동기 로딩만.
+
 ## 렌더링 한계
 
 - **per-entity dynamic UBO** — 수천 개 이상은 인스턴싱 필요.
