@@ -9,12 +9,15 @@ pub mod rigid_body;
 pub mod integrator;
 pub mod solver;
 pub mod raycast;
+pub mod ccd;
 
 pub use bvh::BvhTree;
 pub use collider::Collider;
 pub use contact::ContactPoint;
 pub use collision::detect_collisions;
 pub use rigid_body::{RigidBody, PhysicsConfig};
-pub use integrator::integrate;
+pub use integrator::{integrate, inertia_tensor, inv_inertia};
 pub use solver::{resolve_collisions, physics_step};
-pub use raycast::{RayHit, raycast};
+pub use raycast::{RayHit, raycast, raycast_all};
+pub use ray::ray_vs_triangle;
+pub use ccd::swept_sphere_vs_aabb;

@@ -72,6 +72,58 @@ pub fn raycast(world: &World, ray: &Ray, max_dist: f32) -> Option<RayHit> {
     closest
 }
 
+/// Cast a ray and return ALL hits sorted by distance.
+pub fn raycast_all(world: &World, ray: &Ray, max_dist: f32) -> Vec<RayHit> {
+    let entities: Vec<(Entity, Vec3, Collider)> = world
+        .query2::<Transform, Collider>()
+        .into_iter()
+        .map(|(e, t, c)| (e, t.position, *c))
+        .collect();
+
+    if entities.is_empty() {
+        return Vec::new();
+    }
+
+    let mut hits = Vec::new();
+
+    for (entity, pos, collider) in &entities {
+        let aabb = collider.aabb(*pos);
+
+        // Broad phase: ray vs AABB
+        match ray_tests::ray_vs_aabb(ray, &aabb) {
+            Some(t) if t <= max_dist => {}
+            _ => continue,
+        };
+
+        // Narrow phase
+        let result = match collider {
+            Collider::Sphere { radius } => {
+                ray_tests::ray_vs_sphere(ray, *pos, *radius)
+            }
+            Collider::Box { half_extents } => {
+                ray_tests::ray_vs_box(ray, *pos, *half_extents)
+            }
+            Collider::Capsule { radius, half_height } => {
+                ray_tests::ray_vs_capsule(ray, *pos, *radius, *half_height)
+            }
+        };
+
+        if let Some((t, normal)) = result {
+            if t <= max_dist {
+                hits.push(RayHit {
+                    entity: *entity,
+                    t,
+                    point: ray.at(t),
+                    normal,
+                });
+            }
+        }
+    }
+
+    hits.sort_by(|a, b| a.t.partial_cmp(&b.t).unwrap());
+    hits
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -148,6 +200,62 @@ mod tests {
 
         assert_eq!(hit.entity, e);
         assert!(approx(hit.t, 4.0));
+    }
+
+    // --- raycast_all tests ---
+
+    #[test]
+    fn test_raycast_all_multiple_hits() {
+        let mut world = World::new();
+
+        let near = world.spawn();
+        world.add(near, Transform::from_position(Vec3::new(3.0, 0.0, 0.0)));
+        world.add(near, Collider::Sphere { radius: 0.5 });
+
+        let mid = world.spawn();
+        world.add(mid, Transform::from_position(Vec3::new(6.0, 0.0, 0.0)));
+        world.add(mid, Collider::Sphere { radius: 0.5 });
+
+        let far = world.spawn();
+        world.add(far, Transform::from_position(Vec3::new(10.0, 0.0, 0.0)));
+        world.add(far, Collider::Sphere { radius: 0.5 });
+
+        let ray = Ray::new(Vec3::ZERO, Vec3::X);
+        let hits = raycast_all(&world, &ray, 100.0);
+
+        assert_eq!(hits.len(), 3);
+        assert_eq!(hits[0].entity, near);
+        assert_eq!(hits[1].entity, mid);
+        assert_eq!(hits[2].entity, far);
+        assert!(hits[0].t < hits[1].t);
+        assert!(hits[1].t < hits[2].t);
+    }
+
+    #[test]
+    fn test_raycast_all_empty() {
+        let world = World::new();
+        let ray = Ray::new(Vec3::ZERO, Vec3::X);
+        let hits = raycast_all(&world, &ray, 100.0);
+        assert!(hits.is_empty());
+    }
+
+    #[test]
+    fn test_raycast_all_max_dist() {
+        let mut world = World::new();
+
+        let near = world.spawn();
+        world.add(near, Transform::from_position(Vec3::new(3.0, 0.0, 0.0)));
+        world.add(near, Collider::Sphere { radius: 0.5 });
+
+        let far = world.spawn();
+        world.add(far, Transform::from_position(Vec3::new(50.0, 0.0, 0.0)));
+        world.add(far, Collider::Sphere { radius: 0.5 });
+
+        let ray = Ray::new(Vec3::ZERO, Vec3::X);
+        let hits = raycast_all(&world, &ray, 10.0);
+
+        assert_eq!(hits.len(), 1);
+        assert_eq!(hits[0].entity, near);
     }
 
     #[test]

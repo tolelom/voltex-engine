@@ -183,6 +183,43 @@ pub fn ray_vs_capsule(ray: &Ray, center: Vec3, radius: f32, half_height: f32) ->
     best
 }
 
+/// Ray vs Triangle (Möller–Trumbore algorithm).
+/// Returns (t, normal) where normal is the triangle face normal.
+pub fn ray_vs_triangle(ray: &Ray, v0: Vec3, v1: Vec3, v2: Vec3) -> Option<(f32, Vec3)> {
+    let edge1 = v1 - v0;
+    let edge2 = v2 - v0;
+    let h = ray.direction.cross(edge2);
+    let a = edge1.dot(h);
+
+    if a.abs() < 1e-8 {
+        return None; // Ray is parallel to triangle
+    }
+
+    let f = 1.0 / a;
+    let s = ray.origin - v0;
+    let u = f * s.dot(h);
+
+    if u < 0.0 || u > 1.0 {
+        return None;
+    }
+
+    let q = s.cross(edge1);
+    let v = f * ray.direction.dot(q);
+
+    if v < 0.0 || u + v > 1.0 {
+        return None;
+    }
+
+    let t = f * edge2.dot(q);
+
+    if t < 0.0 {
+        return None; // Triangle is behind the ray
+    }
+
+    let normal = edge1.cross(edge2).normalize();
+    Some((t, normal))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -264,5 +301,62 @@ mod tests {
         let ray = Ray::new(Vec3::ZERO, Vec3::X);
         let (t, _normal) = ray_vs_box(&ray, Vec3::ZERO, Vec3::ONE).unwrap();
         assert!(approx(t, 0.0));
+    }
+
+    // --- ray_vs_triangle tests ---
+
+    #[test]
+    fn test_triangle_hit() {
+        let v0 = Vec3::new(-1.0, -1.0, 5.0);
+        let v1 = Vec3::new(1.0, -1.0, 5.0);
+        let v2 = Vec3::new(0.0, 1.0, 5.0);
+        let ray = Ray::new(Vec3::ZERO, Vec3::Z);
+        let (t, normal) = ray_vs_triangle(&ray, v0, v1, v2).unwrap();
+        assert!(approx(t, 5.0));
+        // Normal should point toward -Z (facing the ray)
+        assert!(normal.z.abs() > 0.9);
+    }
+
+    #[test]
+    fn test_triangle_miss() {
+        let v0 = Vec3::new(-1.0, -1.0, 5.0);
+        let v1 = Vec3::new(1.0, -1.0, 5.0);
+        let v2 = Vec3::new(0.0, 1.0, 5.0);
+        // Ray pointing away
+        let ray = Ray::new(Vec3::new(10.0, 10.0, 0.0), Vec3::Z);
+        assert!(ray_vs_triangle(&ray, v0, v1, v2).is_none());
+    }
+
+    #[test]
+    fn test_triangle_behind_ray() {
+        let v0 = Vec3::new(-1.0, -1.0, -5.0);
+        let v1 = Vec3::new(1.0, -1.0, -5.0);
+        let v2 = Vec3::new(0.0, 1.0, -5.0);
+        let ray = Ray::new(Vec3::ZERO, Vec3::Z);
+        assert!(ray_vs_triangle(&ray, v0, v1, v2).is_none());
+    }
+
+    #[test]
+    fn test_triangle_parallel() {
+        let v0 = Vec3::new(0.0, 0.0, 5.0);
+        let v1 = Vec3::new(1.0, 0.0, 5.0);
+        let v2 = Vec3::new(0.0, 0.0, 6.0);
+        // Ray parallel to triangle (in XZ plane)
+        let ray = Ray::new(Vec3::ZERO, Vec3::X);
+        assert!(ray_vs_triangle(&ray, v0, v1, v2).is_none());
+    }
+
+    #[test]
+    fn test_triangle_edge_hit() {
+        // Ray hitting exactly on an edge
+        let v0 = Vec3::new(-1.0, 0.0, 5.0);
+        let v1 = Vec3::new(1.0, 0.0, 5.0);
+        let v2 = Vec3::new(0.0, 2.0, 5.0);
+        // Hit on the midpoint of v0-v1 edge
+        let ray = Ray::new(Vec3::new(0.0, 0.0, 0.0), Vec3::Z);
+        let result = ray_vs_triangle(&ray, v0, v1, v2);
+        assert!(result.is_some());
+        let (t, _) = result.unwrap();
+        assert!(approx(t, 5.0));
     }
 }
