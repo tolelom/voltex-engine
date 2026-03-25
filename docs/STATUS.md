@@ -80,6 +80,12 @@
 - voltex_audio: AudioSystem (channel-based audio thread, play/stop/volume)
 - examples/audio_demo (sine wave playback)
 
+### Phase 6-2: 3D Audio
+- voltex_audio: Listener, SpatialParams
+- voltex_audio: distance_attenuation (inverse distance), stereo_pan (equal-power)
+- voltex_audio: mix_sounds spatial integration (per-sound attenuation + panning)
+- voltex_audio: play_3d, set_listener API
+
 ## Crate 구조
 
 ```
@@ -93,10 +99,10 @@ crates/
 └── voltex_audio     — AudioClip, WAV parser, mixing, WASAPI backend, AudioSystem
 ```
 
-## 테스트: 180개 전부 통과
+## 테스트: 191개 전부 통과
 
 - voltex_asset: 14
-- voltex_audio: 15 (audio_clip 2 + wav 5 + mixing 6 + audio_system 2)
+- voltex_audio: 26 (audio_clip 2 + wav 5 + mixing 9 + audio_system 2 + spatial 8)
 - voltex_ecs: 39
 - voltex_math: 37 (29 + AABB 6 + Ray 2)
 - voltex_physics: 52 (collider 2 + narrow 11 + bvh 5 + collision 7 + rigid_body 3 + integrator 3 + solver 5 + ray 10 + raycast 6)
@@ -116,7 +122,7 @@ crates/
 - ibl_demo — Normal map + IBL
 - audio_demo — 사인파 오디오 재생
 
-## 다음: Phase 6-2 (3D 오디오)
+## 다음: Phase 6-3 (믹서)
 
 스펙 참조: `docs/superpowers/specs/2026-03-24-voltex-engine-design.md`
 

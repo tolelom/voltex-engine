@@ -62,6 +62,13 @@
 - **raycast_all (다중 hit)** — 가장 가까운 hit만 반환.
 - **BVH 조기 종료 최적화** — 모든 리프 검사 후 최소 t 선택. front-to-back 순회 미구현.
 
+## Phase 6-2
+
+- **도플러 효과** — 미구현. 상대 속도 기반 주파수 변조.
+- **HRTF** — 미구현. 헤드폰용 3D 정위.
+- **Reverb/Echo** — 미구현. 환경 반사음.
+- **Occlusion** — 미구현. 벽 뒤 소리 차단.
+
 ## Phase 6-1
 
 - **macOS/Linux 백엔드** — WASAPI(Windows)만 구현. CoreAudio, ALSA 미구현.
