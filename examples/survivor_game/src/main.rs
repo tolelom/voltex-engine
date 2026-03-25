@@ -1,5 +1,7 @@
 mod arena;
 mod camera;
+mod game;
+mod player;
 
 use winit::{
     application::ApplicationHandler,
@@ -16,13 +18,16 @@ use voltex_renderer::{
     ShadowMap, ShadowUniform, ShadowPassUniform, SHADOW_MAP_SIZE,
     create_shadow_pipeline, shadow_pass_bind_group_layout,
     IblResources, pbr_texture_bind_group_layout, create_pbr_texture_bind_group,
+    generate_sphere,
 };
 use wgpu::util::DeviceExt;
 
 use arena::{generate_arena, arena_model_matrices};
 use camera::QuarterViewCamera;
+use game::GameState;
 
-const NUM_ENTITIES: usize = 5; // 1 floor + 4 obstacles
+const ARENA_ENTITIES: usize = 5; // 1 floor + 4 obstacles
+const MAX_ENTITIES: usize = 100; // pre-allocate for future enemies/projectiles
 
 struct SurvivorApp {
     state: Option<AppState>,
@@ -38,7 +43,9 @@ struct AppState {
     pbr_pipeline: wgpu::RenderPipeline,
     shadow_pipeline: wgpu::RenderPipeline,
     entities: Vec<RenderEntity>,
+    player_mesh: Mesh,
     camera: QuarterViewCamera,
+    game: GameState,
     // Color pass resources
     camera_buffer: wgpu::Buffer,
     light_buffer: wgpu::Buffer,
@@ -132,6 +139,13 @@ impl ApplicationHandler for SurvivorApp {
             materials.push((entity.base_color, entity.metallic, entity.roughness));
         }
 
+        // Player sphere mesh (radius 0.4, 16 sectors/stacks)
+        let (sphere_verts, sphere_indices) = generate_sphere(0.4, 16, 16);
+        let player_mesh = Mesh::new(&gpu.device, &sphere_verts, &sphere_indices);
+
+        // Game state
+        let game = GameState::new();
+
         // Quarter-view camera
         let camera = QuarterViewCamera::new();
 
@@ -147,7 +161,7 @@ impl ApplicationHandler for SurvivorApp {
         // ---- Color pass buffers ----
         let camera_buffer = gpu.device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("Camera Dynamic UBO"),
-            size: (cam_aligned_size as usize * NUM_ENTITIES) as u64,
+            size: (cam_aligned_size as usize * MAX_ENTITIES) as u64,
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
@@ -160,7 +174,7 @@ impl ApplicationHandler for SurvivorApp {
 
         let material_buffer = gpu.device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("Material Dynamic UBO"),
-            size: (mat_aligned_size as usize * NUM_ENTITIES) as u64,
+            size: (mat_aligned_size as usize * MAX_ENTITIES) as u64,
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
@@ -253,7 +267,7 @@ impl ApplicationHandler for SurvivorApp {
         let sp_layout = shadow_pass_bind_group_layout(&gpu.device);
         let shadow_pass_buffer = gpu.device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("Shadow Pass Dynamic UBO"),
-            size: (shadow_pass_aligned_size as usize * NUM_ENTITIES) as u64,
+            size: (shadow_pass_aligned_size as usize * MAX_ENTITIES) as u64,
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
@@ -289,7 +303,9 @@ impl ApplicationHandler for SurvivorApp {
             pbr_pipeline,
             shadow_pipeline,
             entities: render_entities,
+            player_mesh,
             camera,
+            game,
             camera_buffer,
             light_buffer,
             material_buffer,
@@ -371,9 +387,21 @@ impl ApplicationHandler for SurvivorApp {
 
             WindowEvent::RedrawRequested => {
                 state.timer.tick();
+                let dt = state.timer.frame_dt();
                 state.input.begin_frame();
 
+                // Update game logic
+                state.game.update(&state.input, dt);
+
+                // Camera follows player
+                state.camera.target = state.game.player.position;
+
                 let aspect = state.gpu.config.width as f32 / state.gpu.config.height as f32;
+
+                // Build per-frame model/material lists: arena entities + player
+                let player_pos = state.game.player.position;
+                let player_model = Mat4::translation(player_pos.x, player_pos.y + 0.5, player_pos.z);
+                let num_entities = ARENA_ENTITIES + 1; // arena + player
 
                 // ----- Compute light VP for shadows -----
                 let light_dir = Vec3::new(-1.0, -2.0, -1.0).normalize();
@@ -387,11 +415,16 @@ impl ApplicationHandler for SurvivorApp {
                 let sp_aligned = state.shadow_pass_aligned_size as usize;
 
                 // ----- Build shadow pass staging data -----
-                let sp_total = sp_aligned * NUM_ENTITIES;
+                let sp_total = sp_aligned * num_entities;
                 let mut sp_staging = vec![0u8; sp_total];
-                for i in 0..NUM_ENTITIES {
+                for i in 0..num_entities {
+                    let model = if i < ARENA_ENTITIES {
+                        state.models[i]
+                    } else {
+                        player_model
+                    };
                     let sp_uniform = ShadowPassUniform {
-                        light_vp_model: (light_vp * state.models[i]).cols,
+                        light_vp_model: (light_vp * model).cols,
                     };
                     let bytes = bytemuck::bytes_of(&sp_uniform);
                     let offset = i * sp_aligned;
@@ -407,15 +440,23 @@ impl ApplicationHandler for SurvivorApp {
                 let eye = state.camera.eye_position();
                 let cam_pos = [eye.x, eye.y, eye.z];
 
-                let cam_total = cam_aligned * NUM_ENTITIES;
-                let mat_total = mat_aligned * NUM_ENTITIES;
+                let cam_total = cam_aligned * num_entities;
+                let mat_total = mat_aligned * num_entities;
                 let mut cam_staging = vec![0u8; cam_total];
                 let mut mat_staging = vec![0u8; mat_total];
 
-                for i in 0..NUM_ENTITIES {
+                for i in 0..num_entities {
+                    let (model, color, metallic, roughness) = if i < ARENA_ENTITIES {
+                        let (c, m, r) = state.materials[i];
+                        (state.models[i], c, m, r)
+                    } else {
+                        // Player: blue sphere
+                        (player_model, [0.2, 0.4, 1.0, 1.0], 0.3, 0.5)
+                    };
+
                     let cam_uniform = CameraUniform {
                         view_proj: view_proj.cols,
-                        model: state.models[i].cols,
+                        model: model.cols,
                         camera_pos: cam_pos,
                         _padding: 0.0,
                     };
@@ -423,7 +464,6 @@ impl ApplicationHandler for SurvivorApp {
                     let offset = i * cam_aligned;
                     cam_staging[offset..offset + bytes.len()].copy_from_slice(bytes);
 
-                    let (color, metallic, roughness) = state.materials[i];
                     let mat_uniform =
                         MaterialUniform::with_params(color, metallic, roughness);
                     let bytes = bytemuck::bytes_of(&mat_uniform);
@@ -492,6 +532,30 @@ impl ApplicationHandler for SurvivorApp {
                     },
                 );
 
+                // Helper: draw a mesh at entity index i in shadow pass
+                macro_rules! draw_shadow {
+                    ($pass:expr, $mesh:expr, $idx:expr) => {
+                        let offset = ($idx as u32) * state.shadow_pass_aligned_size;
+                        $pass.set_bind_group(0, &state.shadow_pass_bind_group, &[offset]);
+                        $pass.set_vertex_buffer(0, $mesh.vertex_buffer.slice(..));
+                        $pass.set_index_buffer($mesh.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
+                        $pass.draw_indexed(0..$mesh.num_indices, 0, 0..1);
+                    };
+                }
+
+                // Helper: draw a mesh at entity index i in color pass
+                macro_rules! draw_color {
+                    ($pass:expr, $mesh:expr, $idx:expr) => {
+                        let cam_offset = ($idx as u32) * state.cam_aligned_size;
+                        let mat_offset = ($idx as u32) * state.mat_aligned_size;
+                        $pass.set_bind_group(0, &state.camera_light_bind_group, &[cam_offset]);
+                        $pass.set_bind_group(2, &state.material_bind_group, &[mat_offset]);
+                        $pass.set_vertex_buffer(0, $mesh.vertex_buffer.slice(..));
+                        $pass.set_index_buffer($mesh.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
+                        $pass.draw_indexed(0..$mesh.num_indices, 0, 0..1);
+                    };
+                }
+
                 // ===== Pass 1: Shadow =====
                 {
                     let mut shadow_pass =
@@ -515,18 +579,12 @@ impl ApplicationHandler for SurvivorApp {
 
                     shadow_pass.set_pipeline(&state.shadow_pipeline);
 
+                    // Arena entities
                     for (i, entity) in state.entities.iter().enumerate() {
-                        let offset = (i as u32) * state.shadow_pass_aligned_size;
-                        shadow_pass
-                            .set_bind_group(0, &state.shadow_pass_bind_group, &[offset]);
-                        shadow_pass
-                            .set_vertex_buffer(0, entity.mesh.vertex_buffer.slice(..));
-                        shadow_pass.set_index_buffer(
-                            entity.mesh.index_buffer.slice(..),
-                            wgpu::IndexFormat::Uint32,
-                        );
-                        shadow_pass.draw_indexed(0..entity.mesh.num_indices, 0, 0..1);
+                        draw_shadow!(shadow_pass, entity.mesh, i);
                     }
+                    // Player sphere
+                    draw_shadow!(shadow_pass, state.player_mesh, ARENA_ENTITIES);
                 }
 
                 // ===== Pass 2: Color (PBR) =====
@@ -568,27 +626,12 @@ impl ApplicationHandler for SurvivorApp {
                         .set_bind_group(1, &state.pbr_texture_bind_group, &[]);
                     render_pass.set_bind_group(3, &state.shadow_bind_group, &[]);
 
+                    // Arena entities
                     for (i, entity) in state.entities.iter().enumerate() {
-                        let cam_offset = (i as u32) * state.cam_aligned_size;
-                        let mat_offset = (i as u32) * state.mat_aligned_size;
-                        render_pass.set_bind_group(
-                            0,
-                            &state.camera_light_bind_group,
-                            &[cam_offset],
-                        );
-                        render_pass.set_bind_group(
-                            2,
-                            &state.material_bind_group,
-                            &[mat_offset],
-                        );
-                        render_pass
-                            .set_vertex_buffer(0, entity.mesh.vertex_buffer.slice(..));
-                        render_pass.set_index_buffer(
-                            entity.mesh.index_buffer.slice(..),
-                            wgpu::IndexFormat::Uint32,
-                        );
-                        render_pass.draw_indexed(0..entity.mesh.num_indices, 0, 0..1);
+                        draw_color!(render_pass, entity.mesh, i);
                     }
+                    // Player sphere
+                    draw_color!(render_pass, state.player_mesh, ARENA_ENTITIES);
                 }
 
                 state.gpu.queue.submit(std::iter::once(encoder.finish()));
