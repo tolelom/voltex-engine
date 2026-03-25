@@ -49,6 +49,8 @@ struct ShadowUniform {
 @group(2) @binding(2) var<uniform> shadow: ShadowUniform;
 @group(2) @binding(3) var t_brdf_lut: texture_2d<f32>;
 @group(2) @binding(4) var s_brdf_lut: sampler;
+@group(2) @binding(5) var t_ssgi: texture_2d<f32>;
+@group(2) @binding(6) var s_ssgi: sampler;
 
 // ── Vertex / Fragment structs ─────────────────────────────────────────────────
 
@@ -294,7 +296,10 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let brdf_val = textureSample(t_brdf_lut, s_brdf_lut, vec2<f32>(NdotV_ibl, roughness));
     let specular_ibl = prefiltered * (F0 * brdf_val.r + vec3<f32>(brdf_val.g));
 
-    let ambient = (diffuse_ibl + specular_ibl) * ao;
+    let ssgi_data = textureSample(t_ssgi, s_ssgi, uv);
+    let ssgi_ao = ssgi_data.r;
+    let ssgi_indirect = ssgi_data.gba;
+    let ambient = (diffuse_ibl + specular_ibl) * ao * ssgi_ao + ssgi_indirect;
 
     var color = ambient + Lo;
 
