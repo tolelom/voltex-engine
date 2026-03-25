@@ -67,6 +67,25 @@ impl NavMesh {
             (a.z + b.z) / 2.0,
         )
     }
+
+    /// Return the shared edge (portal) vertices between two adjacent triangles.
+    /// Returns (left, right) vertices of the portal edge as seen from `from_tri` looking toward `to_tri`.
+    /// Returns None if the triangles are not adjacent.
+    pub fn shared_edge(&self, from_tri: usize, to_tri: usize) -> Option<(Vec3, Vec3)> {
+        let tri = &self.triangles[from_tri];
+        for edge_idx in 0..3 {
+            if tri.neighbors[edge_idx] == Some(to_tri) {
+                let (i0, i1) = match edge_idx {
+                    0 => (tri.indices[0], tri.indices[1]),
+                    1 => (tri.indices[1], tri.indices[2]),
+                    2 => (tri.indices[2], tri.indices[0]),
+                    _ => unreachable!(),
+                };
+                return Some((self.vertices[i0], self.vertices[i1]));
+            }
+        }
+        None
+    }
 }
 
 /// Test whether `point` lies inside or on the triangle (a, b, c) using XZ barycentric coordinates.
@@ -88,6 +107,104 @@ pub fn point_in_triangle_xz(point: Vec3, a: Vec3, b: Vec3, c: Vec3) -> bool {
     let w = 1.0 - u - v;
 
     u >= 0.0 && v >= 0.0 && w >= 0.0
+}
+
+/// Serialize a NavMesh to binary format.
+/// Format: vertex_count(u32) + vertices(f32*3 each) + triangle_count(u32) + triangles(indices u32*3 + neighbors i32*3 each)
+pub fn serialize_navmesh(navmesh: &NavMesh) -> Vec<u8> {
+    let mut data = Vec::new();
+
+    // Vertex count
+    let vc = navmesh.vertices.len() as u32;
+    data.extend_from_slice(&vc.to_le_bytes());
+
+    // Vertices
+    for v in &navmesh.vertices {
+        data.extend_from_slice(&v.x.to_le_bytes());
+        data.extend_from_slice(&v.y.to_le_bytes());
+        data.extend_from_slice(&v.z.to_le_bytes());
+    }
+
+    // Triangle count
+    let tc = navmesh.triangles.len() as u32;
+    data.extend_from_slice(&tc.to_le_bytes());
+
+    // Triangles: indices(u32*3) + neighbors(i32*3, -1 for None)
+    for tri in &navmesh.triangles {
+        for &idx in &tri.indices {
+            data.extend_from_slice(&(idx as u32).to_le_bytes());
+        }
+        for &nb in &tri.neighbors {
+            let val: i32 = match nb {
+                Some(i) => i as i32,
+                None => -1,
+            };
+            data.extend_from_slice(&val.to_le_bytes());
+        }
+    }
+
+    data
+}
+
+/// Deserialize a NavMesh from binary data.
+pub fn deserialize_navmesh(data: &[u8]) -> Result<NavMesh, String> {
+    let mut offset = 0;
+
+    let read_u32 = |off: &mut usize| -> Result<u32, String> {
+        if *off + 4 > data.len() {
+            return Err("unexpected end of data".to_string());
+        }
+        let val = u32::from_le_bytes([data[*off], data[*off + 1], data[*off + 2], data[*off + 3]]);
+        *off += 4;
+        Ok(val)
+    };
+
+    let read_i32 = |off: &mut usize| -> Result<i32, String> {
+        if *off + 4 > data.len() {
+            return Err("unexpected end of data".to_string());
+        }
+        let val = i32::from_le_bytes([data[*off], data[*off + 1], data[*off + 2], data[*off + 3]]);
+        *off += 4;
+        Ok(val)
+    };
+
+    let read_f32 = |off: &mut usize| -> Result<f32, String> {
+        if *off + 4 > data.len() {
+            return Err("unexpected end of data".to_string());
+        }
+        let val = f32::from_le_bytes([data[*off], data[*off + 1], data[*off + 2], data[*off + 3]]);
+        *off += 4;
+        Ok(val)
+    };
+
+    let vc = read_u32(&mut offset)? as usize;
+    let mut vertices = Vec::with_capacity(vc);
+    for _ in 0..vc {
+        let x = read_f32(&mut offset)?;
+        let y = read_f32(&mut offset)?;
+        let z = read_f32(&mut offset)?;
+        vertices.push(Vec3::new(x, y, z));
+    }
+
+    let tc = read_u32(&mut offset)? as usize;
+    let mut triangles = Vec::with_capacity(tc);
+    for _ in 0..tc {
+        let i0 = read_u32(&mut offset)? as usize;
+        let i1 = read_u32(&mut offset)? as usize;
+        let i2 = read_u32(&mut offset)? as usize;
+        let n0 = read_i32(&mut offset)?;
+        let n1 = read_i32(&mut offset)?;
+        let n2 = read_i32(&mut offset)?;
+        let to_opt = |v: i32| -> Option<usize> {
+            if v < 0 { None } else { Some(v as usize) }
+        };
+        triangles.push(NavTriangle {
+            indices: [i0, i1, i2],
+            neighbors: [to_opt(n0), to_opt(n1), to_opt(n2)],
+        });
+    }
+
+    Ok(NavMesh::new(vertices, triangles))
 }
 
 #[cfg(test)]
@@ -154,5 +271,45 @@ mod tests {
         assert!((mid.x - 1.5).abs() < 1e-5);
         assert!((mid.y - 0.0).abs() < 1e-5);
         assert!((mid.z - 1.0).abs() < 1e-5);
+    }
+
+    #[test]
+    fn test_shared_edge() {
+        let nm = make_simple_navmesh();
+        // Tri 0 edge 1 connects to Tri 1: shared edge is v1=(2,0,0) and v2=(1,0,2)
+        let (left, right) = nm.shared_edge(0, 1).expect("should find shared edge");
+        assert_eq!(left, Vec3::new(2.0, 0.0, 0.0));
+        assert_eq!(right, Vec3::new(1.0, 0.0, 2.0));
+    }
+
+    #[test]
+    fn test_shared_edge_not_adjacent() {
+        let nm = make_simple_navmesh();
+        // Tri 0 is not adjacent to itself via neighbors
+        assert!(nm.shared_edge(0, 0).is_none());
+    }
+
+    #[test]
+    fn test_serialize_roundtrip() {
+        let nm = make_simple_navmesh();
+        let data = serialize_navmesh(&nm);
+        let nm2 = deserialize_navmesh(&data).expect("should deserialize");
+        assert_eq!(nm2.vertices.len(), nm.vertices.len());
+        assert_eq!(nm2.triangles.len(), nm.triangles.len());
+        for (a, b) in nm.vertices.iter().zip(nm2.vertices.iter()) {
+            assert!((a.x - b.x).abs() < 1e-6);
+            assert!((a.y - b.y).abs() < 1e-6);
+            assert!((a.z - b.z).abs() < 1e-6);
+        }
+        for (a, b) in nm.triangles.iter().zip(nm2.triangles.iter()) {
+            assert_eq!(a.indices, b.indices);
+            assert_eq!(a.neighbors, b.neighbors);
+        }
+    }
+
+    #[test]
+    fn test_deserialize_empty_data() {
+        let result = deserialize_navmesh(&[]);
+        assert!(result.is_err());
     }
 }
