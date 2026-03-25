@@ -21,6 +21,11 @@ use voltex_renderer::{
     ssgi_gbuffer_bind_group_layout, ssgi_data_bind_group_layout, create_ssgi_pipeline,
     RtAccel, RtInstance, BlasMeshData, RtShadowResources, RtShadowUniform,
     rt_shadow_gbuffer_bind_group_layout, rt_shadow_data_bind_group_layout, create_rt_shadow_pipeline,
+    HdrTarget, HDR_FORMAT,
+    BloomResources, BloomUniform, mip_sizes, BLOOM_MIP_COUNT,
+    TonemapUniform,
+    bloom_bind_group_layout, create_bloom_downsample_pipeline, create_bloom_upsample_pipeline,
+    tonemap_bind_group_layout, create_tonemap_pipeline,
 };
 use wgpu::util::DeviceExt;
 use bytemuck::{Pod, Zeroable};
@@ -90,6 +95,22 @@ struct AppState {
     rt_shadow_data_layout: wgpu::BindGroupLayout,
     #[allow(dead_code)]
     vertex_count: u32,
+
+    // HDR + Bloom + Tonemap resources
+    hdr_target: HdrTarget,
+    bloom: BloomResources,
+    bloom_down_pipeline: wgpu::RenderPipeline,
+    bloom_up_pipeline: wgpu::RenderPipeline,
+    bloom_layout: wgpu::BindGroupLayout,
+    bloom_down_bind_groups: Vec<wgpu::BindGroup>,
+    bloom_up_bind_groups: Vec<wgpu::BindGroup>,
+    bloom_threshold_buffer: wgpu::Buffer,
+    bloom_no_threshold_buffer: wgpu::Buffer,
+    linear_sampler: wgpu::Sampler,
+    tonemap_pipeline: wgpu::RenderPipeline,
+    tonemap_layout: wgpu::BindGroupLayout,
+    tonemap_bind_group: wgpu::BindGroup,
+    tonemap_uniform_buffer: wgpu::Buffer,
 
     // Layouts needed for rebuild on resize
     gbuffer_layout: wgpu::BindGroupLayout,
@@ -429,13 +450,83 @@ impl ApplicationHandler for DeferredDemoApp {
             &rt_shadow_filtering_sampler,
         );
 
-        // Lighting pipeline
+        // Lighting pipeline — now renders to HDR format instead of surface
         let lighting_pipeline = create_lighting_pipeline(
             &gpu.device,
-            gpu.surface_format,
+            HDR_FORMAT,
             &gbuffer_layout,
             &lights_layout,
             &shadow_layout,
+        );
+
+        // ---------------------------------------------------------------
+        // HDR Target
+        // ---------------------------------------------------------------
+        let hdr_target = HdrTarget::new(&gpu.device, gpu.config.width, gpu.config.height);
+
+        // ---------------------------------------------------------------
+        // Bloom resources + pipelines
+        // ---------------------------------------------------------------
+        let bloom = BloomResources::new(&gpu.device, gpu.config.width, gpu.config.height);
+        let bloom_layout_bg = bloom_bind_group_layout(&gpu.device);
+        let bloom_down_pipeline = create_bloom_downsample_pipeline(&gpu.device, &bloom_layout_bg);
+        let bloom_up_pipeline = create_bloom_upsample_pipeline(&gpu.device, &bloom_layout_bg);
+
+        let linear_sampler = gpu.device.create_sampler(&wgpu::SamplerDescriptor {
+            label: Some("Bloom Linear Sampler"),
+            address_mode_u: wgpu::AddressMode::ClampToEdge,
+            address_mode_v: wgpu::AddressMode::ClampToEdge,
+            address_mode_w: wgpu::AddressMode::ClampToEdge,
+            mag_filter: wgpu::FilterMode::Linear,
+            min_filter: wgpu::FilterMode::Linear,
+            mipmap_filter: wgpu::MipmapFilterMode::Nearest,
+            ..Default::default()
+        });
+
+        // Two bloom uniform buffers: one with threshold, one without
+        let bloom_threshold_uniform = BloomUniform::default(); // threshold=1.0
+        let bloom_threshold_buffer = gpu.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Bloom Threshold UBO"),
+            contents: bytemuck::bytes_of(&bloom_threshold_uniform),
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+        });
+        let bloom_no_threshold_uniform = BloomUniform {
+            threshold: 0.0,
+            soft_threshold: 0.0,
+            _padding: [0.0; 2],
+        };
+        let bloom_no_threshold_buffer = gpu.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Bloom No-Threshold UBO"),
+            contents: bytemuck::bytes_of(&bloom_no_threshold_uniform),
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+        });
+
+        // Create bloom bind groups
+        let bloom_down_bind_groups = create_bloom_down_bind_groups(
+            &gpu.device, &bloom_layout_bg, &hdr_target, &bloom,
+            &linear_sampler, &bloom_threshold_buffer, &bloom_no_threshold_buffer,
+        );
+        let bloom_up_bind_groups = create_bloom_up_bind_groups(
+            &gpu.device, &bloom_layout_bg, &bloom,
+            &linear_sampler, &bloom_no_threshold_buffer,
+        );
+
+        // ---------------------------------------------------------------
+        // Tonemap pipeline + bind group
+        // ---------------------------------------------------------------
+        let tonemap_layout_bg = tonemap_bind_group_layout(&gpu.device);
+        let tonemap_pipeline = create_tonemap_pipeline(&gpu.device, gpu.surface_format, &tonemap_layout_bg);
+
+        let tonemap_uniform = TonemapUniform::default();
+        let tonemap_uniform_buffer = gpu.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Tonemap Uniform Buffer"),
+            contents: bytemuck::bytes_of(&tonemap_uniform),
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+        });
+
+        let tonemap_bind_group = create_tonemap_bind_group(
+            &gpu.device, &tonemap_layout_bg, &hdr_target, &bloom,
+            &linear_sampler, &tonemap_uniform_buffer,
         );
 
         self.state = Some(AppState {
@@ -472,6 +563,20 @@ impl ApplicationHandler for DeferredDemoApp {
             shadow_bind_group,
             light_buffer,
             cam_pos_buffer,
+            hdr_target,
+            bloom,
+            bloom_down_pipeline,
+            bloom_up_pipeline,
+            bloom_layout: bloom_layout_bg,
+            bloom_down_bind_groups,
+            bloom_up_bind_groups,
+            bloom_threshold_buffer,
+            bloom_no_threshold_buffer,
+            linear_sampler,
+            tonemap_pipeline,
+            tonemap_layout: tonemap_layout_bg,
+            tonemap_bind_group,
+            tonemap_uniform_buffer,
             gbuffer_layout,
             shadow_layout,
             _albedo_tex: albedo_tex,
@@ -611,6 +716,28 @@ impl ApplicationHandler for DeferredDemoApp {
                         &ssgi_filtering_sampler,
                         &state.rt_shadow,
                         &rt_shadow_filtering_sampler,
+                    );
+
+                    // Resize HDR target
+                    state.hdr_target.resize(&state.gpu.device, size.width, size.height);
+
+                    // Resize bloom mip chain
+                    state.bloom.resize(&state.gpu.device, size.width, size.height);
+
+                    // Recreate bloom bind groups
+                    state.bloom_down_bind_groups = create_bloom_down_bind_groups(
+                        &state.gpu.device, &state.bloom_layout, &state.hdr_target, &state.bloom,
+                        &state.linear_sampler, &state.bloom_threshold_buffer, &state.bloom_no_threshold_buffer,
+                    );
+                    state.bloom_up_bind_groups = create_bloom_up_bind_groups(
+                        &state.gpu.device, &state.bloom_layout, &state.bloom,
+                        &state.linear_sampler, &state.bloom_no_threshold_buffer,
+                    );
+
+                    // Recreate tonemap bind group
+                    state.tonemap_bind_group = create_tonemap_bind_group(
+                        &state.gpu.device, &state.tonemap_layout, &state.hdr_target, &state.bloom,
+                        &state.linear_sampler, &state.tonemap_uniform_buffer,
                     );
                 }
             }
@@ -929,12 +1056,12 @@ impl ApplicationHandler for DeferredDemoApp {
                     );
                 }
 
-                // ---- Pass 4: Lighting (fullscreen) ----
+                // ---- Pass 4: Lighting → HDR target ----
                 {
                     let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                         label: Some("Lighting Pass"),
                         color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                            view: &view,
+                            view: &state.hdr_target.view,
                             resolve_target: None,
                             depth_slice: None,
                             ops: wgpu::Operations {
@@ -957,6 +1084,90 @@ impl ApplicationHandler for DeferredDemoApp {
                     rpass.set_bind_group(0, &state.gbuffer_bind_group, &[]);
                     rpass.set_bind_group(1, &state.lights_bind_group, &[]);
                     rpass.set_bind_group(2, &state.shadow_bind_group, &[]);
+                    rpass.set_vertex_buffer(0, state.fullscreen_vb.slice(..));
+                    rpass.draw(0..3, 0..1);
+                }
+
+                // ---- Pass 5: Bloom downsample chain ----
+                {
+                    let ms = mip_sizes(state.gpu.config.width, state.gpu.config.height);
+                    for i in 0..BLOOM_MIP_COUNT {
+                        let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                            label: Some("Bloom Downsample"),
+                            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                                view: &state.bloom.mip_views[i],
+                                resolve_target: None,
+                                depth_slice: None,
+                                ops: wgpu::Operations {
+                                    load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+                                    store: wgpu::StoreOp::Store,
+                                },
+                            })],
+                            depth_stencil_attachment: None,
+                            occlusion_query_set: None,
+                            timestamp_writes: None,
+                            multiview_mask: None,
+                        });
+                        let (mw, mh) = ms[i];
+                        rpass.set_viewport(0.0, 0.0, mw as f32, mh as f32, 0.0, 1.0);
+                        rpass.set_pipeline(&state.bloom_down_pipeline);
+                        rpass.set_bind_group(0, &state.bloom_down_bind_groups[i], &[]);
+                        rpass.set_vertex_buffer(0, state.fullscreen_vb.slice(..));
+                        rpass.draw(0..3, 0..1);
+                    }
+                }
+
+                // ---- Pass 6: Bloom upsample chain ----
+                {
+                    let ms = mip_sizes(state.gpu.config.width, state.gpu.config.height);
+                    for j in 0..BLOOM_MIP_COUNT - 1 {
+                        let target_mip = BLOOM_MIP_COUNT - 2 - j; // 3, 2, 1, 0
+                        let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                            label: Some("Bloom Upsample"),
+                            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                                view: &state.bloom.mip_views[target_mip],
+                                resolve_target: None,
+                                depth_slice: None,
+                                ops: wgpu::Operations {
+                                    load: wgpu::LoadOp::Load,
+                                    store: wgpu::StoreOp::Store,
+                                },
+                            })],
+                            depth_stencil_attachment: None,
+                            occlusion_query_set: None,
+                            timestamp_writes: None,
+                            multiview_mask: None,
+                        });
+                        let (mw, mh) = ms[target_mip];
+                        rpass.set_viewport(0.0, 0.0, mw as f32, mh as f32, 0.0, 1.0);
+                        rpass.set_pipeline(&state.bloom_up_pipeline);
+                        rpass.set_bind_group(0, &state.bloom_up_bind_groups[j], &[]);
+                        rpass.set_vertex_buffer(0, state.fullscreen_vb.slice(..));
+                        rpass.draw(0..3, 0..1);
+                    }
+                }
+
+                // ---- Pass 7: Tonemap → surface ----
+                {
+                    let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                        label: Some("Tonemap Pass"),
+                        color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                            view: &view,
+                            resolve_target: None,
+                            depth_slice: None,
+                            ops: wgpu::Operations {
+                                load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+                                store: wgpu::StoreOp::Store,
+                            },
+                        })],
+                        depth_stencil_attachment: None,
+                        occlusion_query_set: None,
+                        timestamp_writes: None,
+                        multiview_mask: None,
+                    });
+
+                    rpass.set_pipeline(&state.tonemap_pipeline);
+                    rpass.set_bind_group(0, &state.tonemap_bind_group, &[]);
                     rpass.set_vertex_buffer(0, state.fullscreen_vb.slice(..));
                     rpass.draw(0..3, 0..1);
                 }
@@ -1142,6 +1353,112 @@ fn create_rt_shadow_data_bg(
             wgpu::BindGroupEntry {
                 binding: 2,
                 resource: rt_shadow.uniform_buffer.as_entire_binding(),
+            },
+        ],
+    })
+}
+
+/// Helper: create bloom downsample bind groups (5 total).
+/// Pass 0 reads from hdr_target, uses threshold buffer.
+/// Passes 1-4 read from the previous mip, use no-threshold buffer.
+fn create_bloom_down_bind_groups(
+    device: &wgpu::Device,
+    layout: &wgpu::BindGroupLayout,
+    hdr_target: &HdrTarget,
+    bloom: &BloomResources,
+    sampler: &wgpu::Sampler,
+    threshold_buf: &wgpu::Buffer,
+    no_threshold_buf: &wgpu::Buffer,
+) -> Vec<wgpu::BindGroup> {
+    (0..BLOOM_MIP_COUNT)
+        .map(|i| {
+            let input_view = if i == 0 { &hdr_target.view } else { &bloom.mip_views[i - 1] };
+            let uniform_buf = if i == 0 { threshold_buf } else { no_threshold_buf };
+            device.create_bind_group(&wgpu::BindGroupDescriptor {
+                label: Some(&format!("Bloom Down BG {}", i)),
+                layout,
+                entries: &[
+                    wgpu::BindGroupEntry {
+                        binding: 0,
+                        resource: wgpu::BindingResource::TextureView(input_view),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 1,
+                        resource: wgpu::BindingResource::Sampler(sampler),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 2,
+                        resource: uniform_buf.as_entire_binding(),
+                    },
+                ],
+            })
+        })
+        .collect()
+}
+
+/// Helper: create bloom upsample bind groups (4 total).
+/// Each reads from mip[i+1] and renders additively into mip[i].
+/// Order: j=0 → input=mip[4] target=mip[3], j=1 → input=mip[3] target=mip[2], etc.
+fn create_bloom_up_bind_groups(
+    device: &wgpu::Device,
+    layout: &wgpu::BindGroupLayout,
+    bloom: &BloomResources,
+    sampler: &wgpu::Sampler,
+    no_threshold_buf: &wgpu::Buffer,
+) -> Vec<wgpu::BindGroup> {
+    (0..BLOOM_MIP_COUNT - 1)
+        .map(|j| {
+            let source_mip = BLOOM_MIP_COUNT - 1 - j; // 4, 3, 2, 1
+            device.create_bind_group(&wgpu::BindGroupDescriptor {
+                label: Some(&format!("Bloom Up BG {}", j)),
+                layout,
+                entries: &[
+                    wgpu::BindGroupEntry {
+                        binding: 0,
+                        resource: wgpu::BindingResource::TextureView(&bloom.mip_views[source_mip]),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 1,
+                        resource: wgpu::BindingResource::Sampler(sampler),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 2,
+                        resource: no_threshold_buf.as_entire_binding(),
+                    },
+                ],
+            })
+        })
+        .collect()
+}
+
+/// Helper: create the tonemap bind group.
+fn create_tonemap_bind_group(
+    device: &wgpu::Device,
+    layout: &wgpu::BindGroupLayout,
+    hdr_target: &HdrTarget,
+    bloom: &BloomResources,
+    sampler: &wgpu::Sampler,
+    uniform_buffer: &wgpu::Buffer,
+) -> wgpu::BindGroup {
+    device.create_bind_group(&wgpu::BindGroupDescriptor {
+        label: Some("Tonemap Bind Group"),
+        layout,
+        entries: &[
+            wgpu::BindGroupEntry {
+                binding: 0,
+                resource: wgpu::BindingResource::TextureView(&hdr_target.view),
+            },
+            wgpu::BindGroupEntry {
+                binding: 1,
+                resource: wgpu::BindingResource::TextureView(&bloom.mip_views[0]),
+            },
+            wgpu::BindGroupEntry {
+                binding: 2,
+                resource: wgpu::BindingResource::Sampler(sampler),
+            },
+            wgpu::BindGroupEntry {
+                binding: 3,
+                resource: uniform_buffer.as_entire_binding(),
             },
         ],
     })
