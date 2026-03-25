@@ -17,6 +17,9 @@ use voltex_renderer::{
     lighting_gbuffer_bind_group_layout, lighting_lights_bind_group_layout,
     lighting_shadow_bind_group_layout,
     pbr_texture_bind_group_layout, create_pbr_texture_bind_group,
+    SsgiResources, SsgiUniform,
+    ssgi_gbuffer_bind_group_layout, ssgi_data_bind_group_layout, create_ssgi_pipeline,
+
 };
 use wgpu::util::DeviceExt;
 use bytemuck::{Pod, Zeroable};
@@ -58,6 +61,15 @@ struct AppState {
     pbr_texture_bind_group: wgpu::BindGroup,
     material_bind_group: wgpu::BindGroup,
 
+    // SSGI pass resources
+    ssgi: SsgiResources,
+    ssgi_pipeline: wgpu::RenderPipeline,
+    ssgi_gbuffer_bind_group: wgpu::BindGroup,
+    ssgi_data_bind_group: wgpu::BindGroup,
+    ssgi_gb_layout: wgpu::BindGroupLayout,
+    #[allow(dead_code)]
+    ssgi_data_layout: wgpu::BindGroupLayout,
+
     // Lighting pass resources
     lighting_pipeline: wgpu::RenderPipeline,
     fullscreen_vb: wgpu::Buffer,
@@ -69,12 +81,14 @@ struct AppState {
 
     // Layouts needed for rebuild on resize
     gbuffer_layout: wgpu::BindGroupLayout,
+    shadow_layout: wgpu::BindGroupLayout,
 
     // Keep textures alive
     _albedo_tex: GpuTexture,
     _normal_tex: (wgpu::Texture, wgpu::TextureView, wgpu::Sampler),
     _shadow_map: ShadowMap,
     _ibl: IblResources,
+    _shadow_uniform_buffer: wgpu::Buffer,
 
     input: InputState,
     timer: GameTimer,
@@ -184,6 +198,56 @@ impl ApplicationHandler for DeferredDemoApp {
         );
 
         // ---------------------------------------------------------------
+        // SSGI pass resources
+        // ---------------------------------------------------------------
+        let ssgi = SsgiResources::new(&gpu.device, &gpu.queue, gpu.config.width, gpu.config.height);
+        let ssgi_gb_layout = ssgi_gbuffer_bind_group_layout(&gpu.device);
+        let ssgi_data_layout = ssgi_data_bind_group_layout(&gpu.device);
+        let ssgi_pipeline = create_ssgi_pipeline(&gpu.device, &ssgi_gb_layout, &ssgi_data_layout);
+
+        // SSGI G-Buffer bind group (group 0): position, normal, albedo, non-filtering sampler
+        let ssgi_nearest_sampler = gpu.device.create_sampler(&wgpu::SamplerDescriptor {
+            label: Some("SSGI GBuffer Nearest Sampler"),
+            address_mode_u: wgpu::AddressMode::ClampToEdge,
+            address_mode_v: wgpu::AddressMode::ClampToEdge,
+            address_mode_w: wgpu::AddressMode::ClampToEdge,
+            mag_filter: wgpu::FilterMode::Nearest,
+            min_filter: wgpu::FilterMode::Nearest,
+            mipmap_filter: wgpu::MipmapFilterMode::Nearest,
+            ..Default::default()
+        });
+        let ssgi_gbuffer_bind_group = create_ssgi_gbuffer_bind_group(
+            &gpu.device,
+            &ssgi_gb_layout,
+            &gbuffer,
+            &ssgi_nearest_sampler,
+        );
+
+        // SSGI data bind group (group 1): uniform, kernel, noise texture, noise sampler
+        let ssgi_data_bind_group = gpu.device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("SSGI Data Bind Group"),
+            layout: &ssgi_data_layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: ssgi.uniform_buffer.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: ssgi.kernel_buffer.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 2,
+                    resource: wgpu::BindingResource::TextureView(&ssgi.noise_view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 3,
+                    resource: wgpu::BindingResource::Sampler(&ssgi.noise_sampler),
+                },
+            ],
+        });
+
+        // ---------------------------------------------------------------
         // Lighting pass bind group layouts
         // ---------------------------------------------------------------
         let gbuffer_layout = lighting_gbuffer_bind_group_layout(&gpu.device);
@@ -243,7 +307,7 @@ impl ApplicationHandler for DeferredDemoApp {
             ],
         });
 
-        // Shadow + IBL bind group (group 2)
+        // Shadow + IBL + SSGI bind group (group 2) — now 7 entries
         let shadow_map = ShadowMap::new(&gpu.device);
         let ibl = IblResources::new(&gpu.device, &gpu.queue);
         let shadow_uniform = ShadowUniform {
@@ -257,32 +321,27 @@ impl ApplicationHandler for DeferredDemoApp {
             contents: bytemuck::cast_slice(&[shadow_uniform]),
             usage: wgpu::BufferUsages::UNIFORM,
         });
-        let shadow_bind_group = gpu.device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("Lighting Shadow Bind Group"),
-            layout: &shadow_layout,
-            entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: wgpu::BindingResource::TextureView(&shadow_map.view),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 1,
-                    resource: wgpu::BindingResource::Sampler(&shadow_map.sampler),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 2,
-                    resource: shadow_uniform_buffer.as_entire_binding(),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 3,
-                    resource: wgpu::BindingResource::TextureView(&ibl.brdf_lut_view),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 4,
-                    resource: wgpu::BindingResource::Sampler(&ibl.brdf_lut_sampler),
-                },
-            ],
+
+        let ssgi_filtering_sampler = gpu.device.create_sampler(&wgpu::SamplerDescriptor {
+            label: Some("SSGI Filtering Sampler"),
+            address_mode_u: wgpu::AddressMode::ClampToEdge,
+            address_mode_v: wgpu::AddressMode::ClampToEdge,
+            address_mode_w: wgpu::AddressMode::ClampToEdge,
+            mag_filter: wgpu::FilterMode::Linear,
+            min_filter: wgpu::FilterMode::Linear,
+            mipmap_filter: wgpu::MipmapFilterMode::Nearest,
+            ..Default::default()
         });
+
+        let shadow_bind_group = create_shadow_bind_group(
+            &gpu.device,
+            &shadow_layout,
+            &shadow_map,
+            &shadow_uniform_buffer,
+            &ibl,
+            &ssgi,
+            &ssgi_filtering_sampler,
+        );
 
         // Lighting pipeline
         let lighting_pipeline = create_lighting_pipeline(
@@ -306,6 +365,12 @@ impl ApplicationHandler for DeferredDemoApp {
             camera_bind_group,
             pbr_texture_bind_group,
             material_bind_group,
+            ssgi,
+            ssgi_pipeline,
+            ssgi_gbuffer_bind_group,
+            ssgi_data_bind_group,
+            ssgi_gb_layout,
+            ssgi_data_layout,
             lighting_pipeline,
             fullscreen_vb,
             gbuffer_bind_group,
@@ -314,10 +379,12 @@ impl ApplicationHandler for DeferredDemoApp {
             light_buffer,
             cam_pos_buffer,
             gbuffer_layout,
+            shadow_layout,
             _albedo_tex: albedo_tex,
             _normal_tex: normal_tex,
             _shadow_map: shadow_map,
             _ibl: ibl,
+            _shadow_uniform_buffer: shadow_uniform_buffer,
             input: InputState::new(),
             timer: GameTimer::new(60),
             cam_aligned_size,
@@ -360,8 +427,13 @@ impl ApplicationHandler for DeferredDemoApp {
                 state.gpu.resize(size.width, size.height);
                 if size.width > 0 && size.height > 0 {
                     state.camera.aspect = size.width as f32 / size.height as f32;
+
                     // Resize G-Buffer
                     state.gbuffer.resize(&state.gpu.device, size.width, size.height);
+
+                    // Resize SSGI output texture
+                    state.ssgi.resize(&state.gpu.device, size.width, size.height);
+
                     // Recreate gbuffer bind group with new texture views
                     let nearest_sampler = state.gpu.device.create_sampler(&wgpu::SamplerDescriptor {
                         label: Some("GBuffer Nearest Sampler"),
@@ -378,6 +450,45 @@ impl ApplicationHandler for DeferredDemoApp {
                         &state.gbuffer_layout,
                         &state.gbuffer,
                         &nearest_sampler,
+                    );
+
+                    // Recreate SSGI G-Buffer bind group (gbuffer views changed)
+                    let ssgi_nearest_sampler = state.gpu.device.create_sampler(&wgpu::SamplerDescriptor {
+                        label: Some("SSGI GBuffer Nearest Sampler"),
+                        address_mode_u: wgpu::AddressMode::ClampToEdge,
+                        address_mode_v: wgpu::AddressMode::ClampToEdge,
+                        address_mode_w: wgpu::AddressMode::ClampToEdge,
+                        mag_filter: wgpu::FilterMode::Nearest,
+                        min_filter: wgpu::FilterMode::Nearest,
+                        mipmap_filter: wgpu::MipmapFilterMode::Nearest,
+                        ..Default::default()
+                    });
+                    state.ssgi_gbuffer_bind_group = create_ssgi_gbuffer_bind_group(
+                        &state.gpu.device,
+                        &state.ssgi_gb_layout,
+                        &state.gbuffer,
+                        &ssgi_nearest_sampler,
+                    );
+
+                    // Recreate shadow bind group (ssgi output_view changed)
+                    let ssgi_filtering_sampler = state.gpu.device.create_sampler(&wgpu::SamplerDescriptor {
+                        label: Some("SSGI Filtering Sampler"),
+                        address_mode_u: wgpu::AddressMode::ClampToEdge,
+                        address_mode_v: wgpu::AddressMode::ClampToEdge,
+                        address_mode_w: wgpu::AddressMode::ClampToEdge,
+                        mag_filter: wgpu::FilterMode::Linear,
+                        min_filter: wgpu::FilterMode::Linear,
+                        mipmap_filter: wgpu::MipmapFilterMode::Nearest,
+                        ..Default::default()
+                    });
+                    state.shadow_bind_group = create_shadow_bind_group(
+                        &state.gpu.device,
+                        &state.shadow_layout,
+                        &state._shadow_map,
+                        &state._shadow_uniform_buffer,
+                        &state._ibl,
+                        &state.ssgi,
+                        &ssgi_filtering_sampler,
                     );
                 }
             }
@@ -524,6 +635,20 @@ impl ApplicationHandler for DeferredDemoApp {
                     bytemuck::cast_slice(&[cam_pos_uniform]),
                 );
 
+                // Update SSGI uniform with current camera matrices
+                let proj_mat = state.camera.projection_matrix();
+                let view_mat = state.camera.view_matrix();
+                let ssgi_uniform = SsgiUniform {
+                    projection: *proj_mat.as_slice(),
+                    view: *view_mat.as_slice(),
+                    ..SsgiUniform::default()
+                };
+                state.gpu.queue.write_buffer(
+                    &state.ssgi.uniform_buffer,
+                    0,
+                    bytemuck::bytes_of(&ssgi_uniform),
+                );
+
                 // Render
                 let output = match state.gpu.surface.get_current_texture() {
                     Ok(t) => t,
@@ -620,7 +745,38 @@ impl ApplicationHandler for DeferredDemoApp {
                     }
                 }
 
-                // ---- Pass 2: Lighting (fullscreen) ----
+                // ---- Pass 2: SSGI ----
+                {
+                    let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                        label: Some("SSGI Pass"),
+                        color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                            view: &state.ssgi.output_view,
+                            resolve_target: None,
+                            depth_slice: None,
+                            ops: wgpu::Operations {
+                                load: wgpu::LoadOp::Clear(wgpu::Color {
+                                    r: 1.0,
+                                    g: 1.0,
+                                    b: 1.0,
+                                    a: 1.0,
+                                }),
+                                store: wgpu::StoreOp::Store,
+                            },
+                        })],
+                        depth_stencil_attachment: None,
+                        occlusion_query_set: None,
+                        timestamp_writes: None,
+                        multiview_mask: None,
+                    });
+
+                    rpass.set_pipeline(&state.ssgi_pipeline);
+                    rpass.set_bind_group(0, &state.ssgi_gbuffer_bind_group, &[]);
+                    rpass.set_bind_group(1, &state.ssgi_data_bind_group, &[]);
+                    rpass.set_vertex_buffer(0, state.fullscreen_vb.slice(..));
+                    rpass.draw(0..3, 0..1);
+                }
+
+                // ---- Pass 3: Lighting (fullscreen) ----
                 {
                     let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                         label: Some("Lighting Pass"),
@@ -697,6 +853,83 @@ fn create_gbuffer_bind_group(
             wgpu::BindGroupEntry {
                 binding: 4,
                 resource: wgpu::BindingResource::Sampler(sampler),
+            },
+        ],
+    })
+}
+
+/// Helper: create the SSGI pass G-Buffer bind group.
+fn create_ssgi_gbuffer_bind_group(
+    device: &wgpu::Device,
+    layout: &wgpu::BindGroupLayout,
+    gbuffer: &GBuffer,
+    sampler: &wgpu::Sampler,
+) -> wgpu::BindGroup {
+    device.create_bind_group(&wgpu::BindGroupDescriptor {
+        label: Some("SSGI GBuffer Bind Group"),
+        layout,
+        entries: &[
+            wgpu::BindGroupEntry {
+                binding: 0,
+                resource: wgpu::BindingResource::TextureView(&gbuffer.position_view),
+            },
+            wgpu::BindGroupEntry {
+                binding: 1,
+                resource: wgpu::BindingResource::TextureView(&gbuffer.normal_view),
+            },
+            wgpu::BindGroupEntry {
+                binding: 2,
+                resource: wgpu::BindingResource::TextureView(&gbuffer.albedo_view),
+            },
+            wgpu::BindGroupEntry {
+                binding: 3,
+                resource: wgpu::BindingResource::Sampler(sampler),
+            },
+        ],
+    })
+}
+
+/// Helper: create the shadow + IBL + SSGI bind group (7 entries).
+fn create_shadow_bind_group(
+    device: &wgpu::Device,
+    layout: &wgpu::BindGroupLayout,
+    shadow_map: &ShadowMap,
+    shadow_uniform_buffer: &wgpu::Buffer,
+    ibl: &IblResources,
+    ssgi: &SsgiResources,
+    ssgi_sampler: &wgpu::Sampler,
+) -> wgpu::BindGroup {
+    device.create_bind_group(&wgpu::BindGroupDescriptor {
+        label: Some("Lighting Shadow+IBL+SSGI Bind Group"),
+        layout,
+        entries: &[
+            wgpu::BindGroupEntry {
+                binding: 0,
+                resource: wgpu::BindingResource::TextureView(&shadow_map.view),
+            },
+            wgpu::BindGroupEntry {
+                binding: 1,
+                resource: wgpu::BindingResource::Sampler(&shadow_map.sampler),
+            },
+            wgpu::BindGroupEntry {
+                binding: 2,
+                resource: shadow_uniform_buffer.as_entire_binding(),
+            },
+            wgpu::BindGroupEntry {
+                binding: 3,
+                resource: wgpu::BindingResource::TextureView(&ibl.brdf_lut_view),
+            },
+            wgpu::BindGroupEntry {
+                binding: 4,
+                resource: wgpu::BindingResource::Sampler(&ibl.brdf_lut_sampler),
+            },
+            wgpu::BindGroupEntry {
+                binding: 5,
+                resource: wgpu::BindingResource::TextureView(&ssgi.output_view),
+            },
+            wgpu::BindGroupEntry {
+                binding: 6,
+                resource: wgpu::BindingResource::Sampler(ssgi_sampler),
             },
         ],
     })
