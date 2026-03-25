@@ -119,6 +119,70 @@ pub fn ray_vs_box(ray: &Ray, center: Vec3, half_extents: Vec3) -> Option<(f32, V
     Some((t, normal))
 }
 
+/// Ray vs Capsule (Y-axis aligned). Returns (t, normal) or None.
+/// Capsule = cylinder of given half_height along Y + hemisphere caps of given radius.
+pub fn ray_vs_capsule(ray: &Ray, center: Vec3, radius: f32, half_height: f32) -> Option<(f32, Vec3)> {
+    // Test the two hemisphere caps
+    let top_center = Vec3::new(center.x, center.y + half_height, center.z);
+    let bot_center = Vec3::new(center.x, center.y - half_height, center.z);
+
+    let mut best: Option<(f32, Vec3)> = None;
+
+    // Test infinite cylinder (ignore Y component for the 2D circle test)
+    // Ray in XZ plane relative to capsule center
+    let ox = ray.origin.x - center.x;
+    let oz = ray.origin.z - center.z;
+    let dx = ray.direction.x;
+    let dz = ray.direction.z;
+
+    let a = dx * dx + dz * dz;
+    let b = 2.0 * (ox * dx + oz * dz);
+    let c = ox * ox + oz * oz - radius * radius;
+
+    if a > 1e-10 {
+        let disc = b * b - 4.0 * a * c;
+        if disc >= 0.0 {
+            let sqrt_d = disc.sqrt();
+            for sign in [-1.0f32, 1.0] {
+                let t = (-b + sign * sqrt_d) / (2.0 * a);
+                if t >= 0.0 {
+                    let hit_y = ray.origin.y + ray.direction.y * t;
+                    // Check if hit is within the cylinder portion
+                    if hit_y >= center.y - half_height && hit_y <= center.y + half_height {
+                        let hit = ray.at(t);
+                        let normal = Vec3::new(hit.x - center.x, 0.0, hit.z - center.z).normalize();
+                        if best.is_none() || t < best.unwrap().0 {
+                            best = Some((t, normal));
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Test top hemisphere
+    if let Some((t, normal)) = ray_vs_sphere(ray, top_center, radius) {
+        let hit = ray.at(t);
+        if hit.y >= center.y + half_height {
+            if best.is_none() || t < best.unwrap().0 {
+                best = Some((t, normal));
+            }
+        }
+    }
+
+    // Test bottom hemisphere
+    if let Some((t, normal)) = ray_vs_sphere(ray, bot_center, radius) {
+        let hit = ray.at(t);
+        if hit.y <= center.y - half_height {
+            if best.is_none() || t < best.unwrap().0 {
+                best = Some((t, normal));
+            }
+        }
+    }
+
+    best
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

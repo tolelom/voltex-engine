@@ -50,6 +50,9 @@ pub fn raycast(world: &World, ray: &Ray, max_dist: f32) -> Option<RayHit> {
             Collider::Box { half_extents } => {
                 ray_tests::ray_vs_box(ray, *pos, *half_extents)
             }
+            Collider::Capsule { radius, half_height } => {
+                ray_tests::ray_vs_capsule(ray, *pos, *radius, *half_height)
+            }
         };
 
         if let Some((t, normal)) = result {

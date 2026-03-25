@@ -4,6 +4,7 @@ use voltex_math::{Vec3, AABB};
 pub enum Collider {
     Sphere { radius: f32 },
     Box { half_extents: Vec3 },
+    Capsule { radius: f32, half_height: f32 },
 }
 
 impl Collider {
@@ -15,6 +16,10 @@ impl Collider {
             }
             Collider::Box { half_extents } => {
                 AABB::new(position - *half_extents, position + *half_extents)
+            }
+            Collider::Capsule { radius, half_height } => {
+                let r = Vec3::new(*radius, *half_height + *radius, *radius);
+                AABB::new(position - r, position + r)
             }
         }
     }
@@ -38,5 +43,13 @@ mod tests {
         let aabb = c.aabb(Vec3::ZERO);
         assert_eq!(aabb.min, Vec3::new(-1.0, -2.0, -3.0));
         assert_eq!(aabb.max, Vec3::new(1.0, 2.0, 3.0));
+    }
+
+    #[test]
+    fn test_capsule_aabb() {
+        let c = Collider::Capsule { radius: 0.5, half_height: 1.0 };
+        let aabb = c.aabb(Vec3::new(1.0, 2.0, 3.0));
+        assert_eq!(aabb.min, Vec3::new(0.5, 0.5, 2.5));
+        assert_eq!(aabb.max, Vec3::new(1.5, 3.5, 3.5));
     }
 }
