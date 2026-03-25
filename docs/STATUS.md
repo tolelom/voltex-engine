@@ -125,6 +125,14 @@
 - voltex_ai: A* pathfinding on triangle graph (center-point path)
 - voltex_ai: Steering behaviors (seek, flee, arrive, wander, follow_path)
 
+### Phase 8-4: Immediate Mode UI (Editor Foundation)
+- voltex_editor: FontAtlas (8x12 비트맵 ASCII, 코드 생성)
+- voltex_editor: DrawList (정점/인덱스/커맨드), DrawVertex (Unorm8x4 color)
+- voltex_editor: UiContext (IMGUI 상태, hot/active, 커서 레이아웃)
+- voltex_editor: Widgets (text, button, slider, checkbox, panel)
+- voltex_editor: UiRenderer (wgpu 2D pipeline, alpha blending, orthographic)
+- examples/editor_demo (IMGUI 위젯 데모)
+
 ### Phase 8-3: Lua Scripting
 - voltex_script: Lua 5.4 내장 빌드 (cc crate)
 - voltex_script: Lua C API FFI 바인딩
@@ -151,10 +159,11 @@ crates/
 ├── voltex_audio     — AudioClip, WAV parser, mixing, WASAPI backend, AudioSystem, MixGroup, spatial
 ├── voltex_ai        — NavMesh, A* pathfinding, steering behaviors
 ├── voltex_net       — UDP packets, NetServer, NetClient
-└── voltex_script    — Lua 5.4 FFI, LuaState, scripting bindings
+├── voltex_script    — Lua 5.4 FFI, LuaState, scripting bindings
+└── voltex_editor    — IMGUI framework, UiRenderer, widgets
 ```
 
-## 테스트: 245개 전부 통과
+## 테스트: 255개 전부 통과
 
 - voltex_asset: 14
 - voltex_audio: 35 (audio_clip 2 + wav 5 + mixing 11 + audio_system 2 + spatial 8 + mix_group 7)
@@ -165,9 +174,10 @@ crates/
 - voltex_ai: 15 (navmesh 4 + pathfinding 5 + steering 6)
 - voltex_net: 8 (packet 7 + integration 1)
 - voltex_script: 9 (state 8 + bindings 1)
+- voltex_editor: 10 (font 2 + draw_list 3 + widgets 3 + layout 1 + renderer 1)
 - voltex_renderer: 33 (20 + SSGI 3 + RT 3 + bloom 3 + tonemap 4)
 
-## Examples (11개)
+## Examples (12개)
 
 - triangle — Phase 1 삼각형
 - model_viewer — OBJ 큐브 + Blinn-Phong
@@ -180,8 +190,9 @@ crates/
 - ibl_demo — Normal map + IBL
 - audio_demo — 사인파 오디오 재생
 - deferred_demo — 디퍼드 렌더링 + 다중 포인트 라이트
+- editor_demo — IMGUI 위젯 데모
 
-## 다음: Phase 8-4 (에디터) — Stretch Goal
+## 전체 완료!
 
 스펙 참조: `docs/superpowers/specs/2026-03-24-voltex-engine-design.md`
 
