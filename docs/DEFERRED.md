@@ -62,6 +62,15 @@
 - **raycast_all (다중 hit)** — 가장 가까운 hit만 반환.
 - **BVH 조기 종료 최적화** — 모든 리프 검사 후 최소 t 선택. front-to-back 순회 미구현.
 
+## Phase 7-3
+
+- **RT Reflections** — 미구현. BLAS/TLAS 인프라 재사용 가능.
+- **RT AO** — 미구현.
+- **Point/Spot Light RT shadows** — Directional만 구현.
+- **Soft RT shadows** — 단일 ray만. Multi-ray soft shadow 미구현.
+- **BLAS 업데이트** — 정적 지오메트리만. 동적 메시 변경 시 BLAS 재빌드 필요.
+- **Fallback** — RT 미지원 GPU에서 자동 PCF 폴백 미구현.
+
 ## Phase 7-2
 
 - **Bilateral Blur** — SSGI 노이즈 제거 블러 미구현. 4x4 노이즈 타일링만.

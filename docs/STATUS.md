@@ -106,6 +106,13 @@
 - voltex_renderer: Lighting pass SSGI integration (ambient * ssgi_ao + indirect)
 - deferred_demo updated with 3-pass rendering (GBuffer → SSGI → Lighting)
 
+### Phase 7-3: RT Shadows (Hardware Ray Tracing)
+- voltex_renderer: RtAccel (BLAS/TLAS acceleration structure management)
+- voltex_renderer: RT Shadow compute shader (ray query, directional light)
+- voltex_renderer: RT shadow pipeline + bind group layouts
+- voltex_renderer: Lighting pass RT shadow integration
+- deferred_demo updated with hardware RT shadows (4-pass: GBuffer → SSGI → RT Shadow → Lighting)
+
 ## Crate 구조
 
 ```
@@ -119,7 +126,7 @@ crates/
 └── voltex_audio     — AudioClip, WAV parser, mixing, WASAPI backend, AudioSystem, MixGroup, spatial
 ```
 
-## 테스트: 203개 전부 통과
+## 테스트: 206개 전부 통과
 
 - voltex_asset: 14
 - voltex_audio: 35 (audio_clip 2 + wav 5 + mixing 11 + audio_system 2 + spatial 8 + mix_group 7)
@@ -127,7 +134,7 @@ crates/
 - voltex_math: 37 (29 + AABB 6 + Ray 2)
 - voltex_physics: 52 (collider 2 + narrow 11 + bvh 5 + collision 7 + rigid_body 3 + integrator 3 + solver 5 + ray 10 + raycast 6)
 - voltex_platform: 3
-- voltex_renderer: 23 (20 + SSGI 3)
+- voltex_renderer: 26 (20 + SSGI 3 + RT 3)
 
 ## Examples (11개)
 
@@ -143,7 +150,7 @@ crates/
 - audio_demo — 사인파 오디오 재생
 - deferred_demo — 디퍼드 렌더링 + 다중 포인트 라이트
 
-## 다음: Phase 7-3 (레이트레이싱) / 7-4 (포스트 프로세싱) — Stretch Goal
+## 다음: Phase 7-4 (포스트 프로세싱) — Stretch Goal
 
 스펙 참조: `docs/superpowers/specs/2026-03-24-voltex-engine-design.md`
 
