@@ -31,10 +31,12 @@ extern "C" {
     pub fn lua_pushnumber(L: *mut lua_State, n: lua_Number);
     pub fn lua_pushstring(L: *mut lua_State, s: *const c_char) -> *const c_char;
     pub fn lua_pushcclosure(L: *mut lua_State, f: lua_CFunction, n: c_int);
+    pub fn lua_pushlightuserdata(L: *mut lua_State, p: *mut c_void);
 
     // Get
     pub fn lua_tonumberx(L: *mut lua_State, idx: c_int, isnum: *mut c_int) -> lua_Number;
     pub fn lua_tolstring(L: *mut lua_State, idx: c_int, len: *mut usize) -> *const c_char;
+    pub fn lua_touserdata(L: *mut lua_State, idx: c_int) -> *mut c_void;
 
     // Globals
     pub fn lua_getglobal(L: *mut lua_State, name: *const c_char) -> c_int;
