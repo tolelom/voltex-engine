@@ -1,5 +1,6 @@
 pub mod deflate;
 pub mod png;
+pub mod jpg;
 pub mod gpu;
 pub mod light;
 pub mod obj;
@@ -54,3 +55,4 @@ pub use hdr::{HdrTarget, HDR_FORMAT};
 pub use bloom::{BloomResources, BloomUniform, mip_sizes, BLOOM_MIP_COUNT};
 pub use tonemap::{TonemapUniform, aces_tonemap};
 pub use png::parse_png;
+pub use jpg::parse_jpg;
