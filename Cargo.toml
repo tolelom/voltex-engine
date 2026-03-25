@@ -19,6 +19,7 @@ members = [
     "crates/voltex_physics",
     "crates/voltex_audio",
     "examples/audio_demo",
+    "crates/voltex_ai",
 ]
 
 [workspace.dependencies]
@@ -29,6 +30,7 @@ voltex_ecs = { path = "crates/voltex_ecs" }
 voltex_asset = { path = "crates/voltex_asset" }
 voltex_physics = { path = "crates/voltex_physics" }
 voltex_audio = { path = "crates/voltex_audio" }
+voltex_ai = { path = "crates/voltex_ai" }
 wgpu = "28.0"
 winit = "0.30"
 bytemuck = { version = "1", features = ["derive"] }
