@@ -86,6 +86,12 @@
 - voltex_audio: mix_sounds spatial integration (per-sound attenuation + panning)
 - voltex_audio: play_3d, set_listener API
 
+### Phase 6-3: Mixer
+- voltex_audio: MixGroup (Master, Bgm, Sfx, Voice), MixerState
+- voltex_audio: GroupState with linear fade (tick-based)
+- voltex_audio: effective_volume (group * master)
+- voltex_audio: set_group_volume, fade_group API
+
 ## Crate 구조
 
 ```
@@ -96,13 +102,13 @@ crates/
 ├── voltex_ecs       — Entity, SparseSet, World, Transform, Hierarchy, Scene, WorldTransform
 ├── voltex_asset     — Handle<T>, AssetStorage<T>, Assets
 ├── voltex_physics   — Collider, ContactPoint, BvhTree, RigidBody, detect_collisions, physics_step, raycast
-└── voltex_audio     — AudioClip, WAV parser, mixing, WASAPI backend, AudioSystem
+└── voltex_audio     — AudioClip, WAV parser, mixing, WASAPI backend, AudioSystem, MixGroup, spatial
 ```
 
-## 테스트: 191개 전부 통과
+## 테스트: 200개 전부 통과
 
 - voltex_asset: 14
-- voltex_audio: 26 (audio_clip 2 + wav 5 + mixing 9 + audio_system 2 + spatial 8)
+- voltex_audio: 35 (audio_clip 2 + wav 5 + mixing 11 + audio_system 2 + spatial 8 + mix_group 7)
 - voltex_ecs: 39
 - voltex_math: 37 (29 + AABB 6 + Ray 2)
 - voltex_physics: 52 (collider 2 + narrow 11 + bvh 5 + collision 7 + rigid_body 3 + integrator 3 + solver 5 + ray 10 + raycast 6)
@@ -122,7 +128,7 @@ crates/
 - ibl_demo — Normal map + IBL
 - audio_demo — 사인파 오디오 재생
 
-## 다음: Phase 6-3 (믹서)
+## 다음: Phase 7 (고급 렌더링) — Stretch Goal
 
 스펙 참조: `docs/superpowers/specs/2026-03-24-voltex-engine-design.md`
 
