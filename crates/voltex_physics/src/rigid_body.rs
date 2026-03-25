@@ -7,6 +7,7 @@ pub struct RigidBody {
     pub mass: f32,
     pub restitution: f32,
     pub gravity_scale: f32,
+    pub friction: f32, // Coulomb friction coefficient, default 0.5
 }
 
 impl RigidBody {
@@ -17,6 +18,7 @@ impl RigidBody {
             mass,
             restitution: 0.3,
             gravity_scale: 1.0,
+            friction: 0.5,
         }
     }
 
@@ -27,6 +29,7 @@ impl RigidBody {
             mass: 0.0,
             restitution: 0.3,
             gravity_scale: 0.0,
+            friction: 0.5,
         }
     }
 

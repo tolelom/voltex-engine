@@ -35,12 +35,42 @@ pub fn resolve_collisions(world: &mut World, contacts: &[ContactPoint]) {
         let v_rel_n = v_rel.dot(contact.normal);
 
         // normal points A→B; v_rel_n > 0 means A approaches B → apply impulse
-        if v_rel_n > 0.0 {
+        let j = if v_rel_n > 0.0 {
             let e = rb_a.restitution.min(rb_b.restitution);
             let j = (1.0 + e) * v_rel_n / inv_mass_sum;
 
             velocity_changes.push((contact.entity_a, contact.normal * (-j * inv_mass_a)));
             velocity_changes.push((contact.entity_b, contact.normal * (j * inv_mass_b)));
+
+            j
+        } else {
+            // No separating impulse needed, but use contact depth to derive a
+            // representative normal force magnitude for friction clamping.
+            // A simple proxy: treat the penetration as providing a static normal force.
+            contact.depth / inv_mass_sum
+        };
+
+        // Coulomb friction: tangential impulse clamped to mu * normal impulse
+        let v_rel_n_scalar = v_rel.dot(contact.normal);
+        let v_rel_tangent = v_rel - contact.normal * v_rel_n_scalar;
+        let tangent_len = v_rel_tangent.length();
+
+        if tangent_len > 1e-6 {
+            let tangent = v_rel_tangent * (1.0 / tangent_len);
+
+            // Friction coefficient: average of both bodies
+            let mu = (rb_a.friction + rb_b.friction) * 0.5;
+
+            // Coulomb's law: friction impulse <= mu * normal impulse
+            let jt = -v_rel_tangent.dot(tangent) / inv_mass_sum;
+            let friction_j = if jt.abs() <= j * mu {
+                jt // static friction
+            } else {
+                j * mu * jt.signum() // dynamic friction (sliding), clamped magnitude
+            };
+
+            velocity_changes.push((contact.entity_a, tangent * (friction_j * inv_mass_a)));
+            velocity_changes.push((contact.entity_b, tangent * (-friction_j * inv_mass_b)));
         }
 
         let correction_mag = (contact.depth - POSITION_SLOP).max(0.0) * POSITION_PERCENT / inv_mass_sum;
@@ -200,6 +230,39 @@ mod tests {
         let t = world.get::<Transform>(ball).unwrap();
         assert!(t.position.y < 5.0);
         assert!(t.position.y > -1.0);
+    }
+
+    #[test]
+    fn test_friction_slows_sliding() {
+        // Ball sliding on static floor with friction
+        let mut world = World::new();
+
+        let ball = world.spawn();
+        world.add(ball, Transform::from_position(Vec3::new(0.0, 0.4, 0.0)));
+        world.add(ball, Collider::Sphere { radius: 0.5 });
+        let mut rb = RigidBody::dynamic(1.0);
+        rb.velocity = Vec3::new(5.0, 0.0, 0.0); // sliding horizontally
+        rb.gravity_scale = 0.0;
+        rb.friction = 0.5;
+        world.add(ball, rb);
+
+        let floor = world.spawn();
+        world.add(floor, Transform::from_position(Vec3::new(0.0, -0.5, 0.0)));
+        world.add(floor, Collider::Box { half_extents: Vec3::new(10.0, 0.5, 10.0) });
+        let mut floor_rb = RigidBody::statik();
+        floor_rb.friction = 0.5;
+        world.add(floor, floor_rb);
+
+        // Ball center at 0.4, radius 0.5, floor top at 0.0 → overlap 0.1
+        let contacts = detect_collisions(&world);
+        if !contacts.is_empty() {
+            resolve_collisions(&mut world, &contacts);
+        }
+
+        let ball_v = world.get::<RigidBody>(ball).unwrap().velocity;
+        // X velocity should be reduced by friction
+        assert!(ball_v.x < 5.0, "friction should slow horizontal velocity: {}", ball_v.x);
+        assert!(ball_v.x > 0.0, "should still be moving: {}", ball_v.x);
     }
 
     #[test]
