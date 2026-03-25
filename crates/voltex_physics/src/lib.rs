@@ -1,4 +1,5 @@
 pub mod bvh;
+pub mod ray;
 pub mod collider;
 pub mod contact;
 pub mod narrow;
