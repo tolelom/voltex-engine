@@ -62,6 +62,13 @@
 - **raycast_all (다중 hit)** — 가장 가까운 hit만 반환.
 - **BVH 조기 종료 최적화** — 모든 리프 검사 후 최소 t 선택. front-to-back 순회 미구현.
 
+## Phase 7-1
+
+- **투명 오브젝트** — 디퍼드에서 처리 불가. 별도 포워드 패스 필요.
+- **G-Buffer 압축** — Position을 depth에서 복원, Normal을 octahedral 인코딩 등 미적용.
+- **Light Volumes** — 풀스크린 라이팅만. 라이트별 sphere/cone 렌더 미구현.
+- **Stencil 최적화** — 미구현.
+
 ## Phase 6-3
 
 - **동적 그룹 생성** — 고정 4개(Master/Bgm/Sfx/Voice)만. 런타임 추가 불가.

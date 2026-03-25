@@ -92,6 +92,13 @@
 - voltex_audio: effective_volume (group * master)
 - voltex_audio: set_group_volume, fade_group API
 
+### Phase 7-1: Deferred Rendering
+- voltex_renderer: GBuffer (4 MRT: Position/Normal/Albedo/Material + Depth)
+- voltex_renderer: G-Buffer pass shader (MRT output, TBN normal mapping)
+- voltex_renderer: Lighting pass shader (fullscreen triangle, Cook-Torrance BRDF, multi-light, shadow, IBL)
+- voltex_renderer: Deferred pipeline (gbuffer + lighting bind group layouts)
+- examples/deferred_demo (5x5 sphere grid + 8 orbiting point lights)
+
 ## Crate 구조
 
 ```
@@ -115,7 +122,7 @@ crates/
 - voltex_platform: 3
 - voltex_renderer: 20
 
-## Examples (10개)
+## Examples (11개)
 
 - triangle — Phase 1 삼각형
 - model_viewer — OBJ 큐브 + Blinn-Phong
@@ -127,8 +134,9 @@ crates/
 - shadow_demo — Directional Light 그림자
 - ibl_demo — Normal map + IBL
 - audio_demo — 사인파 오디오 재생
+- deferred_demo — 디퍼드 렌더링 + 다중 포인트 라이트
 
-## 다음: Phase 7 (고급 렌더링) — Stretch Goal
+## 다음: Phase 7-2 (Global Illumination) — Stretch Goal
 
 스펙 참조: `docs/superpowers/specs/2026-03-24-voltex-engine-design.md`
 
