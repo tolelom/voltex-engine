@@ -174,6 +174,64 @@ impl Mat4 {
         )
     }
 
+    /// Compute the inverse of this matrix. Returns `None` if the matrix is singular.
+    pub fn inverse(&self) -> Option<Self> {
+        let m = &self.cols;
+        // Flatten to row-major for cofactor expansion
+        // m[col][row] — so element (row, col) = m[col][row]
+        let e = |r: usize, c: usize| -> f32 { m[c][r] };
+
+        // Compute cofactors using 2x2 determinants
+        let s0 = e(0,0) * e(1,1) - e(1,0) * e(0,1);
+        let s1 = e(0,0) * e(1,2) - e(1,0) * e(0,2);
+        let s2 = e(0,0) * e(1,3) - e(1,0) * e(0,3);
+        let s3 = e(0,1) * e(1,2) - e(1,1) * e(0,2);
+        let s4 = e(0,1) * e(1,3) - e(1,1) * e(0,3);
+        let s5 = e(0,2) * e(1,3) - e(1,2) * e(0,3);
+
+        let c5 = e(2,2) * e(3,3) - e(3,2) * e(2,3);
+        let c4 = e(2,1) * e(3,3) - e(3,1) * e(2,3);
+        let c3 = e(2,1) * e(3,2) - e(3,1) * e(2,2);
+        let c2 = e(2,0) * e(3,3) - e(3,0) * e(2,3);
+        let c1 = e(2,0) * e(3,2) - e(3,0) * e(2,2);
+        let c0 = e(2,0) * e(3,1) - e(3,0) * e(2,1);
+
+        let det = s0 * c5 - s1 * c4 + s2 * c3 + s3 * c2 - s4 * c1 + s5 * c0;
+        if det.abs() < 1e-12 {
+            return None;
+        }
+        let inv_det = 1.0 / det;
+
+        // Adjugate matrix (transposed cofactor matrix), stored column-major
+        let inv = Self::from_cols(
+            [
+                ( e(1,1) * c5 - e(1,2) * c4 + e(1,3) * c3) * inv_det,
+                (-e(0,1) * c5 + e(0,2) * c4 - e(0,3) * c3) * inv_det,
+                ( e(3,1) * s5 - e(3,2) * s4 + e(3,3) * s3) * inv_det,
+                (-e(2,1) * s5 + e(2,2) * s4 - e(2,3) * s3) * inv_det,
+            ],
+            [
+                (-e(1,0) * c5 + e(1,2) * c2 - e(1,3) * c1) * inv_det,
+                ( e(0,0) * c5 - e(0,2) * c2 + e(0,3) * c1) * inv_det,
+                (-e(3,0) * s5 + e(3,2) * s2 - e(3,3) * s1) * inv_det,
+                ( e(2,0) * s5 - e(2,2) * s2 + e(2,3) * s1) * inv_det,
+            ],
+            [
+                ( e(1,0) * c4 - e(1,1) * c2 + e(1,3) * c0) * inv_det,
+                (-e(0,0) * c4 + e(0,1) * c2 - e(0,3) * c0) * inv_det,
+                ( e(3,0) * s4 - e(3,1) * s2 + e(3,3) * s0) * inv_det,
+                (-e(2,0) * s4 + e(2,1) * s2 - e(2,3) * s0) * inv_det,
+            ],
+            [
+                (-e(1,0) * c3 + e(1,1) * c1 - e(1,2) * c0) * inv_det,
+                ( e(0,0) * c3 - e(0,1) * c1 + e(0,2) * c0) * inv_det,
+                (-e(3,0) * s3 + e(3,1) * s1 - e(3,2) * s0) * inv_det,
+                ( e(2,0) * s3 - e(2,1) * s1 + e(2,2) * s0) * inv_det,
+            ],
+        );
+        Some(inv)
+    }
+
     /// Return the transpose of this matrix.
     pub fn transpose(&self) -> Self {
         let c = &self.cols;
