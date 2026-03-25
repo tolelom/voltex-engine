@@ -55,26 +55,35 @@
 - IBL merged into shadow bind group (group 3) due to max_bind_groups=4
 - examples/ibl_demo
 
+### Phase 5-1: Collision Detection
+- voltex_math: AABB type (new, from_center_half_extents, intersects, merged, surface_area)
+- voltex_physics: Collider enum (Sphere, Box), ContactPoint
+- voltex_physics: BVH broad phase (median split, longest axis)
+- voltex_physics: Narrow phase — sphere_vs_sphere, sphere_vs_box, box_vs_box (SAT)
+- voltex_physics: detect_collisions(world) ECS integration
+
 ## Crate 구조
 
 ```
 crates/
-├── voltex_math      — Vec2, Vec3, Vec4, Mat4
+├── voltex_math      — Vec2, Vec3, Vec4, Mat4, AABB
 ├── voltex_platform  — VoltexWindow, InputState, GameTimer
 ├── voltex_renderer  — GPU, Mesh, OBJ, Camera, Material, PBR, Shadow, IBL, Sphere
 ├── voltex_ecs       — Entity, SparseSet, World, Transform, Hierarchy, Scene, WorldTransform
-└── voltex_asset     — Handle<T>, AssetStorage<T>, Assets
+├── voltex_asset     — Handle<T>, AssetStorage<T>, Assets
+└── voltex_physics   — Collider, ContactPoint, BvhTree, detect_collisions
 ```
 
-## 테스트: 105개 전부 통과
+## 테스트: 136개 전부 통과
 
 - voltex_asset: 14
 - voltex_ecs: 39
-- voltex_math: 29 (28 + orthographic)
+- voltex_math: 35 (29 + AABB 6)
+- voltex_physics: 25 (collider 2 + narrow 11 + bvh 5 + collision 7)
 - voltex_platform: 3
 - voltex_renderer: 20
 
-## Examples (8개)
+## Examples (9개)
 
 - triangle — Phase 1 삼각형
 - model_viewer — OBJ 큐브 + Blinn-Phong
@@ -86,7 +95,7 @@ crates/
 - shadow_demo — Directional Light 그림자
 - ibl_demo — Normal map + IBL
 
-## 다음: Phase 5 (물리 엔진)
+## 다음: Phase 5-2 (리지드바디 시뮬레이션)
 
 스펙 참조: `docs/superpowers/specs/2026-03-24-voltex-engine-design.md`
 

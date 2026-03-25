@@ -42,6 +42,13 @@
 - **Irradiance/Prefiltered Map 컨볼루션** → 프로시저럴 근사.
 - **GPU 컴퓨트 BRDF LUT** → CPU 생성 (256x256).
 
+## Phase 5-1
+
+- **Capsule, Convex Hull 콜라이더** — Sphere + Box만 구현. 추후 GJK/EPA와 함께 추가.
+- **OBB (회전된 박스) 충돌** — 축 정렬 AABB만 지원. OBB는 GJK/EPA로 대체 예정.
+- **Incremental BVH 업데이트** — 매 프레임 전체 rebuild. 성능 이슈 시 incremental update 적용.
+- **연속 충돌 감지 (CCD)** — 이산 충돌만. 빠른 물체의 터널링 미처리.
+
 ## 렌더링 한계
 
 - **per-entity dynamic UBO** — 수천 개 이상은 인스턴싱 필요.
