@@ -73,7 +73,7 @@
 - ~~**OGG/Vorbis 디코더**~~ ✅ OGG 컨테이너 + Vorbis 디코더 완료.
 - ~~**24-bit/32-bit WAV**~~ ✅ 완료.
 - ~~**ECS 통합**~~ ✅ AudioSource 컴포넌트 완료. audio_sync_system 미구현.
-- **비동기 로딩** — 동기 로딩만.
+- ~~**비동기 로딩**~~ ✅ AsyncAudioLoader (스레드 기반) 완료.
 
 ## Phase 6-2
 
@@ -86,14 +86,14 @@
 
 - ~~**동적 그룹 생성**~~ ✅ MixGroupManager 동적 생성/삭제 완료.
 - ~~**그룹 간 라우팅/버스**~~ ✅ AudioBus 믹싱 완료.
-- **이펙트 체인** — Reverb, EQ 등 파이프라인 체인 미구현. (개별 이펙트는 구현됨)
+- ~~**이펙트 체인**~~ ✅ EffectChain (trait 기반 파이프라인) 완료.
 - ~~**비선형 페이드 커브**~~ ✅ Exponential/Logarithmic/SCurve 완료.
 
 ## Phase 7-1
 
 - ~~**투명 오브젝트**~~ ✅ ForwardPass (알파 블렌딩, HDR 타겟, depth read-only) + back-to-front 정렬 완료. deferred_demo 통합 미완료.
 - ~~**G-Buffer 압축**~~ ✅ 옥타헤드럴 노멀 인코딩 + depth 기반 위치 복원 완료.
-- **Light Volumes** — 풀스크린 라이팅만.
+- ~~**Light Volumes**~~ ✅ Sphere/Cone/Fullscreen 볼륨 + contains_point 완료.
 - ~~**Stencil 최적화**~~ ✅ 라이트 볼륨 스텐실 mark/test 완료.
 
 ## Phase 7-2
@@ -101,16 +101,16 @@
 - ~~**Bilateral Blur**~~ ✅ depth/normal edge-aware 컴퓨트 셰이더 완료.
 - ~~**반해상도 렌더링**~~ ✅ half_resolution + depth-aware 업스케일 완료.
 - ~~**Temporal Accumulation**~~ ✅ 히스토리 블렌딩 컴퓨트 셰이더 완료.
-- **Light Probes** — 미구현.
+- ~~**Light Probes**~~ ✅ SH 평가 + LightProbeGrid nearest 완료.
 
 ## Phase 7-3
 
 - ~~**RT Reflections**~~ ✅ 컴퓨트 셰이더 (G-Buffer 기반 반사 레이 마칭) 완료.
 - ~~**RT AO**~~ ✅ 컴퓨트 셰이더 (코사인 가중 반구 샘플링) 완료.
 - ~~**Point/Spot Light RT shadows**~~ ✅ 인프라 + 컴퓨트 셰이더 완료.
-- **Soft RT shadows** — 단일 ray만.
-- **BLAS 업데이트** — 정적 지오메트리만.
-- **Fallback** — RT 미지원 GPU 폴백 미구현.
+- ~~**Soft RT shadows**~~ ✅ 멀티 레이 + penumbra 크기 계산 완료.
+- ~~**BLAS 업데이트**~~ ✅ BlasTracker (dirty mesh 추적) 완료.
+- ~~**Fallback**~~ ✅ RtCapabilities + RenderMode 선택 완료.
 
 ## Phase 7-4
 
