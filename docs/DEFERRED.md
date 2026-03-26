@@ -14,7 +14,7 @@
 - ~~**시스템 스케줄러**~~ ✅ 순서 기반 Scheduler 완료.
 - ~~**쿼리 필터**~~ ✅ With/Without 완료.
 - ~~**query3+**~~ ✅ query3, query4 완료.
-- **Changed 필터** — 컴포넌트 변경 감지 미구현.
+- ~~**Changed 필터**~~ ✅ tick 기반 변경 감지, query_changed, clear_changed 완료.
 - **의존성 기반 스케줄러** — 읽기/쓰기 의존성 자동 정렬/병렬 실행 미구현.
 
 ## Phase 3b

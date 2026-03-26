@@ -145,11 +145,11 @@ crates/
 └── voltex_editor    — IMGUI, docking, 3D viewport, inspector, asset browser, TTF font, UiRenderer
 ```
 
-## 테스트: 563개 전부 통과
+## 테스트: 572개 전부 통과
 
 - voltex_math: 37
 - voltex_platform: 3
-- voltex_ecs: 83
+- voltex_ecs: 91
 - voltex_asset: 22
 - voltex_renderer: 109
 - voltex_physics: 96
