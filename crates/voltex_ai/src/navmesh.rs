@@ -68,6 +68,128 @@ impl NavMesh {
         )
     }
 
+    /// Serialize the NavMesh to a binary format with header.
+    ///
+    /// Format:
+    /// - Magic: "VNAV" (4 bytes)
+    /// - Version: u32 (little-endian)
+    /// - num_vertices: u32
+    /// - vertices: [f32; 3] * num_vertices
+    /// - num_triangles: u32
+    /// - triangles: for each triangle: indices [u32; 3] + neighbors [i32; 3] (-1 for None)
+    pub fn serialize(&self) -> Vec<u8> {
+        let mut data = Vec::new();
+        // Magic
+        data.extend_from_slice(b"VNAV");
+        // Version
+        data.extend_from_slice(&1u32.to_le_bytes());
+
+        // Vertices
+        data.extend_from_slice(&(self.vertices.len() as u32).to_le_bytes());
+        for v in &self.vertices {
+            data.extend_from_slice(&v.x.to_le_bytes());
+            data.extend_from_slice(&v.y.to_le_bytes());
+            data.extend_from_slice(&v.z.to_le_bytes());
+        }
+
+        // Triangles
+        data.extend_from_slice(&(self.triangles.len() as u32).to_le_bytes());
+        for tri in &self.triangles {
+            for &idx in &tri.indices {
+                data.extend_from_slice(&(idx as u32).to_le_bytes());
+            }
+            for &nb in &tri.neighbors {
+                let val: i32 = match nb {
+                    Some(i) => i as i32,
+                    None => -1,
+                };
+                data.extend_from_slice(&val.to_le_bytes());
+            }
+        }
+
+        data
+    }
+
+    /// Deserialize a NavMesh from binary data with header validation.
+    pub fn deserialize(data: &[u8]) -> Result<Self, String> {
+        if data.len() < 8 {
+            return Err("data too short for header".to_string());
+        }
+
+        // Validate magic
+        if &data[0..4] != b"VNAV" {
+            return Err(format!(
+                "invalid magic: expected VNAV, got {:?}",
+                &data[0..4]
+            ));
+        }
+
+        // Read version
+        let version = u32::from_le_bytes([data[4], data[5], data[6], data[7]]);
+        if version != 1 {
+            return Err(format!("unsupported version: {}", version));
+        }
+
+        // Delegate rest to offset-based reading
+        let mut offset = 8usize;
+
+        let read_u32 = |off: &mut usize| -> Result<u32, String> {
+            if *off + 4 > data.len() {
+                return Err("unexpected end of data".to_string());
+            }
+            let val = u32::from_le_bytes([data[*off], data[*off + 1], data[*off + 2], data[*off + 3]]);
+            *off += 4;
+            Ok(val)
+        };
+
+        let read_i32 = |off: &mut usize| -> Result<i32, String> {
+            if *off + 4 > data.len() {
+                return Err("unexpected end of data".to_string());
+            }
+            let val = i32::from_le_bytes([data[*off], data[*off + 1], data[*off + 2], data[*off + 3]]);
+            *off += 4;
+            Ok(val)
+        };
+
+        let read_f32 = |off: &mut usize| -> Result<f32, String> {
+            if *off + 4 > data.len() {
+                return Err("unexpected end of data".to_string());
+            }
+            let val = f32::from_le_bytes([data[*off], data[*off + 1], data[*off + 2], data[*off + 3]]);
+            *off += 4;
+            Ok(val)
+        };
+
+        let vc = read_u32(&mut offset)? as usize;
+        let mut vertices = Vec::with_capacity(vc);
+        for _ in 0..vc {
+            let x = read_f32(&mut offset)?;
+            let y = read_f32(&mut offset)?;
+            let z = read_f32(&mut offset)?;
+            vertices.push(Vec3::new(x, y, z));
+        }
+
+        let tc = read_u32(&mut offset)? as usize;
+        let mut triangles = Vec::with_capacity(tc);
+        for _ in 0..tc {
+            let i0 = read_u32(&mut offset)? as usize;
+            let i1 = read_u32(&mut offset)? as usize;
+            let i2 = read_u32(&mut offset)? as usize;
+            let n0 = read_i32(&mut offset)?;
+            let n1 = read_i32(&mut offset)?;
+            let n2 = read_i32(&mut offset)?;
+            let to_opt = |v: i32| -> Option<usize> {
+                if v < 0 { None } else { Some(v as usize) }
+            };
+            triangles.push(NavTriangle {
+                indices: [i0, i1, i2],
+                neighbors: [to_opt(n0), to_opt(n1), to_opt(n2)],
+            });
+        }
+
+        Ok(NavMesh::new(vertices, triangles))
+    }
+
     /// Return the shared edge (portal) vertices between two adjacent triangles.
     /// Returns (left, right) vertices of the portal edge as seen from `from_tri` looking toward `to_tri`.
     /// Returns None if the triangles are not adjacent.
@@ -311,5 +433,65 @@ mod tests {
     fn test_deserialize_empty_data() {
         let result = deserialize_navmesh(&[]);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_method_serialize_deserialize_roundtrip() {
+        let nm = make_simple_navmesh();
+        let data = nm.serialize();
+        let restored = NavMesh::deserialize(&data).expect("should deserialize");
+        assert_eq!(nm.vertices.len(), restored.vertices.len());
+        assert_eq!(nm.triangles.len(), restored.triangles.len());
+        for (a, b) in nm.vertices.iter().zip(restored.vertices.iter()) {
+            assert!((a.x - b.x).abs() < 1e-6);
+            assert!((a.y - b.y).abs() < 1e-6);
+            assert!((a.z - b.z).abs() < 1e-6);
+        }
+        for (a, b) in nm.triangles.iter().zip(restored.triangles.iter()) {
+            assert_eq!(a.indices, b.indices);
+            assert_eq!(a.neighbors, b.neighbors);
+        }
+    }
+
+    #[test]
+    fn test_deserialize_invalid_magic() {
+        let data = b"XXXX\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00";
+        assert!(NavMesh::deserialize(data).is_err());
+    }
+
+    #[test]
+    fn test_deserialize_too_short() {
+        let data = b"VNA";
+        assert!(NavMesh::deserialize(data).is_err());
+    }
+
+    #[test]
+    fn test_serialize_empty_navmesh() {
+        let nm = NavMesh::new(vec![], vec![]);
+        let data = nm.serialize();
+        let restored = NavMesh::deserialize(&data).expect("should deserialize empty");
+        assert!(restored.vertices.is_empty());
+        assert!(restored.triangles.is_empty());
+    }
+
+    #[test]
+    fn test_serialize_header_format() {
+        let nm = NavMesh::new(vec![], vec![]);
+        let data = nm.serialize();
+        // Check magic
+        assert_eq!(&data[0..4], b"VNAV");
+        // Check version = 1
+        let version = u32::from_le_bytes([data[4], data[5], data[6], data[7]]);
+        assert_eq!(version, 1);
+    }
+
+    #[test]
+    fn test_deserialize_unsupported_version() {
+        let mut data = Vec::new();
+        data.extend_from_slice(b"VNAV");
+        data.extend_from_slice(&99u32.to_le_bytes());
+        data.extend_from_slice(&0u32.to_le_bytes());
+        data.extend_from_slice(&0u32.to_le_bytes());
+        assert!(NavMesh::deserialize(&data).is_err());
     }
 }
