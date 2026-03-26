@@ -4,9 +4,11 @@ pub mod layout;
 pub mod renderer;
 pub mod ui_context;
 pub mod widgets;
+pub mod dock;
 
 pub use font::FontAtlas;
 pub use draw_list::{DrawVertex, DrawCommand, DrawList};
 pub use layout::LayoutState;
 pub use renderer::UiRenderer;
 pub use ui_context::UiContext;
+pub use dock::{DockTree, DockNode, Axis, Rect, LeafLayout};
