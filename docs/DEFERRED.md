@@ -156,5 +156,5 @@
 
 ## 렌더링 한계
 
-- **per-entity dynamic UBO** — 수천 개 이상은 인스턴싱 필요.
+- ~~**per-entity dynamic UBO**~~ ✅ GPU 인스턴싱 (InstanceData, InstanceBuffer, instanced pipeline) 완료.
 - **max_bind_groups=4** — 리소스 합치기로 해결 중.
