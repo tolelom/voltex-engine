@@ -10,8 +10,13 @@ use voltex_renderer::{GpuContext, Mesh, MeshVertex, CameraUniform, LightUniform,
 use voltex_editor::{
     UiContext, UiRenderer, DockTree, DockNode, Axis, Rect, LayoutState,
     OrbitCamera, ViewportTexture, ViewportRenderer, VIEWPORT_COLOR_FORMAT,
+    hierarchy_panel, inspector_panel,
 };
-use voltex_math::Mat4;
+use voltex_ecs::world::World;
+use voltex_ecs::entity::Entity;
+use voltex_ecs::transform::Transform;
+use voltex_ecs::scene::Tag;
+use voltex_math::{Mat4, Vec3};
 
 struct EditorDemoApp {
     state: Option<AppState>,
@@ -29,6 +34,10 @@ struct AppState {
     counter: u32,
     speed: f32,
     show_grid: bool,
+    // ECS
+    world: World,
+    selected_entity: Option<Entity>,
+    tag_buffer: String,
     // Viewport state
     orbit_cam: OrbitCamera,
     viewport_tex: ViewportTexture,
@@ -228,7 +237,7 @@ impl ApplicationHandler for EditorDemoApp {
                     DockNode::Leaf { tabs: vec![2, 3], active: 0 },
                 ),
             ),
-            vec!["Debug", "Viewport", "Properties", "Console"],
+            vec!["Hierarchy", "Viewport", "Inspector", "Console"],
         );
 
         // Viewport
@@ -265,6 +274,28 @@ impl ApplicationHandler for EditorDemoApp {
         let cube2 = make_cube(&gpu.device, 2.0, 0.5, 1.0, 1.0);
         let cube3 = make_cube(&gpu.device, -1.5, 0.5, -1.0, 1.0);
 
+        // ECS World setup
+        let mut world = World::new();
+
+        let ground_e = world.spawn();
+        world.add(ground_e, Transform::from_position(Vec3::new(0.0, 0.0, 0.0)));
+        world.add(ground_e, Tag("Ground".to_string()));
+
+        let cube1_e = world.spawn();
+        world.add(cube1_e, Transform::from_position(Vec3::new(0.0, 0.5, 0.0)));
+        world.add(cube1_e, Tag("Cube1".to_string()));
+
+        let cube2_e = world.spawn();
+        world.add(cube2_e, Transform::from_position(Vec3::new(2.0, 0.5, 1.0)));
+        world.add(cube2_e, Tag("Cube2".to_string()));
+
+        let cube3_e = world.spawn();
+        world.add(cube3_e, Transform::from_position(Vec3::new(-1.5, 0.5, -1.0)));
+        world.add(cube3_e, Tag("Cube3".to_string()));
+
+        // Cube2 is child of Cube1
+        voltex_ecs::hierarchy::add_child(&mut world, cube1_e, cube2_e);
+
         self.state = Some(AppState {
             window,
             gpu,
@@ -286,6 +317,9 @@ impl ApplicationHandler for EditorDemoApp {
             texture_layout: tex_layout,
             dummy_texture_bg: dummy_texture.bind_group,
             scene_meshes: vec![ground, cube1, cube2, cube3],
+            world,
+            selected_entity: None,
+            tag_buffer: String::new(),
             prev_mouse: (0.0, 0.0),
             left_dragging: false,
             middle_dragging: false,
@@ -373,28 +407,21 @@ impl ApplicationHandler for EditorDemoApp {
                 let mut viewport_rect: Option<Rect> = None;
 
                 for (panel_id, rect) in &areas {
-                    state.ui.layout = LayoutState::new(rect.x + 4.0, rect.y + 4.0);
                     match panel_id {
                         0 => {
-                            state.ui.text("Debug Panel");
-                            state.ui.text(&format!("FPS: {:.0}", fps));
-                            if state.ui.button("Click Me") { state.counter += 1; }
-                            state.ui.text(&format!("Count: {}", state.counter));
-                            state.speed = state.ui.slider("Speed", state.speed, 0.0, 10.0);
-                            state.show_grid = state.ui.checkbox("Show Grid", state.show_grid);
+                            // Hierarchy panel
+                            hierarchy_panel(&mut state.ui, &state.world, &mut state.selected_entity, rect);
                         }
                         1 => {
+                            // Viewport panel (keep existing 3D rendering code exactly as-is)
                             viewport_rect = Some(*rect);
-                            // Don't draw UI text in viewport - the 3D scene goes here
                         }
                         2 => {
-                            state.ui.text("Properties");
-                            let pos = state.orbit_cam.position();
-                            state.ui.text(&format!("Cam: ({:.1}, {:.1}, {:.1})", pos.x, pos.y, pos.z));
-                            state.ui.text(&format!("Speed: {:.1}", state.speed));
-                            state.ui.text(&format!("Grid: {}", state.show_grid));
+                            // Inspector panel
+                            inspector_panel(&mut state.ui, &mut state.world, state.selected_entity, rect, &mut state.tag_buffer);
                         }
                         3 => {
+                            state.ui.layout = LayoutState::new(rect.x + 4.0, rect.y + 4.0);
                             state.ui.text("Console");
                             state.ui.text("> Ready.");
                         }
