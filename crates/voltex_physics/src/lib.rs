@@ -10,9 +10,10 @@ pub mod integrator;
 pub mod solver;
 pub mod raycast;
 pub mod ccd;
+pub mod mesh_collider;
 
 pub use bvh::BvhTree;
-pub use collider::Collider;
+pub use collider::{Collider, ConvexHull};
 pub use contact::ContactPoint;
 pub use collision::detect_collisions;
 pub use rigid_body::{RigidBody, PhysicsConfig};
@@ -21,3 +22,4 @@ pub use solver::{resolve_collisions, physics_step};
 pub use raycast::{RayHit, raycast, raycast_all};
 pub use ray::ray_vs_triangle;
 pub use ccd::swept_sphere_vs_aabb;
+pub use mesh_collider::{MeshCollider, MeshHit, ray_vs_mesh, ray_vs_mesh_all};
