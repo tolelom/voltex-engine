@@ -55,7 +55,8 @@ pub fn inspector_panel(
 
 ### 스크롤
 - `ui.begin_scroll_panel` / `end_scroll_panel` 사용
-- content_height = 엔티티 수 * line_height
+- content_height = 전체 노드 수 * line_height (재귀 `count_nodes` 헬퍼로 사전 계산)
+- 선택 하이라이트 색상: `[0x44, 0x66, 0x88, 0xFF]`
 
 ## Inspector 패널
 
@@ -67,13 +68,31 @@ pub fn inspector_panel(
 - Position X/Y/Z: 슬라이더 3개 (range -50.0 ~ 50.0)
 - Rotation X/Y/Z: 슬라이더 3개 (range -3.15 ~ 3.15, 약 ±π)
 - Scale X/Y/Z: 슬라이더 3개 (range 0.01 ~ 10.0)
-- 슬라이더 값을 읽은 후 `world.get_mut::<Transform>(entity)` 로 수정
+
+**Borrow 패턴** (Transform은 Copy이므로 cheap):
+```rust
+// 1. 값 복사 (immutable borrow 해제)
+let (px, py, pz, rx, ry, rz, sx, sy, sz) = {
+    let t = world.get::<Transform>(entity).unwrap();
+    (t.position.x, t.position.y, t.position.z,
+     t.rotation.x, t.rotation.y, t.rotation.z,
+     t.scale.x, t.scale.y, t.scale.z)
+};
+// 2. 슬라이더 (world 미사용)
+let new_px = ui.slider("Pos X", px, -50.0, 50.0);
+// ... 9개 슬라이더
+// 3. 변경된 값 쓰기 (mutable borrow)
+if let Some(t) = world.get_mut::<Transform>(entity) {
+    t.position.x = new_px; // ...
+}
+```
 
 ### Tag 섹션
 - `world.has_component::<Tag>(entity)` 체크
 - 헤더: "-- Tag --"
-- `ui.text_input(id, &mut buffer, x, y, width)` 로 편집
-- 변경 시 `world.get_mut::<Tag>(entity).0 = new_value`
+- **호출자가 `tag_buffer: String`을 별도로 유지** (선택 변경 시 동기화)
+- `ui.text_input(id, &mut tag_buffer, x, y, width)` 로 편집
+- 변경 시 `world.get_mut::<Tag>(entity).unwrap().0 = tag_buffer.clone()`
 
 ### Parent 섹션
 - `world.has_component::<Parent>(entity)` 체크
