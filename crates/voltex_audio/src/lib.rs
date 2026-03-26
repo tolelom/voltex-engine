@@ -5,6 +5,7 @@ pub mod mixing;
 pub mod wasapi;
 pub mod audio_system;
 pub mod spatial;
+pub mod hrtf;
 pub mod mix_group;
 pub mod audio_source;
 
