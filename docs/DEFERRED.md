@@ -78,8 +78,8 @@
 ## Phase 6-2
 
 - ~~**도플러 효과**~~ ✅ doppler_shift 완료.
-- **HRTF** — 미구현.
-- **Reverb/Echo** — 미구현.
+- ~~**HRTF**~~ ✅ ITD/ILD 기반 간소화 HRTF 완료.
+- ~~**Reverb/Echo**~~ ✅ Schroeder reverb (4 comb + 2 allpass) + Echo delay line 완료.
 - **Occlusion** — 미구현.
 
 ## Phase 6-3
@@ -133,9 +133,9 @@
 
 - ~~**상태 동기화 (스냅샷)**~~ ✅ Snapshot + delta 압축 완료.
 - ~~**보간 / 예측**~~ ✅ InterpolationBuffer 완료.
-- **지연 보상** — 미구현.
+- ~~**지연 보상**~~ ✅ LagCompensation (history rewind + interpolation) 완료.
 - ~~**신뢰성 계층**~~ ✅ ReliableChannel + OrderedChannel 완료.
-- **암호화 / 인증** — 미구현.
+- ~~**암호화 / 인증**~~ ✅ PacketCipher (XOR + anti-replay) + AuthToken 완료.
 
 ## Phase 8-3
 
