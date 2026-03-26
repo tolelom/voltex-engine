@@ -123,6 +123,7 @@
 - voltex_editor: Drag and Drop (begin_drag, drop_target)
 - voltex_editor: DockTree (binary split layout, resize, tab switching)
 - voltex_editor: OrbitCamera, ViewportTexture, ViewportRenderer (3D scene viewport)
+- voltex_editor: hierarchy_panel, inspector_panel (Transform/Tag/Parent editing)
 - examples/editor_demo
 
 ## Crate 구조
@@ -139,10 +140,10 @@ crates/
 ├── voltex_ai        — NavMesh(+builder), A*, Funnel, steering, obstacle avoidance
 ├── voltex_net       — UDP, NetServer/Client, Reliable/Ordered, Snapshot(delta), Interpolation
 ├── voltex_script    — Lua 5.4, LuaState, table interop, coroutine, sandbox, hot reload
-└── voltex_editor    — IMGUI, text_input, scroll, drag&drop, docking, 3D viewport, UiRenderer
+└── voltex_editor    — IMGUI, text_input, scroll, drag&drop, docking, 3D viewport, inspector, UiRenderer
 ```
 
-## 테스트: 510개 전부 통과
+## 테스트: 517개 전부 통과
 
 - voltex_math: 37
 - voltex_platform: 3
@@ -154,7 +155,7 @@ crates/
 - voltex_ai: 24
 - voltex_net: 36
 - voltex_script: 18
-- voltex_editor: 47
+- voltex_editor: 54
 
 ## Examples (12개 + survivor_game)
 
