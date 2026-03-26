@@ -6,8 +6,10 @@ pub mod wasapi;
 pub mod audio_system;
 pub mod spatial;
 pub mod mix_group;
+pub mod audio_source;
 
 pub use audio_clip::AudioClip;
+pub use audio_source::AudioSource;
 pub use wav::{parse_wav, generate_wav_bytes};
 pub use mixing::{PlayingSound, mix_sounds};
 pub use audio_system::AudioSystem;
