@@ -4,7 +4,8 @@ use crate::layout::LayoutState;
 use voltex_ecs::world::World;
 use voltex_ecs::entity::Entity;
 use voltex_ecs::scene::Tag;
-use voltex_ecs::hierarchy::{roots, Children};
+use voltex_ecs::hierarchy::{roots, Children, Parent};
+use voltex_ecs::transform::Transform;
 
 const COLOR_SELECTED: [u8; 4] = [0x44, 0x66, 0x88, 0xFF];
 const COLOR_TEXT: [u8; 4] = [0xEE, 0xEE, 0xEE, 0xFF];
@@ -91,16 +92,90 @@ pub fn hierarchy_panel(
     }
 }
 
-/// Inspector panel stub (implemented in next task).
+/// Inspector panel: edit Transform, Tag, Parent for selected entity.
+/// `tag_buffer` is caller-owned staging buffer for Tag text input.
 pub fn inspector_panel(
     ui: &mut UiContext,
-    _world: &mut World,
-    _selected: Option<Entity>,
+    world: &mut World,
+    selected: Option<Entity>,
     rect: &Rect,
-    _tag_buffer: &mut String,
+    tag_buffer: &mut String,
 ) {
     ui.layout = LayoutState::new(rect.x + PADDING, rect.y + PADDING);
-    ui.text("Inspector (TODO)");
+
+    let entity = match selected {
+        Some(e) => e,
+        None => {
+            ui.text("No entity selected");
+            return;
+        }
+    };
+
+    // --- Transform ---
+    if world.has_component::<Transform>(entity) {
+        ui.text("-- Transform --");
+
+        // Copy out values (immutable borrow ends with block)
+        let (px, py, pz, rx, ry, rz, sx, sy, sz) = {
+            let t = world.get::<Transform>(entity).unwrap();
+            (t.position.x, t.position.y, t.position.z,
+             t.rotation.x, t.rotation.y, t.rotation.z,
+             t.scale.x, t.scale.y, t.scale.z)
+        };
+
+        // Sliders (no world borrow active)
+        let new_px = ui.slider("Pos X", px, -50.0, 50.0);
+        let new_py = ui.slider("Pos Y", py, -50.0, 50.0);
+        let new_pz = ui.slider("Pos Z", pz, -50.0, 50.0);
+        let new_rx = ui.slider("Rot X", rx, -3.15, 3.15);
+        let new_ry = ui.slider("Rot Y", ry, -3.15, 3.15);
+        let new_rz = ui.slider("Rot Z", rz, -3.15, 3.15);
+        let new_sx = ui.slider("Scl X", sx, 0.01, 10.0);
+        let new_sy = ui.slider("Scl Y", sy, 0.01, 10.0);
+        let new_sz = ui.slider("Scl Z", sz, 0.01, 10.0);
+
+        // Write back (mutable borrow)
+        if let Some(t) = world.get_mut::<Transform>(entity) {
+            t.position.x = new_px;
+            t.position.y = new_py;
+            t.position.z = new_pz;
+            t.rotation.x = new_rx;
+            t.rotation.y = new_ry;
+            t.rotation.z = new_rz;
+            t.scale.x = new_sx;
+            t.scale.y = new_sy;
+            t.scale.z = new_sz;
+        }
+    }
+
+    // --- Tag ---
+    if world.has_component::<Tag>(entity) {
+        ui.text("-- Tag --");
+
+        // Sync buffer from world
+        if let Some(tag) = world.get::<Tag>(entity) {
+            if tag_buffer.is_empty() || *tag_buffer != tag.0 {
+                *tag_buffer = tag.0.clone();
+            }
+        }
+
+        let input_x = rect.x + PADDING;
+        let input_y = ui.layout.cursor_y;
+        let input_w = (rect.w - PADDING * 2.0).max(50.0);
+        if ui.text_input(8888, tag_buffer, input_x, input_y, input_w) {
+            if let Some(tag) = world.get_mut::<Tag>(entity) {
+                tag.0 = tag_buffer.clone();
+            }
+        }
+        ui.layout.advance_line();
+    }
+
+    // --- Parent ---
+    if let Some(parent) = world.get::<Parent>(entity) {
+        ui.text("-- Parent --");
+        let parent_text = format!("Parent: Entity({})", parent.0.id);
+        ui.text(&parent_text);
+    }
 }
 
 #[cfg(test)]
@@ -176,5 +251,57 @@ mod tests {
         ui.end_frame();
 
         assert!(selected.is_none());
+    }
+
+    #[test]
+    fn test_inspector_no_selection() {
+        let mut world = World::new();
+        let mut ui = UiContext::new(800.0, 600.0);
+        let rect = Rect { x: 0.0, y: 0.0, w: 300.0, h: 400.0 };
+
+        ui.begin_frame(0.0, 0.0, false);
+        let mut tag_buf = String::new();
+        inspector_panel(&mut ui, &mut world, None, &rect, &mut tag_buf);
+        ui.end_frame();
+
+        // "No entity selected" text produces draw commands
+        assert!(ui.draw_list.commands.len() > 0);
+    }
+
+    #[test]
+    fn test_inspector_with_transform() {
+        let mut world = World::new();
+        let e = world.spawn();
+        world.add(e, Transform::from_position(Vec3::new(1.0, 2.0, 3.0)));
+
+        let mut ui = UiContext::new(800.0, 600.0);
+        let rect = Rect { x: 0.0, y: 0.0, w: 300.0, h: 400.0 };
+
+        ui.begin_frame(0.0, 0.0, false);
+        let mut tag_buf = String::new();
+        inspector_panel(&mut ui, &mut world, Some(e), &rect, &mut tag_buf);
+        ui.end_frame();
+
+        // Header + 9 sliders produce many draw commands
+        assert!(ui.draw_list.commands.len() > 10);
+    }
+
+    #[test]
+    fn test_inspector_with_tag() {
+        let mut world = World::new();
+        let e = world.spawn();
+        world.add(e, Transform::new());
+        world.add(e, Tag("TestTag".to_string()));
+
+        let mut ui = UiContext::new(800.0, 600.0);
+        let rect = Rect { x: 0.0, y: 0.0, w: 300.0, h: 400.0 };
+
+        ui.begin_frame(0.0, 0.0, false);
+        let mut tag_buf = String::new();
+        inspector_panel(&mut ui, &mut world, Some(e), &rect, &mut tag_buf);
+        ui.end_frame();
+
+        // tag_buf should be synced from world
+        assert_eq!(tag_buf, "TestTag");
     }
 }
