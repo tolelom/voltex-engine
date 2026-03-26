@@ -9,6 +9,8 @@ pub mod scheduler;
 pub mod json;
 pub mod component_registry;
 pub mod binary_scene;
+pub mod archetype;
+pub mod dependency_scheduler;
 
 pub use entity::{Entity, EntityAllocator};
 pub use sparse_set::SparseSet;
@@ -20,3 +22,5 @@ pub use scene::{Tag, serialize_scene, deserialize_scene, serialize_scene_json, d
 pub use scheduler::{Scheduler, System};
 pub use component_registry::ComponentRegistry;
 pub use binary_scene::{serialize_scene_binary, deserialize_scene_binary};
+pub use archetype::{ArchetypeSignature, Archetype, ArchetypeRegistry};
+pub use dependency_scheduler::{SystemAccess, DependencyScheduler};
