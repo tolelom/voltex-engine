@@ -98,9 +98,9 @@
 
 ## Phase 7-2
 
-- **Bilateral Blur** — SSGI 노이즈 제거 블러 미구현.
+- ~~**Bilateral Blur**~~ ✅ depth/normal edge-aware 컴퓨트 셰이더 완료.
 - **반해상도 렌더링** — 풀 해상도 SSGI.
-- **Temporal Accumulation** — 미구현.
+- ~~**Temporal Accumulation**~~ ✅ 히스토리 블렌딩 컴퓨트 셰이더 완료.
 - **Light Probes** — 미구현.
 
 ## Phase 7-3
