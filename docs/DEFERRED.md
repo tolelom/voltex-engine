@@ -91,7 +91,7 @@
 
 ## Phase 7-1
 
-- **투명 오브젝트** — 디퍼드에서 처리 불가. 별도 포워드 패스 필요.
+- ~~**투명 오브젝트**~~ ✅ ForwardPass (알파 블렌딩, HDR 타겟, depth read-only) + back-to-front 정렬 완료. deferred_demo 통합 미완료.
 - **G-Buffer 압축** — 미적용.
 - **Light Volumes** — 풀스크린 라이팅만.
 - **Stencil 최적화** — 미구현.
