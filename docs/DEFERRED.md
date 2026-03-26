@@ -5,7 +5,7 @@
 - ~~**PNG 디코더 자체 구현**~~ ✅ 완료.
 - ~~**JPG 디코더 자체 구현**~~ ✅ Baseline JPEG 완료.
 - ~~**glTF 파서**~~ ✅ glTF 2.0 / GLB 완료.
-- **JPG Progressive** — Baseline만 지원. Progressive JPEG 미구현.
+- ~~**JPG Progressive**~~ ✅ SOF2 감지 + 스캔 파라미터 파싱 + DCT 계수 병합 완료.
 - ~~**glTF 애니메이션/스킨 파싱**~~ ✅ nodes/skins/animations/JOINTS_0/WEIGHTS_0 파싱 완료. **스킨드 렌더링 + 애니메이션 시스템** 미구현.
 
 ## Phase 3a
@@ -80,7 +80,7 @@
 - ~~**도플러 효과**~~ ✅ doppler_shift 완료.
 - ~~**HRTF**~~ ✅ ITD/ILD 기반 간소화 HRTF 완료.
 - ~~**Reverb/Echo**~~ ✅ Schroeder reverb (4 comb + 2 allpass) + Echo delay line 완료.
-- **Occlusion** — 미구현.
+- ~~**Occlusion**~~ ✅ 레이 기반 차폐 + 로우패스 필터 완료.
 
 ## Phase 6-3
 
