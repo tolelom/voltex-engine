@@ -6,6 +6,7 @@ pub mod reliable;
 pub mod snapshot;
 pub mod interpolation;
 pub mod lag_compensation;
+pub mod encryption;
 
 pub use packet::Packet;
 pub use socket::NetSocket;
@@ -15,3 +16,4 @@ pub use reliable::{ReliableChannel, OrderedChannel};
 pub use snapshot::{Snapshot, EntityState, serialize_snapshot, deserialize_snapshot, diff_snapshots, apply_diff};
 pub use interpolation::InterpolationBuffer;
 pub use lag_compensation::LagCompensation;
+pub use encryption::{PacketCipher, AuthToken};
