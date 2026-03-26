@@ -34,6 +34,25 @@ pub enum DockNode {
 
 pub struct DockTree {
     root: DockNode,
+    names: Vec<&'static str>,       // panel_id → 표시 이름 (인덱스 = panel_id)
+    cached_layouts: Vec<LeafLayout>, // layout() 결과 캐시 (draw_chrome에서 사용)
+    resizing: Option<ResizeState>,   // 현재 리사이즈 중인 Split
+    prev_mouse_down: bool,           // 이전 프레임 마우스 상태 (클릭 감지용)
+}
+
+struct ResizeState {
+    node_path: Vec<usize>,  // 루트에서 해당 Split까지의 child 인덱스 경로
+    axis: Axis,
+    origin: f32,            // 분할 영역의 시작 좌표
+    size: f32,              // 분할 영역의 전체 크기
+}
+
+pub struct LeafLayout {
+    pub tabs: Vec<u32>,
+    pub names: Vec<&'static str>,
+    pub active: usize,
+    pub tab_bar_rect: Rect,
+    pub content_rect: Rect,
 }
 ```
 
@@ -58,6 +77,7 @@ pub struct Rect {
   - Horizontal: 좌(w * ratio) / 우(w * (1 - ratio))
   - Vertical: 상(h * ratio) / 하(h * (1 - ratio))
 - **Leaf 노드**: 탭 바 높이(20px)를 빼고 나머지가 컨텐츠 영역
+- 결과를 `cached_layouts`에 저장 (`draw_chrome`에서 사용)
 - 반환: `Vec<(u32, Rect)>` — (활성 탭의 panel_id, 컨텐츠 rect)
 
 ## Resize
@@ -65,6 +85,7 @@ pub struct Rect {
 Split 경계선 ±3px 영역에서 마우스 드래그를 감지한다.
 
 - `update(mouse_x, mouse_y, mouse_down)` 매 프레임 호출
+- 클릭 감지: `mouse_down && !prev_mouse_down`으로 just-clicked 판별 (prev_mouse_down 내부 추적)
 - 마우스 다운 시 경계선 위에 있으면 해당 Split 노드를 "active resize" 상태로 설정
 - 드래그 중: 마우스 위치에 따라 ratio 업데이트
 - 마우스 릴리즈 시 해제
@@ -95,20 +116,26 @@ Split 경계선 ±3px 영역에서 마우스 드래그를 감지한다.
 - 리사이즈 중 경계선: 밝은 라인 (100, 100, 200)으로 하이라이트
 - 탭 바 하단: 1px 구분선
 
+## Invariants
+
+- `tabs`는 반드시 1개 이상의 요소를 가져야 한다
+- `active`는 항상 `tabs.len() - 1` 이하로 클램프한다 (out of bounds 방지)
+- 리사이즈 핸들은 탭 바보다 우선한다 (겹치는 영역에서 리사이즈 우선)
+
 ## API
 
 ```rust
 impl DockTree {
-    /// 트리 생성
-    pub fn new(root: DockNode) -> Self;
+    /// 트리 생성. names: panel_id → 표시 이름 매핑 (인덱스 = panel_id)
+    pub fn new(root: DockNode, names: Vec<&'static str>) -> Self;
 
-    /// 레이아웃 계산 — 각 활성 패널의 컨텐츠 영역 반환
-    pub fn layout(&self, rect: Rect) -> Vec<(u32, Rect)>;
+    /// 레이아웃 계산 — 결과를 내부에 캐시하고, 활성 패널의 (panel_id, content_rect) 반환
+    pub fn layout(&mut self, rect: Rect) -> Vec<(u32, Rect)>;
 
-    /// 리사이즈 + 탭 클릭 처리
+    /// 리사이즈 + 탭 클릭 처리 (내부에서 prev_mouse_down 추적)
     pub fn update(&mut self, mouse_x: f32, mouse_y: f32, mouse_down: bool);
 
-    /// 탭 바 + 경계선 렌더링
+    /// 탭 바 + 경계선 렌더링 (cached_layouts 사용)
     pub fn draw_chrome(&self, ui: &mut UiContext);
 }
 ```
@@ -116,6 +143,7 @@ impl DockTree {
 ## Usage Example
 
 ```rust
+let names = vec!["Hierarchy", "Viewport", "Inspector", "Console"];
 let mut dock = DockTree::new(DockNode::Split {
     axis: Axis::Horizontal,
     ratio: 0.25,
@@ -130,7 +158,7 @@ let mut dock = DockTree::new(DockNode::Split {
             ],
         }),
     ],
-});
+}, names);
 
 // frame loop
 let areas = dock.layout(Rect { x: 0.0, y: 0.0, w: 1280.0, h: 720.0 });
