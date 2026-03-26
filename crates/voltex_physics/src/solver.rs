@@ -23,8 +23,8 @@ pub fn resolve_collisions(world: &mut World, contacts: &[ContactPoint], iteratio
         for contact in contacts {
             let rb_a = world.get::<RigidBody>(contact.entity_a).copied();
             let rb_b = world.get::<RigidBody>(contact.entity_b).copied();
-            let col_a = world.get::<Collider>(contact.entity_a).copied();
-            let col_b = world.get::<Collider>(contact.entity_b).copied();
+            let col_a = world.get::<Collider>(contact.entity_a).cloned();
+            let col_b = world.get::<Collider>(contact.entity_b).cloned();
             let pos_a = world.get::<Transform>(contact.entity_a).map(|t| t.position);
             let pos_b = world.get::<Transform>(contact.entity_b).map(|t| t.position);
 
@@ -205,7 +205,7 @@ fn apply_ccd(world: &mut World, config: &PhysicsConfig) {
         .query3::<Transform, RigidBody, Collider>()
         .into_iter()
         .filter(|(_, _, rb, _)| !rb.is_static() && !rb.is_sleeping)
-        .map(|(e, t, rb, c)| (e, t.position, rb.velocity, *c))
+        .map(|(e, t, rb, c)| (e, t.position, rb.velocity, c.clone()))
         .collect();
 
     let all_colliders: Vec<(Entity, voltex_math::AABB)> = world
@@ -222,6 +222,10 @@ fn apply_ccd(world: &mut World, config: &PhysicsConfig) {
             Collider::Sphere { radius } => *radius,
             Collider::Box { half_extents } => half_extents.x.min(half_extents.y).min(half_extents.z),
             Collider::Capsule { radius, .. } => *radius,
+            Collider::ConvexHull(hull) => {
+                // Use minimum distance from origin to any vertex as approximate radius
+                hull.vertices.iter().map(|v| v.length()).fold(f32::MAX, f32::min)
+            }
         };
 
         // Only apply CCD if displacement > collider radius

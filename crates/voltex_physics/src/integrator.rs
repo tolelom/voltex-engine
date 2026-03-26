@@ -32,6 +32,25 @@ pub fn inertia_tensor(collider: &Collider, mass: f32) -> Vec3 {
             let iz = ix;
             Vec3::new(ix, iy, iz)
         }
+        Collider::ConvexHull(hull) => {
+            // Approximate using AABB of the hull vertices
+            let mut min = hull.vertices[0];
+            let mut max = min;
+            for &v in &hull.vertices[1..] {
+                min = Vec3::new(min.x.min(v.x), min.y.min(v.y), min.z.min(v.z));
+                max = Vec3::new(max.x.max(v.x), max.y.max(v.y), max.z.max(v.z));
+            }
+            let size = max - min;
+            let w = size.x;
+            let h = size.y;
+            let d = size.z;
+            let factor = mass / 12.0;
+            Vec3::new(
+                factor * (h * h + d * d),
+                factor * (w * w + d * d),
+                factor * (w * w + h * h),
+            )
+        }
     }
 }
 

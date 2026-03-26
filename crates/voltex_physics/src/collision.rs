@@ -13,7 +13,7 @@ pub fn detect_collisions(world: &World) -> Vec<ContactPoint> {
     let pairs_data: Vec<(Entity, Vec3, Collider)> = world
         .query2::<Transform, Collider>()
         .into_iter()
-        .map(|(e, t, c)| (e, t.position, *c))
+        .map(|(e, t, c)| (e, t.position, c.clone()))
         .collect();
 
     if pairs_data.len() < 2 {
@@ -34,7 +34,7 @@ pub fn detect_collisions(world: &World) -> Vec<ContactPoint> {
     let mut contacts = Vec::new();
 
     let lookup = |entity: Entity| -> Option<(Vec3, Collider)> {
-        pairs_data.iter().find(|(e, _, _)| *e == entity).map(|(_, p, c)| (*p, *c))
+        pairs_data.iter().find(|(e, _, _)| *e == entity).map(|(_, p, c)| (*p, c.clone()))
     };
 
     for (ea, eb) in broad_pairs {
@@ -55,8 +55,9 @@ pub fn detect_collisions(world: &World) -> Vec<ContactPoint> {
             (Collider::Box { half_extents: ha }, Collider::Box { half_extents: hb }) => {
                 narrow::box_vs_box(pos_a, *ha, pos_b, *hb)
             }
-            // Any combination involving Capsule uses GJK/EPA
-            (Collider::Capsule { .. }, _) | (_, Collider::Capsule { .. }) => {
+            // Any combination involving Capsule or ConvexHull uses GJK/EPA
+            (Collider::Capsule { .. }, _) | (_, Collider::Capsule { .. })
+            | (Collider::ConvexHull(_), _) | (_, Collider::ConvexHull(_)) => {
                 gjk::gjk_epa(&col_a, pos_a, &col_b, pos_b)
             }
         };

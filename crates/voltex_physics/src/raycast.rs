@@ -17,7 +17,7 @@ pub fn raycast(world: &World, ray: &Ray, max_dist: f32) -> Option<RayHit> {
     let entities: Vec<(Entity, Vec3, Collider)> = world
         .query2::<Transform, Collider>()
         .into_iter()
-        .map(|(e, t, c)| (e, t.position, *c))
+        .map(|(e, t, c)| (e, t.position, c.clone()))
         .collect();
 
     if entities.is_empty() {
@@ -53,6 +53,11 @@ pub fn raycast(world: &World, ray: &Ray, max_dist: f32) -> Option<RayHit> {
             Collider::Capsule { radius, half_height } => {
                 ray_tests::ray_vs_capsule(ray, *pos, *radius, *half_height)
             }
+            Collider::ConvexHull(_) => {
+                // Use AABB test as approximation for convex hull raycasting
+                let aabb = collider.aabb(*pos);
+                ray_tests::ray_vs_aabb(ray, &aabb).map(|t| (t, Vec3::Y))
+            }
         };
 
         if let Some((t, normal)) = result {
@@ -77,7 +82,7 @@ pub fn raycast_all(world: &World, ray: &Ray, max_dist: f32) -> Vec<RayHit> {
     let entities: Vec<(Entity, Vec3, Collider)> = world
         .query2::<Transform, Collider>()
         .into_iter()
-        .map(|(e, t, c)| (e, t.position, *c))
+        .map(|(e, t, c)| (e, t.position, c.clone()))
         .collect();
 
     if entities.is_empty() {
@@ -105,6 +110,11 @@ pub fn raycast_all(world: &World, ray: &Ray, max_dist: f32) -> Vec<RayHit> {
             }
             Collider::Capsule { radius, half_height } => {
                 ray_tests::ray_vs_capsule(ray, *pos, *radius, *half_height)
+            }
+            Collider::ConvexHull(_) => {
+                // Use AABB test as approximation for convex hull raycasting
+                let aabb = collider.aabb(*pos);
+                ray_tests::ray_vs_aabb(ray, &aabb).map(|t| (t, Vec3::Y))
             }
         };
 

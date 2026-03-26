@@ -30,6 +30,9 @@ fn support(collider: &Collider, position: Vec3, direction: Vec3) -> Vec3 {
             }
             base + direction * (*radius / len)
         }
+        Collider::ConvexHull(hull) => {
+            position + hull.support(direction)
+        }
     }
 }
 
