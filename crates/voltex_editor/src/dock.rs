@@ -1,11 +1,8 @@
 const TAB_BAR_HEIGHT: f32 = 20.0;
 const MIN_RATIO: f32 = 0.1;
 const MAX_RATIO: f32 = 0.9;
-#[allow(dead_code)]
 const RESIZE_HANDLE_HALF: f32 = 3.0;
-#[allow(dead_code)]
 const GLYPH_W: f32 = 8.0;
-#[allow(dead_code)]
 const TAB_PADDING: f32 = 8.0;
 
 #[derive(Clone, Copy, Debug)]
@@ -55,7 +52,6 @@ pub struct LeafLayout {
     pub content_rect: Rect,
 }
 
-#[allow(dead_code)]
 struct SplitLayout {
     rect: Rect,
     axis: Axis,
@@ -63,7 +59,6 @@ struct SplitLayout {
     path: Vec<usize>,
 }
 
-#[allow(dead_code)]
 struct ResizeState {
     path: Vec<usize>,
     axis: Axis,
@@ -71,15 +66,18 @@ struct ResizeState {
     size: f32,
 }
 
+enum UpdateAction {
+    None,
+    StartResize(ResizeState),
+    SetActiveTab { leaf_index: usize, new_active: usize },
+}
+
 pub struct DockTree {
     root: DockNode,
-    #[allow(dead_code)]
     names: Vec<&'static str>,
     cached_leaves: Vec<LeafLayout>,
     cached_splits: Vec<SplitLayout>,
-    #[allow(dead_code)]
     resizing: Option<ResizeState>,
-    #[allow(dead_code)]
     prev_mouse_down: bool,
 }
 
@@ -150,6 +148,111 @@ impl DockTree {
             cached_splits: Vec::new(),
             resizing: None,
             prev_mouse_down: false,
+        }
+    }
+
+    pub fn update(&mut self, mouse_x: f32, mouse_y: f32, mouse_down: bool) {
+        let just_clicked = mouse_down && !self.prev_mouse_down;
+        self.prev_mouse_down = mouse_down;
+
+        // Active resize in progress
+        if let Some(ref state) = self.resizing {
+            if mouse_down {
+                let new_ratio = match state.axis {
+                    Axis::Horizontal => (mouse_x - state.origin) / state.size,
+                    Axis::Vertical => (mouse_y - state.origin) / state.size,
+                };
+                let clamped = new_ratio.clamp(MIN_RATIO, MAX_RATIO);
+                let path = state.path.clone();
+                Self::set_ratio_at_path(&mut self.root, &path, clamped);
+            } else {
+                self.resizing = None;
+            }
+            return;
+        }
+
+        if !just_clicked { return; }
+
+        let action = self.find_click_action(mouse_x, mouse_y);
+
+        match action {
+            UpdateAction::StartResize(state) => { self.resizing = Some(state); }
+            UpdateAction::SetActiveTab { leaf_index, new_active } => {
+                Self::set_active_nth(&mut self.root, leaf_index, new_active, &mut 0);
+            }
+            UpdateAction::None => {}
+        }
+    }
+
+    fn find_click_action(&self, mx: f32, my: f32) -> UpdateAction {
+        // Check resize handles first (priority over tab clicks)
+        for split in &self.cached_splits {
+            let hit = match split.axis {
+                Axis::Horizontal => {
+                    mx >= split.boundary - RESIZE_HANDLE_HALF
+                        && mx <= split.boundary + RESIZE_HANDLE_HALF
+                        && my >= split.rect.y
+                        && my < split.rect.y + split.rect.h
+                }
+                Axis::Vertical => {
+                    my >= split.boundary - RESIZE_HANDLE_HALF
+                        && my <= split.boundary + RESIZE_HANDLE_HALF
+                        && mx >= split.rect.x
+                        && mx < split.rect.x + split.rect.w
+                }
+            };
+            if hit {
+                let (origin, size) = match split.axis {
+                    Axis::Horizontal => (split.rect.x, split.rect.w),
+                    Axis::Vertical => (split.rect.y, split.rect.h),
+                };
+                return UpdateAction::StartResize(ResizeState {
+                    path: split.path.clone(),
+                    axis: split.axis,
+                    origin,
+                    size,
+                });
+            }
+        }
+
+        // Check tab bar clicks
+        for leaf in &self.cached_leaves {
+            if leaf.tabs.len() <= 1 { continue; }
+            if !leaf.tab_bar_rect.contains(mx, my) { continue; }
+            let mut tx = leaf.tab_bar_rect.x;
+            for (i, &panel_id) in leaf.tabs.iter().enumerate() {
+                let name_len = self.names.get(panel_id as usize).map(|n| n.len()).unwrap_or(1);
+                let tab_w = name_len as f32 * GLYPH_W + TAB_PADDING;
+                if mx >= tx && mx < tx + tab_w {
+                    return UpdateAction::SetActiveTab { leaf_index: leaf.leaf_index, new_active: i };
+                }
+                tx += tab_w;
+            }
+        }
+
+        UpdateAction::None
+    }
+
+    fn set_ratio_at_path(node: &mut DockNode, path: &[usize], ratio: f32) {
+        if path.is_empty() {
+            if let DockNode::Split { ratio: r, .. } = node { *r = ratio; }
+            return;
+        }
+        if let DockNode::Split { children, .. } = node {
+            Self::set_ratio_at_path(&mut children[path[0]], &path[1..], ratio);
+        }
+    }
+
+    fn set_active_nth(node: &mut DockNode, target: usize, new_active: usize, count: &mut usize) {
+        match node {
+            DockNode::Leaf { active, .. } => {
+                if *count == target { *active = new_active; }
+                *count += 1;
+            }
+            DockNode::Split { children, .. } => {
+                Self::set_active_nth(&mut children[0], target, new_active, count);
+                Self::set_active_nth(&mut children[1], target, new_active, count);
+            }
         }
     }
 
@@ -267,5 +370,77 @@ mod tests {
             vec![],
         );
         dock.layout(Rect { x: 0.0, y: 0.0, w: 400.0, h: 300.0 });
+    }
+
+    #[test]
+    fn test_tab_click_switches_active() {
+        let mut dock = DockTree::new(
+            DockNode::Leaf { tabs: vec![0, 1, 2], active: 0 },
+            vec!["A", "B", "C"],
+        );
+        dock.layout(Rect { x: 0.0, y: 0.0, w: 400.0, h: 300.0 });
+        // Tab "A": w = 1*8+8 = 16, tab "B" starts at x=16. Click at x=20 (inside "B").
+        dock.update(20.0, 10.0, true);
+        dock.update(20.0, 10.0, false);
+        let areas = dock.layout(Rect { x: 0.0, y: 0.0, w: 400.0, h: 300.0 });
+        assert_eq!(areas[0].0, 1);
+    }
+
+    #[test]
+    fn test_tab_click_no_change_on_single_tab() {
+        let mut dock = DockTree::new(DockNode::leaf(vec![0]), vec!["Only"]);
+        dock.layout(Rect { x: 0.0, y: 0.0, w: 400.0, h: 300.0 });
+        dock.update(10.0, 10.0, true);
+        dock.update(10.0, 10.0, false);
+        let areas = dock.layout(Rect { x: 0.0, y: 0.0, w: 400.0, h: 300.0 });
+        assert_eq!(areas[0].0, 0);
+    }
+
+    #[test]
+    fn test_resize_horizontal_drag() {
+        let mut dock = DockTree::new(
+            DockNode::split(Axis::Horizontal, 0.5, DockNode::leaf(vec![0]), DockNode::leaf(vec![1])),
+            vec!["L", "R"],
+        );
+        dock.layout(Rect { x: 0.0, y: 0.0, w: 400.0, h: 300.0 });
+        dock.update(200.0, 150.0, true);  // click on boundary at x=200
+        dock.update(120.0, 150.0, true);  // drag to x=120
+        dock.update(120.0, 150.0, false); // release
+        let areas = dock.layout(Rect { x: 0.0, y: 0.0, w: 400.0, h: 300.0 });
+        let left = areas.iter().find(|(id, _)| *id == 0).unwrap();
+        assert!((left.1.w - 120.0).abs() < 5.0, "left w={}", left.1.w);
+    }
+
+    #[test]
+    fn test_resize_clamps_ratio() {
+        let mut dock = DockTree::new(
+            DockNode::split(Axis::Horizontal, 0.5, DockNode::leaf(vec![0]), DockNode::leaf(vec![1])),
+            vec!["L", "R"],
+        );
+        dock.layout(Rect { x: 0.0, y: 0.0, w: 400.0, h: 300.0 });
+        dock.update(200.0, 150.0, true);
+        dock.update(5.0, 150.0, true);
+        dock.update(5.0, 150.0, false);
+        let areas = dock.layout(Rect { x: 0.0, y: 0.0, w: 400.0, h: 300.0 });
+        let left = areas.iter().find(|(id, _)| *id == 0).unwrap();
+        assert!((left.1.w - 40.0).abs() < 1e-3, "left w={}", left.1.w);
+    }
+
+    #[test]
+    fn test_resize_priority_over_tab_click() {
+        let mut dock = DockTree::new(
+            DockNode::split(Axis::Horizontal, 0.5,
+                DockNode::Leaf { tabs: vec![0, 1], active: 0 },
+                DockNode::leaf(vec![2]),
+            ),
+            vec!["A", "B", "C"],
+        );
+        dock.layout(Rect { x: 0.0, y: 0.0, w: 400.0, h: 300.0 });
+        dock.update(200.0, 10.0, true);   // click at boundary within tab bar
+        dock.update(180.0, 10.0, true);   // drag
+        dock.update(180.0, 10.0, false);  // release
+        let areas = dock.layout(Rect { x: 0.0, y: 0.0, w: 400.0, h: 300.0 });
+        let left = areas.iter().find(|(id, _)| *id == 0 || *id == 1).unwrap();
+        assert!((left.1.w - 180.0).abs() < 5.0, "resize should have priority, w={}", left.1.w);
     }
 }
