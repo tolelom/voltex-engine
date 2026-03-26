@@ -20,6 +20,6 @@ pub use rigid_body::{RigidBody, PhysicsConfig};
 pub use integrator::{integrate, inertia_tensor, inv_inertia};
 pub use solver::{resolve_collisions, physics_step};
 pub use raycast::{RayHit, raycast, raycast_all};
-pub use ray::ray_vs_triangle;
+pub use ray::{ray_vs_triangle, ray_vs_plane};
 pub use ccd::swept_sphere_vs_aabb;
 pub use mesh_collider::{MeshCollider, MeshHit, ray_vs_mesh, ray_vs_mesh_all};

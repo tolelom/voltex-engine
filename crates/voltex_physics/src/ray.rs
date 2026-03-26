@@ -220,6 +220,17 @@ pub fn ray_vs_triangle(ray: &Ray, v0: Vec3, v1: Vec3, v2: Vec3) -> Option<(f32, 
     Some((t, normal))
 }
 
+/// Ray vs infinite plane intersection.
+/// plane_normal: unit normal of the plane
+/// plane_distance: signed distance from origin (plane equation: dot(normal, point) = distance)
+/// Returns distance t along ray, or None if parallel/behind.
+pub fn ray_vs_plane(ray: &Ray, plane_normal: Vec3, plane_distance: f32) -> Option<f32> {
+    let denom = plane_normal.dot(ray.direction);
+    if denom.abs() < 1e-8 { return None; } // parallel
+    let t = (plane_distance - plane_normal.dot(ray.origin)) / denom;
+    if t < 0.0 { None } else { Some(t) }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -358,5 +369,26 @@ mod tests {
         assert!(result.is_some());
         let (t, _) = result.unwrap();
         assert!(approx(t, 5.0));
+    }
+
+    // --- ray_vs_plane tests ---
+
+    #[test]
+    fn test_ray_vs_plane_hit() {
+        let ray = Ray { origin: Vec3::new(0.0, 5.0, 0.0), direction: Vec3::new(0.0, -1.0, 0.0) };
+        let t = ray_vs_plane(&ray, Vec3::new(0.0, 1.0, 0.0), 0.0).unwrap();
+        assert!((t - 5.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_ray_vs_plane_parallel() {
+        let ray = Ray { origin: Vec3::new(0.0, 5.0, 0.0), direction: Vec3::new(1.0, 0.0, 0.0) };
+        assert!(ray_vs_plane(&ray, Vec3::new(0.0, 1.0, 0.0), 0.0).is_none());
+    }
+
+    #[test]
+    fn test_ray_vs_plane_behind() {
+        let ray = Ray { origin: Vec3::new(0.0, 5.0, 0.0), direction: Vec3::new(0.0, 1.0, 0.0) };
+        assert!(ray_vs_plane(&ray, Vec3::new(0.0, 1.0, 0.0), 0.0).is_none()); // plane below, ray going up
     }
 }
