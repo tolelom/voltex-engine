@@ -63,7 +63,7 @@
 ## Phase 5-3
 
 - ~~**Ray vs Triangle**~~ ✅ Möller–Trumbore 완료.
-- ~~**Ray vs Mesh**~~ ✅ MeshCollider + ray_vs_mesh + ray_vs_mesh_all 완료. **Ray vs Plane** 미구현.
+- ~~**Ray vs Mesh**~~ ✅ MeshCollider + ray_vs_mesh + ray_vs_mesh_all 완료. ~~**Ray vs Plane**~~ ✅ 완료.
 - ~~**raycast_all (다중 hit)**~~ ✅ 거리순 정렬 완료.
 - ~~**BVH 조기 종료 최적화**~~ ✅ 재귀 트리 순회 + query_ray 완료.
 
@@ -152,8 +152,8 @@
 - ~~**에셋 브라우저**~~ ✅ 파일 목록 + 디렉토리 탐색 완료. 에셋 로딩/프리뷰 미구현.
 - ~~**텍스트 입력**~~ ✅ text_input 위젯 완료.
 - ~~**스크롤, 드래그앤드롭**~~ ✅ scroll_panel + drag/drop 완료.
-- ~~**도킹, 탭**~~ ✅ DockTree (이진 분할, 리사이즈, 탭 전환) 완료. **플로팅 윈도우/탭 드래그 이동** 미구현.
-- ~~**TTF 폰트**~~ ✅ 자체 TTF 파서 + 래스터라이저 + 온디맨드 캐시 완료. 렌더러 통합(아틀라스 교체) 미완료.
+- ~~**도킹, 탭**~~ ✅ DockTree + ~~**플로팅 윈도우**~~ ✅ FloatingPanelManager 완료. 탭 드래그 이동 미구현.
+- ~~**TTF 폰트**~~ ✅ 자체 TTF 파서 + 래스터라이저 + 온디맨드 캐시 + 렌더러 아틀라스 교체 완료.
 
 ## 렌더링 한계
 
