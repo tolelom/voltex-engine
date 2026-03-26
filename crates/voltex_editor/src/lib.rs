@@ -22,3 +22,6 @@ pub use viewport_texture::{ViewportTexture, VIEWPORT_COLOR_FORMAT, VIEWPORT_DEPT
 
 pub mod viewport_renderer;
 pub use viewport_renderer::ViewportRenderer;
+
+pub mod asset_browser;
+pub use asset_browser::{AssetBrowser, asset_browser_panel};
