@@ -1,3 +1,5 @@
+use crate::ui_context::UiContext;
+
 const TAB_BAR_HEIGHT: f32 = 20.0;
 const MIN_RATIO: f32 = 0.1;
 const MAX_RATIO: f32 = 0.9;
@@ -277,11 +279,66 @@ impl DockTree {
             })
             .collect()
     }
+
+    pub fn draw_chrome(&self, ui: &mut UiContext) {
+        let glyph_w = ui.font.glyph_width as f32;
+        let glyph_h = ui.font.glyph_height as f32;
+
+        const COLOR_TAB_ACTIVE: [u8; 4] = [60, 60, 60, 255];
+        const COLOR_TAB_INACTIVE: [u8; 4] = [40, 40, 40, 255];
+        const COLOR_TEXT: [u8; 4] = [0xEE, 0xEE, 0xEE, 0xFF];
+        const COLOR_SPLIT: [u8; 4] = [30, 30, 30, 255];
+        const COLOR_SPLIT_ACTIVE: [u8; 4] = [100, 100, 200, 255];
+        const COLOR_SEPARATOR: [u8; 4] = [50, 50, 50, 255];
+
+        // Draw tab bars for each leaf
+        for leaf in &self.cached_leaves {
+            let bar = &leaf.tab_bar_rect;
+            let active = leaf.active.min(leaf.tabs.len().saturating_sub(1));
+            let mut tx = bar.x;
+            for (i, &panel_id) in leaf.tabs.iter().enumerate() {
+                let name = self.names.get(panel_id as usize).copied().unwrap_or("?");
+                let tab_w = name.len() as f32 * glyph_w + TAB_PADDING;
+                let bg = if i == active { COLOR_TAB_ACTIVE } else { COLOR_TAB_INACTIVE };
+                ui.draw_list.add_rect(tx, bar.y, tab_w, bar.h, bg);
+                // Inline text rendering (avoids borrow conflict with ui.font + ui.draw_list)
+                let text_x = tx + TAB_PADDING * 0.5;
+                let text_y = bar.y + (bar.h - glyph_h) * 0.5;
+                let mut cx = text_x;
+                for ch in name.chars() {
+                    let (u0, v0, u1, v1) = ui.font.glyph_uv(ch);
+                    ui.draw_list.add_rect_uv(cx, text_y, glyph_w, glyph_h, u0, v0, u1, v1, COLOR_TEXT);
+                    cx += glyph_w;
+                }
+                tx += tab_w;
+            }
+            // Tab bar bottom separator
+            ui.draw_list.add_rect(bar.x, bar.y + bar.h - 1.0, bar.w, 1.0, COLOR_SEPARATOR);
+        }
+
+        // Draw split lines
+        for split in &self.cached_splits {
+            let color = if self.resizing.as_ref().map(|r| &r.path) == Some(&split.path) {
+                COLOR_SPLIT_ACTIVE
+            } else {
+                COLOR_SPLIT
+            };
+            match split.axis {
+                Axis::Horizontal => {
+                    ui.draw_list.add_rect(split.boundary - 0.5, split.rect.y, 1.0, split.rect.h, color);
+                }
+                Axis::Vertical => {
+                    ui.draw_list.add_rect(split.rect.x, split.boundary - 0.5, split.rect.w, 1.0, color);
+                }
+            }
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::ui_context::UiContext;
 
     #[test]
     fn test_rect_contains() {
@@ -442,5 +499,36 @@ mod tests {
         let areas = dock.layout(Rect { x: 0.0, y: 0.0, w: 400.0, h: 300.0 });
         let left = areas.iter().find(|(id, _)| *id == 0 || *id == 1).unwrap();
         assert!((left.1.w - 180.0).abs() < 5.0, "resize should have priority, w={}", left.1.w);
+    }
+
+    #[test]
+    fn test_draw_chrome_produces_draw_commands() {
+        let mut dock = DockTree::new(
+            DockNode::split(Axis::Horizontal, 0.5,
+                DockNode::Leaf { tabs: vec![0, 1], active: 0 },
+                DockNode::leaf(vec![2]),
+            ),
+            vec!["A", "B", "C"],
+        );
+        let mut ui = UiContext::new(800.0, 600.0);
+        ui.begin_frame(0.0, 0.0, false);
+        dock.layout(Rect { x: 0.0, y: 0.0, w: 800.0, h: 600.0 });
+        dock.draw_chrome(&mut ui);
+        assert!(ui.draw_list.commands.len() >= 5);
+    }
+
+    #[test]
+    fn test_draw_chrome_active_tab_color() {
+        let mut dock = DockTree::new(
+            DockNode::Leaf { tabs: vec![0, 1], active: 1 },
+            vec!["AA", "BB"],
+        );
+        let mut ui = UiContext::new(800.0, 600.0);
+        ui.begin_frame(0.0, 0.0, false);
+        dock.layout(Rect { x: 0.0, y: 0.0, w: 400.0, h: 300.0 });
+        dock.draw_chrome(&mut ui);
+        // First tab bg (inactive "AA"): color [40, 40, 40, 255]
+        let first_bg = &ui.draw_list.vertices[0];
+        assert_eq!(first_bg.color, [40, 40, 40, 255]);
     }
 }
