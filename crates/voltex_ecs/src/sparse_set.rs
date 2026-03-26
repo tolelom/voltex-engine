@@ -5,6 +5,8 @@ pub struct SparseSet<T> {
     sparse: Vec<Option<usize>>,
     dense_entities: Vec<Entity>,
     dense_data: Vec<T>,
+    ticks: Vec<u64>,
+    current_tick: u64,
 }
 
 impl<T> SparseSet<T> {
@@ -13,6 +15,8 @@ impl<T> SparseSet<T> {
             sparse: Vec::new(),
             dense_entities: Vec::new(),
             dense_data: Vec::new(),
+            ticks: Vec::new(),
+            current_tick: 1,
         }
     }
 
@@ -27,11 +31,13 @@ impl<T> SparseSet<T> {
             // Overwrite existing
             self.dense_data[dense_idx] = value;
             self.dense_entities[dense_idx] = entity;
+            self.ticks[dense_idx] = self.current_tick;
         } else {
             let dense_idx = self.dense_data.len();
             self.sparse[id] = Some(dense_idx);
             self.dense_entities.push(entity);
             self.dense_data.push(value);
+            self.ticks.push(self.current_tick);
         }
     }
 
@@ -49,12 +55,14 @@ impl<T> SparseSet<T> {
 
         if dense_idx == last_idx {
             self.dense_entities.pop();
+            self.ticks.pop();
             Some(self.dense_data.pop().unwrap())
         } else {
             // Swap with last
             let swapped_entity = self.dense_entities[last_idx];
             self.sparse[swapped_entity.id as usize] = Some(dense_idx);
             self.dense_entities.swap_remove(dense_idx);
+            self.ticks.swap_remove(dense_idx);
             Some(self.dense_data.swap_remove(dense_idx))
         }
     }
@@ -74,6 +82,7 @@ impl<T> SparseSet<T> {
         if self.dense_entities[dense_idx] != entity {
             return None;
         }
+        self.ticks[dense_idx] = self.current_tick;
         Some(&mut self.dense_data[dense_idx])
     }
 
@@ -114,6 +123,29 @@ impl<T> SparseSet<T> {
     pub fn data_mut(&mut self) -> &mut [T] {
         &mut self.dense_data
     }
+
+    /// Check if an entity's component was changed this tick.
+    pub fn is_changed(&self, entity: Entity) -> bool {
+        if let Some(&index) = self.sparse.get(entity.id as usize).and_then(|o| o.as_ref()) {
+            self.ticks[index] == self.current_tick
+        } else {
+            false
+        }
+    }
+
+    /// Advance the tick counter (call at end of frame).
+    pub fn increment_tick(&mut self) {
+        self.current_tick += 1;
+    }
+
+    /// Return entities changed this tick with their data.
+    pub fn iter_changed(&self) -> impl Iterator<Item = (Entity, &T)> + '_ {
+        self.dense_entities.iter()
+            .zip(self.dense_data.iter())
+            .zip(self.ticks.iter())
+            .filter(move |((_, _), &tick)| tick == self.current_tick)
+            .map(|((entity, data), _)| (*entity, data))
+    }
 }
 
 impl<T> Default for SparseSet<T> {
@@ -127,6 +159,7 @@ pub trait ComponentStorage: Any {
     fn as_any_mut(&mut self) -> &mut dyn Any;
     fn remove_entity(&mut self, entity: Entity);
     fn storage_len(&self) -> usize;
+    fn increment_tick(&mut self);
 }
 
 impl<T: 'static> ComponentStorage for SparseSet<T> {
@@ -141,6 +174,9 @@ impl<T: 'static> ComponentStorage for SparseSet<T> {
     }
     fn storage_len(&self) -> usize {
         self.dense_data.len()
+    }
+    fn increment_tick(&mut self) {
+        self.current_tick += 1;
     }
 }
 
@@ -233,6 +269,74 @@ mod tests {
         assert!(set.contains(e));
         set.remove(e);
         assert!(!set.contains(e));
+    }
+
+    #[test]
+    fn test_insert_is_changed() {
+        let mut set = SparseSet::<u32>::new();
+        let e = make_entity(0, 0);
+        set.insert(e, 42);
+        assert!(set.is_changed(e));
+    }
+
+    #[test]
+    fn test_get_mut_marks_changed() {
+        let mut set = SparseSet::<u32>::new();
+        let e = make_entity(0, 0);
+        set.insert(e, 42);
+        set.increment_tick();
+        assert!(!set.is_changed(e));
+        let _ = set.get_mut(e);
+        assert!(set.is_changed(e));
+    }
+
+    #[test]
+    fn test_get_not_changed() {
+        let mut set = SparseSet::<u32>::new();
+        let e = make_entity(0, 0);
+        set.insert(e, 42);
+        set.increment_tick();
+        let _ = set.get(e);
+        assert!(!set.is_changed(e));
+    }
+
+    #[test]
+    fn test_clear_resets_changed() {
+        let mut set = SparseSet::<u32>::new();
+        let e = make_entity(0, 0);
+        set.insert(e, 42);
+        assert!(set.is_changed(e));
+        set.increment_tick();
+        assert!(!set.is_changed(e));
+    }
+
+    #[test]
+    fn test_iter_changed() {
+        let mut set = SparseSet::<u32>::new();
+        let e1 = make_entity(0, 0);
+        let e2 = make_entity(1, 0);
+        let e3 = make_entity(2, 0);
+        set.insert(e1, 10);
+        set.insert(e2, 20);
+        set.insert(e3, 30);
+        set.increment_tick();
+        let _ = set.get_mut(e2);
+        let changed: Vec<_> = set.iter_changed().collect();
+        assert_eq!(changed.len(), 1);
+        assert_eq!(changed[0].0.id, 1);
+    }
+
+    #[test]
+    fn test_remove_preserves_ticks() {
+        let mut set = SparseSet::<u32>::new();
+        let e1 = make_entity(0, 0);
+        let e2 = make_entity(1, 0);
+        set.insert(e1, 10);
+        set.insert(e2, 20);
+        set.increment_tick();
+        let _ = set.get_mut(e2);
+        set.remove(e1);
+        assert!(set.is_changed(e2));
     }
 
     #[test]

@@ -228,6 +228,23 @@ impl World {
         result
     }
 
+    /// Query entities whose component T was changed this tick.
+    pub fn query_changed<T: 'static>(&self) -> Vec<(Entity, &T)> {
+        if let Some(storage) = self.storages.get(&TypeId::of::<T>()) {
+            let set = storage.as_any().downcast_ref::<SparseSet<T>>().unwrap();
+            set.iter_changed().collect()
+        } else {
+            Vec::new()
+        }
+    }
+
+    /// Advance tick on all component storages (call at end of frame).
+    pub fn clear_changed(&mut self) {
+        for storage in self.storages.values_mut() {
+            storage.increment_tick();
+        }
+    }
+
     pub fn has_component<T: 'static>(&self, entity: Entity) -> bool {
         self.storage::<T>().map_or(false, |s| s.contains(entity))
     }
@@ -524,6 +541,37 @@ mod tests {
         let results = world.query2_without::<Position, Velocity, Health>();
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].0, e1);
+    }
+
+    #[test]
+    fn test_query_changed() {
+        let mut world = World::new();
+        let e1 = world.spawn();
+        let e2 = world.spawn();
+        world.add(e1, 10u32);
+        world.add(e2, 20u32);
+        world.clear_changed();
+        if let Some(v) = world.get_mut::<u32>(e1) {
+            *v = 100;
+        }
+        let changed = world.query_changed::<u32>();
+        assert_eq!(changed.len(), 1);
+        assert_eq!(*changed[0].1, 100);
+    }
+
+    #[test]
+    fn test_clear_changed_all_storages() {
+        let mut world = World::new();
+        let e = world.spawn();
+        world.add(e, 42u32);
+        world.add(e, 3.14f32);
+        let changed_u32 = world.query_changed::<u32>();
+        assert_eq!(changed_u32.len(), 1);
+        world.clear_changed();
+        let changed_u32 = world.query_changed::<u32>();
+        assert_eq!(changed_u32.len(), 0);
+        let changed_f32 = world.query_changed::<f32>();
+        assert_eq!(changed_f32.len(), 0);
     }
 
     #[test]
