@@ -84,22 +84,22 @@
 
 ## Phase 6-3
 
-- **동적 그룹 생성** — 고정 4개만.
-- **그룹 간 라우팅/버스** — 미구현.
-- **이펙트 체인** — Reverb, EQ 등 미구현.
-- **비선형 페이드 커브** — 선형 페이드만.
+- ~~**동적 그룹 생성**~~ ✅ MixGroupManager 동적 생성/삭제 완료.
+- ~~**그룹 간 라우팅/버스**~~ ✅ AudioBus 믹싱 완료.
+- **이펙트 체인** — Reverb, EQ 등 파이프라인 체인 미구현. (개별 이펙트는 구현됨)
+- ~~**비선형 페이드 커브**~~ ✅ Exponential/Logarithmic/SCurve 완료.
 
 ## Phase 7-1
 
 - ~~**투명 오브젝트**~~ ✅ ForwardPass (알파 블렌딩, HDR 타겟, depth read-only) + back-to-front 정렬 완료. deferred_demo 통합 미완료.
-- **G-Buffer 압축** — 미적용.
+- ~~**G-Buffer 압축**~~ ✅ 옥타헤드럴 노멀 인코딩 + depth 기반 위치 복원 완료.
 - **Light Volumes** — 풀스크린 라이팅만.
-- **Stencil 최적화** — 미구현.
+- ~~**Stencil 최적화**~~ ✅ 라이트 볼륨 스텐실 mark/test 완료.
 
 ## Phase 7-2
 
 - ~~**Bilateral Blur**~~ ✅ depth/normal edge-aware 컴퓨트 셰이더 완료.
-- **반해상도 렌더링** — 풀 해상도 SSGI.
+- ~~**반해상도 렌더링**~~ ✅ half_resolution + depth-aware 업스케일 완료.
 - ~~**Temporal Accumulation**~~ ✅ 히스토리 블렌딩 컴퓨트 셰이더 완료.
 - **Light Probes** — 미구현.
 
@@ -119,7 +119,7 @@
 - ~~**Motion Blur**~~ ✅ 카메라 속도 기반 컴퓨트 셰이더 완료.
 - ~~**DOF**~~ ✅ Circle-of-confusion 기반 컴퓨트 셰이더 완료.
 - ~~**Auto Exposure**~~ ✅ 컴퓨트 셰이더 luminance + 적응형 노출 계산 완료. deferred_demo 통합 미완료.
-- **Bilateral Bloom Blur** — 단순 tent filter.
+- ~~**Bilateral Bloom Blur**~~ ✅ luminance 기반 bilateral bloom weight 완료.
 
 ## Phase 8-1
 
