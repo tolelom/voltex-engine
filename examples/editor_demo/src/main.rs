@@ -227,8 +227,19 @@ impl ApplicationHandler for EditorDemoApp {
         let window = VoltexWindow::new(event_loop, &config);
         let gpu = GpuContext::new(window.handle.clone());
 
-        let ui = UiContext::new(gpu.config.width as f32, gpu.config.height as f32);
+        let mut ui = UiContext::new(gpu.config.width as f32, gpu.config.height as f32);
         let ui_renderer = UiRenderer::new(&gpu.device, &gpu.queue, gpu.surface_format, &ui.font);
+
+        // Try to load TTF font
+        let ttf_data = std::fs::read("C:/Windows/Fonts/arial.ttf")
+            .or_else(|_| std::fs::read("C:/Windows/Fonts/consola.ttf"))
+            .or_else(|_| std::fs::read("C:/Windows/Fonts/malgun.ttf"))
+            .ok();
+        if let Some(data) = ttf_data {
+            if let Ok(font) = voltex_editor::TtfFont::new(&data, 14.0) {
+                ui.ttf_font = Some(font);
+            }
+        }
 
         let dock = DockTree::new(
             DockNode::split(

@@ -41,6 +41,8 @@ pub struct UiContext {
     pub dragging: Option<(u32, u64)>,
     pub drag_start: (f32, f32),
     pub(crate) drag_started: bool,
+    /// TTF font for high-quality text rendering (None = bitmap fallback).
+    pub ttf_font: Option<crate::ttf_font::TtfFont>,
 }
 
 impl UiContext {
@@ -70,6 +72,7 @@ impl UiContext {
             dragging: None,
             drag_start: (0.0, 0.0),
             drag_started: false,
+            ttf_font: None,
         }
     }
 
@@ -140,5 +143,42 @@ impl UiContext {
             && self.mouse_x < x + w
             && self.mouse_y >= y
             && self.mouse_y < y + h
+    }
+
+    /// Draw text using TTF font if available, otherwise bitmap font fallback.
+    pub fn draw_text(&mut self, text: &str, x: f32, y: f32, color: [u8; 4]) {
+        if let Some(ref mut ttf) = self.ttf_font {
+            let ascender = ttf.ascender;
+            let mut cx = x;
+            for ch in text.chars() {
+                let info = ttf.glyph(ch).clone();
+                if info.width > 0.0 && info.height > 0.0 {
+                    let gx = cx + info.bearing_x;
+                    let gy = y + ascender - info.bearing_y;
+                    let (u0, v0, u1, v1) = (info.uv[0], info.uv[1], info.uv[2], info.uv[3]);
+                    self.draw_list.add_rect_uv(gx, gy, info.width, info.height, u0, v0, u1, v1, color);
+                }
+                cx += info.advance;
+            }
+        } else {
+            // Bitmap font fallback
+            let gw = self.font.glyph_width as f32;
+            let gh = self.font.glyph_height as f32;
+            let mut cx = x;
+            for ch in text.chars() {
+                let (u0, v0, u1, v1) = self.font.glyph_uv(ch);
+                self.draw_list.add_rect_uv(cx, y, gw, gh, u0, v0, u1, v1, color);
+                cx += gw;
+            }
+        }
+    }
+
+    /// Calculate text width using TTF or bitmap font.
+    pub fn ttf_text_width(&mut self, text: &str) -> f32 {
+        if let Some(ref mut ttf) = self.ttf_font {
+            ttf.text_width(text)
+        } else {
+            text.len() as f32 * self.font.glyph_width as f32
+        }
     }
 }
