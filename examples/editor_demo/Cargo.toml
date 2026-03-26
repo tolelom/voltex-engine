@@ -7,6 +7,7 @@ edition = "2021"
 voltex_platform.workspace = true
 voltex_renderer.workspace = true
 voltex_editor.workspace = true
+voltex_math.workspace = true
 wgpu.workspace = true
 winit.workspace = true
 bytemuck.workspace = true

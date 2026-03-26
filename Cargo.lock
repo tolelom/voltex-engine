@@ -492,6 +492,7 @@ dependencies = [
  "log",
  "pollster",
  "voltex_editor",
+ "voltex_math",
  "voltex_platform",
  "voltex_renderer",
  "wgpu",
@@ -2108,6 +2109,7 @@ version = "0.1.0"
 dependencies = [
  "bytemuck",
  "voltex_math",
+ "voltex_renderer",
  "wgpu",
 ]
 
