@@ -105,9 +105,9 @@
 
 ## Phase 7-3
 
-- **RT Reflections** — 미구현.
-- **RT AO** — 미구현.
-- **Point/Spot Light RT shadows** — Directional만 구현.
+- ~~**RT Reflections**~~ ✅ 컴퓨트 셰이더 (G-Buffer 기반 반사 레이 마칭) 완료.
+- ~~**RT AO**~~ ✅ 컴퓨트 셰이더 (코사인 가중 반구 샘플링) 완료.
+- ~~**Point/Spot Light RT shadows**~~ ✅ 인프라 + 컴퓨트 셰이더 완료.
 - **Soft RT shadows** — 단일 ray만.
 - **BLAS 업데이트** — 정적 지오메트리만.
 - **Fallback** — RT 미지원 GPU 폴백 미구현.
