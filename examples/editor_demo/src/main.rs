@@ -7,7 +7,7 @@ use winit::{
 };
 use voltex_platform::{VoltexWindow, WindowConfig, InputState, GameTimer};
 use voltex_renderer::GpuContext;
-use voltex_editor::{UiContext, UiRenderer};
+use voltex_editor::{UiContext, UiRenderer, DockTree, DockNode, Axis, Rect, LayoutState};
 
 struct EditorDemoApp {
     state: Option<AppState>,
@@ -20,6 +20,7 @@ struct AppState {
     timer: GameTimer,
     ui: UiContext,
     ui_renderer: UiRenderer,
+    dock: DockTree,
     // Widget state
     counter: u32,
     speed: f32,
@@ -48,6 +49,19 @@ impl ApplicationHandler for EditorDemoApp {
             &ui.font,
         );
 
+        let dock = DockTree::new(
+            DockNode::split(
+                Axis::Horizontal, 0.25,
+                DockNode::leaf(vec![0]),
+                DockNode::split(
+                    Axis::Vertical, 0.7,
+                    DockNode::leaf(vec![1]),
+                    DockNode::Leaf { tabs: vec![2, 3], active: 0 },
+                ),
+            ),
+            vec!["Debug", "Viewport", "Properties", "Console"],
+        );
+
         self.state = Some(AppState {
             window,
             gpu,
@@ -55,6 +69,7 @@ impl ApplicationHandler for EditorDemoApp {
             timer: GameTimer::new(60),
             ui,
             ui_renderer,
+            dock,
             counter: 0,
             speed: 5.0,
             show_grid: true,
@@ -128,20 +143,43 @@ impl ApplicationHandler for EditorDemoApp {
                 state.ui.begin_frame(mx as f32, my as f32, mouse_down);
 
 
-                // Draw widgets inside a panel
-                state.ui.begin_panel("Debug", 10.0, 10.0, 250.0, 400.0);
-                state.ui.text("Voltex Editor Demo");
-                state.ui.text(&format!("FPS: {:.0}", fps));
+                // Dock layout
+                let screen_w = state.gpu.config.width as f32;
+                let screen_h = state.gpu.config.height as f32;
+                let areas = state.dock.layout(Rect { x: 0.0, y: 0.0, w: screen_w, h: screen_h });
+                state.dock.update(mx as f32, my as f32, mouse_down);
+                state.dock.draw_chrome(&mut state.ui);
 
-                if state.ui.button("Click Me") {
-                    state.counter += 1;
+                for (panel_id, rect) in &areas {
+                    state.ui.layout = LayoutState::new(rect.x + 4.0, rect.y + 4.0);
+                    match panel_id {
+                        0 => {
+                            state.ui.text("Debug Panel");
+                            state.ui.text(&format!("FPS: {:.0}", fps));
+                            if state.ui.button("Click Me") {
+                                state.counter += 1;
+                            }
+                            state.ui.text(&format!("Count: {}", state.counter));
+                            state.speed = state.ui.slider("Speed", state.speed, 0.0, 10.0);
+                            state.show_grid = state.ui.checkbox("Show Grid", state.show_grid);
+                        }
+                        1 => {
+                            state.ui.text("Viewport");
+                            state.ui.text("(3D scene here)");
+                        }
+                        2 => {
+                            state.ui.text("Properties");
+                            state.ui.text(&format!("Speed: {:.1}", state.speed));
+                            state.ui.text(&format!("Grid: {}", state.show_grid));
+                        }
+                        3 => {
+                            state.ui.text("Console");
+                            state.ui.text("> Ready.");
+                        }
+                        _ => {}
+                    }
                 }
-                state.ui.text(&format!("Clicked: {}", state.counter));
 
-                state.speed = state.ui.slider("Speed", state.speed, 0.0, 10.0);
-                state.show_grid = state.ui.checkbox("Show Grid", state.show_grid);
-
-                state.ui.end_panel();
                 state.ui.end_frame();
 
                 // Acquire surface texture

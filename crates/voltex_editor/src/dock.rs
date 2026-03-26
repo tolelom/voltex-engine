@@ -531,4 +531,28 @@ mod tests {
         let first_bg = &ui.draw_list.vertices[0];
         assert_eq!(first_bg.color, [40, 40, 40, 255]);
     }
+
+    #[test]
+    fn test_full_frame_cycle() {
+        let mut dock = DockTree::new(
+            DockNode::split(Axis::Horizontal, 0.3,
+                DockNode::Leaf { tabs: vec![0, 1], active: 0 },
+                DockNode::split(Axis::Vertical, 0.6, DockNode::leaf(vec![2]), DockNode::leaf(vec![3])),
+            ),
+            vec!["Hierarchy", "Inspector", "Viewport", "Console"],
+        );
+        let mut ui = UiContext::new(1280.0, 720.0);
+        for _ in 0..3 {
+            ui.begin_frame(100.0, 100.0, false);
+            let areas = dock.layout(Rect { x: 0.0, y: 0.0, w: 1280.0, h: 720.0 });
+            dock.update(100.0, 100.0, false);
+            dock.draw_chrome(&mut ui);
+            assert_eq!(areas.len(), 3);
+            for (_, r) in &areas {
+                assert!(r.w > 0.0);
+                assert!(r.h > 0.0);
+            }
+            ui.end_frame();
+        }
+    }
 }
