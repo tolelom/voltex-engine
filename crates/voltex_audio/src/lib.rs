@@ -9,6 +9,7 @@ pub mod hrtf;
 pub mod mix_group;
 pub mod audio_source;
 pub mod reverb;
+pub mod occlusion;
 
 pub use audio_clip::AudioClip;
 pub use audio_source::AudioSource;
@@ -18,3 +19,4 @@ pub use audio_system::AudioSystem;
 pub use spatial::{Listener, SpatialParams, distance_attenuation, stereo_pan, compute_spatial_gains};
 pub use mix_group::{MixGroup, MixerState};
 pub use reverb::{Reverb, Echo, DelayLine};
+pub use occlusion::{OcclusionResult, LowPassFilter, calculate_occlusion};
