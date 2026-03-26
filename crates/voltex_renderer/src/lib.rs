@@ -3,6 +3,7 @@ pub mod gltf;
 pub mod deflate;
 pub mod png;
 pub mod jpg;
+pub mod progressive_jpeg;
 pub mod gpu;
 pub mod light;
 pub mod obj;
