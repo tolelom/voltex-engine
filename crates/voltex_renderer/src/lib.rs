@@ -33,6 +33,7 @@ pub mod hdr;
 pub mod bloom;
 pub mod tonemap;
 pub mod forward_pass;
+pub mod auto_exposure;
 
 pub use gpu::{GpuContext, DEPTH_FORMAT};
 pub use light::{CameraUniform, LightUniform, LightData, LightsUniform, MAX_LIGHTS, LIGHT_DIRECTIONAL, LIGHT_POINT, LIGHT_SPOT};
@@ -69,6 +70,7 @@ pub use hdr::{HdrTarget, HDR_FORMAT};
 pub use bloom::{BloomResources, BloomUniform, mip_sizes, BLOOM_MIP_COUNT};
 pub use tonemap::{TonemapUniform, aces_tonemap};
 pub use forward_pass::{ForwardPass, sort_transparent_back_to_front};
+pub use auto_exposure::AutoExposure;
 pub use png::parse_png;
 pub use jpg::parse_jpg;
 pub use gltf::{parse_gltf, GltfData, GltfMesh, GltfMaterial};
