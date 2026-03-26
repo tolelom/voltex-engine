@@ -48,7 +48,7 @@
 
 ## Phase 5-1
 
-- ~~**Capsule, Convex Hull 콜라이더**~~ ✅ Capsule + GJK/EPA 완료. **Convex Hull 미구현.**
+- ~~**Capsule, Convex Hull 콜라이더**~~ ✅ Capsule + ConvexHull + GJK/EPA 완료.
 - ~~**OBB (회전된 박스) 충돌**~~ ✅ GJK/EPA로 대체 완료.
 - ~~**Incremental BVH 업데이트**~~ ✅ refit() 완료.
 - ~~**연속 충돌 감지 (CCD)**~~ ✅ swept_sphere_vs_aabb 완료.
@@ -63,7 +63,7 @@
 ## Phase 5-3
 
 - ~~**Ray vs Triangle**~~ ✅ Möller–Trumbore 완료.
-- **Ray vs Plane, Mesh** — 삼각형 단위만 지원. 전체 메시 순회 레이캐스트 미구현.
+- ~~**Ray vs Mesh**~~ ✅ MeshCollider + ray_vs_mesh + ray_vs_mesh_all 완료. **Ray vs Plane** 미구현.
 - ~~**raycast_all (다중 hit)**~~ ✅ 거리순 정렬 완료.
 - ~~**BVH 조기 종료 최적화**~~ ✅ 재귀 트리 순회 + query_ray 완료.
 
@@ -126,7 +126,7 @@
 - ~~**String Pulling (Funnel)**~~ ✅ SSF 알고리즘 완료.
 - ~~**동적 장애물 회피**~~ ✅ velocity obstacle 기반 완료.
 - ~~**ECS 통합**~~ ✅ NavAgent 컴포넌트 완료. nav_agent_system 미구현.
-- **내비메시 직렬화** — 미구현.
+- ~~**내비메시 직렬화**~~ ✅ VNAV 바이너리 포맷 serialize/deserialize 완료.
 
 ## Phase 8-2
 
