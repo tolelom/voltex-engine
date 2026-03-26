@@ -28,3 +28,4 @@ pub use asset_browser::{AssetBrowser, asset_browser_panel};
 
 pub mod ttf_parser;
 pub mod rasterizer;
+pub mod glyph_cache;

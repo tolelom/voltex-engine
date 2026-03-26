@@ -1,0 +1,197 @@
+use std::collections::HashMap;
+
+pub const ATLAS_SIZE: u32 = 1024;
+
+#[derive(Clone, Debug)]
+pub struct GlyphInfo {
+    pub uv: [f32; 4],       // u0, v0, u1, v1
+    pub width: f32,
+    pub height: f32,
+    pub advance: f32,
+    pub bearing_x: f32,
+    pub bearing_y: f32,
+}
+
+pub struct GlyphCache {
+    pub atlas_data: Vec<u8>,
+    pub atlas_width: u32,
+    pub atlas_height: u32,
+    glyphs: HashMap<char, GlyphInfo>,
+    cursor_x: u32,
+    cursor_y: u32,
+    row_height: u32,
+    pub dirty: bool,
+}
+
+impl GlyphCache {
+    pub fn new(width: u32, height: u32) -> Self {
+        GlyphCache {
+            atlas_data: vec![0u8; (width * height) as usize],
+            atlas_width: width,
+            atlas_height: height,
+            glyphs: HashMap::new(),
+            cursor_x: 0,
+            cursor_y: 0,
+            row_height: 0,
+            dirty: false,
+        }
+    }
+
+    pub fn get(&self, ch: char) -> Option<&GlyphInfo> {
+        self.glyphs.get(&ch)
+    }
+
+    /// Insert a rasterized glyph bitmap into the atlas.
+    /// Returns reference to the cached GlyphInfo.
+    pub fn insert(
+        &mut self,
+        ch: char,
+        bitmap: &[u8],
+        bmp_w: u32,
+        bmp_h: u32,
+        advance: f32,
+        bearing_x: f32,
+        bearing_y: f32,
+    ) -> &GlyphInfo {
+        // Handle zero-size glyphs (e.g., space)
+        if bmp_w == 0 || bmp_h == 0 {
+            self.glyphs.insert(ch, GlyphInfo {
+                uv: [0.0, 0.0, 0.0, 0.0],
+                width: 0.0,
+                height: 0.0,
+                advance,
+                bearing_x,
+                bearing_y,
+            });
+            return self.glyphs.get(&ch).unwrap();
+        }
+
+        // Check if we need to wrap to next row
+        if self.cursor_x + bmp_w > self.atlas_width {
+            self.cursor_y += self.row_height + 1; // +1 pixel gap
+            self.cursor_x = 0;
+            self.row_height = 0;
+        }
+
+        // Check if atlas is full (would overflow vertically)
+        if self.cursor_y + bmp_h > self.atlas_height {
+            // Atlas full — insert with zero UV (glyph won't render but won't crash)
+            self.glyphs.insert(ch, GlyphInfo {
+                uv: [0.0, 0.0, 0.0, 0.0],
+                width: bmp_w as f32,
+                height: bmp_h as f32,
+                advance,
+                bearing_x,
+                bearing_y,
+            });
+            return self.glyphs.get(&ch).unwrap();
+        }
+
+        // Copy bitmap into atlas
+        for row in 0..bmp_h {
+            let src_start = (row * bmp_w) as usize;
+            let src_end = src_start + bmp_w as usize;
+            let dst_y = self.cursor_y + row;
+            let dst_x = self.cursor_x;
+            let dst_start = (dst_y * self.atlas_width + dst_x) as usize;
+            if src_end <= bitmap.len() && dst_start + bmp_w as usize <= self.atlas_data.len() {
+                self.atlas_data[dst_start..dst_start + bmp_w as usize]
+                    .copy_from_slice(&bitmap[src_start..src_end]);
+            }
+        }
+
+        // Calculate UV coordinates
+        let u0 = self.cursor_x as f32 / self.atlas_width as f32;
+        let v0 = self.cursor_y as f32 / self.atlas_height as f32;
+        let u1 = (self.cursor_x + bmp_w) as f32 / self.atlas_width as f32;
+        let v1 = (self.cursor_y + bmp_h) as f32 / self.atlas_height as f32;
+
+        let info = GlyphInfo {
+            uv: [u0, v0, u1, v1],
+            width: bmp_w as f32,
+            height: bmp_h as f32,
+            advance,
+            bearing_x,
+            bearing_y,
+        };
+
+        // Advance cursor
+        self.cursor_x += bmp_w + 1; // +1 pixel gap
+        if bmp_h > self.row_height {
+            self.row_height = bmp_h;
+        }
+
+        self.dirty = true;
+        self.glyphs.insert(ch, info);
+        self.glyphs.get(&ch).unwrap()
+    }
+
+    pub fn clear_dirty(&mut self) {
+        self.dirty = false;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_insert_and_get() {
+        let mut cache = GlyphCache::new(256, 256);
+        let bitmap = vec![255u8; 10 * 12]; // 10x12 glyph
+        cache.insert('A', &bitmap, 10, 12, 11.0, 0.5, 10.0);
+        let info = cache.get('A');
+        assert!(info.is_some());
+        let info = info.unwrap();
+        assert!((info.width - 10.0).abs() < 0.1);
+        assert!((info.advance - 11.0).abs() < 0.1);
+        assert!(info.uv[0] >= 0.0 && info.uv[2] <= 1.0);
+    }
+
+    #[test]
+    fn test_cache_hit() {
+        let mut cache = GlyphCache::new(256, 256);
+        let bitmap = vec![255u8; 8 * 8];
+        cache.insert('B', &bitmap, 8, 8, 9.0, 0.0, 8.0);
+        cache.clear_dirty();
+        // Second access should be cache hit (no dirty)
+        let _info = cache.get('B').unwrap();
+        assert!(!cache.dirty);
+    }
+
+    #[test]
+    fn test_row_wrap() {
+        let mut cache = GlyphCache::new(64, 64);
+        let bitmap = vec![255u8; 20 * 10];
+        // Insert 4 glyphs of width 20 in a 64-wide atlas
+        // 3 fit in first row (20+1 + 20+1 + 20 = 62), 4th wraps
+        cache.insert('A', &bitmap, 20, 10, 21.0, 0.0, 10.0);
+        cache.insert('B', &bitmap, 20, 10, 21.0, 0.0, 10.0);
+        cache.insert('C', &bitmap, 20, 10, 21.0, 0.0, 10.0);
+        cache.insert('D', &bitmap, 20, 10, 21.0, 0.0, 10.0);
+        let d = cache.get('D').unwrap();
+        // D should be on a different row (v0 > 0)
+        assert!(d.uv[1] > 0.0, "D should be on second row, v0={}", d.uv[1]);
+    }
+
+    #[test]
+    fn test_uv_range() {
+        let mut cache = GlyphCache::new(256, 256);
+        let bitmap = vec![128u8; 15 * 20];
+        cache.insert('X', &bitmap, 15, 20, 16.0, 1.0, 18.0);
+        let info = cache.get('X').unwrap();
+        assert!(info.uv[0] >= 0.0 && info.uv[0] < 1.0);
+        assert!(info.uv[1] >= 0.0 && info.uv[1] < 1.0);
+        assert!(info.uv[2] > info.uv[0] && info.uv[2] <= 1.0);
+        assert!(info.uv[3] > info.uv[1] && info.uv[3] <= 1.0);
+    }
+
+    #[test]
+    fn test_zero_size_glyph() {
+        let mut cache = GlyphCache::new(256, 256);
+        cache.insert(' ', &[], 0, 0, 5.0, 0.0, 0.0);
+        let info = cache.get(' ').unwrap();
+        assert!((info.advance - 5.0).abs() < 0.1);
+        assert!((info.width - 0.0).abs() < 0.1);
+    }
+}
