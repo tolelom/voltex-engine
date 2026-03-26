@@ -26,3 +26,7 @@ pub mod dynamic_groups;
 pub use dynamic_groups::MixGroupManager;
 pub mod audio_bus;
 pub use audio_bus::AudioBus;
+pub mod async_loader;
+pub use async_loader::AsyncAudioLoader;
+pub mod effect_chain;
+pub use effect_chain::{AudioEffect, EffectChain};
