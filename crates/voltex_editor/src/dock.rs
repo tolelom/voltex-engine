@@ -1,8 +1,11 @@
 const TAB_BAR_HEIGHT: f32 = 20.0;
 const MIN_RATIO: f32 = 0.1;
 const MAX_RATIO: f32 = 0.9;
+#[allow(dead_code)]
 const RESIZE_HANDLE_HALF: f32 = 3.0;
+#[allow(dead_code)]
 const GLYPH_W: f32 = 8.0;
+#[allow(dead_code)]
 const TAB_PADDING: f32 = 8.0;
 
 #[derive(Clone, Copy, Debug)]
@@ -52,6 +55,7 @@ pub struct LeafLayout {
     pub content_rect: Rect,
 }
 
+#[allow(dead_code)]
 struct SplitLayout {
     rect: Rect,
     axis: Axis,
@@ -59,6 +63,7 @@ struct SplitLayout {
     path: Vec<usize>,
 }
 
+#[allow(dead_code)]
 struct ResizeState {
     path: Vec<usize>,
     axis: Axis,
@@ -68,10 +73,13 @@ struct ResizeState {
 
 pub struct DockTree {
     root: DockNode,
+    #[allow(dead_code)]
     names: Vec<&'static str>,
     cached_leaves: Vec<LeafLayout>,
     cached_splits: Vec<SplitLayout>,
+    #[allow(dead_code)]
     resizing: Option<ResizeState>,
+    #[allow(dead_code)]
     prev_mouse_down: bool,
 }
 
@@ -85,13 +93,13 @@ fn layout_recursive(
 ) {
     match node {
         DockNode::Leaf { tabs, active } => {
-            debug_assert!(!tabs.is_empty(), "DockNode::Leaf must have at least one tab");
+            assert!(!tabs.is_empty(), "DockNode::Leaf must have at least one tab");
             let idx = *leaf_counter;
             *leaf_counter += 1;
             leaves.push(LeafLayout {
                 leaf_index: idx,
                 tabs: tabs.clone(),
-                active: (*active).min(tabs.len() - 1),
+                active: (*active).min(tabs.len().saturating_sub(1)),
                 tab_bar_rect: Rect { x: rect.x, y: rect.y, w: rect.w, h: TAB_BAR_HEIGHT },
                 content_rect: Rect {
                     x: rect.x,
