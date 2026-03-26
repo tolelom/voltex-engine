@@ -4,6 +4,9 @@ use crate::obj::compute_tangents;
 
 pub struct GltfData {
     pub meshes: Vec<GltfMesh>,
+    pub nodes: Vec<GltfNode>,
+    pub skins: Vec<GltfSkin>,
+    pub animations: Vec<GltfAnimation>,
 }
 
 pub struct GltfMesh {
@@ -11,12 +14,80 @@ pub struct GltfMesh {
     pub indices: Vec<u32>,
     pub name: Option<String>,
     pub material: Option<GltfMaterial>,
+    pub joints: Option<Vec<[u16; 4]>>,
+    pub weights: Option<Vec<[f32; 4]>>,
 }
 
 pub struct GltfMaterial {
     pub base_color: [f32; 4],
     pub metallic: f32,
     pub roughness: f32,
+}
+
+#[derive(Debug, Clone)]
+pub struct GltfNode {
+    pub name: Option<String>,
+    pub children: Vec<usize>,
+    pub translation: [f32; 3],
+    pub rotation: [f32; 4],   // quaternion [x,y,z,w]
+    pub scale: [f32; 3],
+    pub mesh: Option<usize>,
+    pub skin: Option<usize>,
+}
+
+#[derive(Debug, Clone)]
+pub struct GltfSkin {
+    pub name: Option<String>,
+    pub joints: Vec<usize>,
+    pub inverse_bind_matrices: Vec<[[f32; 4]; 4]>,
+    pub skeleton: Option<usize>,
+}
+
+#[derive(Debug, Clone)]
+pub struct GltfAnimation {
+    pub name: Option<String>,
+    pub channels: Vec<GltfChannel>,
+}
+
+#[derive(Debug, Clone)]
+pub struct GltfChannel {
+    pub target_node: usize,
+    pub target_path: AnimationPath,
+    pub interpolation: Interpolation,
+    pub times: Vec<f32>,
+    pub values: Vec<f32>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum AnimationPath {
+    Translation,
+    Rotation,
+    Scale,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum Interpolation {
+    Linear,
+    Step,
+    CubicSpline,
+}
+
+pub fn parse_animation_path(s: &str) -> AnimationPath {
+    match s {
+        "translation" => AnimationPath::Translation,
+        "rotation" => AnimationPath::Rotation,
+        "scale" => AnimationPath::Scale,
+        _ => AnimationPath::Translation,
+    }
+}
+
+pub fn parse_interpolation(s: &str) -> Interpolation {
+    match s {
+        "LINEAR" => Interpolation::Linear,
+        "STEP" => Interpolation::Step,
+        "CUBICSPLINE" => Interpolation::CubicSpline,
+        _ => Interpolation::Linear,
+    }
 }
 
 const GLB_MAGIC: u32 = 0x46546C67;
@@ -213,6 +284,20 @@ fn extract_meshes(json: &JsonValue, buffers: &[Vec<u8>]) -> Result<GltfData, Str
                 });
             }
 
+            // Read JOINTS_0 (optional)
+            let joints = if let Some(idx) = attrs.iter().find(|(k, _)| k == "JOINTS_0").and_then(|(_, v)| v.as_u32()) {
+                Some(read_accessor_joints(accessors, buffer_views, buffers, idx as usize)?)
+            } else {
+                None
+            };
+
+            // Read WEIGHTS_0 (optional)
+            let weights = if let Some(idx) = attrs.iter().find(|(k, _)| k == "WEIGHTS_0").and_then(|(_, v)| v.as_u32()) {
+                Some(read_accessor_vec4(accessors, buffer_views, buffers, idx as usize)?)
+            } else {
+                None
+            };
+
             // Compute tangents if not provided
             if tangents.is_none() {
                 compute_tangents(&mut vertices, &indices);
@@ -224,11 +309,15 @@ fn extract_meshes(json: &JsonValue, buffers: &[Vec<u8>]) -> Result<GltfData, Str
                 .and_then(|idx| materials_json?.get(idx as usize))
                 .and_then(|mat| extract_material(mat));
 
-            meshes.push(GltfMesh { vertices, indices, name: name.clone(), material });
+            meshes.push(GltfMesh { vertices, indices, name: name.clone(), material, joints, weights });
         }
     }
 
-    Ok(GltfData { meshes })
+    let nodes = parse_nodes(json);
+    let skins = parse_skins(json, accessors, buffer_views, buffers);
+    let animations = parse_animations(json, accessors, buffer_views, buffers);
+
+    Ok(GltfData { meshes, nodes, skins, animations })
 }
 
 fn get_buffer_data<'a>(
@@ -334,6 +423,219 @@ fn read_accessor_indices(
         _ => return Err(format!("Unsupported index component type: {}", comp_type)),
     }
     Ok(result)
+}
+
+fn read_accessor_joints(
+    accessors: &[JsonValue], buffer_views: &[JsonValue], buffers: &[Vec<u8>], idx: usize,
+) -> Result<Vec<[u16; 4]>, String> {
+    let acc = accessors.get(idx).ok_or("Accessor index out of range")?;
+    let count = acc.get("count").and_then(|v| v.as_u32()).ok_or("Missing count")? as usize;
+    let comp_type = acc.get("componentType").and_then(|v| v.as_u32()).unwrap_or(5123);
+    let (buffer, offset) = get_buffer_data(acc, buffer_views, buffers)?;
+    let mut result = Vec::with_capacity(count);
+    match comp_type {
+        5121 => { // UNSIGNED_BYTE
+            for i in 0..count {
+                let o = offset + i * 4;
+                if o + 4 > buffer.len() { return Err("Buffer overflow reading joints u8".into()); }
+                result.push([
+                    buffer[o] as u16, buffer[o+1] as u16,
+                    buffer[o+2] as u16, buffer[o+3] as u16,
+                ]);
+            }
+        }
+        5123 => { // UNSIGNED_SHORT
+            for i in 0..count {
+                let o = offset + i * 8;
+                if o + 8 > buffer.len() { return Err("Buffer overflow reading joints u16".into()); }
+                result.push([
+                    u16::from_le_bytes([buffer[o], buffer[o+1]]),
+                    u16::from_le_bytes([buffer[o+2], buffer[o+3]]),
+                    u16::from_le_bytes([buffer[o+4], buffer[o+5]]),
+                    u16::from_le_bytes([buffer[o+6], buffer[o+7]]),
+                ]);
+            }
+        }
+        _ => return Err(format!("Unsupported joints component type: {}", comp_type)),
+    }
+    Ok(result)
+}
+
+fn read_accessor_mat4(
+    accessors: &[JsonValue], buffer_views: &[JsonValue], buffers: &[Vec<u8>], idx: usize,
+) -> Result<Vec<[[f32; 4]; 4]>, String> {
+    let acc = accessors.get(idx).ok_or("Accessor index out of range")?;
+    let count = acc.get("count").and_then(|v| v.as_u32()).ok_or("Missing count")? as usize;
+    let (buffer, offset) = get_buffer_data(acc, buffer_views, buffers)?;
+    let mut result = Vec::with_capacity(count);
+    for i in 0..count {
+        let o = offset + i * 64;
+        if o + 64 > buffer.len() { return Err("Buffer overflow reading mat4".into()); }
+        let mut mat = [[0.0f32; 4]; 4];
+        for col in 0..4 {
+            for row in 0..4 {
+                let b = o + (col * 4 + row) * 4;
+                mat[col][row] = f32::from_le_bytes([buffer[b], buffer[b+1], buffer[b+2], buffer[b+3]]);
+            }
+        }
+        result.push(mat);
+    }
+    Ok(result)
+}
+
+fn read_accessor_floats(
+    accessors: &[JsonValue], buffer_views: &[JsonValue], buffers: &[Vec<u8>], idx: usize,
+) -> Result<Vec<f32>, String> {
+    let acc = accessors.get(idx).ok_or("Accessor index out of range")?;
+    let count = acc.get("count").and_then(|v| v.as_u32()).ok_or("Missing count")? as usize;
+    let acc_type = acc.get("type").and_then(|v| v.as_str()).unwrap_or("SCALAR");
+    let components = match acc_type {
+        "SCALAR" => 1,
+        "VEC2" => 2,
+        "VEC3" => 3,
+        "VEC4" => 4,
+        _ => 1,
+    };
+    let total = count * components;
+    let (buffer, offset) = get_buffer_data(acc, buffer_views, buffers)?;
+    let mut result = Vec::with_capacity(total);
+    for i in 0..total {
+        let o = offset + i * 4;
+        if o + 4 > buffer.len() { return Err("Buffer overflow reading floats".into()); }
+        result.push(f32::from_le_bytes([buffer[o], buffer[o+1], buffer[o+2], buffer[o+3]]));
+    }
+    Ok(result)
+}
+
+fn parse_nodes(json: &JsonValue) -> Vec<GltfNode> {
+    let empty_arr: Vec<JsonValue> = Vec::new();
+    let nodes_arr = json.get("nodes").and_then(|v| v.as_array()).unwrap_or(&empty_arr);
+    let mut nodes = Vec::with_capacity(nodes_arr.len());
+    for node_val in nodes_arr {
+        let name = node_val.get("name").and_then(|v| v.as_str()).map(|s| s.to_string());
+
+        let children = node_val.get("children").and_then(|v| v.as_array())
+            .map(|arr| arr.iter().filter_map(|v| v.as_u32().map(|n| n as usize)).collect())
+            .unwrap_or_default();
+
+        let translation = node_val.get("translation").and_then(|v| v.as_array())
+            .map(|arr| [
+                arr.get(0).and_then(|v| v.as_f64()).unwrap_or(0.0) as f32,
+                arr.get(1).and_then(|v| v.as_f64()).unwrap_or(0.0) as f32,
+                arr.get(2).and_then(|v| v.as_f64()).unwrap_or(0.0) as f32,
+            ])
+            .unwrap_or([0.0, 0.0, 0.0]);
+
+        let rotation = node_val.get("rotation").and_then(|v| v.as_array())
+            .map(|arr| [
+                arr.get(0).and_then(|v| v.as_f64()).unwrap_or(0.0) as f32,
+                arr.get(1).and_then(|v| v.as_f64()).unwrap_or(0.0) as f32,
+                arr.get(2).and_then(|v| v.as_f64()).unwrap_or(0.0) as f32,
+                arr.get(3).and_then(|v| v.as_f64()).unwrap_or(1.0) as f32,
+            ])
+            .unwrap_or([0.0, 0.0, 0.0, 1.0]);
+
+        let scale = node_val.get("scale").and_then(|v| v.as_array())
+            .map(|arr| [
+                arr.get(0).and_then(|v| v.as_f64()).unwrap_or(1.0) as f32,
+                arr.get(1).and_then(|v| v.as_f64()).unwrap_or(1.0) as f32,
+                arr.get(2).and_then(|v| v.as_f64()).unwrap_or(1.0) as f32,
+            ])
+            .unwrap_or([1.0, 1.0, 1.0]);
+
+        let mesh = node_val.get("mesh").and_then(|v| v.as_u32()).map(|n| n as usize);
+        let skin = node_val.get("skin").and_then(|v| v.as_u32()).map(|n| n as usize);
+
+        nodes.push(GltfNode { name, children, translation, rotation, scale, mesh, skin });
+    }
+    nodes
+}
+
+fn parse_skins(
+    json: &JsonValue, accessors: &[JsonValue], buffer_views: &[JsonValue], buffers: &[Vec<u8>],
+) -> Vec<GltfSkin> {
+    let empty_arr: Vec<JsonValue> = Vec::new();
+    let skins_arr = json.get("skins").and_then(|v| v.as_array()).unwrap_or(&empty_arr);
+    let mut skins = Vec::with_capacity(skins_arr.len());
+    for skin_val in skins_arr {
+        let name = skin_val.get("name").and_then(|v| v.as_str()).map(|s| s.to_string());
+
+        let joints = skin_val.get("joints").and_then(|v| v.as_array())
+            .map(|arr| arr.iter().filter_map(|v| v.as_u32().map(|n| n as usize)).collect())
+            .unwrap_or_default();
+
+        let skeleton = skin_val.get("skeleton").and_then(|v| v.as_u32()).map(|n| n as usize);
+
+        let inverse_bind_matrices = skin_val.get("inverseBindMatrices")
+            .and_then(|v| v.as_u32())
+            .and_then(|idx| read_accessor_mat4(accessors, buffer_views, buffers, idx as usize).ok())
+            .unwrap_or_default();
+
+        skins.push(GltfSkin { name, joints, inverse_bind_matrices, skeleton });
+    }
+    skins
+}
+
+fn parse_animations(
+    json: &JsonValue, accessors: &[JsonValue], buffer_views: &[JsonValue], buffers: &[Vec<u8>],
+) -> Vec<GltfAnimation> {
+    let empty_arr: Vec<JsonValue> = Vec::new();
+    let anims_arr = json.get("animations").and_then(|v| v.as_array()).unwrap_or(&empty_arr);
+    let mut animations = Vec::with_capacity(anims_arr.len());
+    for anim_val in anims_arr {
+        let name = anim_val.get("name").and_then(|v| v.as_str()).map(|s| s.to_string());
+
+        let samplers_arr = anim_val.get("samplers").and_then(|v| v.as_array()).unwrap_or(&empty_arr);
+        let channels_arr = anim_val.get("channels").and_then(|v| v.as_array()).unwrap_or(&empty_arr);
+
+        // Parse samplers: each has input, output, interpolation
+        struct Sampler {
+            times: Vec<f32>,
+            values: Vec<f32>,
+            interpolation: Interpolation,
+        }
+        let mut samplers = Vec::with_capacity(samplers_arr.len());
+        for s in samplers_arr {
+            let interp_str = s.get("interpolation").and_then(|v| v.as_str()).unwrap_or("LINEAR");
+            let interpolation = parse_interpolation(interp_str);
+
+            let times = s.get("input").and_then(|v| v.as_u32())
+                .and_then(|idx| read_accessor_floats(accessors, buffer_views, buffers, idx as usize).ok())
+                .unwrap_or_default();
+
+            let values = s.get("output").and_then(|v| v.as_u32())
+                .and_then(|idx| read_accessor_floats(accessors, buffer_views, buffers, idx as usize).ok())
+                .unwrap_or_default();
+
+            samplers.push(Sampler { times, values, interpolation });
+        }
+
+        // Parse channels
+        let mut channels = Vec::with_capacity(channels_arr.len());
+        for ch in channels_arr {
+            let sampler_idx = ch.get("sampler").and_then(|v| v.as_u32()).unwrap_or(0) as usize;
+            let target = match ch.get("target") {
+                Some(t) => t,
+                None => continue,
+            };
+            let target_node = target.get("node").and_then(|v| v.as_u32()).unwrap_or(0) as usize;
+            let path_str = target.get("path").and_then(|v| v.as_str()).unwrap_or("translation");
+            let target_path = parse_animation_path(path_str);
+
+            if let Some(sampler) = samplers.get(sampler_idx) {
+                channels.push(GltfChannel {
+                    target_node,
+                    target_path,
+                    interpolation: sampler.interpolation,
+                    times: sampler.times.clone(),
+                    values: sampler.values.clone(),
+                });
+            }
+        }
+
+        animations.push(GltfAnimation { name, channels });
+    }
+    animations
 }
 
 fn extract_material(mat: &JsonValue) -> Option<GltfMaterial> {
@@ -510,6 +812,106 @@ mod tests {
         glb.extend_from_slice(&0x004E4942u32.to_le_bytes()); // "BIN\0"
         glb.extend_from_slice(&bin);
 
+        glb
+    }
+
+    #[test]
+    fn test_animation_path_parsing() {
+        assert_eq!(parse_animation_path("translation"), AnimationPath::Translation);
+        assert_eq!(parse_animation_path("rotation"), AnimationPath::Rotation);
+        assert_eq!(parse_animation_path("scale"), AnimationPath::Scale);
+    }
+
+    #[test]
+    fn test_interpolation_parsing() {
+        assert_eq!(parse_interpolation("LINEAR"), Interpolation::Linear);
+        assert_eq!(parse_interpolation("STEP"), Interpolation::Step);
+        assert_eq!(parse_interpolation("CUBICSPLINE"), Interpolation::CubicSpline);
+    }
+
+    #[test]
+    fn test_gltf_data_has_new_fields() {
+        let glb = build_minimal_glb_triangle();
+        let data = parse_gltf(&glb).unwrap();
+        assert_eq!(data.meshes.len(), 1);
+        // No nodes/skins/animations in minimal GLB — should be empty, not crash
+        assert!(data.nodes.is_empty());
+        assert!(data.skins.is_empty());
+        assert!(data.animations.is_empty());
+        // Joints/weights should be None
+        assert!(data.meshes[0].joints.is_none());
+        assert!(data.meshes[0].weights.is_none());
+    }
+
+    #[test]
+    fn test_parse_glb_with_node() {
+        let glb = build_glb_with_node();
+        let data = parse_gltf(&glb).unwrap();
+        assert_eq!(data.meshes.len(), 1);
+        assert_eq!(data.nodes.len(), 1);
+        let node = &data.nodes[0];
+        assert_eq!(node.name.as_deref(), Some("RootNode"));
+        assert_eq!(node.mesh, Some(0));
+        assert!((node.translation[0] - 1.0).abs() < 0.001);
+        assert!((node.translation[1] - 2.0).abs() < 0.001);
+        assert!((node.translation[2] - 3.0).abs() < 0.001);
+        assert_eq!(node.scale, [1.0, 1.0, 1.0]);
+    }
+
+    fn build_glb_with_node() -> Vec<u8> {
+        let mut bin = Vec::new();
+        for &v in &[0.0f32, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0] {
+            bin.extend_from_slice(&v.to_le_bytes());
+        }
+        for &i in &[0u16, 1, 2] {
+            bin.extend_from_slice(&i.to_le_bytes());
+        }
+        bin.extend_from_slice(&[0, 0]);
+
+        let json_str = format!(r#"{{
+            "asset": {{"version": "2.0"}},
+            "buffers": [{{"byteLength": {}}}],
+            "bufferViews": [
+                {{"buffer": 0, "byteOffset": 0, "byteLength": 36}},
+                {{"buffer": 0, "byteOffset": 36, "byteLength": 6}}
+            ],
+            "accessors": [
+                {{"bufferView": 0, "componentType": 5126, "count": 3, "type": "VEC3",
+                  "max": [1.0, 1.0, 0.0], "min": [0.0, 0.0, 0.0]}},
+                {{"bufferView": 1, "componentType": 5123, "count": 3, "type": "SCALAR"}}
+            ],
+            "nodes": [{{
+                "name": "RootNode",
+                "mesh": 0,
+                "translation": [1.0, 2.0, 3.0]
+            }}],
+            "meshes": [{{
+                "name": "Triangle",
+                "primitives": [{{
+                    "attributes": {{"POSITION": 0}},
+                    "indices": 1
+                }}]
+            }}]
+        }}"#, bin.len());
+
+        let json_bytes = json_str.as_bytes();
+        let json_padded_len = (json_bytes.len() + 3) & !3;
+        let mut json_padded = json_bytes.to_vec();
+        while json_padded.len() < json_padded_len {
+            json_padded.push(b' ');
+        }
+
+        let total_len = 12 + 8 + json_padded.len() + 8 + bin.len();
+        let mut glb = Vec::with_capacity(total_len);
+        glb.extend_from_slice(&0x46546C67u32.to_le_bytes());
+        glb.extend_from_slice(&2u32.to_le_bytes());
+        glb.extend_from_slice(&(total_len as u32).to_le_bytes());
+        glb.extend_from_slice(&(json_padded.len() as u32).to_le_bytes());
+        glb.extend_from_slice(&0x4E4F534Au32.to_le_bytes());
+        glb.extend_from_slice(&json_padded);
+        glb.extend_from_slice(&(bin.len() as u32).to_le_bytes());
+        glb.extend_from_slice(&0x004E4942u32.to_le_bytes());
+        glb.extend_from_slice(&bin);
         glb
     }
 
