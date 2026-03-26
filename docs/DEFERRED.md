@@ -6,7 +6,7 @@
 - ~~**JPG 디코더 자체 구현**~~ ✅ Baseline JPEG 완료.
 - ~~**glTF 파서**~~ ✅ glTF 2.0 / GLB 완료.
 - **JPG Progressive** — Baseline만 지원. Progressive JPEG 미구현.
-- **glTF 애니메이션/스킨** — 메시+머티리얼만 지원.
+- ~~**glTF 애니메이션/스킨 파싱**~~ ✅ nodes/skins/animations/JOINTS_0/WEIGHTS_0 파싱 완료. **스킨드 렌더링 + 애니메이션 시스템** 미구현.
 
 ## Phase 3a
 

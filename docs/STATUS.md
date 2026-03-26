@@ -14,7 +14,7 @@
 - voltex_renderer: Blinn-Phong shader, BMP texture loader, GpuTexture
 - voltex_renderer: PNG decoder (deflate + filter reconstruction)
 - voltex_renderer: JPG decoder (Baseline JPEG: Huffman, IDCT, MCU, YCbCr, subsampling)
-- voltex_renderer: glTF 2.0 / GLB parser (JSON parser, accessor extraction, PBR material)
+- voltex_renderer: glTF 2.0 / GLB parser (JSON parser, accessor extraction, PBR material, nodes/skins/animations)
 - examples/model_viewer
 
 ### Phase 3a: ECS
@@ -145,13 +145,13 @@ crates/
 └── voltex_editor    — IMGUI, docking, 3D viewport, inspector, asset browser, TTF font, UiRenderer
 ```
 
-## 테스트: 548개 전부 통과
+## 테스트: 552개 전부 통과
 
 - voltex_math: 37
 - voltex_platform: 3
 - voltex_ecs: 83
 - voltex_asset: 22
-- voltex_renderer: 102
+- voltex_renderer: 106
 - voltex_physics: 96
 - voltex_audio: 42
 - voltex_ai: 24
