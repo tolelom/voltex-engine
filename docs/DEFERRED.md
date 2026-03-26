@@ -72,7 +72,7 @@
 - **macOS/Linux 백엔드** — WASAPI(Windows)만 구현.
 - ~~**OGG/Vorbis 디코더**~~ ✅ OGG 컨테이너 + Vorbis 디코더 완료.
 - ~~**24-bit/32-bit WAV**~~ ✅ 완료.
-- **ECS 통합** — AudioSource 컴포넌트 미구현.
+- ~~**ECS 통합**~~ ✅ AudioSource 컴포넌트 완료. audio_sync_system 미구현.
 - **비동기 로딩** — 동기 로딩만.
 
 ## Phase 6-2
@@ -125,7 +125,7 @@
 - ~~**자동 내비메시 생성**~~ ✅ 복셀화 기반 NavMeshBuilder 완료.
 - ~~**String Pulling (Funnel)**~~ ✅ SSF 알고리즘 완료.
 - ~~**동적 장애물 회피**~~ ✅ velocity obstacle 기반 완료.
-- **ECS 통합** — AI 컴포넌트 미구현.
+- ~~**ECS 통합**~~ ✅ NavAgent 컴포넌트 완료. nav_agent_system 미구현.
 - **내비메시 직렬화** — 미구현.
 
 ## Phase 8-2
