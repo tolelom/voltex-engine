@@ -125,6 +125,7 @@
 - voltex_editor: OrbitCamera, ViewportTexture, ViewportRenderer (3D scene viewport)
 - voltex_editor: hierarchy_panel, inspector_panel (Transform/Tag/Parent editing)
 - voltex_editor: AssetBrowser (file system browsing, directory navigation)
+- voltex_editor: TtfParser, Rasterizer, GlyphCache, TtfFont (자체 TTF 렌더링, Unicode)
 - examples/editor_demo
 
 ## Crate 구조
@@ -141,10 +142,10 @@ crates/
 ├── voltex_ai        — NavMesh(+builder), A*, Funnel, steering, obstacle avoidance
 ├── voltex_net       — UDP, NetServer/Client, Reliable/Ordered, Snapshot(delta), Interpolation
 ├── voltex_script    — Lua 5.4, LuaState, table interop, coroutine, sandbox, hot reload
-└── voltex_editor    — IMGUI, docking, 3D viewport, inspector, asset browser, UiRenderer
+└── voltex_editor    — IMGUI, docking, 3D viewport, inspector, asset browser, TTF font, UiRenderer
 ```
 
-## 테스트: 525개 전부 통과
+## 테스트: 548개 전부 통과
 
 - voltex_math: 37
 - voltex_platform: 3
@@ -156,7 +157,7 @@ crates/
 - voltex_ai: 24
 - voltex_net: 36
 - voltex_script: 18
-- voltex_editor: 62
+- voltex_editor: 85
 
 ## Examples (12개 + survivor_game)
 
