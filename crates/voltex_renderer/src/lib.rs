@@ -37,6 +37,7 @@ pub mod auto_exposure;
 pub mod instancing;
 pub mod bilateral_blur;
 pub mod temporal_accum;
+pub mod taa;
 
 pub use gpu::{GpuContext, DEPTH_FORMAT};
 pub use light::{CameraUniform, LightUniform, LightData, LightsUniform, MAX_LIGHTS, LIGHT_DIRECTIONAL, LIGHT_POINT, LIGHT_SPOT};
@@ -77,6 +78,7 @@ pub use auto_exposure::AutoExposure;
 pub use instancing::{InstanceData, InstanceBuffer, create_instanced_pipeline};
 pub use bilateral_blur::BilateralBlur;
 pub use temporal_accum::TemporalAccumulation;
+pub use taa::Taa;
 pub use png::parse_png;
 pub use jpg::parse_jpg;
 pub use gltf::{parse_gltf, GltfData, GltfMesh, GltfMaterial};
