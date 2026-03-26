@@ -39,7 +39,11 @@ pub mod bilateral_blur;
 pub mod temporal_accum;
 pub mod taa;
 pub mod ssr;
+pub mod motion_blur;
+pub mod dof;
 
+pub use motion_blur::MotionBlur;
+pub use dof::DepthOfField;
 pub use gpu::{GpuContext, DEPTH_FORMAT};
 pub use light::{CameraUniform, LightUniform, LightData, LightsUniform, MAX_LIGHTS, LIGHT_DIRECTIONAL, LIGHT_POINT, LIGHT_SPOT};
 pub use mesh::Mesh;
