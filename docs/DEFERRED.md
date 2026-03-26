@@ -114,8 +114,8 @@
 
 ## Phase 7-4
 
-- **TAA** — 미구현.
-- **SSR** — 미구현.
+- ~~**TAA**~~ ✅ Halton jitter + neighborhood clamping + history blending 컴퓨트 셰이더 완료.
+- ~~**SSR**~~ ✅ 스크린 스페이스 레이 마칭 + edge fade 컴퓨트 셰이더 완료.
 - **Motion Blur, DOF** — 미구현.
 - ~~**Auto Exposure**~~ ✅ 컴퓨트 셰이더 luminance + 적응형 노출 계산 완료. deferred_demo 통합 미완료.
 - **Bilateral Bloom Blur** — 단순 tent filter.
