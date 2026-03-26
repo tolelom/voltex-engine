@@ -8,9 +8,10 @@ use winit::{
 use voltex_platform::{VoltexWindow, WindowConfig, InputState, GameTimer};
 use voltex_renderer::{GpuContext, Mesh, MeshVertex, CameraUniform, LightUniform, GpuTexture};
 use voltex_editor::{
-    UiContext, UiRenderer, DockTree, DockNode, Axis, Rect, LayoutState,
+    UiContext, UiRenderer, DockTree, DockNode, Axis, Rect,
     OrbitCamera, ViewportTexture, ViewportRenderer, VIEWPORT_COLOR_FORMAT,
     hierarchy_panel, inspector_panel,
+    AssetBrowser, asset_browser_panel,
 };
 use voltex_ecs::world::World;
 use voltex_ecs::entity::Entity;
@@ -51,6 +52,8 @@ struct AppState {
     texture_layout: wgpu::BindGroupLayout,
     dummy_texture_bg: wgpu::BindGroup,
     scene_meshes: Vec<Mesh>,
+    // Asset browser
+    asset_browser: AssetBrowser,
     // Mouse tracking
     prev_mouse: (f32, f32),
     left_dragging: bool,
@@ -237,8 +240,10 @@ impl ApplicationHandler for EditorDemoApp {
                     DockNode::Leaf { tabs: vec![2, 3], active: 0 },
                 ),
             ),
-            vec!["Hierarchy", "Viewport", "Inspector", "Console"],
+            vec!["Hierarchy", "Viewport", "Inspector", "Assets"],
         );
+
+        let asset_browser = AssetBrowser::new(std::env::current_dir().unwrap_or_default());
 
         // Viewport
         let orbit_cam = OrbitCamera::new();
@@ -316,6 +321,7 @@ impl ApplicationHandler for EditorDemoApp {
             camera_light_layout: cl_layout,
             texture_layout: tex_layout,
             dummy_texture_bg: dummy_texture.bind_group,
+            asset_browser,
             scene_meshes: vec![ground, cube1, cube2, cube3],
             world,
             selected_entity: None,
@@ -421,9 +427,7 @@ impl ApplicationHandler for EditorDemoApp {
                             inspector_panel(&mut state.ui, &mut state.world, state.selected_entity, rect, &mut state.tag_buffer);
                         }
                         3 => {
-                            state.ui.layout = LayoutState::new(rect.x + 4.0, rect.y + 4.0);
-                            state.ui.text("Console");
-                            state.ui.text("> Ready.");
+                            asset_browser_panel(&mut state.ui, &mut state.asset_browser, rect);
                         }
                         _ => {}
                     }
