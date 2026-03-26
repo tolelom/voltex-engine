@@ -20,3 +20,9 @@ pub use spatial::{Listener, SpatialParams, distance_attenuation, stereo_pan, com
 pub use mix_group::{MixGroup, MixerState};
 pub use reverb::{Reverb, Echo, DelayLine};
 pub use occlusion::{OcclusionResult, LowPassFilter, calculate_occlusion};
+pub mod fade_curves;
+pub use fade_curves::{FadeCurve, apply_fade};
+pub mod dynamic_groups;
+pub use dynamic_groups::MixGroupManager;
+pub mod audio_bus;
+pub use audio_bus::AudioBus;
