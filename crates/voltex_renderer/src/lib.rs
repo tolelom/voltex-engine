@@ -25,6 +25,7 @@ pub mod brdf_lut;
 pub mod ibl;
 pub mod sh;
 pub mod gbuffer;
+pub mod gbuffer_compress;
 pub mod fullscreen_quad;
 pub mod deferred_pipeline;
 pub mod ssgi;
