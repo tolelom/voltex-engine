@@ -117,7 +117,7 @@
 - **TAA** — 미구현.
 - **SSR** — 미구현.
 - **Motion Blur, DOF** — 미구현.
-- **Auto Exposure** — 고정 exposure만.
+- ~~**Auto Exposure**~~ ✅ 컴퓨트 셰이더 luminance + 적응형 노출 계산 완료. deferred_demo 통합 미완료.
 - **Bilateral Bloom Blur** — 단순 tent filter.
 
 ## Phase 8-1
