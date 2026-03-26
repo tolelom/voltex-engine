@@ -17,3 +17,6 @@ pub use orbit_camera::OrbitCamera;
 
 pub mod viewport_texture;
 pub use viewport_texture::{ViewportTexture, VIEWPORT_COLOR_FORMAT, VIEWPORT_DEPTH_FORMAT};
+
+pub mod viewport_renderer;
+pub use viewport_renderer::ViewportRenderer;
