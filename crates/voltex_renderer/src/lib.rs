@@ -93,6 +93,10 @@ pub use bilateral_blur::BilateralBlur;
 pub use temporal_accum::TemporalAccumulation;
 pub use taa::Taa;
 pub use ssr::Ssr;
+pub mod stencil_opt;
+pub mod half_res_ssgi;
+pub mod bilateral_bloom;
+
 pub use png::parse_png;
 pub use jpg::parse_jpg;
 pub use gltf::{parse_gltf, GltfData, GltfMesh, GltfMaterial};
