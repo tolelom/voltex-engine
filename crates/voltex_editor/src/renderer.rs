@@ -32,13 +32,15 @@ const VERTEX_LAYOUT: wgpu::VertexBufferLayout<'static> = wgpu::VertexBufferLayou
 /// GPU-side UI renderer that turns a DrawList into a rendered frame.
 pub struct UiRenderer {
     pipeline: wgpu::RenderPipeline,
-    #[allow(dead_code)]
     bind_group_layout: wgpu::BindGroupLayout,
+    sampler: wgpu::Sampler,
     font_bind_group: wgpu::BindGroup,
     uniform_buffer: wgpu::Buffer,
     projection: [f32; 16],
     last_screen_w: f32,
     last_screen_h: f32,
+    /// Set to `true` when the font atlas should be replaced via `update_font_atlas`.
+    pub atlas_dirty: bool,
 }
 
 impl UiRenderer {
@@ -208,13 +210,84 @@ impl UiRenderer {
 
         UiRenderer {
             pipeline,
-            bind_group_layout: bind_group_layout,
+            bind_group_layout,
+            sampler,
             font_bind_group,
             uniform_buffer,
             projection,
             last_screen_w: 800.0,
             last_screen_h: 600.0,
+            atlas_dirty: false,
         }
+    }
+
+    /// Replace the font atlas texture with new data (e.g., TTF atlas).
+    /// Creates a new texture, view, and bind group.
+    pub fn update_font_atlas(
+        &mut self,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        atlas_data: &[u8],
+        width: u32,
+        height: u32,
+    ) {
+        let texture = device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("TTF Font Atlas"),
+            size: wgpu::Extent3d {
+                width,
+                height,
+                depth_or_array_layers: 1,
+            },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::R8Unorm,
+            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+            view_formats: &[],
+        });
+
+        queue.write_texture(
+            wgpu::TexelCopyTextureInfo {
+                texture: &texture,
+                mip_level: 0,
+                origin: wgpu::Origin3d::ZERO,
+                aspect: wgpu::TextureAspect::All,
+            },
+            atlas_data,
+            wgpu::TexelCopyBufferLayout {
+                offset: 0,
+                bytes_per_row: Some(width),
+                rows_per_image: Some(height),
+            },
+            wgpu::Extent3d {
+                width,
+                height,
+                depth_or_array_layers: 1,
+            },
+        );
+
+        let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
+
+        self.font_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("UI Font Bind Group"),
+            layout: &self.bind_group_layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: self.uniform_buffer.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::TextureView(&view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 2,
+                    resource: wgpu::BindingResource::Sampler(&self.sampler),
+                },
+            ],
+        });
+
+        self.atlas_dirty = false;
     }
 
     /// Render the draw list onto the given target view.

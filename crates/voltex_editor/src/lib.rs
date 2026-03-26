@@ -31,3 +31,6 @@ pub mod rasterizer;
 pub mod glyph_cache;
 pub mod ttf_font;
 pub use ttf_font::TtfFont;
+
+pub mod floating_panel;
+pub use floating_panel::{FloatingPanel, FloatingPanelManager};
