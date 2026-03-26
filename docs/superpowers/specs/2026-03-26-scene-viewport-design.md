@@ -12,6 +12,16 @@
 - 매 프레임 패널 크기 변경 시 텍스처 재생성
 - 데모 씬 (큐브 + 방향광)
 
+## Dependencies
+
+`voltex_editor/Cargo.toml`에 추가 필요:
+```toml
+voltex_math.workspace = true
+voltex_renderer.workspace = true
+```
+- `voltex_math`: OrbitCamera에서 Vec3, Mat4 사용
+- `voltex_renderer`: Mesh, MeshVertex, 파이프라인 패턴 재사용
+
 ## ViewportTexture
 
 오프스크린 렌더 타겟을 관리한다.
@@ -27,7 +37,8 @@ pub struct ViewportTexture {
 }
 ```
 
-- `new(device, width, height)` — Rgba8UnormSrgb color + Depth32Float depth 텍스처 생성
+- `new(device, width, height)` — **Rgba8Unorm** (linear) color + Depth32Float depth 텍스처 생성
+- 주의: sRGB 변환은 surface에 최종 출력 시 한 번만 적용 (이중 감마 보정 방지)
 - color: usage = RENDER_ATTACHMENT | TEXTURE_BINDING (렌더 타겟 + 후속 샘플링)
 - depth: usage = RENDER_ATTACHMENT
 - `ensure_size(&mut self, device, w, h)` — 크기 다르면 재생성, 같으면 무시
@@ -46,6 +57,7 @@ pub struct ViewportRenderer {
 
 - `new(device, surface_format)` — 파이프라인, 샘플러, 바인드 그룹 레이아웃 생성
 - `render(encoder, target_view, viewport_texture, screen_w, screen_h, rect)` — 패널 영역에 텍스처 매핑
+- 바인드 그룹은 `render()` 호출 시 매 프레임 생성 (텍스처 리사이즈로 TextureView가 변경될 수 있으므로)
 
 ### 셰이더 (viewport_shader.wgsl)
 
@@ -101,7 +113,7 @@ position = target + Vec3(
 ### 입력 처리
 - `orbit(&mut self, dx: f32, dy: f32)` — 좌클릭 드래그: yaw += dx * sensitivity, pitch += dy * sensitivity (클램프)
 - `zoom(&mut self, delta: f32)` — 스크롤: distance *= (1.0 - delta * 0.1), min 0.5 ~ max 50.0
-- `pan(&mut self, dx: f32, dy: f32)` — 미들 클릭 드래그: target을 카메라의 right/up 방향으로 이동
+- `pan(&mut self, dx: f32, dy: f32)` — 미들 클릭 드래그: target을 카메라의 right/up 방향으로 이동. right 벡터가 영벡터에 가까울 때 (pitch ≈ ±90°) Vec3::X로 폴백.
 
 입력은 뷰포트 패널 위에 마우스가 있을 때만 처리 (Rect::contains 활용).
 
@@ -115,12 +127,33 @@ position = target + Vec3(
 - 방향광 1개
 
 ### 렌더 패스
-- target: ViewportTexture.color_view
+- target: ViewportTexture.color_view (Rgba8Unorm)
 - depth: ViewportTexture.depth_view
 - LoadOp::Clear (매 프레임 클리어)
-- bind group 0: camera uniform (view_proj)
-- bind group 1: light uniform
-- bind group 2: model transform
+- 3D 씬 파이프라인은 **오프스크린 포맷(Rgba8Unorm)**으로 생성 (surface_format과 다름)
+- PipelineLayoutDescriptor에 `immediate_size: 0` 필수 (wgpu 28.0)
+
+### 바인드 그룹 레이아웃
+기존 mesh_shader.wgsl 구조를 따른다:
+- **group(0) binding(0)**: CameraUniform (view_proj, model, camera_pos) — 모델 변환 포함
+- **group(0) binding(1)**: LightUniform (direction, color, ambient)
+- **group(1)**: 텍스처 (사용 안 하면 더미 바인드)
+- max_bind_groups=4 내에서 충분 (최대 2개 사용)
+
+### WGSL vec3 패딩
+Rust 측 uniform 구조체에서 vec3 필드 뒤에 `_padding: f32` 추가 (16바이트 정렬):
+```rust
+#[repr(C)]
+struct LightUniform {
+    direction: [f32; 3],
+    _pad0: f32,
+    color: [f32; 3],
+    _pad1: f32,
+    ambient_strength: f32,
+    _pad2: [f32; 3],
+}
+```
+
 - 기존 Mesh, MeshVertex, 파이프라인 생성 패턴 그대로 사용
 
 ## UI 통합
