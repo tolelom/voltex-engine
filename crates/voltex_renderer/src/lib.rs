@@ -109,3 +109,5 @@ pub mod light_probes;
 pub use light_probes::{LightProbe, LightProbeGrid};
 pub mod light_volumes;
 pub use light_volumes::LightVolume;
+pub mod skinned_vertex;
+pub use skinned_vertex::{SkinnedMeshVertex, BonePalette, MAX_BONES};
