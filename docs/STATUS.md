@@ -123,6 +123,12 @@
 - voltex_editor: Drag and Drop (begin_drag, drop_target)
 - examples/editor_demo
 
+### Phase 8-5: Editor Command Foundation
+- voltex_editor: EditorCommand (Spawn/Despawn/SetTransform/SetTag/SaveScene/LoadScene), CommandError
+- voltex_editor: EditorSession (World + ComponentRegistry + 자동 저장 + jsonl 로그)
+- voltex_editor: hierarchy_panel, inspector_panel (panels 모듈)
+- examples/editor_demo: 실제 씬 에디터 (Toolbar + Hierarchy + Inspector)
+
 ## Crate 구조
 
 ```
@@ -140,7 +146,7 @@ crates/
 └── voltex_editor    — IMGUI, text_input, scroll, drag&drop, UiRenderer
 ```
 
-## 테스트: 485개 전부 통과
+## 테스트: 501개 전부 통과
 
 - voltex_math: 37
 - voltex_platform: 3
@@ -152,7 +158,7 @@ crates/
 - voltex_ai: 24
 - voltex_net: 36
 - voltex_script: 18
-- voltex_editor: 22
+- voltex_editor: 38
 
 ## Examples (12개 + survivor_game)
 
