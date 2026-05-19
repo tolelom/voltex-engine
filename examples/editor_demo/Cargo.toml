@@ -13,3 +13,5 @@ bytemuck.workspace = true
 pollster.workspace = true
 env_logger.workspace = true
 log.workspace = true
+voltex_ecs.workspace = true
+voltex_math.workspace = true
