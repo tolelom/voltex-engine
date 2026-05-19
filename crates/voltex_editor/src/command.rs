@@ -68,6 +68,28 @@ pub fn apply_command(
             world.despawn(*entity);
             Ok(*entity)
         }
+        EditorCommand::SetTransform { entity, position, rotation, scale } => {
+            if !world.is_alive(*entity) {
+                return Err(CommandError::EntityNotAlive(*entity));
+            }
+            if let Some(t) = world.get_mut::<Transform>(*entity) {
+                t.position = *position;
+                t.rotation = *rotation;
+                t.scale = *scale;
+            } else {
+                world.add(*entity, Transform { position: *position, rotation: *rotation, scale: *scale });
+            }
+            Ok(*entity)
+        }
+        EditorCommand::SetTag { entity, tag } => {
+            if !world.is_alive(*entity) {
+                return Err(CommandError::EntityNotAlive(*entity));
+            }
+            // Replace existing tag if any
+            world.remove::<voltex_ecs::scene::Tag>(*entity);
+            world.add(*entity, voltex_ecs::scene::Tag(tag.clone()));
+            Ok(*entity)
+        }
         _ => Err(CommandError::Io("not implemented yet".into())),
     }
 }
@@ -124,5 +146,56 @@ mod tests {
         let result = apply_command(&mut world, &registry, &EditorCommand::Despawn { entity });
         assert!(result.is_ok());
         assert!(!world.is_alive(entity));
+    }
+
+    #[test]
+    fn set_transform_updates_existing_component() {
+        let mut world = World::new();
+        let registry = ComponentRegistry::new();
+        let entity = world.spawn();
+        world.add(entity, Transform::new());
+
+        let cmd = EditorCommand::SetTransform {
+            entity,
+            position: Vec3::new(1.0, 2.0, 3.0),
+            rotation: Vec3::new(0.0, 0.5, 0.0),
+            scale: Vec3::new(2.0, 2.0, 2.0),
+        };
+        apply_command(&mut world, &registry, &cmd).expect("ok");
+        let t = world.get::<Transform>(entity).unwrap();
+        assert_eq!(t.position, Vec3::new(1.0, 2.0, 3.0));
+        assert_eq!(t.rotation, Vec3::new(0.0, 0.5, 0.0));
+        assert_eq!(t.scale, Vec3::new(2.0, 2.0, 2.0));
+    }
+
+    #[test]
+    fn set_transform_fails_when_entity_dead() {
+        let mut world = World::new();
+        let registry = ComponentRegistry::new();
+        let entity = world.spawn();
+        world.despawn(entity);
+        let cmd = EditorCommand::SetTransform {
+            entity,
+            position: Vec3::ZERO,
+            rotation: Vec3::ZERO,
+            scale: Vec3::new(1.0, 1.0, 1.0),
+        };
+        assert_eq!(
+            apply_command(&mut world, &registry, &cmd),
+            Err(CommandError::EntityNotAlive(entity)),
+        );
+    }
+
+    #[test]
+    fn set_tag_adds_or_replaces_tag() {
+        use voltex_ecs::scene::Tag;
+        let mut world = World::new();
+        let registry = ComponentRegistry::new();
+        let entity = world.spawn();
+        apply_command(&mut world, &registry, &EditorCommand::SetTag { entity, tag: "Player".into() }).unwrap();
+        assert_eq!(world.get::<Tag>(entity).unwrap().0, "Player");
+
+        apply_command(&mut world, &registry, &EditorCommand::SetTag { entity, tag: "Enemy".into() }).unwrap();
+        assert_eq!(world.get::<Tag>(entity).unwrap().0, "Enemy");
     }
 }
