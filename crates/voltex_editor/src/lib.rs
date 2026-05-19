@@ -7,6 +7,9 @@ pub mod widgets;
 pub mod dock;
 pub mod inspector;
 pub mod orbit_camera;
+pub mod command;
+pub mod session;
+pub mod panels;
 
 pub use font::FontAtlas;
 pub use draw_list::{DrawVertex, DrawCommand, DrawList};
@@ -31,3 +34,6 @@ pub mod rasterizer;
 pub mod glyph_cache;
 pub mod ttf_font;
 pub use ttf_font::TtfFont;
+
+pub use command::{EditorCommand, CommandError};
+pub use session::EditorSession;

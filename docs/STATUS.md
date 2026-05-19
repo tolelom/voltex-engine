@@ -128,6 +128,12 @@
 - voltex_editor: TtfParser, Rasterizer, GlyphCache, TtfFont (자체 TTF 렌더링, Unicode)
 - examples/editor_demo
 
+### Phase 8-5: Editor Command Foundation
+- voltex_editor: EditorCommand (Spawn/Despawn/SetTransform/SetTag/SaveScene/LoadScene), CommandError
+- voltex_editor: EditorSession (World + ComponentRegistry + 자동 저장 + jsonl 로그)
+- voltex_editor: panels::hierarchy, panels::inspector (text_input 기반 — 8-4의 트리/슬라이더 inspector와 별개 경로로 공존)
+- examples/editor_demo: Toolbar(Spawn/Save/Load)를 EditorSession에 dispatch (8-4의 viewport/dock/asset_browser 위에 추가)
+
 ## Crate 구조
 
 ```
@@ -145,7 +151,7 @@ crates/
 └── voltex_editor    — IMGUI, docking, 3D viewport, inspector, asset browser, TTF font, UiRenderer
 ```
 
-## 테스트: 710개 전부 통과
+## 테스트: 726개 전부 통과
 
 - voltex_math: 37
 - voltex_platform: 3
@@ -157,7 +163,7 @@ crates/
 - voltex_ai: 34
 - voltex_net: 47
 - voltex_script: 18
-- voltex_editor: 85
+- voltex_editor: 101
 
 ## Examples (12개 + survivor_game)
 

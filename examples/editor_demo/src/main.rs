@@ -12,8 +12,8 @@ use voltex_editor::{
     OrbitCamera, ViewportTexture, ViewportRenderer, VIEWPORT_COLOR_FORMAT,
     hierarchy_panel, inspector_panel,
     AssetBrowser, asset_browser_panel,
+    EditorSession, EditorCommand,
 };
-use voltex_ecs::world::World;
 use voltex_ecs::entity::Entity;
 use voltex_ecs::transform::Transform;
 use voltex_ecs::scene::Tag;
@@ -35,8 +35,8 @@ struct AppState {
     counter: u32,
     speed: f32,
     show_grid: bool,
-    // ECS
-    world: World,
+    // ECS — wrapped in EditorSession for command-based mutation + auto-save
+    session: EditorSession,
     selected_entity: Option<Entity>,
     tag_buffer: String,
     // Viewport state
@@ -290,27 +290,30 @@ impl ApplicationHandler for EditorDemoApp {
         let cube2 = make_cube(&gpu.device, 2.0, 0.5, 1.0, 1.0);
         let cube3 = make_cube(&gpu.device, -1.5, 0.5, -1.0, 1.0);
 
-        // ECS World setup
-        let mut world = World::new();
+        // ECS Session setup — World lives inside the EditorSession so Toolbar
+        // actions can be logged and auto-saved. Direct seeding (below) bypasses
+        // the command log, which is fine for one-time scene init.
+        std::fs::create_dir_all("scenes").ok();
+        let mut session = EditorSession::new("scenes/editor_demo.vscn");
 
-        let ground_e = world.spawn();
-        world.add(ground_e, Transform::from_position(Vec3::new(0.0, 0.0, 0.0)));
-        world.add(ground_e, Tag("Ground".to_string()));
+        let ground_e = session.world.spawn();
+        session.world.add(ground_e, Transform::from_position(Vec3::new(0.0, 0.0, 0.0)));
+        session.world.add(ground_e, Tag("Ground".to_string()));
 
-        let cube1_e = world.spawn();
-        world.add(cube1_e, Transform::from_position(Vec3::new(0.0, 0.5, 0.0)));
-        world.add(cube1_e, Tag("Cube1".to_string()));
+        let cube1_e = session.world.spawn();
+        session.world.add(cube1_e, Transform::from_position(Vec3::new(0.0, 0.5, 0.0)));
+        session.world.add(cube1_e, Tag("Cube1".to_string()));
 
-        let cube2_e = world.spawn();
-        world.add(cube2_e, Transform::from_position(Vec3::new(2.0, 0.5, 1.0)));
-        world.add(cube2_e, Tag("Cube2".to_string()));
+        let cube2_e = session.world.spawn();
+        session.world.add(cube2_e, Transform::from_position(Vec3::new(2.0, 0.5, 1.0)));
+        session.world.add(cube2_e, Tag("Cube2".to_string()));
 
-        let cube3_e = world.spawn();
-        world.add(cube3_e, Transform::from_position(Vec3::new(-1.5, 0.5, -1.0)));
-        world.add(cube3_e, Tag("Cube3".to_string()));
+        let cube3_e = session.world.spawn();
+        session.world.add(cube3_e, Transform::from_position(Vec3::new(-1.5, 0.5, -1.0)));
+        session.world.add(cube3_e, Tag("Cube3".to_string()));
 
         // Cube2 is child of Cube1
-        voltex_ecs::hierarchy::add_child(&mut world, cube1_e, cube2_e);
+        voltex_ecs::hierarchy::add_child(&mut session.world, cube1_e, cube2_e);
 
         self.state = Some(AppState {
             window,
@@ -334,7 +337,7 @@ impl ApplicationHandler for EditorDemoApp {
             dummy_texture_bg: dummy_texture.bind_group,
             asset_browser,
             scene_meshes: vec![ground, cube1, cube2, cube3],
-            world,
+            session,
             selected_entity: None,
             tag_buffer: String::new(),
             prev_mouse: (0.0, 0.0),
@@ -416,7 +419,27 @@ impl ApplicationHandler for EditorDemoApp {
 
                 let screen_w = state.gpu.config.width as f32;
                 let screen_h = state.gpu.config.height as f32;
-                let areas = state.dock.layout(Rect { x: 0.0, y: 0.0, w: screen_w, h: screen_h });
+
+                // ── Toolbar (Spawn/Save/Load via EditorCommand → session log + auto-save) ──
+                const TOOLBAR_H: f32 = 32.0;
+                state.ui.begin_panel("Toolbar", 0.0, 0.0, screen_w, TOOLBAR_H);
+                if state.ui.button("Spawn") {
+                    if let Ok(e) = state.session.dispatch(EditorCommand::Spawn) {
+                        state.selected_entity = Some(e);
+                    }
+                }
+                if state.ui.button("Save") {
+                    let path = state.session.scene_path.clone();
+                    let _ = state.session.dispatch(EditorCommand::SaveScene { path });
+                }
+                if state.ui.button("Load") {
+                    let path = state.session.scene_path.clone();
+                    let _ = state.session.dispatch(EditorCommand::LoadScene { path });
+                    state.selected_entity = None;
+                }
+                state.ui.end_panel();
+
+                let areas = state.dock.layout(Rect { x: 0.0, y: TOOLBAR_H, w: screen_w, h: screen_h - TOOLBAR_H });
                 state.dock.update(mx, my, mouse_down);
                 state.dock.draw_chrome(&mut state.ui);
 
@@ -427,15 +450,15 @@ impl ApplicationHandler for EditorDemoApp {
                     match panel_id {
                         0 => {
                             // Hierarchy panel
-                            hierarchy_panel(&mut state.ui, &state.world, &mut state.selected_entity, rect);
+                            hierarchy_panel(&mut state.ui, &state.session.world, &mut state.selected_entity, rect);
                         }
                         1 => {
                             // Viewport panel (keep existing 3D rendering code exactly as-is)
                             viewport_rect = Some(*rect);
                         }
                         2 => {
-                            // Inspector panel
-                            inspector_panel(&mut state.ui, &mut state.world, state.selected_entity, rect, &mut state.tag_buffer);
+                            // Inspector panel (8-4: slider-based; mutates world directly — slider edits aren't logged yet)
+                            inspector_panel(&mut state.ui, &mut state.session.world, state.selected_entity, rect, &mut state.tag_buffer);
                         }
                         3 => {
                             asset_browser_panel(&mut state.ui, &mut state.asset_browser, rect);
