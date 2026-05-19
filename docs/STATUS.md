@@ -172,6 +172,27 @@ crates/
 - audio_demo, deferred_demo, editor_demo
 - survivor_game (완성 게임)
 
+## 다음 작업 후보 (2026-05-20 기준)
+
+Phase 8-5 머지 직후 남은 통합/정리 작업:
+
+1. **inspector 통합** — `voltex_editor`에 두 인스펙터가 공존: master의 `inspector::*` (Rect/slider 기반, World 직접 변형) vs `panels::inspector::*` (text_input 기반, EditorSession dispatch). 슬라이더 인스펙터의 변경을 `SetTransform` 커맨드로 라우팅해 jsonl 로그에 잡히게 하거나, 두 인스펙터를 하나로 합치는 결정 필요.
+2. **scene 영속화 검증** — `examples/editor_demo` Toolbar에서 Spawn/Save/Load는 동작. 그런데 ground/cube들은 시작 시 `session.world`에 직접 시드되어 (커맨드 미경유) Save 후 Load 하면 시드된 4개 엔티티는 그대로 살아남는다. 의도된 동작인지 확인 후 문서화 필요.
+3. **EditorCommand 확장** — 현재 6개 variant. 다음 후보: AddChild/RemoveChild (Hierarchy 조작), AddComponent/RemoveComponent (Transform 외 컴포넌트), 그리고 Undo/Redo (커맨드 로그 역연산).
+4. **viewport plan** (master 자동작업으로 이미 구현됨) — 추가 작업: viewport 안에서 raycast로 엔티티 선택, gizmo (translate/rotate/scale 핸들).
+5. **Lua API 확장 + Entity.generation 픽스** — `voltex_script::engine_api`가 여전히 4개 함수만 노출 + `generation: 0` 하드코딩 버그. `docs/superpowers/specs/` 의 자동생성 설계 문서들 참고.
+6. **survivor_game을 ECS/Physics로 재작성** — 엔진 자체 검증을 위해 `Vec<Player>` → ECS 마이그레이션.
+
+## 다른 기기에서 이어서 작업하기
+
+```bash
+git clone https://git.tolelom.xyz/tolelom/game_engine
+cd game_engine
+cargo test --workspace --lib   # 검증: 726개 통과해야 함
+```
+
+진행 상황과 다음 단계는 이 파일과 `docs/DEFERRED.md`, `docs/superpowers/plans/`, `docs/superpowers/specs/` 를 본다. 자동 루프가 master에 계속 작업을 푸시할 수 있으므로 작업 전 `git pull --ff-only` 필수.
+
 ## 간소화/미뤄진 항목
 
 상세: `docs/DEFERRED.md`
