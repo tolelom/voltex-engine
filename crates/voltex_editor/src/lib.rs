@@ -5,6 +5,7 @@ pub mod renderer;
 pub mod ui_context;
 pub mod widgets;
 pub mod command;
+pub mod session;
 
 pub use font::FontAtlas;
 pub use draw_list::{DrawVertex, DrawCommand, DrawList};
@@ -12,3 +13,4 @@ pub use layout::LayoutState;
 pub use renderer::UiRenderer;
 pub use ui_context::UiContext;
 pub use command::{EditorCommand, CommandError};
+pub use session::EditorSession;
