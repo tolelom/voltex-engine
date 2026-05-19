@@ -52,7 +52,7 @@ use voltex_ecs::ComponentRegistry;
 /// mutates the world.
 pub fn apply_command(
     world: &mut World,
-    _registry: &ComponentRegistry,
+    registry: &ComponentRegistry,
     cmd: &EditorCommand,
 ) -> Result<Entity, CommandError> {
     match cmd {
@@ -90,7 +90,17 @@ pub fn apply_command(
             world.add(*entity, voltex_ecs::scene::Tag(tag.clone()));
             Ok(*entity)
         }
-        _ => Err(CommandError::Io("not implemented yet".into())),
+        EditorCommand::SaveScene { path } => {
+            let json = voltex_ecs::serialize_scene_json(world, registry);
+            std::fs::write(path, json).map_err(|e| CommandError::Io(e.to_string()))?;
+            Ok(Entity { id: 0, generation: 0 })
+        }
+        EditorCommand::LoadScene { path } => {
+            let text = std::fs::read_to_string(path).map_err(|e| CommandError::Io(e.to_string()))?;
+            voltex_ecs::deserialize_scene_json(world, &text, registry)
+                .map_err(CommandError::Parse)?;
+            Ok(Entity { id: 0, generation: 0 })
+        }
     }
 }
 
@@ -197,5 +207,60 @@ mod tests {
 
         apply_command(&mut world, &registry, &EditorCommand::SetTag { entity, tag: "Enemy".into() }).unwrap();
         assert_eq!(world.get::<Tag>(entity).unwrap().0, "Enemy");
+    }
+
+    #[test]
+    fn save_then_load_roundtrips_a_scene() {
+        use std::fs;
+        let mut world1 = World::new();
+        let mut registry = ComponentRegistry::new();
+        registry.register_defaults();
+
+        let e1 = apply_command(&mut world1, &registry, &EditorCommand::Spawn).unwrap();
+        apply_command(&mut world1, &registry, &EditorCommand::SetTransform {
+            entity: e1,
+            position: Vec3::new(7.0, 8.0, 9.0),
+            rotation: Vec3::ZERO,
+            scale: Vec3::new(1.0, 1.0, 1.0),
+        }).unwrap();
+        apply_command(&mut world1, &registry, &EditorCommand::SetTag {
+            entity: e1, tag: "Hero".into(),
+        }).unwrap();
+
+        let tmp = std::env::temp_dir().join("voltex_editor_test_scene.vscn");
+        let tmp_str = tmp.to_string_lossy().into_owned();
+
+        apply_command(&mut world1, &registry, &EditorCommand::SaveScene { path: tmp_str.clone() })
+            .expect("save");
+
+        let mut world2 = World::new();
+        apply_command(&mut world2, &registry, &EditorCommand::LoadScene { path: tmp_str.clone() })
+            .expect("load");
+
+        let entities: Vec<_> = world2.query::<Transform>().map(|(e, _)| e).collect();
+        assert_eq!(entities.len(), 1);
+        let loaded_t = world2.get::<Transform>(entities[0]).unwrap();
+        assert_eq!(loaded_t.position, Vec3::new(7.0, 8.0, 9.0));
+        let loaded_tag = world2.get::<voltex_ecs::scene::Tag>(entities[0]).unwrap();
+        assert_eq!(loaded_tag.0, "Hero");
+
+        fs::remove_file(&tmp).ok();
+    }
+
+    #[test]
+    fn load_returns_parse_error_on_garbage() {
+        use std::fs;
+        let mut world = World::new();
+        let registry = ComponentRegistry::new();
+        let tmp = std::env::temp_dir().join("voltex_editor_test_bad.vscn");
+        fs::write(&tmp, "{not json").unwrap();
+        let result = apply_command(&mut world, &registry, &EditorCommand::LoadScene {
+            path: tmp.to_string_lossy().into_owned(),
+        });
+        match result {
+            Err(CommandError::Parse(_)) => {}
+            other => panic!("expected Parse error, got {:?}", other),
+        }
+        fs::remove_file(&tmp).ok();
     }
 }
