@@ -6,3 +6,5 @@ edition = "2021"
 [dependencies]
 bytemuck = { workspace = true }
 wgpu = { workspace = true }
+voltex_ecs = { workspace = true }
+voltex_math = { workspace = true }
