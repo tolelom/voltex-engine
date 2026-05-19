@@ -216,6 +216,11 @@ mod tests {
         let mut registry = ComponentRegistry::new();
         registry.register_defaults();
 
+        let tmp = std::env::temp_dir().join(format!(
+            "voltex_editor_test_scene_roundtrip_{}.vscn", std::process::id()
+        ));
+        let _ = std::fs::remove_file(&tmp);
+
         let e1 = apply_command(&mut world1, &registry, &EditorCommand::Spawn).unwrap();
         apply_command(&mut world1, &registry, &EditorCommand::SetTransform {
             entity: e1,
@@ -227,7 +232,6 @@ mod tests {
             entity: e1, tag: "Hero".into(),
         }).unwrap();
 
-        let tmp = std::env::temp_dir().join("voltex_editor_test_scene.vscn");
         let tmp_str = tmp.to_string_lossy().into_owned();
 
         apply_command(&mut world1, &registry, &EditorCommand::SaveScene { path: tmp_str.clone() })
@@ -252,7 +256,10 @@ mod tests {
         use std::fs;
         let mut world = World::new();
         let registry = ComponentRegistry::new();
-        let tmp = std::env::temp_dir().join("voltex_editor_test_bad.vscn");
+        let tmp = std::env::temp_dir().join(format!(
+            "voltex_editor_test_garbage_{}.vscn", std::process::id()
+        ));
+        let _ = std::fs::remove_file(&tmp);
         fs::write(&tmp, "{not json").unwrap();
         let result = apply_command(&mut world, &registry, &EditorCommand::LoadScene {
             path: tmp.to_string_lossy().into_owned(),
