@@ -6,6 +6,7 @@ pub mod ui_context;
 pub mod widgets;
 pub mod command;
 pub mod session;
+pub mod panels;
 
 pub use font::FontAtlas;
 pub use draw_list::{DrawVertex, DrawCommand, DrawList};
