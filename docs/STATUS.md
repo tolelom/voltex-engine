@@ -150,6 +150,13 @@
 - voltex_editor: panels::hierarchy, panels::inspector (text_input 기반 — 8-4의 트리/슬라이더 inspector와 별개 경로로 공존)
 - examples/editor_demo: Toolbar(Spawn/Save/Load)를 EditorSession에 dispatch (8-4의 viewport/dock/asset_browser 위에 추가)
 
+### Phase 8-6: Editor 통합 + Undo/Redo + Hierarchy Commands + Lua FFI Fix (2026-05-20)
+- voltex_editor: **inspector 통합** — `inspector::*` 제거, `panels::hierarchy::*` 트리 뷰 + `panels::inspector::*` 슬라이더, 모든 mutation이 EditorCommand dispatch 경유 (jsonl 로그 + 자동 저장)
+- voltex_editor: **EditorSession Undo/Redo** — Inverse 스택, undo()/redo()/undo_depth()/redo_depth(). v1 undoable: Spawn/SetTransform/SetTag/AddChild/RemoveChild. v1 non-undoable: Despawn/SaveScene/LoadScene (history 클리어)
+- voltex_editor: **AddChild/RemoveChild commands** — hierarchy 조작도 동일 dispatch path. 비-attached child의 RemoveChild는 no-op + 미기록
+- voltex_script: **Lua FFI 핸들 규약** — Entity = `(id, gen)` 두 정수. spawn_entity → 2 returns, set/get_position → id+gen+payload. 핸들 stale 시 `World::is_alive` 거부 (ABA 버그 fix)
+- examples/editor_demo: Toolbar에 Undo/Redo 버튼 추가, `session.selected` 가 선택의 단일 소스
+
 ## Crate 구조
 
 ```
@@ -168,7 +175,7 @@ crates/
 └── voltex_editor    — IMGUI, docking, 3D viewport, inspector, asset browser, TTF font, UiRenderer
 ```
 
-## 테스트: 765개 전부 통과
+## 테스트: 776개 전부 통과 (Phase 8-6 +11)
 
 - voltex: 2 (M6: prelude/module 경로 컴파일 검증)
 - voltex_math: 37
@@ -180,8 +187,8 @@ crates/
 - voltex_audio: 84
 - voltex_ai: 34
 - voltex_net: 47
-- voltex_script: 18
-- voltex_editor: 105
+- voltex_script: 21 (8-6 +3: stale-handle 거부, multi-return spawn, multi-arg set/get)
+- voltex_editor: 113 (8-6: inspector 통합 -3, undo/redo +6, AddChild/RemoveChild +5)
 
 ## Examples (12개 + survivor_game)
 
@@ -190,16 +197,15 @@ crates/
 - audio_demo, deferred_demo, editor_demo
 - survivor_game (ECS + voltex_physics + voltex facade로 재작성 완료, 2026-05-20)
 
-## 다음 작업 후보 (2026-05-20 기준)
+## 다음 작업 후보 (2026-05-20 8-6 이후)
 
-Phase 8-5 머지 직후 남은 통합/정리 작업:
-
-1. **inspector 통합** — `voltex_editor`에 두 인스펙터가 공존: master의 `inspector::*` (Rect/slider 기반, World 직접 변형) vs `panels::inspector::*` (text_input 기반, EditorSession dispatch). 슬라이더 인스펙터의 변경을 `SetTransform` 커맨드로 라우팅해 jsonl 로그에 잡히게 하거나, 두 인스펙터를 하나로 합치는 결정 필요.
-2. **scene 영속화 검증** — `examples/editor_demo` Toolbar에서 Spawn/Save/Load는 동작. 그런데 ground/cube들은 시작 시 `session.world`에 직접 시드되어 (커맨드 미경유) Save 후 Load 하면 시드된 4개 엔티티는 그대로 살아남는다. 의도된 동작인지 확인 후 문서화 필요.
-3. **EditorCommand 확장** — 현재 6개 variant. 다음 후보: AddChild/RemoveChild (Hierarchy 조작), AddComponent/RemoveComponent (Transform 외 컴포넌트), 그리고 Undo/Redo (커맨드 로그 역연산).
-4. **viewport plan** (master 자동작업으로 이미 구현됨) — 추가 작업: viewport 안에서 raycast로 엔티티 선택, gizmo (translate/rotate/scale 핸들).
-5. **Lua API 확장 + Entity.generation 픽스** — `voltex_script::engine_api`가 여전히 4개 함수만 노출 + `generation: 0` 하드코딩 버그. `docs/superpowers/specs/` 의 자동생성 설계 문서들 참고.
-6. ~~**survivor_game을 ECS/Physics로 재작성**~~ — ✅ 완료 (2026-05-20). World 기반, voltex_physics::detect_collisions 사용, voltex facade로 import. `docs/superpowers/plans/2026-05-20-survivor-ecs-rewrite.md` 참고.
+1. ~~**inspector 통합**~~ — ✅ Phase 8-6. 단일 `panels::*` 경로.
+2. **scene 영속화 검증** — `examples/editor_demo` 의 ground/cube는 시작 시 `session.world`에 직접 시드 (커맨드 미경유). Save → Load 후에도 시드 엔티티 4개는 살아남음. (a) 시드도 `EditorCommand::Spawn` + `SetTag` 로 거치게 하거나, (b) 시드 엔티티는 "transient" 표시로 직렬화 제외, (c) 의도된 동작이라면 문서화. 결정 필요.
+3. **EditorCommand 확장 추가** — Undo/Redo ✅, AddChild/RemoveChild ✅. 남은 후보: AddComponent/RemoveComponent (Transform 외 컴포넌트 — ComponentRegistry 의 raw byte API 활용).
+4. **Despawn 정확한 undo** — 현재 v1은 history 클리어. `EntityAllocator::restore_at_generation(id, gen)` 추가 + 컴포넌트 스냅샷 백업 형태로 풀 undo 지원. World API 변경이라 별 commit 필요.
+5. **viewport raycast 픽킹 + gizmo** — viewport 안에서 마우스 클릭 → ray cast → 엔티티 선택 (`session.selected`). gizmo (translate/rotate/scale 핸들) 도 dispatch path 경유.
+6. **Lua API 확장** — `voltex_script::engine_api` 가 여전히 4개 함수만 노출. set/get_rotation/scale, destroy(id, gen), find_by_tag, AddChild/RemoveChild 등 추가. 새 함수도 (id, gen) 핸들 규약 따라야 함.
+7. ~~**survivor_game을 ECS/Physics로 재작성**~~ — ✅ 완료 (2026-05-20).
 
 ## 다른 기기에서 이어서 작업하기
 
