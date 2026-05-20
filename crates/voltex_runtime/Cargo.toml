@@ -1,0 +1,18 @@
+[package]
+name = "voltex_runtime"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+voltex_math.workspace = true
+voltex_platform.workspace = true
+voltex_ecs.workspace = true
+voltex_asset.workspace = true
+voltex_renderer.workspace = true
+voltex_renderer_ecs.workspace = true
+voltex_physics.workspace = true
+voltex_script.workspace = true
+winit = { workspace = true }
+wgpu = { workspace = true }
+bytemuck = { workspace = true }
+thiserror = { workspace = true }

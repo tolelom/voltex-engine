@@ -2194,6 +2194,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "voltex_runtime"
+version = "0.1.0"
+dependencies = [
+ "bytemuck",
+ "thiserror 2.0.18",
+ "voltex_asset",
+ "voltex_ecs",
+ "voltex_math",
+ "voltex_physics",
+ "voltex_platform",
+ "voltex_renderer",
+ "voltex_renderer_ecs",
+ "voltex_script",
+ "wgpu",
+ "winit",
+]
+
+[[package]]
 name = "voltex_script"
 version = "0.1.0"
 dependencies = [
