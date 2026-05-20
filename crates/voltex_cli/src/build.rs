@@ -68,6 +68,11 @@ pub fn build_target(
     let wrapper_dir = dist_dir.join("wrapper");
     std::fs::create_dir_all(wrapper_dir.join("src"))?;
 
+    // Build the .vpkg archive *before* writing wrapper main.rs so the
+    // codegen can reference it via include_bytes!.
+    let archive_path = wrapper_dir.join("voltex_archive.vpkg");
+    pack_archive(&manifest_dir, manifest, &archive_path)?;
+
     write_wrapper_manifest(&wrapper_dir, &engine_path)?;
     write_wrapper_main(&wrapper_dir, manifest)?;
 
@@ -150,30 +155,26 @@ voltex_runtime = {{ path = "{}" }}
 }
 
 pub fn render_wrapper_main(manifest: &Manifest) -> String {
-    // Wrapper looks for `scene.vscn` next to the exe (works for the prototype
-    // dist layout; VFS in B2 replaces this with an embedded archive).
+    // Wrapper embeds `voltex_archive.vpkg` next to itself via include_bytes!.
+    // The runtime reads the scene through Vfs::Archive, so the exe is fully
+    // self-contained — no `scene.vscn` next to it required.
     let scene_lit = escape_for_rust_string(&manifest.build.scene);
     let title_lit = escape_for_rust_string(&manifest.build.window_title);
     let (w, h) = manifest.build.window_size;
     format!(
-        r#"use voltex_runtime::{{RuntimeApp, RuntimeConfig}};
-use std::path::PathBuf;
+        r#"use voltex_runtime::{{RuntimeApp, RuntimeConfig, Vfs}};
+
+const ARCHIVE_BYTES: &[u8] = include_bytes!("../voltex_archive.vpkg");
 
 fn main() -> voltex_runtime::RuntimeResult<()> {{
+    let vfs = Vfs::archive_from_bytes(ARCHIVE_BYTES)
+        .map_err(|e| voltex_runtime::RuntimeError::Generic(format!("vfs: {{}}", e)))?;
     let mut cfg = RuntimeConfig::new()
         .with_window_title("{title}")
-        .with_window_size({w}, {h});
-    let scene_path = scene_path_next_to_exe("{scene}");
-    if scene_path.exists() {{
-        cfg = cfg.with_initial_scene(scene_path.to_string_lossy().to_string());
-    }}
+        .with_window_size({w}, {h})
+        .with_vfs(vfs);
+    cfg = cfg.with_initial_scene("{scene}");
     RuntimeApp::new(cfg)?.run()
-}}
-
-fn scene_path_next_to_exe(name: &str) -> PathBuf {{
-    let mut p = std::env::current_exe().unwrap_or_default();
-    p.pop();
-    p.join(name)
 }}
 "#,
         title = title_lit,
@@ -181,6 +182,68 @@ fn scene_path_next_to_exe(name: &str) -> PathBuf {{
         h = h,
         scene = scene_lit,
     )
+}
+
+/// Walk the manifest's scene + scripts + assets dirs and write a `.vpkg`.
+/// Paths inside the archive use forward slashes and are relative to the
+/// manifest directory (so `with_initial_scene("scene.vscn")` works).
+pub fn pack_archive(
+    manifest_dir: &Path,
+    manifest: &Manifest,
+    out_path: &Path,
+) -> Result<()> {
+    let mut entries: Vec<(String, Vec<u8>)> = Vec::new();
+
+    // 1. scene
+    let scene_path = manifest_dir.join(&manifest.build.scene);
+    if scene_path.exists() {
+        let bytes = std::fs::read(&scene_path)?;
+        entries.push((manifest.build.scene.clone(), bytes));
+    }
+
+    // 2. scripts
+    for dir in manifest.resolved_script_dirs(manifest_dir) {
+        collect_into_entries(&dir, manifest_dir, &mut entries)?;
+    }
+    // 3. assets
+    for dir in manifest.resolved_assets_dirs(manifest_dir) {
+        collect_into_entries(&dir, manifest_dir, &mut entries)?;
+    }
+
+    let archive = voltex_asset::write_vpkg(&entries);
+    std::fs::write(out_path, archive)?;
+    eprintln!(
+        "voltex build: packed {} entries → {}",
+        entries.len(),
+        out_path.display()
+    );
+    Ok(())
+}
+
+fn collect_into_entries(
+    dir: &Path,
+    relative_to: &Path,
+    out: &mut Vec<(String, Vec<u8>)>,
+) -> Result<()> {
+    if !dir.exists() {
+        return Ok(());
+    }
+    for entry in std::fs::read_dir(dir)? {
+        let entry = entry?;
+        let ty = entry.file_type()?;
+        let path = entry.path();
+        if ty.is_dir() {
+            collect_into_entries(&path, relative_to, out)?;
+        } else if ty.is_file() {
+            let rel = path
+                .strip_prefix(relative_to)
+                .map_err(|e| CliError::Io(format!("strip_prefix: {}", e)))?;
+            let key = rel.to_string_lossy().replace('\\', "/");
+            let bytes = std::fs::read(&path)?;
+            out.push((key, bytes));
+        }
+    }
+    Ok(())
 }
 
 fn write_wrapper_main(wrapper_dir: &Path, manifest: &Manifest) -> Result<()> {
@@ -221,6 +284,35 @@ mod tests {
         assert!(body.contains(r#"with_window_title("Hello \"World\"")"#));
         assert!(body.contains("with_window_size(800, 600)"));
         assert!(body.contains("with_initial_scene"));
+        assert!(body.contains("include_bytes!"));
+        assert!(body.contains("with_vfs"));
+    }
+
+    #[test]
+    fn pack_archive_collects_scripts_and_assets() {
+        let stamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_nanos())
+            .unwrap_or(0);
+        let root = std::env::temp_dir().join(format!("voltex_cli_pack_test_{}", stamp));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(root.join("scripts")).unwrap();
+        std::fs::create_dir_all(root.join("assets").join("sub")).unwrap();
+        std::fs::write(root.join("scene.vscn"), "scene-bytes").unwrap();
+        std::fs::write(root.join("scripts").join("a.lua"), "a").unwrap();
+        std::fs::write(root.join("assets").join("sub").join("b.png"), "b").unwrap();
+
+        let m = dummy("X", 100, 100);
+        let archive_path = root.join("out.vpkg");
+        pack_archive(&root, &m, &archive_path).unwrap();
+        let bytes = std::fs::read(&archive_path).unwrap();
+        let reader = voltex_asset::VpkgReader::parse(&bytes).unwrap();
+        let mut paths: Vec<String> = reader.list().map(|s| s.to_string()).collect();
+        paths.sort();
+        assert!(paths.contains(&"scene.vscn".to_string()));
+        assert!(paths.contains(&"scripts/a.lua".to_string()));
+        assert!(paths.contains(&"assets/sub/b.png".to_string()));
+        let _ = std::fs::remove_dir_all(&root);
     }
 
     #[test]

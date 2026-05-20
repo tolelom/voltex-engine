@@ -6,3 +6,6 @@ edition = "2021"
 [[bin]]
 name = "voltex"
 path = "src/main.rs"
+
+[dependencies]
+voltex_asset = { path = "../voltex_asset" }

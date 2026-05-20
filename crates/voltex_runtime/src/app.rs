@@ -69,7 +69,12 @@ impl RuntimeApp {
 
         let mut world = World::new();
         if let Some(scene_path) = config.initial_scene.as_ref() {
-            let _ = load_scene_if_present(&mut world, &registry, scene_path);
+            let _ = load_scene_via_vfs_or_disk(
+                &mut world,
+                &registry,
+                scene_path,
+                config.vfs.as_ref(),
+            );
         }
         let scene_builder = config.build_scene.take();
         if let Some(build) = scene_builder {
@@ -141,12 +146,18 @@ impl RuntimeApp {
     }
 }
 
-fn load_scene_if_present(
+fn load_scene_via_vfs_or_disk(
     world: &mut World,
     registry: &ComponentRegistry,
     path: &str,
+    vfs: Option<&voltex_asset::Vfs>,
 ) -> RuntimeResult<()> {
-    let data = std::fs::read(path).map_err(|e| RuntimeError::SceneLoad(e.to_string()))?;
+    let data = match vfs {
+        Some(v) if v.exists(path) => v
+            .read(path)
+            .map_err(|e| RuntimeError::SceneLoad(format!("{}", e)))?,
+        _ => std::fs::read(path).map_err(|e| RuntimeError::SceneLoad(e.to_string()))?,
+    };
     // Try binary first, then JSON.
     if voltex_ecs::deserialize_scene_binary(world, &data, registry).is_ok() {
         return Ok(());

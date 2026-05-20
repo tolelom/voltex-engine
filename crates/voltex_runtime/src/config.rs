@@ -29,6 +29,9 @@ pub struct RuntimeConfig {
     pub fixed_dt: Option<f32>,
     pub enable_physics: bool,
     pub enable_scripts: bool,
+    /// Optional virtual filesystem to consult first when loading scenes /
+    /// scripts. When `None`, paths are read directly from disk.
+    pub vfs: Option<voltex_asset::Vfs>,
 }
 
 impl Default for RuntimeConfig {
@@ -43,6 +46,7 @@ impl Default for RuntimeConfig {
             fixed_dt: None,
             enable_physics: true,
             enable_scripts: true,
+            vfs: None,
         }
     }
 }
@@ -115,6 +119,14 @@ impl RuntimeConfig {
 
     pub fn disable_scripts(mut self) -> Self {
         self.enable_scripts = false;
+        self
+    }
+
+    /// Attach a `Vfs` (filesystem-rooted or embedded `.vpkg`). When set, the
+    /// runtime reads scene / script files through the Vfs first; fs path
+    /// fallback still applies for paths the Vfs cannot resolve.
+    pub fn with_vfs(mut self, vfs: voltex_asset::Vfs) -> Self {
+        self.vfs = Some(vfs);
         self
     }
 }

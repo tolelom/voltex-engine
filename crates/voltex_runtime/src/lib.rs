@@ -23,3 +23,4 @@ pub(crate) mod handler;
 pub use app::RuntimeApp;
 pub use config::RuntimeConfig;
 pub use error::{RuntimeError, RuntimeResult};
+pub use voltex_asset::Vfs;
