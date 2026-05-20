@@ -10,6 +10,7 @@ Lua 5.4 내장 + 엔진 API 바인딩 + 샌드박싱 + 핫 리로드.
 - engine_api — spawn/position/velocity/rotation/scale/destroy/find_by_tag (src/engine_api.rs)
 - bindings — voltex_print 등 (src/bindings.rs)
 - ffi — Lua C API FFI (src/ffi.rs)
+- `ScriptError`, `Result` — thiserror 기반 에러 (Generic/Io) (src/error.rs)
 
 ## 모듈 구조
 - `state` — LuaState + push/read table/vec3, register_fn, exec (src/state.rs, 505줄)

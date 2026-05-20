@@ -13,6 +13,7 @@
 - `EffectChain`, `Reverb`, `EchoDelay` — 이펙트 (src/effect_chain.rs, src/reverb.rs)
 - spatial — `distance_attenuation`, `stereo_pan`, `doppler_shift`, HRTF (src/spatial.rs, src/hrtf.rs)
 - `Occlusion` — 레이 기반 차폐 (src/occlusion.rs)
+- `AudioError`, `Result` — thiserror 기반 에러 (Generic/Io) (src/error.rs)
 
 ## 모듈 구조
 - `audio_system` — 메인 시스템 (src/audio_system.rs)

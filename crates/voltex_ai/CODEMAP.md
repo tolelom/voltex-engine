@@ -10,6 +10,7 @@ AI 기초 — NavMesh (수동 + 자동 voxelization), A* + Funnel, steering, 동
 - Steering — `seek`, `flee`, `arrive`, `wander` (src/steering.rs)
 - `NavAgent` — ECS 컴포넌트 (src/nav_agent.rs)
 - `Obstacle`, velocity obstacle 회피 (src/obstacle.rs)
+- `AiError`, `Result` — thiserror 기반 에러 (Generic/Io) (src/error.rs)
 
 ## 모듈 구조
 - `navmesh` — NavMesh 데이터 구조 + 직렬화 (src/navmesh.rs)

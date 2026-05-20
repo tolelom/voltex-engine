@@ -30,8 +30,9 @@ Immediate-mode UI 에디터 — 도킹/플로팅/뷰포트/인스펙터/에셋 �
 - `panels::hierarchy`, `panels::inspector` (text_input 기반, EditorSession dispatch) (src/panels/)
 - `AssetBrowser`, `asset_browser_panel` (src/asset_browser.rs)
 
-### Editor Command
-- `EditorCommand`, `CommandError` — Spawn/Despawn/SetTransform/SetTag/SaveScene/LoadScene (src/command.rs)
+### Editor Command / Error
+- `EditorCommand` — Spawn/Despawn/SetTransform/SetTag/SaveScene/LoadScene (src/command.rs)
+- `EditorError`, `Result` — Generic / EntityNotAlive(Entity) / Io(String) / Parse(String) (src/error.rs, PartialEq 유지)
 - `EditorSession` — World + ComponentRegistry + 자동저장 + jsonl 로그 (src/session.rs)
 
 ## 모듈 구조

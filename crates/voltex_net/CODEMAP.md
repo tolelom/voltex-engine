@@ -12,6 +12,7 @@ UDP 기반 게임 네트워킹 — 신뢰성/순서/암호화/스냅샷/예측 �
 - `InterpolationBuffer` — 클라이언트 보간 (src/interpolation.rs)
 - `PacketCipher`, `AuthToken` — XOR 암호화 + anti-replay + 토큰 (src/encryption.rs)
 - `LagCompensation` — 히스토리 rewind (src/lag_compensation.rs)
+- `NetError`, `Result` — thiserror 기반 에러 (Generic/Io) (src/error.rs)
 
 ## 모듈 구조
 - `packet` — 패킷 직렬화/역직렬화 (src/packet.rs)

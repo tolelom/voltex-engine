@@ -15,6 +15,7 @@ ECS 코어 — Entity/Component/World/Query + Hierarchy + Scene 직렬화 + Syst
 - `ComponentRegistry` — 임의 컴포넌트 등록 기반 직렬화 (src/component_registry.rs)
 - `Scheduler`, `DependencyScheduler` — 시스템 실행 (src/scheduler.rs, src/dependency_scheduler.rs)
 - `Archetype` — signature 기반 그룹 저장소 (src/archetype.rs)
+- `EcsError`, `Result` — thiserror 기반 에러 (Generic/Io) (src/error.rs)
 
 ## 모듈 구조
 - `entity` — Entity (src/entity.rs)

@@ -77,6 +77,9 @@ wgpu 기반 렌더링 — 메시/PBR/그림자/IBL/디퍼드/RT/post-process + �
 ### Pipeline
 - `pipeline` — 기본 pipeline 헬퍼 (src/pipeline.rs)
 
+### Error
+- `RendererError`, `Result` — thiserror 기반 에러 (Generic/Io) (src/error.rs)
+
 ## 모듈 구조
 
 대분류 (자세한 항목은 lib.rs의 `pub mod`/`pub use` 참조):

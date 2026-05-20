@@ -72,8 +72,14 @@ L3:
 
 ## 공통 패턴 인덱스
 
-### 에러 처리 (M4 표준화 예정)
-현재 crate마다 다름. M4 이후: `voltex_<crate>::<Crate>Error` (thiserror 기반).
+### 에러 처리 (M4 표준화 완료)
+모든 crate가 `voltex_<crate>::<Crate>Error` + `Result<T>` alias 사용 (thiserror 기반).
+- 각 crate `src/error.rs` 에 `<Crate>Error` enum + `Generic(String)` variant + `#[from] std::io::Error`
+- `From<String> for <Crate>Error`, `From<&str> for <Crate>Error` 자동 변환 impl 제공
+- crate 간 에러 전파: `?` 연산자 + `Generic` variant로 String 메시지 흡수 (`.into()` 또는 `.to_string().into()`)
+- 에러 타입이 존재하는 crate: asset, net, ecs, audio, ai, script, renderer, editor
+- 에러 타입이 없는 crate (Result<T,String> 미사용): math, platform, physics
+- voltex_editor: `EditorError`가 기존 `CommandError`를 흡수 (Generic/EntityNotAlive/Io/Parse variants, PartialEq 유지)
 
 ### 컴포넌트 등록 (M5 표준화 예정)
 현재: `ComponentRegistry::register::<T>()`. 자세한 사용은 `crates/voltex_ecs/CODEMAP.md`.

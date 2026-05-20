@@ -9,6 +9,7 @@
 - `Assets` — type-erased 다중 저장소 (src/assets.rs)
 - `AssetLoader` — 워커 스레드 비동기 로딩 (src/loader.rs)
 - `FileWatcher` — mtime 폴링 변경 감지 (src/watcher.rs)
+- `AssetError`, `Result` — thiserror 기반 에러 (Generic/Io) (src/error.rs)
 
 ## 모듈 구조
 - `handle` — Handle<T> 정의 (src/handle.rs)
