@@ -39,6 +39,7 @@ Immediate-mode UI 에디터 — 도킹/플로팅/뷰포트/인스펙터/에셋 �
   - `undo() / redo() -> bool` — 마지막 액션 복원 / 재적용
   - `undo_depth() / redo_depth() -> usize` — UI/test 용
   - **v1 undoable**: Spawn / SetTransform / SetTag / AddChild / RemoveChild.  **v1 non-undoable**: Despawn / SaveScene / LoadScene (실행 시 history 클리어)
+  - **LoadScene semantics**: World::clear() 후 deserialize → "디스크가 source of truth". 시드 엔티티는 Save 안 했으면 Load 후 사라짐.
 
 ## 모듈 구조
 - 코어: ui_context, renderer, draw_list, font, layout, ttf_* (parser, font, rasterizer, glyph_cache)

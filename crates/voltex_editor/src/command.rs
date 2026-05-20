@@ -106,7 +106,11 @@ pub fn apply_command(
             Ok(Entity { id: 0, generation: 0 })
         }
         EditorCommand::LoadScene { path } => {
+            // Editor semantics: Load == "disk is the source of truth", so wipe
+            // the in-memory world before deserializing. Library callers that
+            // want append-style behavior call deserialize_scene_json directly.
             let text = std::fs::read_to_string(path).map_err(|e| EditorError::Io(e.to_string()))?;
+            world.clear();
             voltex_ecs::deserialize_scene_json(world, &text, registry)
                 .map_err(|e| EditorError::Parse(e.to_string()))?;
             Ok(Entity { id: 0, generation: 0 })
@@ -287,6 +291,46 @@ mod tests {
         world.despawn(p);
         let result = apply_command(&mut world, &registry, &EditorCommand::AddChild { parent: p, child: c });
         assert!(matches!(result, Err(EditorError::EntityNotAlive(_))));
+    }
+
+    #[test]
+    fn load_scene_clears_world_before_deserializing() {
+        // Setup: world A has 1 entity, write it to disk.
+        let mut world_a = World::new();
+        let mut registry = ComponentRegistry::new();
+        registry.register_defaults();
+
+        let tmp = std::env::temp_dir().join(format!(
+            "voltex_editor_load_clears_{}.vscn", std::process::id()
+        ));
+        let _ = std::fs::remove_file(&tmp);
+        let tmp_str = tmp.to_string_lossy().into_owned();
+
+        let saved = apply_command(&mut world_a, &registry, &EditorCommand::Spawn).unwrap();
+        apply_command(&mut world_a, &registry, &EditorCommand::SetTag {
+            entity: saved, tag: "FromDisk".into(),
+        }).unwrap();
+        apply_command(&mut world_a, &registry, &EditorCommand::SaveScene { path: tmp_str.clone() }).unwrap();
+
+        // World B is pre-seeded with 2 entities BEFORE Load.
+        let mut world_b = World::new();
+        let seed1 = world_b.spawn();
+        world_b.add(seed1, Transform::new());
+        let seed2 = world_b.spawn();
+        world_b.add(seed2, Transform::new());
+        assert_eq!(world_b.entity_count(), 2);
+
+        // Load — should wipe the 2 seeds and end up with only 1 (from disk).
+        apply_command(&mut world_b, &registry, &EditorCommand::LoadScene { path: tmp_str.clone() }).unwrap();
+        assert_eq!(world_b.entity_count(), 1);
+        // The remaining entity is the loaded one (tag "FromDisk").
+        let tagged: Vec<_> = world_b
+            .query::<voltex_ecs::scene::Tag>()
+            .filter(|(_, t)| t.0 == "FromDisk")
+            .collect();
+        assert_eq!(tagged.len(), 1);
+
+        std::fs::remove_file(&tmp).ok();
     }
 
     #[test]

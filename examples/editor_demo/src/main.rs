@@ -292,7 +292,10 @@ impl ApplicationHandler for EditorDemoApp {
 
         // ECS Session setup — World lives inside the EditorSession so Toolbar
         // actions can be logged and auto-saved. Direct seeding (below) bypasses
-        // the command log, which is fine for one-time scene init.
+        // the command log: that's fine for one-time demo scene init, but
+        // because EditorCommand::LoadScene now clears the world before
+        // deserializing, the seed entities disappear if the user clicks Load
+        // without first clicking Save.
         std::fs::create_dir_all("scenes").ok();
         let mut session = EditorSession::new("scenes/editor_demo.vscn");
 

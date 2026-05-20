@@ -38,6 +38,14 @@ impl World {
         self.allocator.alive_count()
     }
 
+    /// Drop every entity, every component storage, and the entity allocator.
+    /// Any externally-held `Entity` handles become invalid (their `is_alive`
+    /// returns false). Use before loading a scene from disk to enforce
+    /// "disk is the source of truth" semantics.
+    pub fn clear(&mut self) {
+        *self = Self::new();
+    }
+
     pub fn add<T: 'static>(&mut self, entity: Entity, component: T) {
         let type_id = TypeId::of::<T>();
         let storage = self.storages
@@ -312,6 +320,36 @@ mod tests {
 
     #[derive(Debug, PartialEq)]
     struct Name(String);
+
+    #[test]
+    fn clear_drops_all_entities_and_components() {
+        let mut world = World::new();
+        let e1 = world.spawn();
+        world.add(e1, Position { x: 1.0, y: 2.0 });
+        let e2 = world.spawn();
+        world.add(e2, Position { x: 3.0, y: 4.0 });
+        assert_eq!(world.entity_count(), 2);
+
+        world.clear();
+
+        assert_eq!(world.entity_count(), 0);
+        // Old handles must read as not alive.
+        assert!(!world.is_alive(e1));
+        assert!(!world.is_alive(e2));
+        // Component lookups return None.
+        assert!(world.get::<Position>(e1).is_none());
+    }
+
+    #[test]
+    fn clear_then_spawn_reuses_id_zero_with_fresh_generation() {
+        let mut world = World::new();
+        let _e = world.spawn();
+        world.clear();
+        let e_new = world.spawn();
+        // Allocator was reset → new spawn starts back at id 0, gen 0.
+        assert_eq!(e_new.id, 0);
+        assert_eq!(e_new.generation, 0);
+    }
 
     #[test]
     fn test_spawn_and_add() {

@@ -4,7 +4,7 @@
 ECS 코어 — Entity/Component/World/Query + Hierarchy + Scene 직렬화 + System Scheduler.
 
 ## 공개 API 진입점
-- `World` — type-erased 저장소 + query (src/world.rs)
+- `World` — type-erased 저장소 + query, `clear()` 로 전체 리셋 (src/world.rs)
 - `Entity` — id + generation (src/entity.rs)
 - `SparseSet<T>` — 컴포넌트 저장소 (src/sparse_set.rs)
 - `Transform` — 위치/회전/스케일 컴포넌트 (src/transform.rs)
@@ -44,4 +44,4 @@ ECS 코어 — Entity/Component/World/Query + Hierarchy + Scene 직렬화 + Syst
 ## 테스트
 - 단위 테스트: src/**/*.rs `#[cfg(test)]`
 - 실행: `cargo test -p voltex_ecs --lib`
-- 현재 테스트 개수: 107개 (M5에서 +3: 제네릭 register / 커스텀 컴포넌트 roundtrip / register_raw 검증)
+- 현재 테스트 개수: 109개 (M5 +3; 8-6 +2: World::clear roundtrip)
