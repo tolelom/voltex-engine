@@ -50,7 +50,7 @@ impl AssetBrowser {
         if let Ok(read_dir) = std::fs::read_dir(&self.current) {
             for entry in read_dir.flatten() {
                 let meta = entry.metadata().ok();
-                let is_dir = meta.as_ref().map_or(false, |m| m.is_dir());
+                let is_dir = meta.as_ref().is_some_and(|m| m.is_dir());
                 let size = meta.as_ref().map_or(0, |m| m.len());
                 let name = entry.file_name().to_string_lossy().to_string();
                 self.entries.push(DirEntry { name, is_dir, size });
@@ -101,12 +101,11 @@ pub fn asset_browser_panel(
     ui.text(&path_text);
 
     // Go up button
-    if browser.current != browser.root {
-        if ui.button("[..]") {
+    if browser.current != browser.root
+        && ui.button("[..]") {
             browser.go_up();
             return;
         }
-    }
 
     let gw = ui.font.glyph_width as f32;
     let gh = ui.font.glyph_height as f32;
@@ -123,11 +122,10 @@ pub fn asset_browser_panel(
         let x = rect.x + PADDING;
 
         // Highlight selected file
-        if !is_dir {
-            if browser.selected_file.as_deref() == Some(name.as_str()) {
+        if !is_dir
+            && browser.selected_file.as_deref() == Some(name.as_str()) {
                 ui.draw_list.add_rect(rect.x, y, rect.w, line_h, COLOR_SELECTED);
             }
-        }
 
         // Click
         if ui.mouse_clicked && ui.mouse_in_rect(rect.x, y, rect.w, line_h) {

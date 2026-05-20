@@ -13,6 +13,12 @@ pub struct MixGroupConfig {
     pub parent: Option<String>,
 }
 
+impl Default for MixGroupManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl MixGroupManager {
     pub fn new() -> Self {
         let mut mgr = MixGroupManager { groups: HashMap::new() };

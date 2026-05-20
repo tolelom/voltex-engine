@@ -9,6 +9,12 @@ pub struct CameraUniform {
     pub _padding: f32,
 }
 
+impl Default for CameraUniform {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl CameraUniform {
     pub fn new() -> Self {
         Self {
@@ -27,6 +33,12 @@ pub struct LightUniform {
     pub _padding1: f32,
     pub color: [f32; 3],
     pub ambient_strength: f32,
+}
+
+impl Default for LightUniform {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl LightUniform {
@@ -122,6 +134,12 @@ pub struct LightsUniform {
     pub _pad_count: [f32; 3],              // 12 bytes (align ambient_color to 16-byte for WGSL vec3)
     pub ambient_color: [f32; 3],           // 12 bytes at offset 1040
     pub _pad_end: f32,                     // 4 bytes → total 1056 (matches WGSL)
+}
+
+impl Default for LightsUniform {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl LightsUniform {

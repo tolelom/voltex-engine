@@ -79,11 +79,10 @@ impl UiContext {
 
         // Return true if mouse was released over this button while it was active
         let clicked = hovered && self.mouse_released && self.active == Some(id);
-        if self.mouse_released {
-            if self.active == Some(id) {
+        if self.mouse_released
+            && self.active == Some(id) {
                 self.active = None;
             }
-        }
         clicked
     }
 

@@ -14,6 +14,12 @@ pub struct ReliableChannel {
     outgoing_acks: Vec<u16>,
 }
 
+impl Default for ReliableChannel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ReliableChannel {
     pub fn new() -> Self {
         ReliableChannel {
@@ -104,6 +110,12 @@ pub struct OrderedChannel {
     reliable: ReliableChannel,
     next_deliver: u16,
     buffer: HashMap<u16, Vec<u8>>,
+}
+
+impl Default for OrderedChannel {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl OrderedChannel {

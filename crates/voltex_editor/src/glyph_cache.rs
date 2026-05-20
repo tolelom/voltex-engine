@@ -43,6 +43,7 @@ impl GlyphCache {
 
     /// Insert a rasterized glyph bitmap into the atlas.
     /// Returns reference to the cached GlyphInfo.
+    #[allow(clippy::too_many_arguments)]
     pub fn insert(
         &mut self,
         ch: char,

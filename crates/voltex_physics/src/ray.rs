@@ -163,21 +163,19 @@ pub fn ray_vs_capsule(ray: &Ray, center: Vec3, radius: f32, half_height: f32) ->
     // Test top hemisphere
     if let Some((t, normal)) = ray_vs_sphere(ray, top_center, radius) {
         let hit = ray.at(t);
-        if hit.y >= center.y + half_height {
-            if best.is_none() || t < best.unwrap().0 {
+        if hit.y >= center.y + half_height
+            && (best.is_none() || t < best.unwrap().0) {
                 best = Some((t, normal));
             }
-        }
     }
 
     // Test bottom hemisphere
     if let Some((t, normal)) = ray_vs_sphere(ray, bot_center, radius) {
         let hit = ray.at(t);
-        if hit.y <= center.y - half_height {
-            if best.is_none() || t < best.unwrap().0 {
+        if hit.y <= center.y - half_height
+            && (best.is_none() || t < best.unwrap().0) {
                 best = Some((t, normal));
             }
-        }
     }
 
     best
@@ -199,7 +197,7 @@ pub fn ray_vs_triangle(ray: &Ray, v0: Vec3, v1: Vec3, v2: Vec3) -> Option<(f32, 
     let s = ray.origin - v0;
     let u = f * s.dot(h);
 
-    if u < 0.0 || u > 1.0 {
+    if !(0.0..=1.0).contains(&u) {
         return None;
     }
 

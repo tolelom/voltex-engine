@@ -30,7 +30,7 @@ pub fn parse_bmp(data: &[u8]) -> crate::Result<BmpImage> {
     let bottom_up = height_raw > 0;
 
     let bytes_per_pixel = (bpp as usize) / 8;
-    let row_size = ((bpp as usize * width as usize + 31) / 32) * 4;
+    let row_size = (bpp as usize * width as usize).div_ceil(32) * 4;
     let required_data_size = pixel_offset + row_size * height as usize;
 
     if data.len() < required_data_size {
@@ -407,6 +407,7 @@ pub fn pbr_full_texture_bind_group_layout(device: &wgpu::Device) -> wgpu::BindGr
 }
 
 /// Create a bind group for full PBR textures (albedo + normal + ORM + emissive).
+#[allow(clippy::too_many_arguments)]
 pub fn create_pbr_full_texture_bind_group(
     device: &wgpu::Device,
     layout: &wgpu::BindGroupLayout,

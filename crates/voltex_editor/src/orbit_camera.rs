@@ -18,6 +18,12 @@ pub struct OrbitCamera {
     pub far: f32,
 }
 
+impl Default for OrbitCamera {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl OrbitCamera {
     pub fn new() -> Self {
         OrbitCamera {

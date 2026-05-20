@@ -8,6 +8,13 @@ use crate::assets::Assets;
 use crate::error::Result;
 use crate::handle::Handle;
 
+/// Type-erased parser: deserializes raw bytes into a boxed asset value.
+type ParseFn = Box<dyn FnOnce(&[u8]) -> Result<Box<dyn Any + Send>> + Send>;
+
+/// Type-erased inserter: places a parsed asset into `Assets` and returns the
+/// assigned handle as a raw (id, generation) pair.
+type InserterFn = Box<dyn FnOnce(&mut Assets, Box<dyn Any + Send>) -> (u32, u32)>;
+
 #[derive(Debug)]
 pub enum LoadState {
     Loading,
@@ -18,7 +25,7 @@ pub enum LoadState {
 struct LoadRequest {
     id: u64,
     path: PathBuf,
-    parse: Box<dyn FnOnce(&[u8]) -> Result<Box<dyn Any + Send>> + Send>,
+    parse: ParseFn,
 }
 
 struct LoadResult {
@@ -33,7 +40,7 @@ struct PendingEntry {
     type_id: TypeId,
     /// Type-erased inserter: takes (assets, boxed_any) and inserts the asset,
     /// returning the actual handle (id, gen) that was assigned.
-    inserter: Option<Box<dyn FnOnce(&mut Assets, Box<dyn Any + Send>) -> (u32, u32)>>,
+    inserter: Option<InserterFn>,
 }
 
 enum PendingState {
@@ -108,12 +115,11 @@ impl AssetLoader {
 
         // Create a type-erased inserter closure that knows how to downcast
         // Box<dyn Any + Send> back to T and insert it into Assets.
-        let inserter: Box<dyn FnOnce(&mut Assets, Box<dyn Any + Send>) -> (u32, u32)> =
-            Box::new(|assets: &mut Assets, boxed: Box<dyn Any + Send>| {
-                let asset = *boxed.downcast::<T>().expect("type mismatch in loader");
-                let real_handle = assets.insert(asset);
-                (real_handle.id, real_handle.generation)
-            });
+        let inserter: InserterFn = Box::new(|assets: &mut Assets, boxed: Box<dyn Any + Send>| {
+            let asset = *boxed.downcast::<T>().expect("type mismatch in loader");
+            let real_handle = assets.insert(asset);
+            (real_handle.id, real_handle.generation)
+        });
 
         self.pending.insert(
             id,
@@ -129,9 +135,7 @@ impl AssetLoader {
             .insert((type_id, handle_id, handle_gen), id);
 
         // Wrap parse_fn to erase the type
-        let boxed_parse: Box<
-            dyn FnOnce(&[u8]) -> Result<Box<dyn Any + Send>> + Send,
-        > = Box::new(move |data: &[u8]| {
+        let boxed_parse: ParseFn = Box::new(move |data: &[u8]| {
             parse_fn(data).map(|v| Box::new(v) as Box<dyn Any + Send>)
         });
 

@@ -294,6 +294,7 @@ impl UiRenderer {
     ///
     /// Uses `LoadOp::Load` so the UI overlays whatever was previously rendered.
     /// For a standalone UI demo, clear the surface before calling this.
+    #[allow(clippy::too_many_arguments)]
     pub fn render(
         &mut self,
         device: &wgpu::Device,

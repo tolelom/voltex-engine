@@ -20,11 +20,7 @@ impl<T> Handle<T> {
 
 impl<T> Clone for Handle<T> {
     fn clone(&self) -> Self {
-        Self {
-            id: self.id,
-            generation: self.generation,
-            _marker: PhantomData,
-        }
+        *self
     }
 }
 

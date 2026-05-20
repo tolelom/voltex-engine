@@ -50,13 +50,13 @@ pub(super) fn idct(coeffs: &[i32; 64]) -> [i32; 64] {
 fn idct_1d(data: &mut [f64], off: usize) {
     use std::f64::consts::PI;
     let mut tmp = [0.0f64; 8];
-    for x in 0..8 {
+    for (x, slot) in tmp.iter_mut().enumerate() {
         let mut sum = 0.0;
         for u in 0..8 {
             let cu = if u == 0 { 1.0 / 2.0f64.sqrt() } else { 1.0 };
             sum += cu * data[off + u] * ((2.0 * x as f64 + 1.0) * u as f64 * PI / 16.0).cos();
         }
-        tmp[x] = sum / 2.0;
+        *slot = sum / 2.0;
     }
     data[off..off + 8].copy_from_slice(&tmp);
 }

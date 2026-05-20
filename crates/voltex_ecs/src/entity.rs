@@ -61,7 +61,7 @@ impl EntityAllocator {
     pub fn is_alive(&self, entity: Entity) -> bool {
         self.entries
             .get(entity.id as usize)
-            .map_or(false, |e| e.alive && e.generation == entity.generation)
+            .is_some_and(|e| e.alive && e.generation == entity.generation)
     }
 
     pub fn alive_count(&self) -> usize {

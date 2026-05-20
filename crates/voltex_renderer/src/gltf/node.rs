@@ -18,7 +18,7 @@ pub(super) fn parse_nodes(json: &JsonValue) -> Vec<GltfNode> {
 
         let translation = node_val.get("translation").and_then(|v| v.as_array())
             .map(|arr| [
-                arr.get(0).and_then(|v| v.as_f64()).unwrap_or(0.0) as f32,
+                arr.first().and_then(|v| v.as_f64()).unwrap_or(0.0) as f32,
                 arr.get(1).and_then(|v| v.as_f64()).unwrap_or(0.0) as f32,
                 arr.get(2).and_then(|v| v.as_f64()).unwrap_or(0.0) as f32,
             ])
@@ -26,7 +26,7 @@ pub(super) fn parse_nodes(json: &JsonValue) -> Vec<GltfNode> {
 
         let rotation = node_val.get("rotation").and_then(|v| v.as_array())
             .map(|arr| [
-                arr.get(0).and_then(|v| v.as_f64()).unwrap_or(0.0) as f32,
+                arr.first().and_then(|v| v.as_f64()).unwrap_or(0.0) as f32,
                 arr.get(1).and_then(|v| v.as_f64()).unwrap_or(0.0) as f32,
                 arr.get(2).and_then(|v| v.as_f64()).unwrap_or(0.0) as f32,
                 arr.get(3).and_then(|v| v.as_f64()).unwrap_or(1.0) as f32,
@@ -35,7 +35,7 @@ pub(super) fn parse_nodes(json: &JsonValue) -> Vec<GltfNode> {
 
         let scale = node_val.get("scale").and_then(|v| v.as_array())
             .map(|arr| [
-                arr.get(0).and_then(|v| v.as_f64()).unwrap_or(1.0) as f32,
+                arr.first().and_then(|v| v.as_f64()).unwrap_or(1.0) as f32,
                 arr.get(1).and_then(|v| v.as_f64()).unwrap_or(1.0) as f32,
                 arr.get(2).and_then(|v| v.as_f64()).unwrap_or(1.0) as f32,
             ])

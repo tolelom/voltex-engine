@@ -254,7 +254,7 @@ impl FontAtlas {
     /// Returns coordinates for space if character is out of ASCII range.
     pub fn glyph_uv(&self, ch: char) -> (f32, f32, f32, f32) {
         let code = ch as u32;
-        let index = if code >= 32 && code <= 126 {
+        let index = if (32..=126).contains(&code) {
             code - 32
         } else {
             0 // space

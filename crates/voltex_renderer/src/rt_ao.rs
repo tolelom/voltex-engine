@@ -13,6 +13,12 @@ pub struct RtAoParams {
     pub intensity: f32,
 }
 
+impl Default for RtAoParams {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl RtAoParams {
     pub fn new() -> Self {
         RtAoParams {
@@ -89,6 +95,7 @@ impl RtAo {
         RtAo { pipeline, bind_group_layout, params_buffer, enabled: true }
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn dispatch(
         &self,
         device: &wgpu::Device,
@@ -116,7 +123,7 @@ impl RtAo {
         let mut cpass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor { label: Some("RT AO Pass"), timestamp_writes: None });
         cpass.set_pipeline(&self.pipeline);
         cpass.set_bind_group(0, &bind_group, &[]);
-        cpass.dispatch_workgroups((width + 15) / 16, (height + 15) / 16, 1);
+        cpass.dispatch_workgroups(width.div_ceil(16), height.div_ceil(16), 1);
     }
 }
 

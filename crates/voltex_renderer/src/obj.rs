@@ -58,7 +58,7 @@ pub fn parse_obj(source: &str) -> ObjData {
             "f" => {
                 let face: Vec<(u32, u32, u32)> = rest
                     .split_whitespace()
-                    .map(|token| parse_face_vertex(token))
+                    .map(parse_face_vertex)
                     .collect();
                 if face.len() >= 3 {
                     faces.push(face);
@@ -202,7 +202,7 @@ pub fn compute_tangents(vertices: &mut [MeshVertex], indices: &[u32]) {
 /// Returns (v_idx, vt_idx, vn_idx) where 0 means absent.
 fn parse_face_vertex(token: &str) -> (u32, u32, u32) {
     let parts: Vec<&str> = token.split('/').collect();
-    let v = parts.get(0).and_then(|s| s.parse::<u32>().ok()).unwrap_or(0);
+    let v = parts.first().and_then(|s| s.parse::<u32>().ok()).unwrap_or(0);
     let vt = parts.get(1).and_then(|s| s.parse::<u32>().ok()).unwrap_or(0);
     let vn = parts.get(2).and_then(|s| s.parse::<u32>().ok()).unwrap_or(0);
     (v, vt, vn)

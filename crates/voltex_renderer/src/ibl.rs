@@ -169,8 +169,8 @@ impl IblResources {
             pass.set_pipeline(&pipeline);
             pass.set_bind_group(0, &bind_group, &[]);
             // Dispatch enough workgroups to cover size x size texels (16x16 per workgroup)
-            let wg_x = (size + 15) / 16;
-            let wg_y = (size + 15) / 16;
+            let wg_x = size.div_ceil(16);
+            let wg_y = size.div_ceil(16);
             pass.dispatch_workgroups(wg_x, wg_y, 1);
         }
 

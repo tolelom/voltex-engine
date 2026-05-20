@@ -236,10 +236,7 @@ impl TtfParser {
 
     /// Parse the outline of a simple glyph.
     pub fn glyph_outline(&self, glyph_id: u16) -> Option<GlyphOutline> {
-        let (glyph_off, _glyph_len) = match self.glyph_offset(glyph_id) {
-            Some(v) => v,
-            None => return None, // empty glyph
-        };
+        let (glyph_off, _glyph_len) = self.glyph_offset(glyph_id)?;
 
         let num_contours = read_i16(&self.data, glyph_off);
         if num_contours < 0 {
@@ -295,8 +292,7 @@ impl TtfParser {
         // Parse x-coordinates (delta-encoded)
         let mut x_coords = Vec::with_capacity(num_points);
         let mut x: i32 = 0;
-        for i in 0..num_points {
-            let flag = flags[i];
+        for &flag in flags.iter().take(num_points) {
             if flag & X_SHORT != 0 {
                 let dx = read_u8(&self.data, off) as i32;
                 off += 1;
@@ -314,8 +310,7 @@ impl TtfParser {
         // Parse y-coordinates (delta-encoded)
         let mut y_coords = Vec::with_capacity(num_points);
         let mut y: i32 = 0;
-        for i in 0..num_points {
-            let flag = flags[i];
+        for &flag in flags.iter().take(num_points) {
             if flag & Y_SHORT != 0 {
                 let dy = read_u8(&self.data, off) as i32;
                 off += 1;
@@ -398,7 +393,7 @@ impl TtfParser {
         };
         let hmtx_off = hmtx_off as usize;
 
-        if (glyph_id as u16) < self.num_h_metrics {
+        if glyph_id < self.num_h_metrics {
             let rec = hmtx_off + glyph_id as usize * 4;
             GlyphMetrics {
                 advance_width: read_u16(&self.data, rec),

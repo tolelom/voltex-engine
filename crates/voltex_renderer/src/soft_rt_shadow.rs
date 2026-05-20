@@ -10,6 +10,12 @@ pub struct SoftShadowParams {
     pub _pad: [f32; 2],
 }
 
+impl Default for SoftShadowParams {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl SoftShadowParams {
     pub fn new() -> Self {
         SoftShadowParams { light_dir: [0.0, -1.0, 0.0], num_rays: 16, light_radius: 0.02, max_distance: 50.0, _pad: [0.0; 2] }

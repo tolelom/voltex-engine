@@ -246,7 +246,7 @@ impl World {
     }
 
     pub fn has_component<T: 'static>(&self, entity: Entity) -> bool {
-        self.storage::<T>().map_or(false, |s| s.contains(entity))
+        self.storage::<T>().is_some_and(|s| s.contains(entity))
     }
 
     /// Query entities that have component T AND also have component W.

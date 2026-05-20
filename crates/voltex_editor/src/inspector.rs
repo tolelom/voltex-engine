@@ -48,7 +48,7 @@ fn draw_entity_node(
     }
 
     // Build label
-    let has_children = world.get::<Children>(entity).map_or(false, |c| !c.0.is_empty());
+    let has_children = world.get::<Children>(entity).is_some_and(|c| !c.0.is_empty());
     let prefix = if has_children { "> " } else { "  " };
     let name = if let Some(tag) = world.get::<Tag>(entity) {
         format!("{}{}", prefix, tag.0)

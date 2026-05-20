@@ -62,6 +62,12 @@ pub struct ArchetypeRegistry {
     entity_archetype: HashMap<u32, usize>, // entity_id -> archetype index
 }
 
+impl Default for ArchetypeRegistry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ArchetypeRegistry {
     pub fn new() -> Self {
         ArchetypeRegistry { archetypes: Vec::new(), entity_archetype: HashMap::new() }

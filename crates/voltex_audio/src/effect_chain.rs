@@ -10,6 +10,12 @@ pub struct EffectChain {
     pub bypass: bool,
 }
 
+impl Default for EffectChain {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl EffectChain {
     pub fn new() -> Self { EffectChain { effects: Vec::new(), bypass: false } }
     pub fn add(&mut self, effect: Box<dyn AudioEffect>) { self.effects.push(effect); }

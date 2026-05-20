@@ -13,6 +13,12 @@ pub struct AsyncAudioLoader {
     pending: Arc<Mutex<Vec<(u32, PathBuf, LoadState)>>>,
 }
 
+impl Default for AsyncAudioLoader {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl AsyncAudioLoader {
     pub fn new() -> Self {
         AsyncAudioLoader { pending: Arc::new(Mutex::new(Vec::new())) }

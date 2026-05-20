@@ -46,6 +46,7 @@ impl PlayingSound {
 /// - `frames`: number of output frames to fill.
 /// - `listener`: the listener for 3D spatialization.
 /// - `mixer`: the global mixer state providing per-group and master volumes.
+#[allow(clippy::too_many_arguments)]
 pub fn mix_sounds(
     output: &mut Vec<f32>,
     playing: &mut Vec<PlayingSound>,

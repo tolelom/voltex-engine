@@ -9,6 +9,12 @@ pub struct DofParams {
     pub _pad: f32,
 }
 
+impl Default for DofParams {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl DofParams {
     pub fn new() -> Self {
         DofParams { focus_distance: 5.0, focus_range: 3.0, max_blur: 5.0, _pad: 0.0 }
@@ -75,6 +81,7 @@ impl DepthOfField {
         DepthOfField { pipeline, bind_group_layout, params_buffer, enabled: true }
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn dispatch(
         &self, device: &wgpu::Device, queue: &wgpu::Queue, encoder: &mut wgpu::CommandEncoder,
         color_view: &wgpu::TextureView, depth_view: &wgpu::TextureView,
@@ -93,7 +100,7 @@ impl DepthOfField {
         let mut cpass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor { label: Some("DOF Pass"), timestamp_writes: None });
         cpass.set_pipeline(&self.pipeline);
         cpass.set_bind_group(0, &bind_group, &[]);
-        cpass.dispatch_workgroups((width + 15) / 16, (height + 15) / 16, 1);
+        cpass.dispatch_workgroups(width.div_ceil(16), height.div_ceil(16), 1);
     }
 }
 

@@ -1,4 +1,4 @@
-/// Self-contained Deflate (RFC 1951) decompressor with zlib wrapper handling.
+//! Self-contained Deflate (RFC 1951) decompressor with zlib wrapper handling.
 
 struct BitReader<'a> {
     data: &'a [u8],
@@ -192,10 +192,10 @@ const CODE_LENGTH_ORDER: [usize; 19] = [
 
 fn build_fixed_lit_tree() -> HuffmanTree {
     let mut lengths = vec![0u8; 288];
-    for i in 0..=143 { lengths[i] = 8; }
-    for i in 144..=255 { lengths[i] = 9; }
-    for i in 256..=279 { lengths[i] = 7; }
-    for i in 280..=287 { lengths[i] = 8; }
+    for slot in lengths.iter_mut().take(144) { *slot = 8; }            // 0..=143
+    for slot in lengths.iter_mut().take(256).skip(144) { *slot = 9; }   // 144..=255
+    for slot in lengths.iter_mut().take(280).skip(256) { *slot = 7; }   // 256..=279
+    for slot in lengths.iter_mut().take(288).skip(280) { *slot = 8; }   // 280..=287
     HuffmanTree::from_lengths(&lengths).unwrap()
 }
 
@@ -285,16 +285,12 @@ fn decode_dynamic_trees(reader: &mut BitReader) -> crate::Result<(HuffmanTree, H
             17 => {
                 // Repeat 0 for 3-10 times
                 let repeat = reader.read_bits(3)? as usize + 3;
-                for _ in 0..repeat {
-                    lengths.push(0);
-                }
+                lengths.resize(lengths.len() + repeat, 0);
             }
             18 => {
                 // Repeat 0 for 11-138 times
                 let repeat = reader.read_bits(7)? as usize + 11;
-                for _ in 0..repeat {
-                    lengths.push(0);
-                }
+                lengths.resize(lengths.len() + repeat, 0);
             }
             _ => return Err(format!("Invalid code length symbol: {}", sym).into()),
         }

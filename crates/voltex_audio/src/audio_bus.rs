@@ -10,6 +10,12 @@ pub struct BusInput {
     pub gain: f32,
 }
 
+impl Default for AudioBus {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl AudioBus {
     pub fn new() -> Self {
         AudioBus { inputs: Vec::new(), output_gain: 1.0 }

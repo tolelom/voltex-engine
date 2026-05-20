@@ -27,7 +27,7 @@ pub fn ray_vs_mesh(ray: &Ray, mesh: &MeshCollider) -> Option<MeshHit> {
         let v2 = mesh.vertices[tri[2] as usize];
 
         if let Some((t, normal)) = ray_vs_triangle(ray, v0, v1, v2) {
-            let is_closer = closest.as_ref().map_or(true, |c| t < c.distance);
+            let is_closer = closest.as_ref().is_none_or(|c| t < c.distance);
             if is_closer {
                 let point = ray.at(t);
                 closest = Some(MeshHit {

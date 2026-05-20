@@ -32,6 +32,12 @@ pub struct DrawList {
     scissor_stack: Vec<ScissorRect>,
 }
 
+impl Default for DrawList {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl DrawList {
     pub fn new() -> Self {
         DrawList {
@@ -71,6 +77,7 @@ impl DrawList {
     }
 
     /// Add a textured quad with explicit UV coordinates.
+    #[allow(clippy::too_many_arguments)]
     pub fn add_rect_uv(
         &mut self,
         x: f32, y: f32, w: f32, h: f32,

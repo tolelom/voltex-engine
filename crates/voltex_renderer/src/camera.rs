@@ -54,6 +54,12 @@ pub struct FpsController {
     pub mouse_sensitivity: f32,
 }
 
+impl Default for FpsController {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl FpsController {
     pub fn new() -> Self {
         Self { speed: 5.0, mouse_sensitivity: 0.003 }

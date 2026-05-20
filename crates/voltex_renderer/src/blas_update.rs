@@ -3,6 +3,12 @@ pub struct BlasTracker {
     dirty: Vec<(u32, bool)>, // (mesh_id, needs_rebuild)
 }
 
+impl Default for BlasTracker {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl BlasTracker {
     pub fn new() -> Self { BlasTracker { dirty: Vec::new() } }
     pub fn register(&mut self, mesh_id: u32) { self.dirty.push((mesh_id, false)); }

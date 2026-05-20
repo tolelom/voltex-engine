@@ -133,7 +133,7 @@ pub fn deserialize_scene(world: &mut World, source: &str) -> Vec<Entity> {
     for i in 0..local_transforms.len() {
         let entity = world.spawn();
         // Add transform (default if not present)
-        let transform = local_transforms[i].unwrap_or_else(Transform::new);
+        let transform = local_transforms[i].unwrap_or_default();
         world.add(entity, transform);
         // Add tag if present
         if let Some(ref tag_str) = local_tags[i] {
@@ -165,7 +165,7 @@ fn bytes_to_hex(data: &[u8]) -> String {
 }
 
 fn hex_to_bytes(hex: &str) -> crate::Result<Vec<u8>> {
-    if hex.len() % 2 != 0 {
+    if !hex.len().is_multiple_of(2) {
         return Err("Hex string has odd length".into());
     }
     let mut bytes = Vec::with_capacity(hex.len() / 2);

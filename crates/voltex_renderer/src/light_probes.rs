@@ -12,10 +12,10 @@ impl LightProbe {
         let mut result = [self.sh_coefficients[0][0], self.sh_coefficients[0][1], self.sh_coefficients[0][2]];
         // L1
         let (nx, ny, nz) = (normal[0], normal[1], normal[2]);
-        for c in 0..3 {
-            result[c] += self.sh_coefficients[1][c] * ny;
-            result[c] += self.sh_coefficients[2][c] * nz;
-            result[c] += self.sh_coefficients[3][c] * nx;
+        for (c, slot) in result.iter_mut().enumerate() {
+            *slot += self.sh_coefficients[1][c] * ny;
+            *slot += self.sh_coefficients[2][c] * nz;
+            *slot += self.sh_coefficients[3][c] * nx;
         }
         result
     }
@@ -23,6 +23,12 @@ impl LightProbe {
 
 pub struct LightProbeGrid {
     probes: Vec<LightProbe>,
+}
+
+impl Default for LightProbeGrid {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl LightProbeGrid {
@@ -36,6 +42,7 @@ impl LightProbeGrid {
         })
     }
     pub fn len(&self) -> usize { self.probes.len() }
+    pub fn is_empty(&self) -> bool { self.probes.is_empty() }
 }
 
 fn dist_sq(a: [f32; 3], b: [f32; 3]) -> f32 {

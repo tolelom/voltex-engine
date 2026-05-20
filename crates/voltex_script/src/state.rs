@@ -17,6 +17,12 @@ pub struct LuaState {
 
 unsafe impl Send for LuaState {}
 
+impl Default for LuaState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl LuaState {
     pub fn new() -> Self {
         unsafe {
@@ -224,10 +230,10 @@ impl LuaState {
 
             // Try array-style {v[1], v[2], v[3]}
             let mut vals = [0.0f32; 3];
-            for i in 0..3 {
+            for (i, slot) in vals.iter_mut().enumerate() {
                 ffi::lua_rawgeti(self.state, abs_idx, (i + 1) as ffi::lua_Integer);
                 let mut isnum = 0;
-                vals[i] = ffi::lua_tonumberx(self.state, -1, &mut isnum) as f32;
+                *slot = ffi::lua_tonumberx(self.state, -1, &mut isnum) as f32;
                 ffi::lua_pop(self.state, 1);
                 if isnum == 0 {
                     return Err("vec3 array element is not a number".into());

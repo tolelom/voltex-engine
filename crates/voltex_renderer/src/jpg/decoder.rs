@@ -29,11 +29,11 @@ pub(super) fn decode_scan(
 
     let mut scan_components = components.to_vec();
     let mut off = pos + 3;
-    for i in 0..ns {
+    for comp in scan_components.iter_mut().take(ns) {
         let _cs = data[off]; // component selector
         let td_ta = data[off + 1];
-        scan_components[i].dc_table = td_ta >> 4;
-        scan_components[i].ac_table = td_ta & 0x0F;
+        comp.dc_table = td_ta >> 4;
+        comp.ac_table = td_ta & 0x0F;
         off += 2;
     }
     let scan_data_start = pos + seg_len;
@@ -55,8 +55,8 @@ pub(super) fn decode_scan(
         .unwrap_or(1);
     let mcu_width = max_h as u16 * 8;
     let mcu_height = max_v as u16 * 8;
-    let mcus_x = (width + mcu_width - 1) / mcu_width;
-    let mcus_y = (height + mcu_height - 1) / mcu_height;
+    let mcus_x = width.div_ceil(mcu_width);
+    let mcus_y = height.div_ceil(mcu_height);
 
     let mut dc_pred = vec![0i32; num_components as usize];
     let mut rgb = vec![0u8; (width as usize) * (height as usize) * 3];
@@ -66,7 +66,7 @@ pub(super) fn decode_scan(
     for mcu_row in 0..mcus_y {
         for mcu_col in 0..mcus_x {
             // Handle restart interval
-            if restart_interval > 0 && mcu_count > 0 && mcu_count % restart_interval == 0 {
+            if restart_interval > 0 && mcu_count > 0 && mcu_count.is_multiple_of(restart_interval) {
                 // Reset DC predictors
                 for dc in dc_pred.iter_mut() {
                     *dc = 0;
@@ -151,7 +151,7 @@ fn decode_block(
     while k < 64 {
         let rs = reader.decode_huffman(ac_table)?;
         let run = (rs >> 4) as usize;
-        let size = (rs & 0x0F) as u8;
+        let size = rs & 0x0F;
 
         if size == 0 {
             if run == 0 {

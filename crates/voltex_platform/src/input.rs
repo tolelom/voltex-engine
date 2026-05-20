@@ -14,6 +14,12 @@ pub struct InputState {
     mouse_scroll_delta: f32,
 }
 
+impl Default for InputState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl InputState {
     pub fn new() -> Self {
         Self {

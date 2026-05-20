@@ -38,6 +38,12 @@ pub struct BonePalette {
     pub matrices: [[[f32; 4]; 4]; MAX_BONES],
 }
 
+impl Default for BonePalette {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl BonePalette {
     pub fn new() -> Self {
         let identity = [[1.0,0.0,0.0,0.0],[0.0,1.0,0.0,0.0],[0.0,0.0,1.0,0.0],[0.0,0.0,0.0,1.0]];

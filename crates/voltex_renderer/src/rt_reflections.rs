@@ -16,6 +16,12 @@ pub struct RtReflParams {
     pub _pad: [u32; 3],
 }
 
+impl Default for RtReflParams {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl RtReflParams {
     pub fn new() -> Self {
         RtReflParams {
@@ -105,6 +111,7 @@ impl RtReflections {
         RtReflections { pipeline, bind_group_layout, params_buffer, enabled: true }
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn dispatch(
         &self,
         device: &wgpu::Device,
@@ -136,7 +143,7 @@ impl RtReflections {
         let mut cpass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor { label: Some("RT Reflections Pass"), timestamp_writes: None });
         cpass.set_pipeline(&self.pipeline);
         cpass.set_bind_group(0, &bind_group, &[]);
-        cpass.dispatch_workgroups((width + 15) / 16, (height + 15) / 16, 1);
+        cpass.dispatch_workgroups(width.div_ceil(16), height.div_ceil(16), 1);
     }
 }
 

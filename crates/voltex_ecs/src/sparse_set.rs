@@ -91,9 +91,7 @@ impl<T> SparseSet<T> {
         self.sparse
             .get(id)
             .and_then(|opt| opt.as_ref())
-            .map_or(false, |&dense_idx| {
-                self.dense_entities[dense_idx] == entity
-            })
+            .is_some_and(|&dense_idx| self.dense_entities[dense_idx] == entity)
     }
 
     pub fn len(&self) -> usize {

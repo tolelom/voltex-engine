@@ -144,8 +144,8 @@ impl AutoExposure {
             });
             cpass.set_pipeline(&self.compute_pipeline);
             cpass.set_bind_group(0, &bind_group, &[]);
-            let wg_x = (hdr_width + 15) / 16;
-            let wg_y = (hdr_height + 15) / 16;
+            let wg_x = hdr_width.div_ceil(16);
+            let wg_y = hdr_height.div_ceil(16);
             cpass.dispatch_workgroups(wg_x, wg_y, 1);
         }
 

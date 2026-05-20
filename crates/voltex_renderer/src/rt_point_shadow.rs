@@ -18,6 +18,12 @@ pub struct RtPointShadowParams {
     pub _pad: [u32; 2],
 }
 
+impl Default for RtPointShadowParams {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl RtPointShadowParams {
     pub fn new() -> Self {
         RtPointShadowParams {
@@ -89,6 +95,7 @@ impl RtPointShadow {
         RtPointShadow { pipeline, bind_group_layout, params_buffer, enabled: true }
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn dispatch(
         &self,
         device: &wgpu::Device,
@@ -114,7 +121,7 @@ impl RtPointShadow {
         let mut cpass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor { label: Some("RT Point Shadow Pass"), timestamp_writes: None });
         cpass.set_pipeline(&self.pipeline);
         cpass.set_bind_group(0, &bind_group, &[]);
-        cpass.dispatch_workgroups((width + 15) / 16, (height + 15) / 16, 1);
+        cpass.dispatch_workgroups(width.div_ceil(16), height.div_ceil(16), 1);
     }
 }
 

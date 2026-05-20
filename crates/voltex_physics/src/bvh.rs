@@ -88,7 +88,7 @@ impl BvhTree {
         let aabb_a = self.node_aabb(a);
         let aabb_b = self.node_aabb(b);
 
-        if !aabb_a.intersects(&aabb_b) {
+        if !aabb_a.intersects(aabb_b) {
             return;
         }
 
@@ -188,8 +188,6 @@ impl BvhTree {
                 *aabb
             }
             BvhNode::Internal { left, right, aabb: _ } => {
-                let left = left;
-                let right = right;
                 let left_aabb = self.refit_recursive(left, updated);
                 let right_aabb = self.refit_recursive(right, updated);
                 let new_aabb = left_aabb.merged(&right_aabb);

@@ -94,7 +94,7 @@ pub(super) fn extract_meshes(json: &JsonValue, buffers: &[Vec<u8>]) -> crate::Re
             let material = prim.get("material")
                 .and_then(|v| v.as_u32())
                 .and_then(|idx| materials_json?.get(idx as usize))
-                .and_then(|mat| extract_material(mat));
+                .and_then(extract_material);
 
             meshes.push(GltfMesh { vertices, indices, name: name.clone(), material, joints, weights });
         }
@@ -259,10 +259,10 @@ pub(super) fn read_accessor_mat4(
         let o = offset + i * 64;
         if o + 64 > buffer.len() { return Err("Buffer overflow reading mat4".into()); }
         let mut mat = [[0.0f32; 4]; 4];
-        for col in 0..4 {
-            for row in 0..4 {
+        for (col, col_data) in mat.iter_mut().enumerate() {
+            for (row, slot) in col_data.iter_mut().enumerate() {
                 let b = o + (col * 4 + row) * 4;
-                mat[col][row] = f32::from_le_bytes([buffer[b], buffer[b+1], buffer[b+2], buffer[b+3]]);
+                *slot = f32::from_le_bytes([buffer[b], buffer[b+1], buffer[b+2], buffer[b+3]]);
             }
         }
         result.push(mat);

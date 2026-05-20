@@ -10,6 +10,12 @@ pub struct MaterialUniform {
     pub _padding: f32,
 }
 
+impl Default for MaterialUniform {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl MaterialUniform {
     pub fn new() -> Self {
         Self {

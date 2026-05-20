@@ -1,7 +1,7 @@
-/// Baseline JPEG decoder. Supports SOF0 (sequential DCT, Huffman).
-/// Returns RGBA pixel data like parse_png.
-/// Supports grayscale (1-component) and YCbCr (3-component) with
-/// chroma subsampling (4:4:4, 4:2:2, 4:2:0).
+//! Baseline JPEG decoder. Supports SOF0 (sequential DCT, Huffman).
+//! Returns RGBA pixel data like parse_png.
+//! Supports grayscale (1-component) and YCbCr (3-component) with
+//! chroma subsampling (4:4:4, 4:2:2, 4:2:0).
 
 mod headers;
 mod bit_reader;

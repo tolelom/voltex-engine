@@ -39,6 +39,12 @@ pub struct DependencyScheduler {
 /// A group of systems that can execute in parallel.
 pub type ParallelGroup = Vec<usize>; // indices into systems
 
+impl Default for DependencyScheduler {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl DependencyScheduler {
     pub fn new() -> Self { DependencyScheduler { systems: Vec::new() } }
 
@@ -55,13 +61,13 @@ impl DependencyScheduler {
 
         loop {
             let mut group = Vec::new();
-            for i in 0..self.systems.len() {
-                if placed[i] { continue; }
+            for (i, slot) in placed.iter_mut().enumerate() {
+                if *slot { continue; }
                 // Check if this system conflicts with any already in this group
                 let conflicts = group.iter().any(|&j: &usize| self.systems[i].conflicts_with(&self.systems[j]));
                 if !conflicts {
                     group.push(i);
-                    placed[i] = true;
+                    *slot = true;
                 }
             }
             if group.is_empty() { break; }

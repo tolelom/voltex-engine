@@ -1,6 +1,6 @@
 /// Calculate half-resolution dimensions (rounded up).
 pub fn half_resolution(width: u32, height: u32) -> (u32, u32) {
-    ((width + 1) / 2, (height + 1) / 2)
+    (width.div_ceil(2), height.div_ceil(2))
 }
 
 /// Bilinear upscale weight calculation for a 2x2 tap pattern.

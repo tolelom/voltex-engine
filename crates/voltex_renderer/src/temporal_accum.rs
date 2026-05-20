@@ -81,6 +81,7 @@ impl TemporalAccumulation {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn dispatch(
         &self,
         device: &wgpu::Device,
@@ -112,7 +113,7 @@ impl TemporalAccumulation {
         });
         cpass.set_pipeline(&self.pipeline);
         cpass.set_bind_group(0, &bind_group, &[]);
-        cpass.dispatch_workgroups((width + 15) / 16, (height + 15) / 16, 1);
+        cpass.dispatch_workgroups(width.div_ceil(16), height.div_ceil(16), 1);
     }
 }
 

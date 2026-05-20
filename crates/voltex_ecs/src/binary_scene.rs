@@ -1,13 +1,13 @@
-/// Binary scene format (.vscn binary).
-///
-/// Format:
-///   Header: "VSCN" (4 bytes) + version u32 LE + entity_count u32 LE
-///   Per entity:
-///     parent_index i32 LE (-1 = no parent)
-///     component_count u32 LE
-///     Per component:
-///       name_len u16 LE + name bytes
-///       data_len u32 LE + data bytes
+//! Binary scene format (.vscn binary).
+//!
+//! Format:
+//!   Header: "VSCN" (4 bytes) + version u32 LE + entity_count u32 LE
+//!   Per entity:
+//!     parent_index i32 LE (-1 = no parent)
+//!     component_count u32 LE
+//!     Per component:
+//!       name_len u16 LE + name bytes
+//!       data_len u32 LE + data bytes
 
 use std::collections::HashMap;
 use crate::entity::Entity;

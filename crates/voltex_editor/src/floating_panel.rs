@@ -35,6 +35,12 @@ pub struct FloatingPanelManager {
     panels: Vec<FloatingPanel>,
 }
 
+impl Default for FloatingPanelManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl FloatingPanelManager {
     pub fn new() -> Self {
         FloatingPanelManager {
@@ -64,6 +70,10 @@ impl FloatingPanelManager {
 
     pub fn len(&self) -> usize {
         self.panels.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.panels.is_empty()
     }
 }
 

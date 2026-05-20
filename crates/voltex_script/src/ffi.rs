@@ -68,17 +68,27 @@ extern "C" {
     pub fn lua_status(L: *mut lua_State) -> c_int;
 }
 
-// Helper: lua_pcall macro equivalent
+/// Helper: lua_pcall macro equivalent.
+///
+/// # Safety
+/// `L` must be a valid `lua_State` pointer. See Lua reference for `lua_pcallk`.
 pub unsafe fn lua_pcall(L: *mut lua_State, nargs: c_int, nresults: c_int, msgh: c_int) -> c_int {
     lua_pcallk(L, nargs, nresults, msgh, 0, std::ptr::null())
 }
 
-// Helper: lua_pop
+/// Helper: lua_pop.
+///
+/// # Safety
+/// `L` must be a valid `lua_State` pointer and the stack must have at least `n` values.
 pub unsafe fn lua_pop(L: *mut lua_State, n: c_int) {
     lua_settop(L, -n - 1);
 }
 
-// Helper: lua_tostring (without length)
+/// Helper: lua_tostring (without length).
+///
+/// # Safety
+/// `L` must be a valid `lua_State` pointer and the returned pointer is valid only
+/// while the corresponding stack value remains untouched.
 pub unsafe fn lua_tostring(L: *mut lua_State, idx: c_int) -> *const c_char {
     lua_tolstring(L, idx, std::ptr::null_mut())
 }

@@ -129,7 +129,7 @@ impl ForwardPass {
 
 /// Sort transparent objects back-to-front by distance from camera.
 pub fn sort_transparent_back_to_front(
-    items: &mut Vec<(usize, [f32; 3])>, // (index, center_position)
+    items: &mut [(usize, [f32; 3])], // (index, center_position)
     camera_pos: [f32; 3],
 ) {
     items.sort_by(|a, b| {

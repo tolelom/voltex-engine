@@ -38,13 +38,13 @@ impl Mat4 {
     /// Matrix × matrix multiplication.
     pub fn mul_mat4(&self, rhs: &Mat4) -> Mat4 {
         let mut result = [[0.0f32; 4]; 4];
-        for col in 0..4 {
-            for row in 0..4 {
+        for (col, col_data) in result.iter_mut().enumerate() {
+            for (row, slot) in col_data.iter_mut().enumerate() {
                 let mut sum = 0.0f32;
                 for k in 0..4 {
                     sum += self.cols[k][row] * rhs.cols[col][k];
                 }
-                result[col][row] = sum;
+                *slot = sum;
             }
         }
         Mat4 { cols: result }

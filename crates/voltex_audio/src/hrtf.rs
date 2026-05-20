@@ -1,5 +1,3 @@
-use std::f32::consts::PI;
-
 /// Head radius in meters (average human).
 const HEAD_RADIUS: f32 = 0.0875;
 /// Speed of sound in m/s.
@@ -79,6 +77,7 @@ pub fn azimuth_from_positions(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::f32::consts::PI;
 
     #[test]
     fn test_hrtf_front() {

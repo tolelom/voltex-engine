@@ -12,6 +12,12 @@ pub struct SsrParams {
     pub _pad: [f32; 2],
 }
 
+impl Default for SsrParams {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl SsrParams {
     pub fn new() -> Self {
         SsrParams {
@@ -96,6 +102,7 @@ impl Ssr {
         Ssr { pipeline, bind_group_layout, params_buffer, enabled: true }
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn dispatch(
         &self,
         device: &wgpu::Device,
@@ -125,7 +132,7 @@ impl Ssr {
         let mut cpass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor { label: Some("SSR Pass"), timestamp_writes: None });
         cpass.set_pipeline(&self.pipeline);
         cpass.set_bind_group(0, &bind_group, &[]);
-        cpass.dispatch_workgroups((width + 15) / 16, (height + 15) / 16, 1);
+        cpass.dispatch_workgroups(width.div_ceil(16), height.div_ceil(16), 1);
     }
 }
 

@@ -61,8 +61,8 @@ pub fn raycast(world: &World, ray: &Ray, max_dist: f32) -> Option<RayHit> {
         };
 
         if let Some((t, normal)) = result {
-            if t <= max_dist {
-                if closest.is_none() || t < closest.as_ref().unwrap().t {
+            if t <= max_dist
+                && (closest.is_none() || t < closest.as_ref().unwrap().t) {
                     closest = Some(RayHit {
                         entity: *entity,
                         t,
@@ -70,7 +70,6 @@ pub fn raycast(world: &World, ray: &Ray, max_dist: f32) -> Option<RayHit> {
                         normal,
                     });
                 }
-            }
         }
     }
 
