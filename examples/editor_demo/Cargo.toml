@@ -6,6 +6,8 @@ edition = "2021"
 [dependencies]
 voltex_platform.workspace = true
 voltex_renderer.workspace = true
+voltex_renderer_ecs.workspace = true
+voltex_asset.workspace = true
 voltex_editor.workspace = true
 voltex_math.workspace = true
 voltex_ecs.workspace = true

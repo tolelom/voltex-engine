@@ -6,7 +6,8 @@ use winit::{
     window::WindowId,
 };
 use voltex_platform::{VoltexWindow, WindowConfig, InputState, GameTimer};
-use voltex_renderer::{GpuContext, Mesh, MeshVertex, CameraUniform, LightUniform, GpuTexture};
+use voltex_renderer::{GpuContext, LightUniform, MaterialUniform, Mesh, MeshVertex};
+use voltex_renderer_ecs::{BasicRenderer, RenderAssets};
 use voltex_editor::{
     UiContext, UiRenderer, DockTree, DockNode, Axis, Rect,
     OrbitCamera, ViewportTexture, ViewportRenderer, VIEWPORT_COLOR_FORMAT,
@@ -16,7 +17,8 @@ use voltex_editor::{
     pick_entity,
 };
 use voltex_ecs::entity::Entity;
-use voltex_math::{Mat4, Vec3};
+use voltex_ecs::{MaterialHandle, MeshHandle};
+use voltex_math::Vec3;
 
 struct EditorDemoApp {
     state: Option<AppState>,
@@ -30,10 +32,6 @@ struct AppState {
     ui: UiContext,
     ui_renderer: UiRenderer,
     dock: DockTree,
-    // Widget state
-    counter: u32,
-    speed: f32,
-    show_grid: bool,
     // ECS — wrapped in EditorSession for command-based mutation + auto-save.
     // `session.selected` is the single source of truth for the selected entity.
     session: EditorSession,
@@ -42,15 +40,13 @@ struct AppState {
     orbit_cam: OrbitCamera,
     viewport_tex: ViewportTexture,
     viewport_renderer: ViewportRenderer,
-    // 3D scene
-    scene_pipeline: wgpu::RenderPipeline,
-    camera_buffer: wgpu::Buffer,
-    light_buffer: wgpu::Buffer,
-    camera_light_layout: wgpu::BindGroupLayout,
+    // ECS-driven renderer (mesh_shader.wgsl). Owns pipeline + per-entity UBO.
+    render_assets: RenderAssets,
+    basic_renderer: BasicRenderer,
+    cube_mesh_h: MeshHandle,
     #[allow(dead_code)]
-    texture_layout: wgpu::BindGroupLayout,
-    dummy_texture_bg: wgpu::BindGroup,
-    scene_meshes: Vec<Mesh>,
+    ground_mesh_h: MeshHandle,
+    default_mat_h: MaterialHandle,
     // Asset browser
     asset_browser: AssetBrowser,
     // Mouse tracking
@@ -66,158 +62,40 @@ struct AppState {
     pending_click: Option<(f32, f32)>,
 }
 
-fn camera_light_bind_group_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
-    device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-        label: Some("Camera+Light BGL"),
-        entries: &[
-            wgpu::BindGroupLayoutEntry {
-                binding: 0,
-                visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
-                ty: wgpu::BindingType::Buffer {
-                    ty: wgpu::BufferBindingType::Uniform,
-                    has_dynamic_offset: false,
-                    min_binding_size: None,
-                },
-                count: None,
-            },
-            wgpu::BindGroupLayoutEntry {
-                binding: 1,
-                visibility: wgpu::ShaderStages::FRAGMENT,
-                ty: wgpu::BindingType::Buffer {
-                    ty: wgpu::BufferBindingType::Uniform,
-                    has_dynamic_offset: false,
-                    min_binding_size: None,
-                },
-                count: None,
-            },
-        ],
-    })
-}
-
-fn texture_bind_group_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
-    device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-        label: Some("Texture BGL"),
-        entries: &[
-            wgpu::BindGroupLayoutEntry {
-                binding: 0,
-                visibility: wgpu::ShaderStages::FRAGMENT,
-                ty: wgpu::BindingType::Texture {
-                    multisampled: false,
-                    view_dimension: wgpu::TextureViewDimension::D2,
-                    sample_type: wgpu::TextureSampleType::Float { filterable: true },
-                },
-                count: None,
-            },
-            wgpu::BindGroupLayoutEntry {
-                binding: 1,
-                visibility: wgpu::ShaderStages::FRAGMENT,
-                ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
-                count: None,
-            },
-        ],
-    })
-}
-
-fn create_scene_pipeline(
-    device: &wgpu::Device,
-    cl_layout: &wgpu::BindGroupLayout,
-    tex_layout: &wgpu::BindGroupLayout,
-) -> wgpu::RenderPipeline {
-    let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-        label: Some("Scene Shader"),
-        source: wgpu::ShaderSource::Wgsl(include_str!("../../../crates/voltex_renderer/src/mesh_shader.wgsl").into()),
-    });
-
-    let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-        label: Some("Scene Pipeline Layout"),
-        bind_group_layouts: &[cl_layout, tex_layout],
-        immediate_size: 0,
-    });
-
-    device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-        label: Some("Scene Pipeline"),
-        layout: Some(&layout),
-        vertex: wgpu::VertexState {
-            module: &shader,
-            entry_point: Some("vs_main"),
-            buffers: &[MeshVertex::LAYOUT],
-            compilation_options: wgpu::PipelineCompilationOptions::default(),
-        },
-        fragment: Some(wgpu::FragmentState {
-            module: &shader,
-            entry_point: Some("fs_main"),
-            targets: &[Some(wgpu::ColorTargetState {
-                format: VIEWPORT_COLOR_FORMAT,
-                blend: Some(wgpu::BlendState::REPLACE),
-                write_mask: wgpu::ColorWrites::ALL,
-            })],
-            compilation_options: wgpu::PipelineCompilationOptions::default(),
-        }),
-        primitive: wgpu::PrimitiveState {
-            topology: wgpu::PrimitiveTopology::TriangleList,
-            strip_index_format: None,
-            front_face: wgpu::FrontFace::Ccw,
-            cull_mode: Some(wgpu::Face::Back),
-            polygon_mode: wgpu::PolygonMode::Fill,
-            unclipped_depth: false,
-            conservative: false,
-        },
-        depth_stencil: Some(wgpu::DepthStencilState {
-            format: wgpu::TextureFormat::Depth32Float,
-            depth_write_enabled: true,
-            depth_compare: wgpu::CompareFunction::Less,
-            stencil: wgpu::StencilState::default(),
-            bias: wgpu::DepthBiasState::default(),
-        }),
-        multisample: wgpu::MultisampleState { count: 1, mask: !0, alpha_to_coverage_enabled: false },
-        multiview_mask: None,
-        cache: None,
-    })
-}
-
-fn make_cube(device: &wgpu::Device, cx: f32, cy: f32, cz: f32, size: f32) -> Mesh {
-    let s = size * 0.5;
+fn make_unit_cube(device: &wgpu::Device) -> Mesh {
+    let s = 0.5;
     let mut verts = Vec::new();
     let mut indices = Vec::new();
-
     let mut add_face = |positions: [[f32; 3]; 4], normal: [f32; 3]| {
         let base = verts.len() as u32;
         for pos in &positions {
             verts.push(MeshVertex {
-                position: [pos[0] + cx, pos[1] + cy, pos[2] + cz],
+                position: *pos,
                 normal,
                 uv: [0.0, 0.0],
                 tangent: [1.0, 0.0, 0.0, 1.0],
             });
         }
-        indices.extend_from_slice(&[base, base+1, base+2, base, base+2, base+3]);
+        indices.extend_from_slice(&[base, base + 1, base + 2, base, base + 2, base + 3]);
     };
-
-    // +Y (top)
-    add_face([[-s,s,-s], [s,s,-s], [s,s,s], [-s,s,s]], [0.0, 1.0, 0.0]);
-    // -Y (bottom)
-    add_face([[-s,-s,s], [s,-s,s], [s,-s,-s], [-s,-s,-s]], [0.0, -1.0, 0.0]);
-    // +Z (front)
-    add_face([[-s,-s,s], [-s,s,s], [s,s,s], [s,-s,s]], [0.0, 0.0, 1.0]);
-    // -Z (back)
-    add_face([[s,-s,-s], [s,s,-s], [-s,s,-s], [-s,-s,-s]], [0.0, 0.0, -1.0]);
-    // +X (right)
-    add_face([[s,-s,s], [s,s,s], [s,s,-s], [s,-s,-s]], [1.0, 0.0, 0.0]);
-    // -X (left)
-    add_face([[-s,-s,-s], [-s,s,-s], [-s,s,s], [-s,-s,s]], [-1.0, 0.0, 0.0]);
-
+    add_face([[-s,  s, -s], [ s,  s, -s], [ s,  s,  s], [-s,  s,  s]], [0.0,  1.0,  0.0]);
+    add_face([[-s, -s,  s], [ s, -s,  s], [ s, -s, -s], [-s, -s, -s]], [0.0, -1.0,  0.0]);
+    add_face([[-s, -s,  s], [-s,  s,  s], [ s,  s,  s], [ s, -s,  s]], [0.0,  0.0,  1.0]);
+    add_face([[ s, -s, -s], [ s,  s, -s], [-s,  s, -s], [-s, -s, -s]], [0.0,  0.0, -1.0]);
+    add_face([[ s, -s,  s], [ s,  s,  s], [ s,  s, -s], [ s, -s, -s]], [1.0,  0.0,  0.0]);
+    add_face([[-s, -s, -s], [-s,  s, -s], [-s,  s,  s], [-s, -s,  s]], [-1.0, 0.0,  0.0]);
     Mesh::new(device, &verts, &indices)
 }
 
-fn make_ground(device: &wgpu::Device) -> Mesh {
+fn make_unit_ground(device: &wgpu::Device) -> Mesh {
     let s = 5.0;
     let verts = vec![
         MeshVertex { position: [-s, 0.0, -s], normal: [0.0, 1.0, 0.0], uv: [0.0, 0.0], tangent: [1.0, 0.0, 0.0, 1.0] },
-        MeshVertex { position: [s, 0.0, -s], normal: [0.0, 1.0, 0.0], uv: [1.0, 0.0], tangent: [1.0, 0.0, 0.0, 1.0] },
-        MeshVertex { position: [s, 0.0, s], normal: [0.0, 1.0, 0.0], uv: [1.0, 1.0], tangent: [1.0, 0.0, 0.0, 1.0] },
-        MeshVertex { position: [-s, 0.0, s], normal: [0.0, 1.0, 0.0], uv: [0.0, 1.0], tangent: [1.0, 0.0, 0.0, 1.0] },
+        MeshVertex { position: [ s, 0.0, -s], normal: [0.0, 1.0, 0.0], uv: [1.0, 0.0], tangent: [1.0, 0.0, 0.0, 1.0] },
+        MeshVertex { position: [ s, 0.0,  s], normal: [0.0, 1.0, 0.0], uv: [1.0, 1.0], tangent: [1.0, 0.0, 0.0, 1.0] },
+        MeshVertex { position: [-s, 0.0,  s], normal: [0.0, 1.0, 0.0], uv: [0.0, 1.0], tangent: [1.0, 0.0, 0.0, 1.0] },
     ];
-    let indices = vec![0, 1, 2, 0, 2, 3];
+    let indices = vec![0u32, 1, 2, 0, 2, 3];
     Mesh::new(device, &verts, &indices)
 }
 
@@ -266,41 +144,23 @@ impl ApplicationHandler for EditorDemoApp {
         let viewport_tex = ViewportTexture::new(&gpu.device, 640, 480);
         let viewport_renderer = ViewportRenderer::new(&gpu.device, gpu.surface_format);
 
-        // 3D scene setup
-        let cl_layout = camera_light_bind_group_layout(&gpu.device);
-        let tex_layout = texture_bind_group_layout(&gpu.device);
-        let scene_pipeline = create_scene_pipeline(&gpu.device, &cl_layout, &tex_layout);
-
-        let camera_uniform = CameraUniform::new();
-        let light_uniform = LightUniform::new();
-
-        use wgpu::util::DeviceExt;
-        let camera_buffer = gpu.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Camera Buffer"),
-            contents: bytemuck::cast_slice(&[camera_uniform]),
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-        });
-        let light_buffer = gpu.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Light Buffer"),
-            contents: bytemuck::cast_slice(&[light_uniform]),
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-        });
-
-        // Dummy white texture for mesh shader group(1)
-        let dummy_texture = GpuTexture::white_1x1(&gpu.device, &gpu.queue, &tex_layout);
-
-        // Scene meshes
-        let ground = make_ground(&gpu.device);
-        let cube1 = make_cube(&gpu.device, 0.0, 0.5, 0.0, 1.0);
-        let cube2 = make_cube(&gpu.device, 2.0, 0.5, 1.0, 1.0);
-        let cube3 = make_cube(&gpu.device, -1.5, 0.5, -1.0, 1.0);
+        // ECS-driven renderer setup. RenderAssets owns the GPU meshes; BasicRenderer
+        // owns the pipeline + dynamic UBO + bind group + default white texture.
+        let mut render_assets = RenderAssets::new();
+        let cube_mesh_h = render_assets.add_mesh(make_unit_cube(&gpu.device));
+        let ground_mesh_h = render_assets.add_mesh(make_unit_ground(&gpu.device));
+        let default_mat_h = render_assets.add_material(MaterialUniform::new());
+        let basic_renderer = BasicRenderer::new(
+            &gpu.device,
+            &gpu.queue,
+            VIEWPORT_COLOR_FORMAT,
+            256,
+        );
 
         // ECS Session setup — World lives inside the EditorSession so Toolbar
         // actions can be logged and auto-saved. Seed entities go through the
         // command dispatcher so they appear in the jsonl log and survive a
-        // Save → Load round-trip (LoadScene wipes the world before reading
-        // disk; if we'd seeded directly via World::spawn the demo scene would
-        // be empty after Load).
+        // Save → Load round-trip.
         std::fs::create_dir_all("scenes").ok();
         let mut session = EditorSession::new("scenes/editor_demo.vscn");
 
@@ -318,13 +178,27 @@ impl ApplicationHandler for EditorDemoApp {
             }).unwrap();
             e
         };
-        let _ground_e = seed(&mut session, Vec3::new(0.0, 0.0, 0.0), "Ground");
+        let ground_e = seed(&mut session, Vec3::new(0.0, 0.0, 0.0), "Ground");
         let cube1_e = seed(&mut session, Vec3::new(0.0, 0.5, 0.0), "Cube1");
         let cube2_e = seed(&mut session, Vec3::new(2.0, 0.5, 1.0), "Cube2");
-        let _cube3_e = seed(&mut session, Vec3::new(-1.5, 0.5, -1.0), "Cube3");
+        let cube3_e = seed(&mut session, Vec3::new(-1.5, 0.5, -1.0), "Cube3");
 
-        // Cube2 is child of Cube1 — through the command path so undo/redo and
-        // the log capture the relationship.
+        // Attach render handles directly. E3 will introduce an AddComponent
+        // EditorCommand; until then seed entities bypass the dispatcher for
+        // these two components. The ComponentRegistry already handles
+        // MeshHandle/MaterialHandle serialization (C0a), so Save/Load round
+        // trips preserve them.
+        session.world.add(ground_e, MeshHandle(ground_mesh_h.0));
+        session.world.add(ground_e, MaterialHandle(default_mat_h.0));
+        session.world.add(cube1_e, MeshHandle(cube_mesh_h.0));
+        session.world.add(cube1_e, MaterialHandle(default_mat_h.0));
+        session.world.add(cube2_e, MeshHandle(cube_mesh_h.0));
+        session.world.add(cube2_e, MaterialHandle(default_mat_h.0));
+        session.world.add(cube3_e, MeshHandle(cube_mesh_h.0));
+        session.world.add(cube3_e, MaterialHandle(default_mat_h.0));
+
+        // Cube2 is child of Cube1 — through the command path so undo/redo
+        // and the log capture the relationship.
         session.dispatch(EditorCommand::AddChild {
             parent: cube1_e,
             child: cube2_e,
@@ -338,20 +212,15 @@ impl ApplicationHandler for EditorDemoApp {
             ui,
             ui_renderer,
             dock,
-            counter: 0,
-            speed: 5.0,
-            show_grid: true,
             orbit_cam,
             viewport_tex,
             viewport_renderer,
-            scene_pipeline,
-            camera_buffer,
-            light_buffer,
-            camera_light_layout: cl_layout,
-            texture_layout: tex_layout,
-            dummy_texture_bg: dummy_texture.bind_group,
+            render_assets,
+            basic_renderer,
+            cube_mesh_h,
+            ground_mesh_h,
+            default_mat_h,
             asset_browser,
-            scene_meshes: vec![ground, cube1, cube2, cube3],
             session,
             inspector_state: InspectorState::default(),
             prev_mouse: (0.0, 0.0),
@@ -442,9 +311,6 @@ impl ApplicationHandler for EditorDemoApp {
                 let my = my as f32;
                 let mouse_down = state.input.is_mouse_button_pressed(winit::event::MouseButton::Left);
 
-                let dt = state.timer.frame_dt();
-                let fps = if dt > 0.0 { 1.0 / dt } else { 0.0 };
-
                 state.ui.begin_frame(mx, my, mouse_down);
 
                 let screen_w = state.gpu.config.width as f32;
@@ -455,6 +321,16 @@ impl ApplicationHandler for EditorDemoApp {
                 state.ui.begin_panel("Toolbar", 0.0, 0.0, screen_w, TOOLBAR_H);
                 if state.ui.button("Spawn") {
                     if let Ok(e) = state.session.dispatch(EditorCommand::Spawn) {
+                        // Default placement + visible cube. E3 의 AddComponent
+                        // 도입 전 임시 처치.
+                        let _ = state.session.dispatch(EditorCommand::SetTransform {
+                            entity: e,
+                            position: Vec3::new(0.0, 0.5, 0.0),
+                            rotation: Vec3::ZERO,
+                            scale: Vec3::new(1.0, 1.0, 1.0),
+                        });
+                        state.session.world.add(e, MeshHandle(state.cube_mesh_h.0));
+                        state.session.world.add(e, MaterialHandle(state.default_mat_h.0));
                         state.session.selected = Some(e);
                     }
                 }
@@ -522,7 +398,6 @@ impl ApplicationHandler for EditorDemoApp {
                 }
 
                 // Viewport click → raycast pick → update session.selected.
-                // Runs only if the release lands inside the viewport rect.
                 if let (Some(click), Some(vr)) = (state.pending_click.take(), viewport_rect) {
                     if vr.contains(click.0, click.1) {
                         let aspect = vr.w / vr.h.max(1.0);
@@ -560,74 +435,37 @@ impl ApplicationHandler for EditorDemoApp {
                     &wgpu::CommandEncoderDescriptor { label: Some("Editor Encoder") },
                 );
 
-                // Render 3D scene to viewport texture
+                // Render 3D scene to viewport texture via the ECS-driven path.
                 if let Some(vr) = &viewport_rect {
-                    state.viewport_tex.ensure_size(&state.gpu.device, vr.w.max(1.0) as u32, vr.h.max(1.0) as u32);
+                    state.viewport_tex.ensure_size(
+                        &state.gpu.device,
+                        vr.w.max(1.0) as u32,
+                        vr.h.max(1.0) as u32,
+                    );
 
-                    // Update camera uniform
                     let aspect = vr.w / vr.h.max(1.0);
                     let vp = state.orbit_cam.view_projection(aspect);
                     let cam_pos = state.orbit_cam.position();
 
-                    let camera_uniform = CameraUniform {
-                        view_proj: vp.cols,
-                        model: Mat4::IDENTITY.cols,
-                        camera_pos: [cam_pos.x, cam_pos.y, cam_pos.z],
-                        _padding: 0.0,
-                    };
-                    state.gpu.queue.write_buffer(&state.camera_buffer, 0, bytemuck::cast_slice(&[camera_uniform]));
-
-                    let light_uniform = LightUniform {
+                    let light = LightUniform {
                         direction: [0.3, -1.0, -0.5],
                         _padding1: 0.0,
                         color: [1.0, 0.95, 0.9],
                         ambient_strength: 0.15,
                     };
-                    state.gpu.queue.write_buffer(&state.light_buffer, 0, bytemuck::cast_slice(&[light_uniform]));
 
-                    // Create bind group for this frame
-                    let camera_light_bg = state.gpu.device.create_bind_group(&wgpu::BindGroupDescriptor {
-                        label: Some("Scene Camera+Light BG"),
-                        layout: &state.camera_light_layout,
-                        entries: &[
-                            wgpu::BindGroupEntry { binding: 0, resource: state.camera_buffer.as_entire_binding() },
-                            wgpu::BindGroupEntry { binding: 1, resource: state.light_buffer.as_entire_binding() },
-                        ],
-                    });
-
-                    // Render scene to offscreen texture
-                    {
-                        let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                            label: Some("Scene Pass"),
-                            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                                view: &state.viewport_tex.color_view,
-                                resolve_target: None,
-                                depth_slice: None,
-                                ops: wgpu::Operations {
-                                    load: wgpu::LoadOp::Clear(wgpu::Color { r: 0.15, g: 0.15, b: 0.2, a: 1.0 }),
-                                    store: wgpu::StoreOp::Store,
-                                },
-                            })],
-                            depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
-                                view: &state.viewport_tex.depth_view,
-                                depth_ops: Some(wgpu::Operations { load: wgpu::LoadOp::Clear(1.0), store: wgpu::StoreOp::Store }),
-                                stencil_ops: None,
-                            }),
-                            occlusion_query_set: None,
-                            timestamp_writes: None,
-                            multiview_mask: None,
-                        });
-
-                        rpass.set_pipeline(&state.scene_pipeline);
-                        rpass.set_bind_group(0, &camera_light_bg, &[]);
-                        rpass.set_bind_group(1, &state.dummy_texture_bg, &[]);
-
-                        for mesh in &state.scene_meshes {
-                            rpass.set_vertex_buffer(0, mesh.vertex_buffer.slice(..));
-                            rpass.set_index_buffer(mesh.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
-                            rpass.draw_indexed(0..mesh.num_indices, 0, 0..1);
-                        }
-                    }
+                    state.basic_renderer.render(
+                        &state.gpu.queue,
+                        &mut encoder,
+                        &state.viewport_tex.color_view,
+                        &state.viewport_tex.depth_view,
+                        wgpu::Color { r: 0.15, g: 0.15, b: 0.2, a: 1.0 },
+                        &mut state.session.world,
+                        &state.render_assets,
+                        vp,
+                        cam_pos,
+                        light,
+                    );
                 }
 
                 // Clear the surface background
