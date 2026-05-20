@@ -147,7 +147,7 @@ pub fn world_aabb_from_local(local: &AABB, world: &Mat4) -> AABB {
 /// Returns `None` if the mouse is outside the viewport rect, the matrix is
 /// singular, or no entity is hit.
 pub fn pick_entity(
-    world: &World,
+    world: &mut World,
     view_proj: &Mat4,
     cam_pos: Vec3,
     rect_x: f32,
@@ -169,14 +169,34 @@ pub fn pick_entity(
     let ndc = ndc_from_viewport(mouse_x, mouse_y, rect_x, rect_y, rect_w, rect_h);
     let ray = ray_from_ndc(&inv, cam_pos, ndc);
 
+    // E1: propagate transforms so WorldTransform reflects current state.
+    // Caller may have just dispatched a SetTransform that hasn't been propagated.
+    voltex_ecs::propagate_transforms(world);
+
     let mut best: Option<(Entity, f32)> = None;
-    for (entity, t) in world.query::<Transform>() {
-        let s = t.scale.x.max(t.scale.y).max(t.scale.z).max(1e-6);
-        let r = default_radius * s;
-        if let Some(hit_t) = ray_vs_sphere_t(&ray, t.position, r) {
+    let entities: Vec<Entity> = world.query::<Transform>().map(|(e, _)| e).collect();
+    for entity in entities {
+        let hit_t: Option<f32> = if let (Some(bounds), Some(wt)) = (
+            world.get::<voltex_ecs::Bounds>(entity),
+            world.get::<voltex_ecs::WorldTransform>(entity),
+        ) {
+            // AABB path: transform local Bounds.0 by WorldTransform → world AABB.
+            let world_aabb = world_aabb_from_local(&bounds.0, &wt.0);
+            ray_vs_aabb(&ray, &world_aabb)
+        } else {
+            // Sphere fallback for entities without Bounds.
+            let t = match world.get::<Transform>(entity) {
+                Some(t) => t,
+                None => continue,
+            };
+            let s = t.scale.x.max(t.scale.y).max(t.scale.z).max(1e-6);
+            let r = default_radius * s;
+            ray_vs_sphere_t(&ray, t.position, r)
+        };
+        if let Some(t) = hit_t {
             best = match best {
-                Some((_, bt)) if bt <= hit_t => best,
-                _ => Some((entity, hit_t)),
+                Some((_, bt)) if bt <= t => best,
+                _ => Some((entity, t)),
             };
         }
     }
@@ -276,10 +296,10 @@ mod tests {
 
     #[test]
     fn pick_returns_none_when_mouse_outside_rect() {
-        let world = World::new();
+        let mut world = World::new();
         let vp = Mat4::IDENTITY;
         let result = pick_entity(
-            &world, &vp, Vec3::ZERO,
+            &mut world, &vp, Vec3::ZERO,
             10.0, 10.0, 100.0, 100.0,
             5.0, 5.0,   // mouse to upper-left of the rect
             1.0,
@@ -289,12 +309,12 @@ mod tests {
 
     #[test]
     fn pick_returns_none_on_empty_world() {
-        let world = World::new();
+        let mut world = World::new();
         let cam = OrbitCamera::new();
         let vp = cam.view_projection(1.0);
         // Click dead-centre, but world has no entities.
         let result = pick_entity(
-            &world, &vp, cam.position(),
+            &mut world, &vp, cam.position(),
             0.0, 0.0, 800.0, 600.0,
             400.0, 300.0,
             1.0,
@@ -314,7 +334,7 @@ mod tests {
         let cam = OrbitCamera::new();
         let vp = cam.view_projection(1.0);
         let result = pick_entity(
-            &world, &vp, cam.position(),
+            &mut world, &vp, cam.position(),
             0.0, 0.0, 800.0, 800.0,
             400.0, 400.0,   // centre
             1.0,
@@ -341,7 +361,7 @@ mod tests {
 
         let vp = cam.view_projection(1.0);
         let result = pick_entity(
-            &world, &vp, cam.position(),
+            &mut world, &vp, cam.position(),
             0.0, 0.0, 800.0, 800.0,
             400.0, 400.0,
             1.0,
@@ -360,7 +380,7 @@ mod tests {
         let cam = OrbitCamera::new();
         let vp = cam.view_projection(1.0);
         let result = pick_entity(
-            &world, &vp, cam.position(),
+            &mut world, &vp, cam.position(),
             0.0, 0.0, 800.0, 800.0,
             400.0, 400.0,
             0.5,   // small radius
@@ -410,5 +430,67 @@ mod tests {
         assert!(world.max.x > 1.3 && world.max.x < 1.5,
             "expected ~sqrt(2), got {}", world.max.x);
         assert!(world.max.z > 1.3 && world.max.z < 1.5);
+    }
+
+    #[test]
+    fn pick_uses_aabb_when_bounds_present() {
+        use voltex_ecs::Bounds;
+        let mut world = World::new();
+        let e = world.spawn();
+        world.add(e, Transform::new());
+        world.add(e, Bounds(AABB::new(Vec3::new(-1.0, -1.0, -1.0), Vec3::new(1.0, 1.0, 1.0))));
+
+        let cam = OrbitCamera::new();
+        let vp = cam.view_projection(1.0);
+        let result = pick_entity(
+            &mut world, &vp, cam.position(),
+            0.0, 0.0, 800.0, 800.0,
+            400.0, 400.0,    // dead-centre
+            0.1,             // sphere fallback radius too small to hit — must rely on AABB
+        );
+        assert_eq!(result, Some(e));
+    }
+
+    #[test]
+    fn pick_falls_back_to_sphere_when_no_bounds() {
+        let mut world = World::new();
+        let e = world.spawn();
+        world.add(e, Transform::new());
+        // No Bounds — sphere with default_radius must hit centred entity.
+        let cam = OrbitCamera::new();
+        let vp = cam.view_projection(1.0);
+        let result = pick_entity(
+            &mut world, &vp, cam.position(),
+            0.0, 0.0, 800.0, 800.0,
+            400.0, 400.0,
+            1.0,
+        );
+        assert_eq!(result, Some(e));
+    }
+
+    #[test]
+    fn pick_returns_nearest_of_two_overlapping_aabbs() {
+        use voltex_ecs::Bounds;
+        // Both Bounds intersect the centre ray; the one nearer the camera wins.
+        let mut world = World::new();
+        let cam = OrbitCamera::new();
+        let near_e = world.spawn();
+        world.add(near_e, Transform::from_position(Vec3::ZERO));
+        world.add(near_e, Bounds(AABB::new(Vec3::new(-1.0, -1.0, -1.0), Vec3::new(1.0, 1.0, 1.0))));
+
+        let cam_to_target = (cam.target - cam.position()).normalize();
+        let far_pos = cam.target + cam_to_target * 5.0;
+        let far_e = world.spawn();
+        world.add(far_e, Transform::from_position(far_pos));
+        world.add(far_e, Bounds(AABB::new(Vec3::new(-1.0, -1.0, -1.0), Vec3::new(1.0, 1.0, 1.0))));
+
+        let vp = cam.view_projection(1.0);
+        let result = pick_entity(
+            &mut world, &vp, cam.position(),
+            0.0, 0.0, 800.0, 800.0,
+            400.0, 400.0,
+            1.0,
+        );
+        assert_eq!(result, Some(near_e));
     }
 }

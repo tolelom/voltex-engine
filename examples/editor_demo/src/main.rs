@@ -404,7 +404,7 @@ impl ApplicationHandler for EditorDemoApp {
                         let vp = state.orbit_cam.view_projection(aspect);
                         let cam_pos = state.orbit_cam.position();
                         let hit = pick_entity(
-                            &state.session.world,
+                            &mut state.session.world,
                             &vp,
                             cam_pos,
                             vr.x, vr.y, vr.w, vr.h,
