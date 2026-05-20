@@ -166,6 +166,14 @@
 - examples/editor_demo: 시드 엔티티 (ground + 3 cube + Cube1↔Cube2 hierarchy)를 `EditorSession::dispatch` 경로로 옮김 → jsonl 로그 + Save/Load round-trip 일관성
 - v1 한계 (문서화): picking은 sphere 근사 (메시 AABB는 미구현). gizmo translate/rotate/scale 핸들은 미구현
 
+### Cycle 4 (E2): Play/Stop + Lifecycle Hooks (2026-05-20)
+- voltex_editor::session: **`EditorMode { Edit, Play }`** + `play_snapshot: Option<Vec<u8>>` + `lifecycles` 콜백 리스트. `set_mode(target)` 가 Edit↔Play 전환 (snapshot + lifecycle fire + undo/redo clear). `dispatch` 가 Play 중 모든 명령을 `EditorError::ModeMismatch` 로 거부.
+- voltex_editor::lifecycle: **신규 모듈** — `LifecycleEvent { PlayStart, PlayStop }`, `LifecycleCallback = Box<dyn FnMut(LifecycleEvent, &mut World)>`. 후속 cycle (S1 스크립팅 등) 이 사용할 단일 통로.
+- voltex_editor::error: `ModeMismatch { current: EditorMode }` variant 추가.
+- 미등록 컴포넌트 정책: snapshot 은 ComponentRegistry 에 등록된 타입만 보존. RigidBody/Collider 처럼 미등록인 컴포넌트는 Play→Stop 시 자동 소멸 (정확히 v1 데모가 원하는 동작). 게임 측 영구 컴포넌트는 `register::<T>()` 필요. CODEMAP 에 명시.
+- examples/editor_demo: Toolbar 에 Play/Stop 토글. Play 모드 시 Spawn/Save/Load/Undo/Redo/Move/Rotate/Scale 버튼은 숨김. Play 진입 시 lifecycle 콜백이 cube 들에 `RigidBody::dynamic(1.0)` + `Collider::Sphere`, ground 에 `RigidBody::statik()` + `Collider::Box` 부착. 매 프레임 `physics_step(world, &PhysicsConfig::default())` 호출 (Play 모드만). Stop 시 snapshot 복원으로 모든 큐브 원위치. gizmo drag/overlay 도 Play 중 비활성.
+- 시각 검증: GUI 자동화 환경 부재 → 수동 검증. 단위 테스트 +11 (snapshot 7, lifecycle/dispatch 4).
+
 ### Cycle 3 (E1): Gizmo + AABB Picking (2026-05-20)
 - voltex_editor::picking: **`ray_vs_aabb` + `world_aabb_from_local`** 헬퍼 추가 (voltex_physics 의 동등 구현을 cross-crate 의존성 회피 위해 복제). `pick_entity` 가 `Bounds` 있는 엔티티는 world-space AABB (8-corner 변환, loose), 없으면 sphere fallback. 시그니처 `&World` → `&mut World` (내부에서 `propagate_transforms` 호출).
 - voltex_editor::gizmo: **신규 모듈** (mod + translate + rotate + scale + renderer + shader.wgsl). `GizmoMode` (Translate/Rotate/Scale), `GizmoAxis`, `GizmoState` (drag 상태머신, set_mode 가 드래깅 중에는 no-op). per-mode 모듈:
@@ -205,7 +213,7 @@ crates/
 └── voltex_editor      — IMGUI, docking, 3D viewport, inspector, asset browser, TTF font, UiRenderer
 ```
 
-## 테스트: 838개 전부 통과 (Cycle 3 +19 vs Cycle 2 직후 819)
+## 테스트: 850개 전부 통과 (Cycle 4 +12 vs Cycle 3 직후 838)
 
 - voltex: 2 (M6: prelude/module 경로 컴파일 검증)
 - voltex_math: 39 (8-7 +2: inverse roundtrip × VP+translation)
@@ -219,7 +227,7 @@ crates/
 - voltex_ai: 34
 - voltex_net: 47
 - voltex_script: 30 (8-7 +5: add_child/remove_child/stale-parent/find_all_by_tag×2)
-- voltex_editor: 146 (E1 +19: picking::* aabb/world_aabb/bounds-aware ×8, gizmo::* mode/translate/rotate/scale/state ×11)
+- voltex_editor: 158 (E2 +12: session::* mode/snapshot/dispatch ×7, lifecycle/callbacks ×4, undo/redo non-Health-snapshot inner test ×1)
 
 ## Examples (12개 + survivor_game)
 

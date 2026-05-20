@@ -34,22 +34,32 @@ Immediate-mode UI 에디터 — 도킹/플로팅/뷰포트/인스펙터/에셋 �
 
 ### Editor Command / Error
 - `EditorCommand` — Spawn / Despawn / SetTransform / SetTag / **AddChild** / **RemoveChild** / SaveScene / LoadScene (src/command.rs)
-- `EditorError`, `Result` — Generic / EntityNotAlive(Entity) / Io(String) / Parse(String) (src/error.rs, PartialEq 유지)
-- `EditorSession` — World + ComponentRegistry + 자동저장 + jsonl 로그 + **Undo/Redo 스택** (src/session.rs)
-  - `dispatch(cmd)` — apply + log + auto-save + history push
+- `EditorError`, `Result` — Generic / EntityNotAlive(Entity) / Io(String) / Parse(String) / **ModeMismatch { current: EditorMode }** (src/error.rs, PartialEq 유지)
+- `EditorSession` — World + ComponentRegistry + 자동저장 + jsonl 로그 + **Undo/Redo 스택** + **Play/Stop mode + lifecycle 콜백** (src/session.rs)
+  - `dispatch(cmd)` — apply + log + auto-save + history push. **Play 모드에서는 ModeMismatch 로 거부**.
   - `undo() / redo() -> bool` — 마지막 액션 복원 / 재적용
   - `undo_depth() / redo_depth() -> usize` — UI/test 용
   - **v1 undoable**: Spawn / SetTransform / SetTag / AddChild / RemoveChild.  **v1 non-undoable**: Despawn / SaveScene / LoadScene (실행 시 history 클리어)
   - **LoadScene semantics**: World::clear() 후 deserialize → "디스크가 source of truth". 시드 엔티티는 Save 안 했으면 Load 후 사라짐.
 
+### Play / Stop modes (E2)
+- `EditorMode { Edit, Play }` — 에디터의 user-facing state. (src/session.rs)
+- `EditorSession::set_mode(target)` — Edit↔Play 전환.
+  - Edit→Play: `serialize_scene_binary` 로 snapshot 저장 → mode 전환 → `LifecycleEvent::PlayStart` 콜백 호출 → undo/redo 클리어.
+  - Play→Edit: `LifecycleEvent::PlayStop` 콜백 호출 → `World::clear()` → snapshot 으로 deserialize → mode 전환 → undo/redo 클리어.
+  - 같은 모드 호출은 no-op.
+- `EditorSession::add_lifecycle(closure)` — `(LifecycleEvent, &mut World)` 받는 콜백 등록. 등록 순서대로 호출.
+- `lifecycle::LifecycleEvent { PlayStart, PlayStop }` + `lifecycle::LifecycleCallback` (src/lifecycle.rs)
+- **미등록 컴포넌트는 Play→Stop 시 자동 소멸**. snapshot 은 `ComponentRegistry` 에 등록된 타입만 보존 (built-in: Transform, Tag, MeshHandle, MaterialHandle, Bounds). RigidBody / Collider / Velocity 처럼 미등록인 컴포넌트는 Play 중에 추가했어도 Stop 시 사라진다. editor_demo 의 physics 데모가 이 동작을 이용해 RigidBody 를 PlayStart 콜백에서 부착 → Stop 자동 정리. 게임 측 영구 컴포넌트는 `registry.register::<MyComponent>()` 로 등록 필수.
+
 ## 모듈 구조
 - 코어: ui_context, renderer, draw_list, font, layout, ttf_* (parser, font, rasterizer, glyph_cache)
 - 위젯: widgets/ (controls, containers, text_input, drag)
 - 레이아웃: dock, floating_panel
-- 뷰포트: orbit_camera, viewport_texture, viewport_renderer
+- 뷰포트: orbit_camera, viewport_texture, viewport_renderer, picking, gizmo/
 - 패널: panels/{hierarchy, inspector}, asset_browser
-- 커맨드: command, session
-- 셰이더: ui_shader.wgsl
+- 커맨드/세션: command, session, lifecycle
+- 셰이더: ui_shader.wgsl, gizmo/shader.wgsl
 
 ## 의존성
 - voltex crate: voltex_math, voltex_ecs, voltex_renderer
