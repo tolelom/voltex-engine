@@ -197,6 +197,36 @@ mod tests {
     }
 
     #[test]
+    fn poll_reload_picks_up_file_changes() {
+        use std::time::Duration;
+        let mut world = World::new();
+        let world_ptr = &mut world as *mut World;
+        // Unique filename so other test runs don't trigger spurious watcher changes.
+        let path = write_tmp_lua("watched_unique_abc.lua", "value = 10");
+
+        let mut pool = ScriptInstancePool::new();
+        let id = pool.get_or_create(path.to_str().unwrap(), world_ptr).unwrap();
+        pool.get_mut(id).unwrap().started = true;
+
+        let mut watcher = voltex_asset::FileWatcher::new(Duration::from_millis(0));
+        ScriptInstancePool::watch(path.to_str().unwrap(), &mut watcher);
+        // First poll registers the initial mtime — must not report a change.
+        let _ = pool.poll_reload(&mut watcher);
+        assert!(pool.get(id).unwrap().started);
+
+        // Touch the file with new contents so the watcher detects a change.
+        std::thread::sleep(Duration::from_millis(50));
+        std::fs::write(&path, "value = 99").unwrap();
+
+        let reloaded = pool.poll_reload(&mut watcher);
+        assert_eq!(reloaded.len(), 1);
+        let inst = pool.get(id).unwrap();
+        // Reload re-executes the file on the same LuaState and clears `started`.
+        assert!(!inst.started);
+        assert_eq!(inst.lua.get_global_number("value"), Some(99.0));
+    }
+
+    #[test]
     fn clear_empties_pool() {
         let mut world = World::new();
         let world_ptr = &mut world as *mut World;

@@ -15,6 +15,8 @@ ECS 코어 — Entity/Component/World/Query + Hierarchy + Scene 직렬화 + Syst
 - `Component` — 직렬화 가능 컴포넌트 trait (`NAME` + `serialize`/`deserialize`) (src/component_registry.rs)
 - `MeshHandle`, `MaterialHandle`, `Bounds` — 렌더링 데이터 컴포넌트 (src/render_components.rs)
 - `MeshAsset`, `MaterialAsset` — Handle<T> 의 phantom marker (src/render_components.rs)
+- `ScriptComponent` — per-entity Lua 스크립트 첨부. `script_path` + `instance_id` (UNBOUND sentinel) (src/script_component.rs)
+- `World::live_entities()` — 살아있는 모든 entity iterator (src/world.rs, voltex_script::iter_entities 가 사용)
 - `ComponentRegistry::register::<T>()` — Component trait 기반 표준 등록 (src/component_registry.rs)
 - `ComponentRegistry::register_raw` — trait 구현 불가 타입용 escape hatch (src/component_registry.rs)
 - `Scheduler`, `DependencyScheduler` — 시스템 실행 (src/scheduler.rs, src/dependency_scheduler.rs)
@@ -33,6 +35,7 @@ ECS 코어 — Entity/Component/World/Query + Hierarchy + Scene 직렬화 + Syst
 - `scheduler`, `dependency_scheduler` — 시스템 스케줄링 (src/scheduler.rs, src/dependency_scheduler.rs)
 - `archetype` — Archetype 저장 (src/archetype.rs)
 - `render_components` — Mesh/Material handle + Bounds + phantom marker (src/render_components.rs)
+- `script_component` — ScriptComponent (script_path + instance_id) + Component impl (src/script_component.rs)
 
 ## 의존성
 - voltex crate: voltex_math (Vec3, Mat4, AABB), voltex_asset (Handle<T>)
@@ -47,4 +50,4 @@ ECS 코어 — Entity/Component/World/Query + Hierarchy + Scene 직렬화 + Syst
 ## 테스트
 - 단위 테스트: src/**/*.rs `#[cfg(test)]`
 - 실행: `cargo test -p voltex_ecs --lib`
-- 현재 테스트 개수: 116개 (M5 +3; 8-6 +2; C0a +7: render_components 6 + register_defaults 1)
+- 현재 테스트 개수: 121개 (S1 +5: ScriptComponent ×4 + register_defaults_includes_script ×1)

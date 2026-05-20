@@ -166,6 +166,16 @@
 - examples/editor_demo: 시드 엔티티 (ground + 3 cube + Cube1↔Cube2 hierarchy)를 `EditorSession::dispatch` 경로로 옮김 → jsonl 로그 + Save/Load round-trip 일관성
 - v1 한계 (문서화): picking은 sphere 근사 (메시 AABB는 미구현). gizmo translate/rotate/scale 핸들은 미구현
 
+### Cycle 5 (S1): per-entity Lua ScriptComponent + iterator (2026-05-21)
+- voltex_ecs::script_component: **`ScriptComponent { script_path: String, instance_id: u32 }`** + `Component` trait impl (NAME="script", `[u32 instance_id LE][UTF-8 path]`). `UNBOUND = u32::MAX` 센티넬. `register_defaults()` 가 자동 등록 (built-in 6번째 컴포넌트).
+- voltex_ecs::World/EntityAllocator: **`live_entities() -> impl Iterator<Item=Entity>`** — 살아있는 entity 만 id 순으로. voltex_script 의 `iter_entities()` 가 사용.
+- voltex_script::instance/pool: **`ScriptInstance { lua, path, started }`** + **`ScriptInstancePool`** — 한 .lua 당 하나의 LuaState 공유 (여러 entity 같은 path → 같은 인터프리터). `get_or_create(path, world_ptr)` / `reload(path)` / `clear()` / `poll_reload(&mut FileWatcher)` (자동 hot reload).
+- voltex_script::system: **`script_start_all(world, pool)`** + **`script_update_all(world, pool, dt)`** — Lua 측 `on_start(id, gen)` / `on_update(id, gen, dt)` 디스패치. `lua_pcall` 실패는 silent. 함수가 없으면 silent skip.
+- voltex_script::engine_api: **+2 fns (15 → 17)** — `iter_entities()` (모든 live entity 의 `{id=, gen=}` 배열), `iter_by_tag(tag)` (`find_all_by_tag` 의 alias).
+- voltex_script::Cargo.toml: **voltex_asset 의존성 추가** (FileWatcher 사용).
+- assets/scripts/spinner.lua: **신규 데모** — `on_update` 가 `rotation.y += dt`. 5 cube 통합 테스트가 검증.
+- 시각 검증: 라이브러리만 추가, GUI 데모는 Cycle 6 의 runtime_demo 에서 통합. 단위 테스트 +14 (voltex_ecs +5, voltex_script +9 → 추가 +3 pool watcher/clear/unknown + iter_entities/iter_by_tag = 총 14).
+
 ### Cycle 4 (E2): Play/Stop + Lifecycle Hooks (2026-05-20)
 - voltex_editor::session: **`EditorMode { Edit, Play }`** + `play_snapshot: Option<Vec<u8>>` + `lifecycles` 콜백 리스트. `set_mode(target)` 가 Edit↔Play 전환 (snapshot + lifecycle fire + undo/redo clear). `dispatch` 가 Play 중 모든 명령을 `EditorError::ModeMismatch` 로 거부.
 - voltex_editor::lifecycle: **신규 모듈** — `LifecycleEvent { PlayStart, PlayStop }`, `LifecycleCallback = Box<dyn FnMut(LifecycleEvent, &mut World)>`. 후속 cycle (S1 스크립팅 등) 이 사용할 단일 통로.
@@ -213,12 +223,12 @@ crates/
 └── voltex_editor      — IMGUI, docking, 3D viewport, inspector, asset browser, TTF font, UiRenderer
 ```
 
-## 테스트: 850개 전부 통과 (Cycle 4 +12 vs Cycle 3 직후 838)
+## 테스트: 867개 전부 통과 (Cycle 5 +17 vs Cycle 4 직후 850)
 
 - voltex: 2 (M6: prelude/module 경로 컴파일 검증)
 - voltex_math: 39 (8-7 +2: inverse roundtrip × VP+translation)
 - voltex_platform: 3
-- voltex_ecs: 116 (C0a +7: MeshHandle/MaterialHandle/Bounds Component roundtrip + register_defaults)
+- voltex_ecs: 121 (S1 +5: ScriptComponent roundtrip/unbound/too-short/utf8 ×4 + register_defaults_includes_script ×1)
 - voltex_asset: 24 (C0a +2: Handle::from_raw_parts / id+generation 접근자)
 - voltex_renderer: 200
 - voltex_renderer_ecs: 7 (C0b 신규: RenderAssets material roundtrip ×2, missing handle ×2, items empty/skip-no-mesh/stale/hierarchy)
@@ -226,7 +236,7 @@ crates/
 - voltex_audio: 84
 - voltex_ai: 34
 - voltex_net: 47
-- voltex_script: 30 (8-7 +5: add_child/remove_child/stale-parent/find_all_by_tag×2)
+- voltex_script: 42 (S1 +12: pool ×6 [get_or_create same/load/reload/unknown/poll_reload/clear], system ×4 [start/update/5-cubes/missing-callbacks], engine_api ×2 [iter_entities/iter_by_tag])
 - voltex_editor: 158 (E2 +12: session::* mode/snapshot/dispatch ×7, lifecycle/callbacks ×4, undo/redo non-Health-snapshot inner test ×1)
 
 ## Examples (12개 + survivor_game)

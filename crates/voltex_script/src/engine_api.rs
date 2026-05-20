@@ -45,6 +45,8 @@ pub fn register_engine_api(lua: &LuaState, world: *mut World) {
     lua.register_fn("add_child", lua_add_child);
     lua.register_fn("remove_child", lua_remove_child);
     lua.register_fn("entity_count", lua_entity_count);
+    lua.register_fn("iter_entities", lua_iter_entities);
+    lua.register_fn("iter_by_tag", lua_iter_by_tag);
 }
 
 /// Helper to retrieve the World pointer from the Lua registry global.
@@ -301,6 +303,33 @@ unsafe extern "C" fn lua_remove_child(L: *mut ffi::lua_State) -> c_int {
     }
     voltex_ecs::hierarchy::remove_child(world, parent, child);
     0
+}
+
+/// `iter_entities()` → array table of `{id=, gen=}` for every currently live
+/// entity (in id order). Empty table if the world is empty.
+unsafe extern "C" fn lua_iter_entities(L: *mut ffi::lua_State) -> c_int {
+    let world = get_world(L);
+    ffi::lua_createtable(L, 0, 0);
+    let id_key = std::ffi::CString::new("id").unwrap();
+    let gen_key = std::ffi::CString::new("gen").unwrap();
+    let mut index: ffi::lua_Integer = 1;
+    for entity in world.live_entities() {
+        ffi::lua_createtable(L, 0, 2);
+        ffi::lua_pushnumber(L, entity.id as f64);
+        ffi::lua_setfield(L, -2, id_key.as_ptr());
+        ffi::lua_pushnumber(L, entity.generation as f64);
+        ffi::lua_setfield(L, -2, gen_key.as_ptr());
+        ffi::lua_rawseti(L, -2, index);
+        index += 1;
+    }
+    1
+}
+
+/// `iter_by_tag(tag)` → array table of `{id=, gen=}` for every entity carrying
+/// that tag. Alias of `find_all_by_tag` — named for `for _, e in ipairs(...)`
+/// readability.
+unsafe extern "C" fn lua_iter_by_tag(L: *mut ffi::lua_State) -> c_int {
+    lua_find_all_by_tag(L)
 }
 
 /// `find_by_tag(tag_string)` → `id, gen` of the first entity with that Tag,
@@ -615,6 +644,51 @@ mod tests {
         // Instead, verify by setting a number flag.
         lua.exec("flag = (type(find_all_by_tag('Missing')) == 'table') and 1 or 0").unwrap();
         assert_eq!(lua.get_global_number("flag"), Some(1.0));
+    }
+
+    #[test]
+    fn iter_entities_returns_all_live() {
+        let lua = LuaState::new();
+        let mut world = World::new();
+        register_engine_api(&lua, &mut world as *mut World);
+
+        // Spawn three, despawn one, expect iter_entities to report two.
+        let e0 = world.spawn();
+        let _e1 = world.spawn();
+        let _e2 = world.spawn();
+        world.despawn(e0);
+
+        lua.exec("
+            local all = iter_entities()
+            count = #all
+            second_id = all[1].id
+            second_gen = all[1].gen
+            third_id = all[2].id
+        ").unwrap();
+
+        assert_eq!(lua.get_global_number("count"), Some(2.0));
+        // The first live entity is the second one we spawned (id=1, gen=0).
+        assert_eq!(lua.get_global_number("second_id"), Some(1.0));
+        assert_eq!(lua.get_global_number("second_gen"), Some(0.0));
+        assert_eq!(lua.get_global_number("third_id"), Some(2.0));
+    }
+
+    #[test]
+    fn iter_by_tag_matches_find_all_by_tag() {
+        let lua = LuaState::new();
+        let mut world = World::new();
+        register_engine_api(&lua, &mut world as *mut World);
+
+        lua.exec("
+            for _ = 1, 4 do
+                local id, gen = spawn_entity()
+                set_tag(id, gen, 'spinner')
+            end
+            local found = iter_by_tag('spinner')
+            spinner_count = #found
+        ").unwrap();
+
+        assert_eq!(lua.get_global_number("spinner_count"), Some(4.0));
     }
 
     #[test]
