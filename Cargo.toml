@@ -26,6 +26,7 @@ members = [
     "crates/voltex_script",
     "crates/voltex_editor",
     "crates/voltex_runtime",
+    "crates/voltex_cli",
     "examples/editor_demo",
     "examples/survivor_game",
     "examples/runtime_demo",
@@ -46,6 +47,7 @@ voltex_net = { path = "crates/voltex_net" }
 voltex_script = { path = "crates/voltex_script" }
 voltex_editor = { path = "crates/voltex_editor" }
 voltex_runtime = { path = "crates/voltex_runtime" }
+voltex_cli = { path = "crates/voltex_cli" }
 wgpu = "28.0"
 winit = "0.30"
 bytemuck = { version = "1", features = ["derive"] }

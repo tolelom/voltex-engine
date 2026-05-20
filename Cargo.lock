@@ -2129,6 +2129,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "voltex_cli"
+version = "0.1.0"
+
+[[package]]
 name = "voltex_ecs"
 version = "0.1.0"
 dependencies = [
