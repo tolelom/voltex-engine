@@ -377,6 +377,11 @@ impl ApplicationHandler for EditorDemoApp {
                 state.timer.tick();
                 state.input.begin_frame();
 
+                // Physics: only ticks while in Play mode.
+                if state.session.mode == EditorMode::Play {
+                    physics_step(&mut state.session.world, &state.physics_config);
+                }
+
                 let (mx, my) = state.input.mouse_position();
                 let mx = mx as f32;
                 let my = my as f32;
@@ -387,42 +392,47 @@ impl ApplicationHandler for EditorDemoApp {
                 let screen_w = state.gpu.config.width as f32;
                 let screen_h = state.gpu.config.height as f32;
 
-                // ── Toolbar (Spawn/Save/Load via EditorCommand → session log + auto-save) ──
+                // ── Toolbar (Play/Stop gates the other controls) ──
                 const TOOLBAR_H: f32 = 32.0;
                 state.ui.begin_panel("Toolbar", 0.0, 0.0, screen_w, TOOLBAR_H);
-                if state.ui.button("Spawn") {
-                    if let Ok(e) = state.session.dispatch(EditorCommand::Spawn) {
-                        // Default placement + visible cube. E3 의 AddComponent
-                        // 도입 전 임시 처치.
-                        let _ = state.session.dispatch(EditorCommand::SetTransform {
-                            entity: e,
-                            position: Vec3::new(0.0, 0.5, 0.0),
-                            rotation: Vec3::ZERO,
-                            scale: Vec3::new(1.0, 1.0, 1.0),
-                        });
-                        state.session.world.add(e, MeshHandle(state.cube_mesh_h.0));
-                        state.session.world.add(e, MaterialHandle(state.default_mat_h.0));
-                        state.session.selected = Some(e);
+                let in_play = state.session.mode == EditorMode::Play;
+                if in_play {
+                    if state.ui.button("Stop") {
+                        state.session.set_mode(EditorMode::Edit);
+                        state.session.selected = None;
                     }
+                } else {
+                    if state.ui.button("Play") {
+                        state.session.set_mode(EditorMode::Play);
+                    }
+                    if state.ui.button("Spawn") {
+                        if let Ok(e) = state.session.dispatch(EditorCommand::Spawn) {
+                            let _ = state.session.dispatch(EditorCommand::SetTransform {
+                                entity: e,
+                                position: Vec3::new(0.0, 0.5, 0.0),
+                                rotation: Vec3::ZERO,
+                                scale: Vec3::new(1.0, 1.0, 1.0),
+                            });
+                            state.session.world.add(e, MeshHandle(state.cube_mesh_h.0));
+                            state.session.world.add(e, MaterialHandle(state.default_mat_h.0));
+                            state.session.selected = Some(e);
+                        }
+                    }
+                    if state.ui.button("Save") {
+                        let path = state.session.scene_path.clone();
+                        let _ = state.session.dispatch(EditorCommand::SaveScene { path });
+                    }
+                    if state.ui.button("Load") {
+                        let path = state.session.scene_path.clone();
+                        let _ = state.session.dispatch(EditorCommand::LoadScene { path });
+                        state.session.selected = None;
+                    }
+                    if state.ui.button("Undo") { state.session.undo(); }
+                    if state.ui.button("Redo") { state.session.redo(); }
+                    if state.ui.button("Move") { state.gizmo_state.set_mode(GizmoMode::Translate); }
+                    if state.ui.button("Rotate") { state.gizmo_state.set_mode(GizmoMode::Rotate); }
+                    if state.ui.button("Scale") { state.gizmo_state.set_mode(GizmoMode::Scale); }
                 }
-                if state.ui.button("Save") {
-                    let path = state.session.scene_path.clone();
-                    let _ = state.session.dispatch(EditorCommand::SaveScene { path });
-                }
-                if state.ui.button("Load") {
-                    let path = state.session.scene_path.clone();
-                    let _ = state.session.dispatch(EditorCommand::LoadScene { path });
-                    state.session.selected = None;
-                }
-                if state.ui.button("Undo") {
-                    state.session.undo();
-                }
-                if state.ui.button("Redo") {
-                    state.session.redo();
-                }
-                if state.ui.button("Move") { state.gizmo_state.set_mode(GizmoMode::Translate); }
-                if state.ui.button("Rotate") { state.gizmo_state.set_mode(GizmoMode::Rotate); }
-                if state.ui.button("Scale") { state.gizmo_state.set_mode(GizmoMode::Scale); }
                 state.ui.end_panel();
 
                 let areas = state.dock.layout(Rect { x: 0.0, y: TOOLBAR_H, w: screen_w, h: screen_h - TOOLBAR_H });
@@ -472,15 +482,17 @@ impl ApplicationHandler for EditorDemoApp {
                     }
                 }
 
-                // ── Gizmo drag begin / update ──
+                // ── Gizmo drag begin / update ── (Edit mode only)
                 if let (Some(sel), Some(vr)) = (state.session.selected, viewport_rect) {
+                    let in_play = state.session.mode == EditorMode::Play;
                     let aspect = vr.w / vr.h.max(1.0);
                     let vp = state.orbit_cam.view_projection(aspect);
                     let cam_pos = state.orbit_cam.position();
                     let rect_tuple = (vr.x, vr.y, vr.w, vr.h);
                     let mouse = (mx, my);
 
-                    if state.left_dragging
+                    if !in_play
+                        && state.left_dragging
                         && !state.gizmo_dragging
                         && state.left_down_pos.map(|p| (p.0 - mx).abs() + (p.1 - my).abs() < 8.0).unwrap_or(false)
                         && vr.contains(mx, my)
@@ -496,7 +508,7 @@ impl ApplicationHandler for EditorDemoApp {
                             state.gizmo_dragging = true;
                         }
                     }
-                    if state.gizmo_dragging {
+                    if state.gizmo_dragging && !in_play {
                         state.gizmo_state.update_drag(
                             &mut state.session.world,
                             sel,
@@ -579,18 +591,21 @@ impl ApplicationHandler for EditorDemoApp {
                     );
 
                     // Gizmo overlay (depth-off, always on top of the scene).
-                    if let Some(sel) = state.session.selected {
-                        if let Some(origin) = GizmoState::gizmo_origin(&state.session.world, sel) {
-                            state.gizmo_renderer.render(
-                                &state.gpu.queue,
-                                &mut encoder,
-                                &state.viewport_tex.color_view,
-                                &state.viewport_tex.depth_view,
-                                vp,
-                                origin,
-                                state.gizmo_state.mode,
-                                state.gizmo_state.active_axis(),
-                            );
+                    // Hidden in Play mode — no editing during simulation.
+                    if state.session.mode == EditorMode::Edit {
+                        if let Some(sel) = state.session.selected {
+                            if let Some(origin) = GizmoState::gizmo_origin(&state.session.world, sel) {
+                                state.gizmo_renderer.render(
+                                    &state.gpu.queue,
+                                    &mut encoder,
+                                    &state.viewport_tex.color_view,
+                                    &state.viewport_tex.depth_view,
+                                    vp,
+                                    origin,
+                                    state.gizmo_state.mode,
+                                    state.gizmo_state.active_axis(),
+                                );
+                            }
                         }
                     }
                 }
