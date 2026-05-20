@@ -7,6 +7,9 @@ pub mod widgets;
 pub mod dock;
 pub mod inspector;
 pub mod orbit_camera;
+pub mod command;
+pub mod session;
+pub mod panels;
 
 pub use font::FontAtlas;
 pub use draw_list::{DrawVertex, DrawCommand, DrawList};
@@ -34,3 +37,6 @@ pub use ttf_font::TtfFont;
 
 pub mod floating_panel;
 pub use floating_panel::{FloatingPanel, FloatingPanelManager};
+
+pub use command::{EditorCommand, CommandError};
+pub use session::EditorSession;
