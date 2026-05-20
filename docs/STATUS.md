@@ -1,5 +1,21 @@
 # Voltex Engine - 작업 현황
 
+## AI 친화 재구조화 (2026-05-20 완료)
+
+`docs/superpowers/specs/2026-05-20-engine-restructure-design.md` 에 명시된 7개 마일스톤 전부 완료.
+
+| # | 작업 | 결과 |
+|---|---|---|
+| M1 | 11개 crate × CODEMAP.md + CLAUDE.md 보강 | 12 CODEMAP (sub 11 + facade) |
+| M2 | 800줄+ 파일 4개 분리 (vorbis/gltf/jpg/deferred_pipeline) | 0건 잔존 |
+| M3 | 500-800줄 파일 11개 분리 | 0건 잔존 (전체 .rs 600줄 이하) |
+| M4 | 에러 표준화 (thiserror 기반 `<Crate>Error` + `Result<T>` alias) | 8 crate 적용, `Result<T, String>` 0건 |
+| M5 | ECS 패턴 표준화 (Component trait + `register::<T>()`) | Transform/Tag 마이그레이션, +3 테스트 |
+| M6 | voltex facade crate + prelude | L4 facade, triangle 마이그레이션 |
+| M7 | 최종 검증 + hierarchy_demo 추가 마이그레이션 | 모든 성공기준 충족 |
+
+성공기준 7개 전부 충족: CODEMAP / 600줄 / thiserror / Component+register / facade / 760+ tests / examples 빌드.
+
 ## 완료된 Phase
 
 ### Phase 1: Foundation (삼각형 렌더링)
