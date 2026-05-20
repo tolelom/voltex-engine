@@ -51,6 +51,28 @@ impl Component for MeshHandle {
     }
 }
 
+impl Component for MaterialHandle {
+    const NAME: &'static str = "material_handle";
+
+    fn serialize(world: &World, entity: Entity) -> Option<Vec<u8>> {
+        let h = world.get::<MaterialHandle>(entity)?;
+        let mut data = Vec::with_capacity(8);
+        data.extend_from_slice(&h.0.id().to_le_bytes());
+        data.extend_from_slice(&h.0.generation().to_le_bytes());
+        Some(data)
+    }
+
+    fn deserialize(world: &mut World, entity: Entity, data: &[u8]) -> crate::Result<()> {
+        if data.len() < 8 {
+            return Err("MaterialHandle data too short".into());
+        }
+        let id = u32::from_le_bytes([data[0], data[1], data[2], data[3]]);
+        let gen = u32::from_le_bytes([data[4], data[5], data[6], data[7]]);
+        world.add(entity, MaterialHandle(Handle::from_raw_parts(id, gen)));
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -80,6 +102,32 @@ mod tests {
         let mut world = World::new();
         let e = world.spawn();
         let result = <MeshHandle as Component>::deserialize(&mut world, e, &[0u8; 7]);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_material_handle_roundtrip() {
+        let mut world = World::new();
+        let e = world.spawn();
+        world.add(e, MaterialHandle(Handle::from_raw_parts(99, 3)));
+
+        let data = <MaterialHandle as Component>::serialize(&world, e)
+            .expect("serialize MaterialHandle should return Some");
+
+        let mut world2 = World::new();
+        let e2 = world2.spawn();
+        <MaterialHandle as Component>::deserialize(&mut world2, e2, &data).unwrap();
+
+        let h = world2.get::<MaterialHandle>(e2).expect("MaterialHandle present");
+        assert_eq!(h.0.id(), 99);
+        assert_eq!(h.0.generation(), 3);
+    }
+
+    #[test]
+    fn test_material_handle_deserialize_too_short() {
+        let mut world = World::new();
+        let e = world.spawn();
+        let result = <MaterialHandle as Component>::deserialize(&mut world, e, &[0u8; 7]);
         assert!(result.is_err());
     }
 }
