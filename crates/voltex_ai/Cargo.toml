@@ -6,3 +6,4 @@ edition = "2021"
 [dependencies]
 voltex_math.workspace = true
 voltex_ecs.workspace = true
+thiserror = { workspace = true }

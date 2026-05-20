@@ -111,9 +111,9 @@ impl NavMesh {
     }
 
     /// Deserialize a NavMesh from binary data with header validation.
-    pub fn deserialize(data: &[u8]) -> Result<Self, String> {
+    pub fn deserialize(data: &[u8]) -> crate::Result<Self> {
         if data.len() < 8 {
-            return Err("data too short for header".to_string());
+            return Err("data too short for header".into());
         }
 
         // Validate magic
@@ -121,39 +121,39 @@ impl NavMesh {
             return Err(format!(
                 "invalid magic: expected VNAV, got {:?}",
                 &data[0..4]
-            ));
+            ).into());
         }
 
         // Read version
         let version = u32::from_le_bytes([data[4], data[5], data[6], data[7]]);
         if version != 1 {
-            return Err(format!("unsupported version: {}", version));
+            return Err(format!("unsupported version: {}", version).into());
         }
 
         // Delegate rest to offset-based reading
         let mut offset = 8usize;
 
-        let read_u32 = |off: &mut usize| -> Result<u32, String> {
+        let read_u32 = |off: &mut usize| -> crate::Result<u32> {
             if *off + 4 > data.len() {
-                return Err("unexpected end of data".to_string());
+                return Err("unexpected end of data".into());
             }
             let val = u32::from_le_bytes([data[*off], data[*off + 1], data[*off + 2], data[*off + 3]]);
             *off += 4;
             Ok(val)
         };
 
-        let read_i32 = |off: &mut usize| -> Result<i32, String> {
+        let read_i32 = |off: &mut usize| -> crate::Result<i32> {
             if *off + 4 > data.len() {
-                return Err("unexpected end of data".to_string());
+                return Err("unexpected end of data".into());
             }
             let val = i32::from_le_bytes([data[*off], data[*off + 1], data[*off + 2], data[*off + 3]]);
             *off += 4;
             Ok(val)
         };
 
-        let read_f32 = |off: &mut usize| -> Result<f32, String> {
+        let read_f32 = |off: &mut usize| -> crate::Result<f32> {
             if *off + 4 > data.len() {
-                return Err("unexpected end of data".to_string());
+                return Err("unexpected end of data".into());
             }
             let val = f32::from_le_bytes([data[*off], data[*off + 1], data[*off + 2], data[*off + 3]]);
             *off += 4;
@@ -269,30 +269,30 @@ pub fn serialize_navmesh(navmesh: &NavMesh) -> Vec<u8> {
 }
 
 /// Deserialize a NavMesh from binary data.
-pub fn deserialize_navmesh(data: &[u8]) -> Result<NavMesh, String> {
+pub fn deserialize_navmesh(data: &[u8]) -> crate::Result<NavMesh> {
     let mut offset = 0;
 
-    let read_u32 = |off: &mut usize| -> Result<u32, String> {
+    let read_u32 = |off: &mut usize| -> crate::Result<u32> {
         if *off + 4 > data.len() {
-            return Err("unexpected end of data".to_string());
+            return Err("unexpected end of data".into());
         }
         let val = u32::from_le_bytes([data[*off], data[*off + 1], data[*off + 2], data[*off + 3]]);
         *off += 4;
         Ok(val)
     };
 
-    let read_i32 = |off: &mut usize| -> Result<i32, String> {
+    let read_i32 = |off: &mut usize| -> crate::Result<i32> {
         if *off + 4 > data.len() {
-            return Err("unexpected end of data".to_string());
+            return Err("unexpected end of data".into());
         }
         let val = i32::from_le_bytes([data[*off], data[*off + 1], data[*off + 2], data[*off + 3]]);
         *off += 4;
         Ok(val)
     };
 
-    let read_f32 = |off: &mut usize| -> Result<f32, String> {
+    let read_f32 = |off: &mut usize| -> crate::Result<f32> {
         if *off + 4 > data.len() {
-            return Err("unexpected end of data".to_string());
+            return Err("unexpected end of data".into());
         }
         let val = f32::from_le_bytes([data[*off], data[*off + 1], data[*off + 2], data[*off + 3]]);
         *off += 4;

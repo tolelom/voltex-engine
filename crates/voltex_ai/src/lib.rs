@@ -1,8 +1,10 @@
+pub mod error;
 pub mod nav_agent;
 pub mod navmesh;
 pub mod pathfinding;
 pub mod steering;
 
+pub use error::{AiError, Result};
 pub use nav_agent::NavAgent;
 pub use navmesh::{NavMesh, NavTriangle};
 pub use pathfinding::find_path;
