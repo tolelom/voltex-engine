@@ -209,4 +209,50 @@ mod tests {
         g.set_mode(GizmoMode::Scale);
         assert_eq!(g.mode, GizmoMode::Scale);
     }
+
+    #[test]
+    fn begin_then_end_drag_returns_drag_result() {
+        let mut g = GizmoState::new();
+        let mut world = World::new();
+        let e = world.spawn();
+        world.add(e, Transform::new());
+
+        // Construct a drag manually (try_begin requires a viewport-projected
+        // ray we can't easily synthesise headlessly). Simulate the end_drag
+        // round-trip.
+        g.drag = Some(DragState {
+            axis: GizmoAxis::X,
+            initial_transform: Transform::new(),
+            gizmo_origin: Vec3::ZERO,
+            plane_normal: Vec3::new(0.0, 1.0, 0.0),
+            anchor: 0.0,
+        });
+
+        // Mutate the world Transform to simulate update_drag having moved it.
+        if let Some(t) = world.get_mut::<Transform>(e) {
+            t.position = Vec3::new(5.0, 0.0, 0.0);
+        }
+
+        let result = g.end_drag(&mut world, e).expect("Some(DragResult)");
+        assert_eq!(result.initial.position, Vec3::ZERO);
+        assert_eq!(result.final_transform.position, Vec3::new(5.0, 0.0, 0.0));
+        // World rolled back to initial so dispatch captures the right inverse.
+        let post = world.get::<Transform>(e).unwrap();
+        assert_eq!(post.position, Vec3::ZERO);
+        assert!(!g.is_dragging());
+    }
+
+    #[test]
+    fn set_mode_ignored_while_dragging() {
+        let mut g = GizmoState::new();
+        g.drag = Some(DragState {
+            axis: GizmoAxis::X,
+            initial_transform: Transform::new(),
+            gizmo_origin: Vec3::ZERO,
+            plane_normal: Vec3::new(0.0, 1.0, 0.0),
+            anchor: 0.0,
+        });
+        g.set_mode(GizmoMode::Rotate);
+        assert_eq!(g.mode, GizmoMode::Translate, "set_mode must be a no-op while dragging");
+    }
 }

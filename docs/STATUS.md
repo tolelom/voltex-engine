@@ -166,6 +166,17 @@
 - examples/editor_demo: 시드 엔티티 (ground + 3 cube + Cube1↔Cube2 hierarchy)를 `EditorSession::dispatch` 경로로 옮김 → jsonl 로그 + Save/Load round-trip 일관성
 - v1 한계 (문서화): picking은 sphere 근사 (메시 AABB는 미구현). gizmo translate/rotate/scale 핸들은 미구현
 
+### Cycle 3 (E1): Gizmo + AABB Picking (2026-05-20)
+- voltex_editor::picking: **`ray_vs_aabb` + `world_aabb_from_local`** 헬퍼 추가 (voltex_physics 의 동등 구현을 cross-crate 의존성 회피 위해 복제). `pick_entity` 가 `Bounds` 있는 엔티티는 world-space AABB (8-corner 변환, loose), 없으면 sphere fallback. 시그니처 `&World` → `&mut World` (내부에서 `propagate_transforms` 호출).
+- voltex_editor::gizmo: **신규 모듈** (mod + translate + rotate + scale + renderer + shader.wgsl). `GizmoMode` (Translate/Rotate/Scale), `GizmoAxis`, `GizmoState` (drag 상태머신, set_mode 가 드래깅 중에는 no-op). per-mode 모듈:
+  - `translate.rs`: axis thin-AABB hit + drag-plane projection (가장 카메라 향한 면 선택) → axis 투영 delta
+  - `rotate.rs`: ring plane (= axis normal) ray-vs-plane hit + 도넛 반경 검사 → atan2 angle delta (wrap (-π, π])
+  - `scale.rs`: translate hit + handle cube AABB, drag projection ratio → 축별 scale multiplier (anchor ≈ 0 보호)
+  - `renderer.rs`: LINE-list wgpu pipeline (depth-test Always, alpha blending), procedural translate arrows / rotate rings (32-seg) / scale handle cubes. active axis 노란색 강조.
+- examples/editor_demo: Toolbar 에 Move/Rotate/Scale 버튼. 시드 엔티티 (ground + 3 cube) 에 `Bounds` 부착. 좌클릭 down → 8px 이내 + 모드 axis hit 이면 drag 시작 → 매 프레임 World 직접 mutate, release 시 `end_drag` → final 로 `SetTransform` dispatch (단일 undo 엔트리, initial 이 inverse). orbit camera 는 gizmo dragging 중 비활성.
+- v1 한계: snap-to-grid, multi-select, OBB picking 미구현 (모두 spec out-of-scope). gizmo 는 world-space 고정 크기 (1.5 단위).
+- 시각 검증: GUI 자동화 환경 부재 → 수동 검증 권장. 단위 테스트 +19 (picking +8, gizmo +11).
+
 ### Cycle 2 (C0b): Renderer 브릿지 + ECS-driven 렌더링 (2026-05-20)
 - **voltex_renderer_ecs**: 신규 L3 crate. `RenderAssets` (id/generation lockstep wrapper around voltex_asset::Assets — C0a 의 phantom-typed `Handle<MeshAsset>` 과 내부 `Handle<Mesh>` 핸들이 lockstep), `BasicRenderer` (mesh_shader.wgsl pipeline + per-entity dynamic UBO, 한 메서드 render), `RenderItem` + `collect_render_items` (자체 PBR pipeline 호출자용 helper)
 - voltex (facade): `voltex::renderer_ecs` 모듈 re-export 추가 (prelude 변경 없음 — 도메인 특화 정책)
@@ -194,7 +205,7 @@ crates/
 └── voltex_editor      — IMGUI, docking, 3D viewport, inspector, asset browser, TTF font, UiRenderer
 ```
 
-## 테스트: 819개 전부 통과 (Cycle 2 +16 vs STATUS.md 8-7 직후 803)
+## 테스트: 838개 전부 통과 (Cycle 3 +19 vs Cycle 2 직후 819)
 
 - voltex: 2 (M6: prelude/module 경로 컴파일 검증)
 - voltex_math: 39 (8-7 +2: inverse roundtrip × VP+translation)
@@ -208,7 +219,7 @@ crates/
 - voltex_ai: 34
 - voltex_net: 47
 - voltex_script: 30 (8-7 +5: add_child/remove_child/stale-parent/find_all_by_tag×2)
-- voltex_editor: 127 (8-7 +13: picking::* ndc/ray/sphere/pick 케이스들)
+- voltex_editor: 146 (E1 +19: picking::* aabb/world_aabb/bounds-aware ×8, gizmo::* mode/translate/rotate/scale/state ×11)
 
 ## Examples (12개 + survivor_game)
 
