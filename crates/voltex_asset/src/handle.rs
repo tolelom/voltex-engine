@@ -16,6 +16,30 @@ impl<T> Handle<T> {
             _marker: PhantomData,
         }
     }
+
+    /// Returns the raw id (slot index) of this handle.
+    pub fn id(&self) -> u32 {
+        self.id
+    }
+
+    /// Returns the generation counter of this handle.
+    pub fn generation(&self) -> u32 {
+        self.generation
+    }
+
+    /// Reconstructs a handle from raw (id, generation) parts.
+    ///
+    /// **Validity:** the caller is responsible for ensuring the resulting
+    /// handle refers to a still-live asset. Used by scene deserialization to
+    /// restore previously persisted handles; the normal path to obtain a
+    /// handle is `AssetStorage::insert`.
+    pub fn from_raw_parts(id: u32, generation: u32) -> Self {
+        Self {
+            id,
+            generation,
+            _marker: PhantomData,
+        }
+    }
 }
 
 impl<T> Clone for Handle<T> {
@@ -74,5 +98,19 @@ mod tests {
         assert_eq!(h1, h2);
         assert_ne!(h1, h3);
         assert_ne!(h1, h4);
+    }
+
+    #[test]
+    fn test_handle_accessors() {
+        let h: Handle<Dummy> = Handle::from_raw_parts(3, 9);
+        assert_eq!(h.id(), 3);
+        assert_eq!(h.generation(), 9);
+    }
+
+    #[test]
+    fn test_handle_from_raw_parts_roundtrip() {
+        let h: Handle<Dummy> = Handle::from_raw_parts(42, 7);
+        let h2: Handle<Dummy> = Handle::from_raw_parts(h.id(), h.generation());
+        assert_eq!(h, h2);
     }
 }
