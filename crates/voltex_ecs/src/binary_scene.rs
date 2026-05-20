@@ -80,7 +80,7 @@ pub fn deserialize_scene_binary(
     world: &mut World,
     data: &[u8],
     registry: &ComponentRegistry,
-) -> Result<Vec<Entity>, String> {
+) -> crate::Result<Vec<Entity>> {
     if data.len() < 12 {
         return Err("Binary scene data too short".into());
     }
@@ -92,7 +92,7 @@ pub fn deserialize_scene_binary(
 
     let version = u32::from_le_bytes([data[4], data[5], data[6], data[7]]);
     if version != 1 {
-        return Err(format!("Unsupported binary scene version: {}", version));
+        return Err(format!("Unsupported binary scene version: {}", version).into());
     }
 
     let entity_count = u32::from_le_bytes([data[8], data[9], data[10], data[11]]) as usize;
@@ -131,7 +131,7 @@ pub fn deserialize_scene_binary(
                 return Err("Unexpected end of data reading component name".into());
             }
             let name = std::str::from_utf8(&data[pos..pos + name_len])
-                .map_err(|_| "Invalid UTF-8 in component name".to_string())?;
+                .map_err(|_| crate::EcsError::from("Invalid UTF-8 in component name"))?;
             pos += name_len;
 
             // Data length

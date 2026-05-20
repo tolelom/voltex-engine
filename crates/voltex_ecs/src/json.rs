@@ -119,12 +119,12 @@ impl JsonVal {
 
 // ── Parser (recursive descent) ──────────────────────────────────────
 
-pub fn json_parse(input: &str) -> Result<JsonVal, String> {
+pub fn json_parse(input: &str) -> crate::Result<JsonVal> {
     let bytes = input.as_bytes();
     let (val, pos) = parse_value(bytes, skip_ws(bytes, 0))?;
     let pos = skip_ws(bytes, pos);
     if pos != bytes.len() {
-        return Err(format!("Unexpected trailing content at position {}", pos));
+        return Err(format!("Unexpected trailing content at position {}", pos).into());
     }
     Ok(val)
 }
@@ -136,7 +136,7 @@ fn skip_ws(b: &[u8], mut pos: usize) -> usize {
     pos
 }
 
-fn parse_value(b: &[u8], pos: usize) -> Result<(JsonVal, usize), String> {
+fn parse_value(b: &[u8], pos: usize) -> crate::Result<(JsonVal, usize)> {
     if pos >= b.len() {
         return Err("Unexpected end of input".into());
     }
@@ -150,14 +150,14 @@ fn parse_value(b: &[u8], pos: usize) -> Result<(JsonVal, usize), String> {
     }
 }
 
-fn parse_string(b: &[u8], pos: usize) -> Result<(JsonVal, usize), String> {
+fn parse_string(b: &[u8], pos: usize) -> crate::Result<(JsonVal, usize)> {
     let (s, end) = read_string(b, pos)?;
     Ok((JsonVal::Str(s), end))
 }
 
-fn read_string(b: &[u8], pos: usize) -> Result<(String, usize), String> {
+fn read_string(b: &[u8], pos: usize) -> crate::Result<(String, usize)> {
     if pos >= b.len() || b[pos] != b'"' {
-        return Err(format!("Expected '\"' at position {}", pos));
+        return Err(format!("Expected '\"' at position {}", pos).into());
     }
     let mut i = pos + 1;
     let mut s = String::new();
@@ -192,7 +192,7 @@ fn read_string(b: &[u8], pos: usize) -> Result<(String, usize), String> {
     Err("Unterminated string".into())
 }
 
-fn parse_number(b: &[u8], pos: usize) -> Result<(JsonVal, usize), String> {
+fn parse_number(b: &[u8], pos: usize) -> crate::Result<(JsonVal, usize)> {
     let mut i = pos;
     // optional minus
     if i < b.len() && b[i] == b'-' {
@@ -220,32 +220,32 @@ fn parse_number(b: &[u8], pos: usize) -> Result<(JsonVal, usize), String> {
         }
     }
     if i == pos {
-        return Err(format!("Expected number at position {}", pos));
+        return Err(format!("Expected number at position {}", pos).into());
     }
     let s = std::str::from_utf8(&b[pos..i]).unwrap();
     let n: f64 = s.parse().map_err(|e| format!("Invalid number '{}': {}", s, e))?;
     Ok((JsonVal::Number(n), i))
 }
 
-fn parse_bool(b: &[u8], pos: usize) -> Result<(JsonVal, usize), String> {
+fn parse_bool(b: &[u8], pos: usize) -> crate::Result<(JsonVal, usize)> {
     if b[pos..].starts_with(b"true") {
         Ok((JsonVal::Bool(true), pos + 4))
     } else if b[pos..].starts_with(b"false") {
         Ok((JsonVal::Bool(false), pos + 5))
     } else {
-        Err(format!("Expected bool at position {}", pos))
+        Err(format!("Expected bool at position {}", pos).into())
     }
 }
 
-fn parse_null(b: &[u8], pos: usize) -> Result<(JsonVal, usize), String> {
+fn parse_null(b: &[u8], pos: usize) -> crate::Result<(JsonVal, usize)> {
     if b[pos..].starts_with(b"null") {
         Ok((JsonVal::Null, pos + 4))
     } else {
-        Err(format!("Expected null at position {}", pos))
+        Err(format!("Expected null at position {}", pos).into())
     }
 }
 
-fn parse_array(b: &[u8], pos: usize) -> Result<(JsonVal, usize), String> {
+fn parse_array(b: &[u8], pos: usize) -> crate::Result<(JsonVal, usize)> {
     let mut i = pos + 1; // skip '['
     let mut arr = Vec::new();
     i = skip_ws(b, i);
@@ -264,13 +264,13 @@ fn parse_array(b: &[u8], pos: usize) -> Result<(JsonVal, usize), String> {
             return Ok((JsonVal::Array(arr), i + 1));
         }
         if b[i] != b',' {
-            return Err(format!("Expected ',' or ']' at position {}", i));
+            return Err(format!("Expected ',' or ']' at position {}", i).into());
         }
         i += 1; // skip ','
     }
 }
 
-fn parse_object(b: &[u8], pos: usize) -> Result<(JsonVal, usize), String> {
+fn parse_object(b: &[u8], pos: usize) -> crate::Result<(JsonVal, usize)> {
     let mut i = pos + 1; // skip '{'
     let mut pairs = Vec::new();
     i = skip_ws(b, i);
@@ -282,7 +282,7 @@ fn parse_object(b: &[u8], pos: usize) -> Result<(JsonVal, usize), String> {
         let (key, next) = read_string(b, i)?;
         i = skip_ws(b, next);
         if i >= b.len() || b[i] != b':' {
-            return Err(format!("Expected ':' at position {}", i));
+            return Err(format!("Expected ':' at position {}", i).into());
         }
         i = skip_ws(b, i + 1);
         let (val, next) = parse_value(b, i)?;
@@ -295,7 +295,7 @@ fn parse_object(b: &[u8], pos: usize) -> Result<(JsonVal, usize), String> {
             return Ok((JsonVal::Object(pairs), i + 1));
         }
         if b[i] != b',' {
-            return Err(format!("Expected ',' or '}}' at position {}", i));
+            return Err(format!("Expected ',' or '}}' at position {}", i).into());
         }
         i += 1; // skip ','
     }

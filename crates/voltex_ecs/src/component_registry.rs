@@ -6,7 +6,7 @@ use crate::entity::Entity;
 use crate::world::World;
 
 pub type SerializeFn = fn(&World, Entity) -> Option<Vec<u8>>;
-pub type DeserializeFn = fn(&mut World, Entity, &[u8]) -> Result<(), String>;
+pub type DeserializeFn = fn(&mut World, Entity, &[u8]) -> crate::Result<()>;
 
 pub struct ComponentEntry {
     pub name: String,
@@ -67,7 +67,7 @@ fn serialize_transform(world: &World, entity: Entity) -> Option<Vec<u8>> {
     Some(data)
 }
 
-fn deserialize_transform(world: &mut World, entity: Entity, data: &[u8]) -> Result<(), String> {
+fn deserialize_transform(world: &mut World, entity: Entity, data: &[u8]) -> crate::Result<()> {
     if data.len() < 36 {
         return Err("Transform data too short".into());
     }
@@ -88,8 +88,8 @@ fn serialize_tag(world: &World, entity: Entity) -> Option<Vec<u8>> {
     Some(tag.0.as_bytes().to_vec())
 }
 
-fn deserialize_tag(world: &mut World, entity: Entity, data: &[u8]) -> Result<(), String> {
-    let s = std::str::from_utf8(data).map_err(|_| "Invalid UTF-8 in tag".to_string())?;
+fn deserialize_tag(world: &mut World, entity: Entity, data: &[u8]) -> crate::Result<()> {
+    let s = std::str::from_utf8(data).map_err(|_| crate::EcsError::from("Invalid UTF-8 in tag"))?;
     world.add(entity, crate::scene::Tag(s.to_string()));
     Ok(())
 }

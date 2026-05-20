@@ -1,3 +1,4 @@
+pub mod error;
 pub mod entity;
 pub mod sparse_set;
 pub mod world;
@@ -12,6 +13,7 @@ pub mod binary_scene;
 pub mod archetype;
 pub mod dependency_scheduler;
 
+pub use error::{EcsError, Result};
 pub use entity::{Entity, EntityAllocator};
 pub use sparse_set::SparseSet;
 pub use world::World;

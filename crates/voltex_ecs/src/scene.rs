@@ -164,7 +164,7 @@ fn bytes_to_hex(data: &[u8]) -> String {
     s
 }
 
-fn hex_to_bytes(hex: &str) -> Result<Vec<u8>, String> {
+fn hex_to_bytes(hex: &str) -> crate::Result<Vec<u8>> {
     if hex.len() % 2 != 0 {
         return Err("Hex string has odd length".into());
     }
@@ -180,12 +180,12 @@ fn hex_to_bytes(hex: &str) -> Result<Vec<u8>, String> {
     Ok(bytes)
 }
 
-fn hex_digit(c: u8) -> Result<u8, String> {
+fn hex_digit(c: u8) -> crate::Result<u8> {
     match c {
         b'0'..=b'9' => Ok(c - b'0'),
         b'a'..=b'f' => Ok(c - b'a' + 10),
         b'A'..=b'F' => Ok(c - b'A' + 10),
-        _ => Err(format!("Invalid hex digit: {}", c as char)),
+        _ => Err(format!("Invalid hex digit: {}", c as char).into()),
     }
 }
 
@@ -246,19 +246,19 @@ pub fn deserialize_scene_json(
     world: &mut World,
     json_str: &str,
     registry: &ComponentRegistry,
-) -> Result<Vec<Entity>, String> {
+) -> crate::Result<Vec<Entity>> {
     let root = json::json_parse(json_str)?;
 
     let version = root.get("version")
         .and_then(|v| v.as_f64())
-        .ok_or("Missing or invalid 'version'")?;
+        .ok_or_else(|| crate::EcsError::from("Missing or invalid 'version'"))?;
     if version as u32 != 1 {
-        return Err(format!("Unsupported version: {}", version));
+        return Err(format!("Unsupported version: {}", version).into());
     }
 
     let entities_arr = root.get("entities")
         .and_then(|v| v.as_array())
-        .ok_or("Missing or invalid 'entities'")?;
+        .ok_or_else(|| crate::EcsError::from("Missing or invalid 'entities'"))?;
 
     // First pass: create entities and deserialize components
     let mut created: Vec<Entity> = Vec::with_capacity(entities_arr.len());
