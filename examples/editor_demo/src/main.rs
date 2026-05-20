@@ -436,6 +436,12 @@ impl ApplicationHandler for EditorDemoApp {
                     let _ = state.session.dispatch(EditorCommand::LoadScene { path });
                     state.session.selected = None;
                 }
+                if state.ui.button("Undo") {
+                    state.session.undo();
+                }
+                if state.ui.button("Redo") {
+                    state.session.redo();
+                }
                 state.ui.end_panel();
 
                 let areas = state.dock.layout(Rect { x: 0.0, y: TOOLBAR_H, w: screen_w, h: screen_h - TOOLBAR_H });

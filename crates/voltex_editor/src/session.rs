@@ -4,12 +4,38 @@
 //! which mutates the world, appends a jsonl log line, and (for non-Load commands)
 //! re-saves the active scene file so that a watcher / AI / human reading from
 //! disk always sees the latest state.
+//!
+//! On top of dispatch, the session maintains an undo/redo history of *inverse*
+//! commands so user/AI mistakes can be rolled back without re-loading the scene.
 
 use crate::command::{apply_command, EditorCommand};
 use crate::error::EditorError;
 use std::fs::OpenOptions;
 use std::io::Write;
-use voltex_ecs::{ComponentRegistry, Entity, World};
+use voltex_ecs::scene::Tag;
+use voltex_ecs::{ComponentRegistry, Entity, Transform, World};
+use voltex_math::Vec3;
+
+/// The inverse of a dispatched command. The undo stack stores one of these per
+/// undoable command. Commands that don't have a tractable inverse (Despawn,
+/// SaveScene, LoadScene) clear the undo/redo history when they run.
+#[derive(Debug, Clone)]
+enum Inverse {
+    /// Undo Spawn: despawn the entity that was just created.
+    DespawnSpawned(Entity),
+    /// Undo SetTransform: write back the previous Transform values.
+    SetTransform {
+        entity: Entity,
+        position: Vec3,
+        rotation: Vec3,
+        scale: Vec3,
+    },
+    /// Undo SetTag: restore the previous Tag (or remove if there was none).
+    SetTag {
+        entity: Entity,
+        prev: Option<String>,
+    },
+}
 
 pub struct EditorSession {
     pub world: World,
@@ -17,6 +43,10 @@ pub struct EditorSession {
     pub selected: Option<Entity>,
     pub scene_path: String,
     pub log_path: String,
+    /// Stack of pairs: (forward command, inverse). Top is the most recent action.
+    undo_stack: Vec<(EditorCommand, Inverse)>,
+    /// Stack of pairs cleared by every new forward dispatch; populated by undo().
+    redo_stack: Vec<(EditorCommand, Inverse)>,
 }
 
 impl EditorSession {
@@ -33,14 +63,45 @@ impl EditorSession {
             selected: None,
             scene_path,
             log_path,
+            undo_stack: Vec::new(),
+            redo_stack: Vec::new(),
         }
     }
 
     /// Execute a command, append a jsonl log entry, and (for state-mutating
     /// commands) re-save the scene to disk so the file is always current.
     pub fn dispatch(&mut self, cmd: EditorCommand) -> Result<Entity, EditorError> {
+        // Capture the inverse BEFORE applying, so we read the pre-state.
+        // For Spawn this returns None — we'll patch it post-apply once we know
+        // the entity id.
+        let pre_inverse = self.capture_inverse(&cmd);
+
         let result = apply_command(&mut self.world, &self.registry, &cmd);
         self.append_log(&cmd, &result);
+
+        if let Ok(applied_entity) = &result {
+            match &cmd {
+                EditorCommand::Spawn => {
+                    self.undo_stack
+                        .push((cmd.clone(), Inverse::DespawnSpawned(*applied_entity)));
+                    self.redo_stack.clear();
+                }
+                EditorCommand::SetTransform { .. } | EditorCommand::SetTag { .. } => {
+                    if let Some(inv) = pre_inverse {
+                        self.undo_stack.push((cmd.clone(), inv));
+                        self.redo_stack.clear();
+                    }
+                }
+                EditorCommand::Despawn { .. }
+                | EditorCommand::SaveScene { .. }
+                | EditorCommand::LoadScene { .. } => {
+                    // No tractable inverse in v1 — drop history rather than
+                    // produce stale, broken undo paths.
+                    self.undo_stack.clear();
+                    self.redo_stack.clear();
+                }
+            }
+        }
 
         // Auto-sync scene file on every state mutation except LoadScene (which
         // already read from disk) and SaveScene (already wrote).
@@ -54,6 +115,105 @@ impl EditorSession {
                 .map_err(|e| EditorError::Io(e.to_string()))?;
         }
         result
+    }
+
+    /// Number of actions on the undo stack (mostly for tests / UI affordances).
+    pub fn undo_depth(&self) -> usize {
+        self.undo_stack.len()
+    }
+
+    /// Number of actions on the redo stack.
+    pub fn redo_depth(&self) -> usize {
+        self.redo_stack.len()
+    }
+
+    /// Roll back the most recent undoable command. Returns true if anything
+    /// was undone. The reverse becomes redo-able.
+    pub fn undo(&mut self) -> bool {
+        let Some((forward, inverse)) = self.undo_stack.pop() else {
+            return false;
+        };
+        self.apply_inverse(&inverse);
+        self.redo_stack.push((forward, inverse));
+        self.persist_scene_silent();
+        true
+    }
+
+    /// Re-apply the most recently undone command. Returns true if anything
+    /// was redone.
+    pub fn redo(&mut self) -> bool {
+        let Some((forward, inverse)) = self.redo_stack.pop() else {
+            return false;
+        };
+        let result = apply_command(&mut self.world, &self.registry, &forward);
+        self.append_log(&forward, &result);
+        if result.is_ok() {
+            self.undo_stack.push((forward, inverse));
+            self.persist_scene_silent();
+        }
+        result.is_ok()
+    }
+
+    fn capture_inverse(&self, cmd: &EditorCommand) -> Option<Inverse> {
+        match cmd {
+            EditorCommand::Spawn => {
+                // We don't know the entity yet; resolved post-apply in dispatch.
+                // Use a placeholder and patch it in below. Simpler: capture after apply.
+                None
+            }
+            EditorCommand::SetTransform { entity, .. } => {
+                let t = self.world.get::<Transform>(*entity)?;
+                Some(Inverse::SetTransform {
+                    entity: *entity,
+                    position: t.position,
+                    rotation: t.rotation,
+                    scale: t.scale,
+                })
+            }
+            EditorCommand::SetTag { entity, .. } => Some(Inverse::SetTag {
+                entity: *entity,
+                prev: self.world.get::<Tag>(*entity).map(|t| t.0.clone()),
+            }),
+            EditorCommand::Despawn { .. }
+            | EditorCommand::SaveScene { .. }
+            | EditorCommand::LoadScene { .. } => None,
+        }
+    }
+
+    fn apply_inverse(&mut self, inverse: &Inverse) {
+        match inverse {
+            Inverse::DespawnSpawned(entity) => {
+                if self.world.is_alive(*entity) {
+                    self.world.despawn(*entity);
+                    if self.selected == Some(*entity) {
+                        self.selected = None;
+                    }
+                }
+            }
+            Inverse::SetTransform {
+                entity,
+                position,
+                rotation,
+                scale,
+            } => {
+                if let Some(t) = self.world.get_mut::<Transform>(*entity) {
+                    t.position = *position;
+                    t.rotation = *rotation;
+                    t.scale = *scale;
+                }
+            }
+            Inverse::SetTag { entity, prev } => {
+                self.world.remove::<Tag>(*entity);
+                if let Some(tag) = prev {
+                    self.world.add(*entity, Tag(tag.clone()));
+                }
+            }
+        }
+    }
+
+    fn persist_scene_silent(&self) {
+        let json = voltex_ecs::serialize_scene_json(&self.world, &self.registry);
+        let _ = std::fs::write(&self.scene_path, json);
     }
 
     fn append_log(&self, cmd: &EditorCommand, result: &Result<Entity, EditorError>) {
@@ -80,29 +240,28 @@ mod tests {
             .into_owned()
     }
 
+    fn cleanup(scene: &str) {
+        let _ = std::fs::remove_file(scene);
+        let _ = std::fs::remove_file(format!("{}.log", scene));
+    }
+
     #[test]
     fn dispatch_spawn_writes_scene_to_disk() {
         let scene = temp_path("voltex_session_spawn.vscn");
-        let log = format!("{}.log", scene);
-        let _ = std::fs::remove_file(&scene);
-        let _ = std::fs::remove_file(&log);
+        cleanup(&scene);
 
         let mut session = EditorSession::new(scene.clone());
         session.dispatch(EditorCommand::Spawn).unwrap();
 
         let on_disk = std::fs::read_to_string(&scene).expect("scene file written");
         assert!(on_disk.contains("\"entities\""));
-
-        let _ = std::fs::remove_file(&scene);
-        let _ = std::fs::remove_file(&log);
+        cleanup(&scene);
     }
 
     #[test]
     fn dispatch_appends_to_log() {
         let scene = temp_path("voltex_session_log.vscn");
-        let log = format!("{}.log", scene);
-        let _ = std::fs::remove_file(&scene);
-        let _ = std::fs::remove_file(&log);
+        cleanup(&scene);
 
         let mut session = EditorSession::new(scene.clone());
         let e = session.dispatch(EditorCommand::Spawn).unwrap();
@@ -115,13 +274,147 @@ mod tests {
             })
             .unwrap();
 
+        let log = format!("{}.log", scene);
         let log_text = std::fs::read_to_string(&log).expect("log written");
         let lines: Vec<&str> = log_text.lines().collect();
         assert_eq!(lines.len(), 2);
         assert!(lines[0].contains("Spawn"));
         assert!(lines[1].contains("SetTransform"));
+        cleanup(&scene);
+    }
 
-        let _ = std::fs::remove_file(&scene);
-        let _ = std::fs::remove_file(&log);
+    #[test]
+    fn undo_spawn_removes_the_entity() {
+        let scene = temp_path("voltex_undo_spawn.vscn");
+        cleanup(&scene);
+        let mut session = EditorSession::new(scene.clone());
+        let e = session.dispatch(EditorCommand::Spawn).unwrap();
+        assert!(session.world.is_alive(e));
+        assert_eq!(session.undo_depth(), 1);
+
+        assert!(session.undo());
+        assert!(!session.world.is_alive(e));
+        assert_eq!(session.undo_depth(), 0);
+        assert_eq!(session.redo_depth(), 1);
+        cleanup(&scene);
+    }
+
+    #[test]
+    fn undo_set_transform_restores_previous_values() {
+        let scene = temp_path("voltex_undo_xform.vscn");
+        cleanup(&scene);
+        let mut session = EditorSession::new(scene.clone());
+        let e = session.dispatch(EditorCommand::Spawn).unwrap();
+        // Spawn writes default Transform (all zeros + scale=1).
+        session
+            .dispatch(EditorCommand::SetTransform {
+                entity: e,
+                position: Vec3::new(5.0, 6.0, 7.0),
+                rotation: Vec3::ZERO,
+                scale: Vec3::new(2.0, 2.0, 2.0),
+            })
+            .unwrap();
+        assert_eq!(session.world.get::<Transform>(e).unwrap().position, Vec3::new(5.0, 6.0, 7.0));
+
+        assert!(session.undo());
+        let t = session.world.get::<Transform>(e).unwrap();
+        assert_eq!(t.position, Vec3::ZERO);
+        assert_eq!(t.scale, Vec3::new(1.0, 1.0, 1.0));
+        cleanup(&scene);
+    }
+
+    #[test]
+    fn undo_set_tag_restores_or_removes() {
+        let scene = temp_path("voltex_undo_tag.vscn");
+        cleanup(&scene);
+        let mut session = EditorSession::new(scene.clone());
+        let e = session.dispatch(EditorCommand::Spawn).unwrap();
+        assert!(session.world.get::<Tag>(e).is_none());
+
+        session
+            .dispatch(EditorCommand::SetTag { entity: e, tag: "Hero".into() })
+            .unwrap();
+        assert_eq!(session.world.get::<Tag>(e).unwrap().0, "Hero");
+
+        // Undo SetTag → no tag again
+        assert!(session.undo());
+        assert!(session.world.get::<Tag>(e).is_none());
+
+        // Redo restores
+        assert!(session.redo());
+        assert_eq!(session.world.get::<Tag>(e).unwrap().0, "Hero");
+        cleanup(&scene);
+    }
+
+    #[test]
+    fn redo_after_new_dispatch_is_cleared() {
+        let scene = temp_path("voltex_redo_cleared.vscn");
+        cleanup(&scene);
+        let mut session = EditorSession::new(scene.clone());
+        let e = session.dispatch(EditorCommand::Spawn).unwrap();
+        session
+            .dispatch(EditorCommand::SetTag { entity: e, tag: "A".into() })
+            .unwrap();
+        session.undo();
+        assert_eq!(session.redo_depth(), 1);
+
+        // New action clears the redo stack
+        session
+            .dispatch(EditorCommand::SetTag { entity: e, tag: "B".into() })
+            .unwrap();
+        assert_eq!(session.redo_depth(), 0);
+        cleanup(&scene);
+    }
+
+    #[test]
+    fn despawn_clears_undo_history_v1() {
+        let scene = temp_path("voltex_despawn_clears.vscn");
+        cleanup(&scene);
+        let mut session = EditorSession::new(scene.clone());
+        let e = session.dispatch(EditorCommand::Spawn).unwrap();
+        session
+            .dispatch(EditorCommand::SetTag { entity: e, tag: "Doomed".into() })
+            .unwrap();
+        assert_eq!(session.undo_depth(), 2);
+
+        session.dispatch(EditorCommand::Despawn { entity: e }).unwrap();
+        assert_eq!(session.undo_depth(), 0);
+        assert_eq!(session.redo_depth(), 0);
+        cleanup(&scene);
+    }
+
+    #[test]
+    fn multi_step_undo_redo_walks_both_ways() {
+        let scene = temp_path("voltex_undo_multi.vscn");
+        cleanup(&scene);
+        let mut session = EditorSession::new(scene.clone());
+        let e = session.dispatch(EditorCommand::Spawn).unwrap();
+        session
+            .dispatch(EditorCommand::SetTransform {
+                entity: e,
+                position: Vec3::new(1.0, 0.0, 0.0),
+                rotation: Vec3::ZERO,
+                scale: Vec3::new(1.0, 1.0, 1.0),
+            })
+            .unwrap();
+        session
+            .dispatch(EditorCommand::SetTransform {
+                entity: e,
+                position: Vec3::new(2.0, 0.0, 0.0),
+                rotation: Vec3::ZERO,
+                scale: Vec3::new(1.0, 1.0, 1.0),
+            })
+            .unwrap();
+        assert_eq!(session.world.get::<Transform>(e).unwrap().position.x, 2.0);
+
+        session.undo();
+        assert_eq!(session.world.get::<Transform>(e).unwrap().position.x, 1.0);
+        session.undo();
+        assert_eq!(session.world.get::<Transform>(e).unwrap().position.x, 0.0);
+        session.redo();
+        assert_eq!(session.world.get::<Transform>(e).unwrap().position.x, 1.0);
+        session.redo();
+        assert_eq!(session.world.get::<Transform>(e).unwrap().position.x, 2.0);
+        cleanup(&scene);
     }
 }
