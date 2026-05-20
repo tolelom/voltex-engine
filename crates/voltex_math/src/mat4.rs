@@ -175,61 +175,65 @@ impl Mat4 {
     }
 
     /// Compute the inverse of this matrix. Returns `None` if the matrix is singular.
+    ///
+    /// Uses direct cofactor expansion via 3x3 minors. The previous shortcut that
+    /// expressed every cofactor in terms of just six 2x2 minors of rows {0,1}
+    /// and six of rows {2,3} produced wrong results for entries whose 3x3
+    /// minor spans top and bottom halves (e.g. row 0 + row 2 + row 3), which
+    /// silently broke unprojection / viewport-picking.
     pub fn inverse(&self) -> Option<Self> {
         let m = &self.cols;
-        // Flatten to row-major for cofactor expansion
-        // m[col][row] — so element (row, col) = m[col][row]
         let e = |r: usize, c: usize| -> f32 { m[c][r] };
 
-        // Compute cofactors using 2x2 determinants
-        let s0 = e(0,0) * e(1,1) - e(1,0) * e(0,1);
-        let s1 = e(0,0) * e(1,2) - e(1,0) * e(0,2);
-        let s2 = e(0,0) * e(1,3) - e(1,0) * e(0,3);
-        let s3 = e(0,1) * e(1,2) - e(1,1) * e(0,2);
-        let s4 = e(0,1) * e(1,3) - e(1,1) * e(0,3);
-        let s5 = e(0,2) * e(1,3) - e(1,2) * e(0,3);
+        // 3x3 determinant of a row-major 3-by-3 block.
+        let det3 = |a: f32, b: f32, c: f32,
+                    d: f32, ee: f32, f: f32,
+                    g: f32, h: f32, i: f32| -> f32 {
+            a * (ee * i - f * h) - b * (d * i - f * g) + c * (d * h - ee * g)
+        };
 
-        let c5 = e(2,2) * e(3,3) - e(3,2) * e(2,3);
-        let c4 = e(2,1) * e(3,3) - e(3,1) * e(2,3);
-        let c3 = e(2,1) * e(3,2) - e(3,1) * e(2,2);
-        let c2 = e(2,0) * e(3,3) - e(3,0) * e(2,3);
-        let c1 = e(2,0) * e(3,2) - e(3,0) * e(2,2);
-        let c0 = e(2,0) * e(3,1) - e(3,0) * e(2,1);
+        // Cofactor at (r, c): signed 3x3 minor with row r and column c removed.
+        let cof = |r: usize, c: usize| -> f32 {
+            let mut rows = [0usize; 3];
+            let mut cols = [0usize; 3];
+            let mut ri = 0;
+            for x in 0..4 {
+                if x != r {
+                    rows[ri] = x;
+                    ri += 1;
+                }
+            }
+            let mut ci = 0;
+            for x in 0..4 {
+                if x != c {
+                    cols[ci] = x;
+                    ci += 1;
+                }
+            }
+            let sign = if (r + c) % 2 == 0 { 1.0 } else { -1.0 };
+            sign * det3(
+                e(rows[0], cols[0]), e(rows[0], cols[1]), e(rows[0], cols[2]),
+                e(rows[1], cols[0]), e(rows[1], cols[1]), e(rows[1], cols[2]),
+                e(rows[2], cols[0]), e(rows[2], cols[1]), e(rows[2], cols[2]),
+            )
+        };
 
-        let det = s0 * c5 - s1 * c4 + s2 * c3 + s3 * c2 - s4 * c1 + s5 * c0;
+        // det(M) = Laplace expansion along row 0.
+        let det = e(0,0) * cof(0,0) + e(0,1) * cof(0,1)
+                + e(0,2) * cof(0,2) + e(0,3) * cof(0,3);
         if det.abs() < 1e-12 {
             return None;
         }
         let inv_det = 1.0 / det;
 
-        // Adjugate matrix (transposed cofactor matrix), stored column-major
-        let inv = Self::from_cols(
-            [
-                ( e(1,1) * c5 - e(1,2) * c4 + e(1,3) * c3) * inv_det,
-                (-e(0,1) * c5 + e(0,2) * c4 - e(0,3) * c3) * inv_det,
-                ( e(3,1) * s5 - e(3,2) * s4 + e(3,3) * s3) * inv_det,
-                (-e(2,1) * s5 + e(2,2) * s4 - e(2,3) * s3) * inv_det,
-            ],
-            [
-                (-e(1,0) * c5 + e(1,2) * c2 - e(1,3) * c1) * inv_det,
-                ( e(0,0) * c5 - e(0,2) * c2 + e(0,3) * c1) * inv_det,
-                (-e(3,0) * s5 + e(3,2) * s2 - e(3,3) * s1) * inv_det,
-                ( e(2,0) * s5 - e(2,2) * s2 + e(2,3) * s1) * inv_det,
-            ],
-            [
-                ( e(1,0) * c4 - e(1,1) * c2 + e(1,3) * c0) * inv_det,
-                (-e(0,0) * c4 + e(0,1) * c2 - e(0,3) * c0) * inv_det,
-                ( e(3,0) * s4 - e(3,1) * s2 + e(3,3) * s0) * inv_det,
-                (-e(2,0) * s4 + e(2,1) * s2 - e(2,3) * s0) * inv_det,
-            ],
-            [
-                (-e(1,0) * c3 + e(1,1) * c1 - e(1,2) * c0) * inv_det,
-                ( e(0,0) * c3 - e(0,1) * c1 + e(0,2) * c0) * inv_det,
-                (-e(3,0) * s3 + e(3,1) * s1 - e(3,2) * s0) * inv_det,
-                ( e(2,0) * s3 - e(2,1) * s1 + e(2,2) * s0) * inv_det,
-            ],
-        );
-        Some(inv)
+        // inv(r, c) = cofactor(c, r) / det  (adjugate is transposed cofactor).
+        let mut out = [[0.0f32; 4]; 4];
+        for r in 0..4 {
+            for c in 0..4 {
+                out[c][r] = cof(c, r) * inv_det;
+            }
+        }
+        Some(Mat4 { cols: out })
     }
 
     /// Return the transpose of this matrix.
@@ -394,6 +398,43 @@ mod tests {
         let ndc = Vec3::new(p.x / p.w, p.y / p.w, p.z / p.w);
         assert!(approx_eq(ndc.x, 0.0));
         assert!(approx_eq(ndc.y, 0.0));
+    }
+
+    // M * inv(M) == I  for a perspective+lookAt composition. Regression for a
+    // historical bug where inverse() built cofactors from only 2x2 minors of
+    // rows {0,1}+{2,3}, which is insufficient for entries whose 3x3 minor spans
+    // top and bottom halves of the matrix.
+    #[test]
+    fn test_inverse_composes_to_identity() {
+        let view = Mat4::look_at(
+            Vec3::new(0.0, 1.5, 5.0),
+            Vec3::new(0.0, 0.0, 0.0),
+            Vec3::new(0.0, 1.0, 0.0),
+        );
+        let proj = Mat4::perspective(std::f32::consts::FRAC_PI_4, 1.0, 0.1, 100.0);
+        let vp = proj.mul_mat4(&view);
+        let inv = vp.inverse().expect("invertible");
+        let product = vp.mul_mat4(&inv);
+        for col in 0..4 {
+            for row in 0..4 {
+                let expected = if col == row { 1.0 } else { 0.0 };
+                assert!(
+                    (product.cols[col][row] - expected).abs() < 1e-3,
+                    "[col {} row {}] = {}, expected {}",
+                    col, row, product.cols[col][row], expected,
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_inverse_translate_roundtrip() {
+        let t = Mat4::translation(3.0, -4.0, 7.0);
+        let inv = t.inverse().expect("translation invertible");
+        let v = Vec4::new(1.0, 2.0, 3.0, 1.0);
+        let mapped = t * v;
+        let back = inv * mapped;
+        assert!(vec4_approx_eq(back, v));
     }
 
     // 9. as_slice — identity diagonal
