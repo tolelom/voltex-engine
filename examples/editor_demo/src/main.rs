@@ -10,15 +10,16 @@ use voltex_renderer::{GpuContext, LightUniform, MaterialUniform, Mesh, MeshVerte
 use voltex_renderer_ecs::{BasicRenderer, RenderAssets};
 use voltex_editor::{
     UiContext, UiRenderer, DockTree, DockNode, Axis, Rect,
-    OrbitCamera, ViewportTexture, ViewportRenderer, VIEWPORT_COLOR_FORMAT,
+    OrbitCamera, ViewportTexture, ViewportRenderer, VIEWPORT_COLOR_FORMAT, VIEWPORT_DEPTH_FORMAT,
     hierarchy_panel, inspector_panel, InspectorState,
     AssetBrowser, asset_browser_panel,
     EditorSession, EditorCommand,
     pick_entity,
+    GizmoMode, GizmoRenderer, GizmoState,
 };
 use voltex_ecs::entity::Entity;
-use voltex_ecs::{MaterialHandle, MeshHandle};
-use voltex_math::Vec3;
+use voltex_ecs::{Bounds, MaterialHandle, MeshHandle};
+use voltex_math::{Vec3, AABB};
 
 struct EditorDemoApp {
     state: Option<AppState>,
@@ -47,6 +48,10 @@ struct AppState {
     #[allow(dead_code)]
     ground_mesh_h: MeshHandle,
     default_mat_h: MaterialHandle,
+    // Gizmo state + renderer (E1)
+    gizmo_state: GizmoState,
+    gizmo_renderer: GizmoRenderer,
+    gizmo_dragging: bool,
     // Asset browser
     asset_browser: AssetBrowser,
     // Mouse tracking
@@ -157,6 +162,13 @@ impl ApplicationHandler for EditorDemoApp {
             256,
         );
 
+        let gizmo_renderer = GizmoRenderer::new(
+            &gpu.device,
+            VIEWPORT_COLOR_FORMAT,
+            VIEWPORT_DEPTH_FORMAT,
+        );
+        let gizmo_state = GizmoState::new();
+
         // ECS Session setup — World lives inside the EditorSession so Toolbar
         // actions can be logged and auto-saved. Seed entities go through the
         // command dispatcher so they appear in the jsonl log and survive a
@@ -197,6 +209,15 @@ impl ApplicationHandler for EditorDemoApp {
         session.world.add(cube3_e, MeshHandle(cube_mesh_h.0));
         session.world.add(cube3_e, MaterialHandle(default_mat_h.0));
 
+        // Bounds for AABB picking (E1). Local-space mesh AABB; world AABB is
+        // rebuilt each frame inside pick_entity using WorldTransform.
+        let cube_bounds = Bounds(AABB::new(Vec3::new(-0.5, -0.5, -0.5), Vec3::new(0.5, 0.5, 0.5)));
+        let ground_bounds = Bounds(AABB::new(Vec3::new(-5.0, -0.01, -5.0), Vec3::new(5.0, 0.01, 5.0)));
+        session.world.add(ground_e, ground_bounds);
+        session.world.add(cube1_e, cube_bounds);
+        session.world.add(cube2_e, cube_bounds);
+        session.world.add(cube3_e, cube_bounds);
+
         // Cube2 is child of Cube1 — through the command path so undo/redo
         // and the log capture the relationship.
         session.dispatch(EditorCommand::AddChild {
@@ -220,6 +241,9 @@ impl ApplicationHandler for EditorDemoApp {
             cube_mesh_h,
             ground_mesh_h,
             default_mat_h,
+            gizmo_state,
+            gizmo_renderer,
+            gizmo_dragging: false,
             asset_browser,
             session,
             inspector_state: InspectorState::default(),
@@ -279,12 +303,28 @@ impl ApplicationHandler for EditorDemoApp {
                         let p = (pos.0 as f32, pos.1 as f32);
                         if pressed {
                             state.left_down_pos = Some(p);
-                        } else if let Some(down) = state.left_down_pos.take() {
-                            // Treat as a click if total movement is small.
-                            let dx = (p.0 - down.0).abs();
-                            let dy = (p.1 - down.1).abs();
-                            if dx + dy < 4.0 {
-                                state.pending_click = Some(p);
+                            state.gizmo_dragging = false;
+                        } else {
+                            // Release: if a gizmo drag was active, end it.
+                            if state.gizmo_dragging {
+                                if let Some(sel) = state.session.selected {
+                                    if let Some(drag) = state.gizmo_state.end_drag(&mut state.session.world, sel) {
+                                        let _ = state.session.dispatch(EditorCommand::SetTransform {
+                                            entity: sel,
+                                            position: drag.final_transform.position,
+                                            rotation: drag.final_transform.rotation,
+                                            scale: drag.final_transform.scale,
+                                        });
+                                    }
+                                }
+                                state.gizmo_dragging = false;
+                                state.left_down_pos = None;
+                            } else if let Some(down) = state.left_down_pos.take() {
+                                let dx = (p.0 - down.0).abs();
+                                let dy = (p.1 - down.1).abs();
+                                if dx + dy < 4.0 {
+                                    state.pending_click = Some(p);
+                                }
                             }
                         }
                     }
@@ -349,6 +389,9 @@ impl ApplicationHandler for EditorDemoApp {
                 if state.ui.button("Redo") {
                     state.session.redo();
                 }
+                if state.ui.button("Move") { state.gizmo_state.set_mode(GizmoMode::Translate); }
+                if state.ui.button("Rotate") { state.gizmo_state.set_mode(GizmoMode::Rotate); }
+                if state.ui.button("Scale") { state.gizmo_state.set_mode(GizmoMode::Scale); }
                 state.ui.end_panel();
 
                 let areas = state.dock.layout(Rect { x: 0.0, y: TOOLBAR_H, w: screen_w, h: screen_h - TOOLBAR_H });
@@ -384,16 +427,53 @@ impl ApplicationHandler for EditorDemoApp {
 
                 state.ui.end_frame();
 
-                // Orbit camera input (only when mouse is over viewport)
+                // Orbit camera input (only when mouse is over viewport).
+                // Gizmo dragging preempts orbit so the camera doesn't fight the gizmo.
                 if let Some(vr) = &viewport_rect {
                     if vr.contains(mx, my) {
                         let dx = mx - state.prev_mouse.0;
                         let dy = my - state.prev_mouse.1;
-                        if state.left_dragging { state.orbit_cam.orbit(dx, dy); }
+                        if state.left_dragging && !state.gizmo_dragging { state.orbit_cam.orbit(dx, dy); }
                         if state.middle_dragging { state.orbit_cam.pan(dx, dy); }
                         if state.scroll_delta.abs() > 0.0 {
                             state.orbit_cam.zoom(state.scroll_delta);
                         }
+                    }
+                }
+
+                // ── Gizmo drag begin / update ──
+                if let (Some(sel), Some(vr)) = (state.session.selected, viewport_rect) {
+                    let aspect = vr.w / vr.h.max(1.0);
+                    let vp = state.orbit_cam.view_projection(aspect);
+                    let cam_pos = state.orbit_cam.position();
+                    let rect_tuple = (vr.x, vr.y, vr.w, vr.h);
+                    let mouse = (mx, my);
+
+                    if state.left_dragging
+                        && !state.gizmo_dragging
+                        && state.left_down_pos.map(|p| (p.0 - mx).abs() + (p.1 - my).abs() < 8.0).unwrap_or(false)
+                        && vr.contains(mx, my)
+                    {
+                        if state.gizmo_state.try_begin_drag(
+                            &mut state.session.world,
+                            sel,
+                            &vp,
+                            cam_pos,
+                            rect_tuple,
+                            mouse,
+                        ) {
+                            state.gizmo_dragging = true;
+                        }
+                    }
+                    if state.gizmo_dragging {
+                        state.gizmo_state.update_drag(
+                            &mut state.session.world,
+                            sel,
+                            &vp,
+                            cam_pos,
+                            rect_tuple,
+                            mouse,
+                        );
                     }
                 }
 
@@ -466,6 +546,22 @@ impl ApplicationHandler for EditorDemoApp {
                         cam_pos,
                         light,
                     );
+
+                    // Gizmo overlay (depth-off, always on top of the scene).
+                    if let Some(sel) = state.session.selected {
+                        if let Some(origin) = GizmoState::gizmo_origin(&state.session.world, sel) {
+                            state.gizmo_renderer.render(
+                                &state.gpu.queue,
+                                &mut encoder,
+                                &state.viewport_tex.color_view,
+                                &state.viewport_tex.depth_view,
+                                vp,
+                                origin,
+                                state.gizmo_state.mode,
+                                state.gizmo_state.active_axis(),
+                            );
+                        }
+                    }
                 }
 
                 // Clear the surface background
