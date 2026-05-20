@@ -49,8 +49,10 @@ L2:
   voltex_renderer   → voltex_math, voltex_platform   (wgpu, PBR, RT, post-process)
 
 L3:
-  voltex_editor     → voltex_math, voltex_ecs, voltex_renderer
-                      (IMGUI, dock, viewport, inspector, TTF)
+  voltex_renderer_ecs → voltex_math, voltex_ecs, voltex_asset, voltex_renderer
+                        (RenderAssets, BasicRenderer, collect_render_items — ECS-driven 렌더링 브릿지)
+  voltex_editor       → voltex_math, voltex_ecs, voltex_renderer
+                        (IMGUI, dock, viewport, inspector, TTF)
 
 L4 (facade):
   voltex            → 모든 sub-crate를 모듈로 re-export + prelude

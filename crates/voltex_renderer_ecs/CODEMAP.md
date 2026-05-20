@@ -1,0 +1,51 @@
+# voltex_renderer_ecs
+
+ECS World ↔ voltex_renderer 브릿지. C0a 의 `MeshHandle` / `MaterialHandle` 컴포넌트를 실제 GPU 자원과 연결한다.
+
+## 책임
+
+- `voltex_renderer::Mesh` 와 `MaterialUniform` 을 `RenderAssets` 에 저장
+- C0a 의 phantom-typed `Handle<MeshAsset>` / `Handle<MaterialAsset>` 과 내부 `Handle<Mesh>` / `Handle<MaterialUniform>` 의 id/generation lockstep 유지
+- `BasicRenderer` (mesh_shader.wgsl, Blinn-Phong) 로 한 메서드 호출로 World 를 그림
+- `collect_render_items` 로 자체 pipeline 호출자(survivor_game PBR loop) 를 위한 RenderItem 리스트 생성
+
+## 공개 API
+
+| 항목 | 파일 | 메모 |
+|---|---|---|
+| `RenderAssets::new()` / `add_mesh(Mesh) -> MeshHandle` / `mesh(MeshHandle) -> Option<&Mesh>` | `assets.rs` | 머티리얼도 동일 패턴 (`add_material` / `material`) |
+| `RenderItem { entity, model, mesh, material }` | `items.rs` | per-frame 데이터 단위 |
+| `collect_render_items(&mut World, &RenderAssets) -> Vec<RenderItem>` | `items.rs` | `propagate_transforms` 자동 호출 |
+| `BasicRenderer::new(device, queue, target_format, max_entities)` | `basic_renderer.rs` | mesh_shader.wgsl pipeline 소유 |
+| `BasicRenderer::render(queue, encoder, target_view, depth_view, clear_color, &mut World, &RenderAssets, view_proj, cam_pos, light)` | `basic_renderer.rs` | dynamic-offset draw |
+| `RendererEcsError`, `Result<T>` | `error.rs` | M4 표준 패턴 |
+
+## 의존성
+
+- voltex_math — `Mat4`, `Vec3`
+- voltex_ecs — `World`, `Entity`, `MeshHandle`, `MaterialHandle`, `WorldTransform`, `propagate_transforms`
+- voltex_asset — `Handle`, `Assets`
+- voltex_renderer — `Mesh`, `MaterialUniform`, `CameraUniform`, `LightUniform`, `GpuTexture`, `pipeline::create_mesh_pipeline`
+- wgpu, bytemuck, thiserror
+
+## 모듈 구조
+
+```
+src/
+├── lib.rs              # module decls + re-exports
+├── error.rs            # RendererEcsError + Result<T>
+├── assets.rs           # RenderAssets
+├── items.rs            # RenderItem + collect_render_items
+└── basic_renderer.rs   # BasicRenderer
+```
+
+각 파일 300줄 미만. lib.rs 는 module/use 만.
+
+## 변경 시 주의점
+
+- `RenderAssets::add_mesh` / `add_material` 외 경로로 핸들을 만들면 id 불일치 위험. `Handle::from_raw_parts` 의 직접 사용은 scene deserialize 가 유일한 정당 사용처.
+- `BasicRenderer::new(max_entities)` 보다 많은 엔티티가 World 에 있으면 초과분은 silently drop. v1 한도 (수십~수백) 에서는 무시 가능하지만 외부 사용 시 `max_entities` 적절히 설정.
+- `BasicRenderer` 의 pipeline 은 mesh_shader.wgsl (Blinn-Phong). PBR / 멀티라이트 / 그림자 사용 시 자체 pipeline + `collect_render_items` 패턴 사용 (survivor_game 참조).
+- `propagate_transforms` 가 매 `collect_render_items` 호출마다 실행. 한 프레임에 여러 번 부르면 비용 누적 → 매 프레임 한 번만 호출 권장.
+- max_bind_groups=4 제약: BasicRenderer 는 2개 (cam+light, texture). 외부 추가 bind group 시점 점검.
+- headless 단위 테스트는 GPU device 가 필요해서 `add_mesh` 라운드트립 / `collect_render_items` 의 emit 케이스 직접 검증 불가 → editor_demo 시각 검증으로 위임.

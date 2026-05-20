@@ -7,6 +7,7 @@ edition = "2021"
 voltex_math = { workspace = true }
 voltex_platform = { workspace = true }
 voltex_renderer = { workspace = true }
+voltex_renderer_ecs = { workspace = true }
 voltex_ecs = { workspace = true }
 voltex_asset = { workspace = true }
 voltex_physics = { workspace = true }

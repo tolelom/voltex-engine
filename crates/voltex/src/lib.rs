@@ -19,6 +19,7 @@ pub use voltex_net as net;
 pub use voltex_physics as physics;
 pub use voltex_platform as platform;
 pub use voltex_renderer as renderer;
+pub use voltex_renderer_ecs as renderer_ecs;
 pub use voltex_script as script;
 
 /// 자주 쓰는 타입을 한 번에 가져온다.
