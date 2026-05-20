@@ -1,7 +1,7 @@
 # voltex_audio
 
 ## 책임 (한 줄)
-오디오 — WAV/OGG 디코더, WASAPI 백엔드, 3D 사운드, 믹서, 이펙트.
+오디오 — WAV/OGG 디코더, AudioBackend (WASAPI/ALSA/Null), 3D 사운드, 믹서, 이펙트.
 
 ## 공개 API 진입점
 - `AudioSystem` — 메인 오디오 시스템 (src/audio_system.rs)
@@ -13,6 +13,8 @@
 - `EffectChain`, `Reverb`, `EchoDelay` — 이펙트 (src/effect_chain.rs, src/reverb.rs)
 - spatial — `distance_attenuation`, `stereo_pan`, `doppler_shift`, HRTF (src/spatial.rs, src/hrtf.rs)
 - `Occlusion` — 레이 기반 차폐 (src/occlusion.rs)
+- `AudioBackend` trait + impls (P1): `WasapiBackend` (Windows), `AlsaBackend` (Linux), `NullBackend` (헤드리스/CI), `make_backend()` (OS 자동 분기) (src/backend/)
+- `BackendError` — backend-level error type
 - `AudioError`, `Result` — thiserror 기반 에러 (Generic/Io) (src/error.rs)
 
 ## 모듈 구조
@@ -23,14 +25,19 @@
 - `mixing`, `mix_group`, `dynamic_groups`, `audio_bus` — 믹서 (src/mixing.rs 등)
 - `effect_chain`, `reverb`, `fade_curves` — 이펙트 (src/effect_chain.rs 등)
 - `spatial`, `hrtf`, `occlusion` — 3D 오디오 (src/spatial.rs 등)
-- `wasapi` — Windows 백엔드 (src/wasapi.rs)
+- `wasapi` — Windows 백엔드 FFI (src/wasapi.rs)
+- `backend` — `AudioBackend` trait + `null.rs` + `wasapi.rs` (windows) + `alsa.rs` (linux) + `make_backend` (P1)
 
 ## 의존성
 - voltex crate: voltex_math (3D 사운드 좌표)
 - 외부 crate: 없음 (WASAPI는 Windows API 직접 사용)
 
 ## 변경 시 주의점
-- WASAPI는 Windows 전용 — macOS/Linux 백엔드 미구현
+- WASAPI 는 Windows 전용 FFI — `backend::WasapiBackend` 가 trait impl 로 래핑
+- ALSA 는 Linux 전용 FFI — `backend::AlsaBackend` (cfg(target_os = "linux") only). `#[link(name = "asound")]` → 사용자 시스템에 `libasound2` (apt) 또는 `alsa-lib` (pacman) 설치 필요.
+- ALSA 초기화 실패 시 `make_backend()` 가 stderr 에 경고 출력 후 `NullBackend` 로 fallback — 헤드리스 환경에서도 audio 스레드 panic 없음.
+- macOS CoreAudio 백엔드는 Cycle 11 (B3) 의 일.
+- ALSA backend 는 Windows dev 머신에서 작성됨 → Linux 환경에서 실제 cargo build + audio_demo 검증은 향후 (spec § 8.1).
 - vorbis는 src/vorbis/ 디렉토리로 분리됨 (bit_reader, codebook, floor, residue, headers, imdct, decoder)
 - wasapi.rs는 521줄 (spec 만족, 분리 대상 아님)
 - AudioSource 컴포넌트는 ECS와 함께 사용
@@ -38,4 +45,4 @@
 ## 테스트
 - 단위 테스트: src/**/*.rs `#[cfg(test)]`
 - 실행: `cargo test -p voltex_audio --lib`
-- 현재 테스트 개수: 84개
+- 현재 테스트 개수: 89개 (P1 +5: backend null ×3, make_backend smoke, BackendError Display)

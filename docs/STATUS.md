@@ -166,6 +166,38 @@
 - examples/editor_demo: 시드 엔티티 (ground + 3 cube + Cube1↔Cube2 hierarchy)를 `EditorSession::dispatch` 경로로 옮김 → jsonl 로그 + Save/Load round-trip 일관성
 - v1 한계 (문서화): picking은 sphere 근사 (메시 AABB는 미구현). gizmo translate/rotate/scale 핸들은 미구현
 
+### Cycle 10 (P1): AudioBackend trait + ALSA (2026-05-21)
+- voltex_audio::backend (신규 디렉토리): **`AudioBackend` trait** (sample_rate/channels/buffer_frames/write/shutdown), `BackendError` (InitFailed/WriteFailed/NotSupported), `make_backend()` 가 OS 분기 + null fallback.
+- `WasapiBackend` — 기존 src/wasapi.rs 의 `WasapiDevice` 를 trait impl 로 래핑 (Windows only).
+- `AlsaBackend` — libasound FFI (`snd_pcm_open` / `set_params` / `writei` / `prepare` / `close`), f32 LE stereo @48kHz 고정, EPIPE/ESTRPIPE underrun 복구 (Linux only, `#[link(name = "asound")]`).
+- `NullBackend` — 헤드리스/CI 용 no-op. make_backend 가 init 실패 시 자동 fallback.
+- ALSA 검증 한계: 코드 작성은 Windows 개발 머신에서 수행 → Linux 환경에서의 실제 `cargo build --target x86_64-unknown-linux-gnu` + audio_demo 소리 출력 검증은 향후. spec § 8.1 에 명시.
+- 테스트 +5 (null backend ×3, make_backend smoke, BackendError Display). voltex_audio 84 → 89.
+
+### Cycle 9 (B2): Asset packing + VFS (2026-05-21)
+- voltex_asset::vpkg (신규): **`.vpkg` 포맷** (magic "VPKG" + version 1 + entry table + concat blobs), no compression, no external deps. `write_vpkg(&[(path, bytes)])` / `VpkgReader::parse(&[u8])`.
+- voltex_asset::vfs (신규): **`Vfs` enum** — `Filesystem(PathBuf)` | `Archive(VpkgReaderOwned)`. 단일 `read(path)` / `exists` / `list` API. `archive_from_bytes(&'static [u8])` 가 `include_bytes!` 결과를 받음.
+- voltex_runtime: `RuntimeConfig::with_vfs(Vfs)` 빌더 + `RuntimeApp` 의 scene 로더가 Vfs 우선 (fs fallback 유지). `voltex::Vfs` re-export.
+- voltex_cli build: scene + scripts + assets 를 `<dist>/wrapper/voltex_archive.vpkg` 로 묶고 wrapper main.rs 가 `include_bytes!("../voltex_archive.vpkg")` + `Vfs::archive_from_bytes` + `with_vfs` 로 self-contained exe 생성.
+- 테스트 +13 (voltex_asset +12: vpkg ×6 [roundtrip 2, bad magic, truncated, empty, unknown path], vfs ×6 [fs read/missing/list, archive read/unknown/exists-matches]. voltex_cli +1: pack_archive). voltex_asset 24 → 36.
+
+### Cycle 8 (B1): voltex.toml + voltex CLI + Windows exe (2026-05-21)
+- crates/voltex_cli (B1-spike 의 voltex_cli 를 production-grade 로 확장): 6 모듈 (main/manifest/error/util/new/build/run)
+- **voltex.toml 매니페스트** (자체 미니 TOML 파서, 외부 의존 0): `[project] name/version`, `[build] scene/scripts/assets/window_title/window_size/targets`, `[build.<triple>] icon`.
+- **`voltex new <name>`**: 디렉토리 스캐폴드 (voltex.toml + scene.vscn + scripts/spinner.lua + assets/.gitkeep).
+- **`voltex build [--target X] [--manifest-path D] [--engine-path R]`**: 매니페스트 파싱 → wrapper crate 생성 → cargo build --release → `dist/<name>(.exe)` + 자원 복사.
+- **`voltex run`**: build 후 exe 실행, exit code 전파.
+- 친화 에러: `MissingField/ManifestParse/CargoMissing/...` 의 Display impl.
+- 테스트 +19 (manifest 9, new 3, build 2, util 3, strip_glob, host_triple).
+- Roadmap Cycle 8 [✅ 3/3] commit bda6412.
+
+### Cycle 7 (B1-spike): voltex_cli prototype (2026-05-21)
+- crates/voltex_cli 신규 (bin name "voltex") — 1세션 timebox.
+- 단일 subcommand `voltex build <project_dir>` — wrapper crate 생성 + cargo build --release → `dist/<name>(.exe)` + scene/scripts/assets 자원 복사.
+- 학습 노트: docs/superpowers/notes/2026-05-21-b1-spike-learnings.md — voltex.toml 매니페스트 필드 결정, target dir 공유 미지수, host triple 분기 등 B1 의 출발점.
+- 테스트 3 (project_name, escape_for_rust_string, copy_optional_file no-op).
+- Roadmap Cycle 7 [✅ 1/1] commit 5c885e2.
+
 ### Cycle 6 (B0): voltex_runtime 라이브러리 (2026-05-21)
 - crates/voltex_runtime (L3 신규): **`RuntimeConfig`** 빌더 (8 메서드) + **`RuntimeApp`** + winit `ApplicationHandler` 통합 + `RuntimeError`/`RuntimeResult` (thiserror).
 - **`RuntimeApp::new(config)`** — `register_defaults` → register_components 콜백 → 초기 scene 로드 (silent 실패) → build_scene 콜백 → setup_systems 콜백. GPU/window 는 만들지 않음 (lazy).
@@ -232,25 +264,27 @@ crates/
 ├── voltex_net         — UDP, NetServer/Client, Reliable/Ordered, Snapshot(delta), Interpolation
 ├── voltex_script      — Lua 5.4, LuaState, table interop, coroutine, sandbox, hot reload, ScriptInstancePool + system (S1)
 ├── voltex_editor      — IMGUI, docking, 3D viewport, inspector, asset browser, TTF font, UiRenderer
-└── voltex_runtime     — RuntimeApp + RuntimeConfig builder + winit handler (B0, "조립된 앱" 진입점)
+├── voltex_runtime     — RuntimeApp + RuntimeConfig builder + winit handler (B0, "조립된 앱" 진입점)
+└── voltex_cli         — bin "voltex" (new/build/run), voltex.toml 매니페스트, .vpkg packing (B1+B2)
 ```
 
-## 테스트: 878개 전부 통과 (Cycle 6 +11 vs Cycle 5 직후 867; Cycle 5 +17 vs Cycle 4 직후 850)
+## 테스트: 895개 전부 통과 (Cycle 7-10 +17 vs Cycle 6 직후 878; Cycle 6 +11 vs Cycle 5 직후 867)
 
 - voltex: 2 (M6: prelude/module 경로 컴파일 검증)
 - voltex_math: 39 (8-7 +2: inverse roundtrip × VP+translation)
 - voltex_platform: 3
 - voltex_ecs: 121 (S1 +5: ScriptComponent roundtrip/unbound/too-short/utf8 ×4 + register_defaults_includes_script ×1)
-- voltex_asset: 24 (C0a +2: Handle::from_raw_parts / id+generation 접근자)
+- voltex_asset: 36 (B2 +12: vpkg ×6 + vfs ×6; C0a +2: Handle accessors)
 - voltex_renderer: 200
 - voltex_renderer_ecs: 7 (C0b 신규: RenderAssets material roundtrip ×2, missing handle ×2, items empty/skip-no-mesh/stale/hierarchy)
 - voltex_physics: 106
-- voltex_audio: 84
+- voltex_audio: 89 (P1 +5: backend null ×3, make_backend smoke, BackendError Display)
 - voltex_ai: 34
 - voltex_net: 47
 - voltex_script: 42 (S1 +12: pool ×6 [get_or_create same/load/reload/unknown/poll_reload/clear], system ×4 [start/update/5-cubes/missing-callbacks], engine_api ×2 [iter_entities/iter_by_tag])
 - voltex_editor: 158 (E2 +12: session::* mode/snapshot/dispatch ×7, lifecycle/callbacks ×4, undo/redo non-Health-snapshot inner test ×1)
 - voltex_runtime: 11 (B0 신규: config ×5, error ×2, app ×4 [registry/scene order, system order, transform propagation, missing-scene graceful])
+- voltex_cli: 20 (B1-spike +3, B1 +16, B2 +1: manifest ×9, new ×3, build ×2 + pack_archive, util ×3, strip_glob, host_triple)
 
 ## Examples (13개 + survivor_game)
 

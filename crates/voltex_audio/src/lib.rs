@@ -4,6 +4,7 @@ pub mod wav;
 pub mod mixing;
 #[cfg(target_os = "windows")]
 pub mod wasapi;
+pub mod backend;
 pub mod audio_system;
 pub mod spatial;
 pub mod hrtf;
@@ -32,3 +33,8 @@ pub mod async_loader;
 pub use async_loader::AsyncAudioLoader;
 pub mod effect_chain;
 pub use effect_chain::{AudioEffect, EffectChain};
+pub use backend::{AudioBackend, BackendError, NullBackend, make_backend};
+#[cfg(target_os = "windows")]
+pub use backend::WasapiBackend;
+#[cfg(target_os = "linux")]
+pub use backend::AlsaBackend;
