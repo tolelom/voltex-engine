@@ -155,6 +155,8 @@
 - voltex_editor: **EditorSession Undo/Redo** — Inverse 스택, undo()/redo()/undo_depth()/redo_depth(). v1 undoable: Spawn/SetTransform/SetTag/AddChild/RemoveChild. v1 non-undoable: Despawn/SaveScene/LoadScene (history 클리어)
 - voltex_editor: **AddChild/RemoveChild commands** — hierarchy 조작도 동일 dispatch path. 비-attached child의 RemoveChild는 no-op + 미기록
 - voltex_script: **Lua FFI 핸들 규약** — Entity = `(id, gen)` 두 정수. spawn_entity → 2 returns, set/get_position → id+gen+payload. 핸들 stale 시 `World::is_alive` 거부 (ABA 버그 fix)
+- voltex_script: **engine_api 확장** — 4개 → 12개 함수. 신규: destroy_entity / set/get_rotation / set/get_scale / set/get_tag / find_by_tag. 모두 `(id, gen)` 규약 준수
+- voltex_ecs: **World::clear()** — 모든 entity/component/allocator 리셋. LoadScene 같은 source-of-truth replace 시나리오용
 - examples/editor_demo: Toolbar에 Undo/Redo 버튼 추가, `session.selected` 가 선택의 단일 소스
 
 ## Crate 구조
@@ -175,20 +177,20 @@ crates/
 └── voltex_editor    — IMGUI, docking, 3D viewport, inspector, asset browser, TTF font, UiRenderer
 ```
 
-## 테스트: 776개 전부 통과 (Phase 8-6 +11)
+## 테스트: 783개 전부 통과 (Phase 8-6 +18)
 
 - voltex: 2 (M6: prelude/module 경로 컴파일 검증)
 - voltex_math: 37
 - voltex_platform: 3
-- voltex_ecs: 107 (M5 +3: Component trait 제네릭 register / 커스텀 컴포넌트 roundtrip / register_raw)
+- voltex_ecs: 109 (M5 +3; 8-6 +2: World::clear roundtrip)
 - voltex_asset: 22
 - voltex_renderer: 200
 - voltex_physics: 106
 - voltex_audio: 84
 - voltex_ai: 34
 - voltex_net: 47
-- voltex_script: 21 (8-6 +3: stale-handle 거부, multi-return spawn, multi-arg set/get)
-- voltex_editor: 113 (8-6: inspector 통합 -3, undo/redo +6, AddChild/RemoveChild +5)
+- voltex_script: 25 (8-6 +7: handle 규약 fix + engine_api 4→12 함수)
+- voltex_editor: 114 (8-6: inspector 통합 -3, undo/redo +6, AddChild/RemoveChild +5, LoadScene clear +1)
 
 ## Examples (12개 + survivor_game)
 
@@ -204,7 +206,7 @@ crates/
 3. **EditorCommand 확장 추가** — Undo/Redo ✅, AddChild/RemoveChild ✅. 남은 후보: AddComponent/RemoveComponent (Transform 외 컴포넌트 — ComponentRegistry 의 raw byte API 활용).
 4. **Despawn 정확한 undo** — 현재 v1은 history 클리어. `EntityAllocator::restore_at_generation(id, gen)` 추가 + 컴포넌트 스냅샷 백업 형태로 풀 undo 지원. World API 변경이라 별 commit 필요.
 5. **viewport raycast 픽킹 + gizmo** — viewport 안에서 마우스 클릭 → ray cast → 엔티티 선택 (`session.selected`). gizmo (translate/rotate/scale 핸들) 도 dispatch path 경유.
-6. **Lua API 확장** — `voltex_script::engine_api` 가 여전히 4개 함수만 노출. set/get_rotation/scale, destroy(id, gen), find_by_tag, AddChild/RemoveChild 등 추가. 새 함수도 (id, gen) 핸들 규약 따라야 함.
+6. ~~**Lua API 확장**~~ — ✅ Phase 8-6 (12개 함수). 다음: AddChild/RemoveChild, get_world_transform, find_all_by_tag 같은 collection 반환.
 7. ~~**survivor_game을 ECS/Physics로 재작성**~~ — ✅ 완료 (2026-05-20).
 
 ## 다른 기기에서 이어서 작업하기
