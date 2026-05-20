@@ -2082,6 +2082,7 @@ checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
 name = "voltex_ai"
 version = "0.1.0"
 dependencies = [
+ "thiserror 2.0.18",
  "voltex_ecs",
  "voltex_math",
 ]
@@ -2089,11 +2090,15 @@ dependencies = [
 [[package]]
 name = "voltex_asset"
 version = "0.1.0"
+dependencies = [
+ "thiserror 2.0.18",
+]
 
 [[package]]
 name = "voltex_audio"
 version = "0.1.0"
 dependencies = [
+ "thiserror 2.0.18",
  "voltex_math",
 ]
 
@@ -2101,6 +2106,7 @@ dependencies = [
 name = "voltex_ecs"
 version = "0.1.0"
 dependencies = [
+ "thiserror 2.0.18",
  "voltex_math",
 ]
 
@@ -2109,6 +2115,7 @@ name = "voltex_editor"
 version = "0.1.0"
 dependencies = [
  "bytemuck",
+ "thiserror 2.0.18",
  "voltex_ecs",
  "voltex_math",
  "voltex_renderer",
@@ -2122,6 +2129,9 @@ version = "0.1.0"
 [[package]]
 name = "voltex_net"
 version = "0.1.0"
+dependencies = [
+ "thiserror 2.0.18",
+]
 
 [[package]]
 name = "voltex_physics"
@@ -2147,6 +2157,7 @@ dependencies = [
  "bytemuck",
  "log",
  "pollster",
+ "thiserror 2.0.18",
  "voltex_math",
  "voltex_platform",
  "wgpu",
@@ -2158,6 +2169,7 @@ name = "voltex_script"
 version = "0.1.0"
 dependencies = [
  "cc",
+ "thiserror 2.0.18",
  "voltex_ecs",
  "voltex_math",
 ]
