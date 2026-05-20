@@ -15,8 +15,8 @@ wgpu 기반 렌더링 — 메시/PBR/그림자/IBL/디퍼드/RT/post-process + �
 
 ### Image / Model
 - `parse_png` — PNG 디코더 (src/png.rs)
-- `parse_jpg` — JPG Baseline + Progressive (src/jpg.rs, src/progressive_jpeg.rs)
-- `parse_gltf`, `GltfData`, `GltfMesh`, `GltfMaterial` — glTF 2.0/GLB (src/gltf.rs)
+- `parse_jpg` — JPG Baseline (src/jpg/) + Progressive (src/progressive_jpeg.rs)
+- `parse_gltf`, `GltfData`, `GltfMesh`, `GltfMaterial` — glTF 2.0/GLB (src/gltf/)
 - `obj` — OBJ 파서 (src/obj.rs)
 - `deflate` — zlib/deflate (src/deflate.rs)
 - `json_parser` — glTF JSON 파서 (src/json_parser.rs)
@@ -43,7 +43,7 @@ wgpu 기반 렌더링 — 메시/PBR/그림자/IBL/디퍼드/RT/post-process + �
 - `GBuffer` (src/gbuffer.rs)
 - `gbuffer_compress` — 옥타헤드럴 노멀 인코딩 (src/gbuffer_compress.rs)
 - `FullscreenVertex`, `create_fullscreen_vertex_buffer` (src/fullscreen_quad.rs)
-- `create_gbuffer_pipeline`, `create_lighting_pipeline` 등 (src/deferred_pipeline.rs, 905줄 — M2)
+- `create_gbuffer_pipeline`, `create_lighting_pipeline` 등 (src/deferred_pipeline/: gbuffer, lighting, ssgi, rt_shadow, bloom, tonemap)
 
 ### RT (Ray Tracing)
 - `RtAccel`, `RtInstance`, `BlasMeshData` (src/rt_accel.rs)
@@ -99,7 +99,8 @@ wgpu 기반 렌더링 — 메시/PBR/그림자/IBL/디퍼드/RT/post-process + �
 - max_bind_groups=4 — 리소스를 합쳐 4개 이내로 유지
 - WGSL vec3 alignment 16바이트 (Rust struct에 padding 필요)
 - wgpu 28.0 전용 필드: immediate_size, multiview_mask, TexelCopyTextureInfo
-- gltf.rs (982줄), jpg.rs (959줄), deferred_pipeline.rs (905줄), texture.rs (514줄)는 M2/M3 분리 예정
+- gltf, jpg, deferred_pipeline은 src/<name>/ 디렉토리로 분리됨 (M2 완료). texture.rs (514줄)는 M3 분리 예정
+- deferred_pipeline 하위 모듈에서 WGSL 셰이더 include 경로는 `include_str!("../<name>.wgsl")` (한 단계 깊음)
 - 이미지 디코더/glTF 파서는 향후 voltex_image 같은 별도 crate로 분리 고려 (DEFERRED)
 - Forward pass(mesh_shader.wgsl, Blinn-Phong)와 PBR/Deferred path는 별도 — 기존 예제(triangle, model_viewer)는 forward 사용
 

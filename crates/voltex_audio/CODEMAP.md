@@ -18,7 +18,7 @@
 - `audio_system` — 메인 시스템 (src/audio_system.rs)
 - `audio_clip`, `audio_source` — 데이터 + 컴포넌트 (src/audio_clip.rs, src/audio_source.rs)
 - `async_loader` — 비동기 로더 (src/async_loader.rs)
-- `wav`, `ogg`, `vorbis` — 디코더 (src/wav.rs, src/ogg.rs, src/vorbis.rs)
+- `wav`, `ogg`, `vorbis` — 디코더 (src/wav.rs, src/ogg.rs, src/vorbis/)
 - `mixing`, `mix_group`, `dynamic_groups`, `audio_bus` — 믹서 (src/mixing.rs 등)
 - `effect_chain`, `reverb`, `fade_curves` — 이펙트 (src/effect_chain.rs 등)
 - `spatial`, `hrtf`, `occlusion` — 3D 오디오 (src/spatial.rs 등)
@@ -30,7 +30,7 @@
 
 ## 변경 시 주의점
 - WASAPI는 Windows 전용 — macOS/Linux 백엔드 미구현
-- vorbis.rs는 1493줄로 매우 큼 (M2에서 분리 예정)
+- vorbis는 src/vorbis/ 디렉토리로 분리됨 (bit_reader, codebook, floor, residue, headers, imdct, decoder)
 - wasapi.rs는 521줄 (M3 분리 예정)
 - AudioSource 컴포넌트는 ECS와 함께 사용
 
