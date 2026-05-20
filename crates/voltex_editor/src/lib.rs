@@ -24,6 +24,9 @@ pub use panels::inspector::{inspector_panel, InspectorState};
 pub use orbit_camera::OrbitCamera;
 pub use picking::pick_entity;
 
+pub mod gizmo;
+pub use gizmo::{DragResult, GizmoAxis, GizmoMode, GizmoRenderer, GizmoState};
+
 pub mod viewport_texture;
 pub use viewport_texture::{ViewportTexture, VIEWPORT_COLOR_FORMAT, VIEWPORT_DEPTH_FORMAT};
 
