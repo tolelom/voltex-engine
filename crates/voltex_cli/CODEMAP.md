@@ -1,0 +1,82 @@
+# voltex_cli
+
+## 책임 (한 줄)
+`voltex` 바이너리 — `new` / `build` / `run` subcommand 로 voltex.toml 기반 프로젝트를 스캐폴드, 빌드, 실행한다.
+
+## 공개 인터페이스
+- Bin name: `voltex` (Cargo `[[bin]] name = "voltex"`)
+- Subcommands:
+  - `voltex new <name>` — 빈 프로젝트 스캐폴드 (voltex.toml + scene.vscn + scripts/spinner.lua + assets/.gitkeep)
+  - `voltex build [--target <triple>] [--manifest-path <dir>] [--engine-path <repo>]` — voltex.toml 읽고 wrapper crate 생성 + `cargo build --release` + `<project>/dist/<name>(.exe)` + 자원 복사
+  - `voltex run` — `build` 후 산출 exe 실행 (exit code 전파)
+  - `voltex --help`
+
+## voltex.toml 매니페스트
+```toml
+[project]
+name = "my_game"           # required
+version = "0.1.0"          # required
+
+[build]
+scene = "scene.vscn"               # optional, default = "scene.vscn"
+scripts = ["scripts/**/*.lua"]     # optional
+assets = ["assets/**/*"]           # optional
+window_title = "My Game"           # optional, default = project.name
+window_size = [1280, 720]          # optional
+targets = ["windows-x64"]          # optional, default = host triple
+
+[build.windows-x64]                 # 선택적 per-target 섹션. v1 에서는 icon 만 기록 (사용은 v1.1+)
+icon = "assets/icon.ico"
+```
+
+자체 미니 TOML 파서 (외부 crate 의존 없음, voltex_ecs 가 JSON 자체 구현하는 정책과 동일). 지원: section header `[a]` / `[a.b]`, string / int / bool / string array / int array, `#` 주석, 빈 줄. 미지원: multiline string, dotted key, inline table, datetime, float.
+
+## 모듈 구조
+```
+src/
+├── main.rs       # dispatch + 도움말 (~50줄)
+├── manifest.rs   # Manifest struct + 미니 TOML 파서 + load_from_dir (~400줄)
+├── error.rs      # CliError + Display (사람-친화 메시지) + Result<T>
+├── util.rs       # copy_optional_file/dir, escape_for_rust_string
+├── new.rs        # scaffold (디렉토리 + 매니페스트 + 샘플 lua)
+├── build.rs      # render_wrapper_main, build_target, cargo invocation
+└── run.rs        # build 후 exe 실행
+```
+
+## 동작 (build 의 단계)
+1. `--manifest-path` 또는 cwd 에서 `voltex.toml` 로드
+2. `--target` 또는 `manifest.build.targets[0]` 또는 host triple 결정
+3. `<project>/dist/wrapper/{Cargo.toml,src/main.rs}` 생성
+   - `Cargo.toml`: `voltex_runtime` path 의존 (engine_path 의 `crates/voltex_runtime`)
+   - `src/main.rs`: `RuntimeApp::new(RuntimeConfig::new().with_window_title(<manifest.window_title>).with_window_size(...).with_initial_scene(scene_path_next_to_exe(...)))?.run()`
+4. wrapper 디렉토리에서 `cargo build --release`
+5. `target/release/wrapper(.exe)` → `dist/<name>(.exe)` 복사
+6. `scene.vscn` / `scripts/` / `assets/` 를 dist 폴더에 복사 (없으면 silent skip)
+
+## 의존성
+- workspace 내부: **없음** (voltex_runtime 은 wrapper 의 의존, voltex_cli 의 의존 아님)
+- 외부 crate: 없음 (TOML 파서 자체 구현)
+- 시스템 의존: `cargo` 가 PATH 에 있어야 함 (없으면 `CargoMissing` 친화 에러)
+
+## 변경 시 주의점
+- **voltex_runtime 위치**: `--engine-path` cli flag 또는 `VOLTEX_REPO` 환경변수로 받음. crates.io publish 후에는 정식 의존성으로 교체 예정.
+- **wrapper crate 생성 vs workspace 의존**: 매번 wrapper 생성 + cargo build 호출. wrapper 의 target dir 은 `<project>/dist/wrapper/target` 으로 격리 → 사용자 프로젝트 간 incremental cache 공유는 안 됨. B2 (asset packing) 시 검토.
+- **wrapper main.rs codegen**: `escape_for_rust_string` 이 backslash/quote 만 처리. 사용자 manifest 의 `window_title` 가 newline / control char 가지면 코드 깨질 수 있음 (현재 silent). 다음 cycle 에 validate.
+- **--target 분기 미구현**: B3 (Cycle 11) 에서 native build per-OS 정책 구현 예정. 현재는 매니페스트의 `targets[0]` 만 보고 cargo build (즉 host triple 로 빌드).
+
+## 테스트
+- 19개 단위 테스트 (manifest 9 + new 3 + build 2 + util 3 + error 0 — Display 검증은 추후)
+- 실행: `cargo test -p voltex_cli`
+- cargo invocation 자체는 단위 테스트 안 함 — 수동 검증 또는 통합 테스트 별도 추가
+
+## 수동 검증 절차
+```bash
+export VOLTEX_REPO=<engine repo root>
+cargo install --path crates/voltex_cli   # 1회
+cd /tmp
+voltex new mygame
+cd mygame
+voltex build
+./dist/mygame.exe   # Windows 에서 빈 윈도우
+voltex run          # 동등
+```
