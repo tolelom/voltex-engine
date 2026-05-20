@@ -159,6 +159,13 @@
 - voltex_ecs: **World::clear()** — 모든 entity/component/allocator 리셋. LoadScene 같은 source-of-truth replace 시나리오용
 - examples/editor_demo: Toolbar에 Undo/Redo 버튼 추가, `session.selected` 가 선택의 단일 소스
 
+### Phase 8-7: Viewport Picking + Seed-as-Commands + Lua Hierarchy + Mat4 Fix (2026-05-20)
+- voltex_editor: **viewport raycast picking** — `picking::pick_entity` + 순수 helpers (ndc_from_viewport / ray_from_ndc / ray_vs_sphere_t). 좌클릭 release 시 드래그가 작으면 (≤4px) ray cast → 가장 가까운 sphere hit entity로 `session.selected` 갱신
+- voltex_math: **Mat4::inverse 버그 fix** — 이전 구현은 6개 s/c 2x2 minor만으로 cofactor를 표현 → 행 0+1 또는 2+3에 속하지 않는 3x3 minor 엔트리가 잘못된 값. 표준 3x3 minor cofactor 전개로 교체. `VP * VP^-1 ≈ I` 회귀 테스트 추가 (viewport unprojection이 100배 가까운 점을 반환하던 silent bug)
+- voltex_script: **engine_api 12 → 15** — `add_child` / `remove_child` (둘 다 `(id,gen)` 4개 인자), `find_all_by_tag(tag) → Lua table`. stale handle은 모두 silent no-op
+- examples/editor_demo: 시드 엔티티 (ground + 3 cube + Cube1↔Cube2 hierarchy)를 `EditorSession::dispatch` 경로로 옮김 → jsonl 로그 + Save/Load round-trip 일관성
+- v1 한계 (문서화): picking은 sphere 근사 (메시 AABB는 미구현). gizmo translate/rotate/scale 핸들은 미구현
+
 ## Crate 구조
 
 ```
@@ -177,10 +184,10 @@ crates/
 └── voltex_editor    — IMGUI, docking, 3D viewport, inspector, asset browser, TTF font, UiRenderer
 ```
 
-## 테스트: 783개 전부 통과 (Phase 8-6 +18)
+## 테스트: 803개 전부 통과 (Phase 8-7 +20)
 
 - voltex: 2 (M6: prelude/module 경로 컴파일 검증)
-- voltex_math: 37
+- voltex_math: 39 (8-7 +2: inverse roundtrip × VP+translation)
 - voltex_platform: 3
 - voltex_ecs: 109 (M5 +3; 8-6 +2: World::clear roundtrip)
 - voltex_asset: 22
@@ -189,8 +196,8 @@ crates/
 - voltex_audio: 84
 - voltex_ai: 34
 - voltex_net: 47
-- voltex_script: 25 (8-6 +7: handle 규약 fix + engine_api 4→12 함수)
-- voltex_editor: 114 (8-6: inspector 통합 -3, undo/redo +6, AddChild/RemoveChild +5, LoadScene clear +1)
+- voltex_script: 30 (8-7 +5: add_child/remove_child/stale-parent/find_all_by_tag×2)
+- voltex_editor: 127 (8-7 +13: picking::* ndc/ray/sphere/pick 케이스들)
 
 ## Examples (12개 + survivor_game)
 
@@ -199,15 +206,16 @@ crates/
 - audio_demo, deferred_demo, editor_demo
 - survivor_game (ECS + voltex_physics + voltex facade로 재작성 완료, 2026-05-20)
 
-## 다음 작업 후보 (2026-05-20 8-6 이후)
+## 다음 작업 후보 (2026-05-20 8-7 이후)
 
 1. ~~**inspector 통합**~~ — ✅ Phase 8-6. 단일 `panels::*` 경로.
-2. **scene 영속화 검증** — `examples/editor_demo` 의 ground/cube는 시작 시 `session.world`에 직접 시드 (커맨드 미경유). Save → Load 후에도 시드 엔티티 4개는 살아남음. (a) 시드도 `EditorCommand::Spawn` + `SetTag` 로 거치게 하거나, (b) 시드 엔티티는 "transient" 표시로 직렬화 제외, (c) 의도된 동작이라면 문서화. 결정 필요.
+2. ~~**scene 영속화 검증**~~ — ✅ Phase 8-7. 시드 엔티티가 `EditorCommand` dispatch 경로 통과 → 로그/Save/Load 일관성.
 3. **EditorCommand 확장 추가** — Undo/Redo ✅, AddChild/RemoveChild ✅. 남은 후보: AddComponent/RemoveComponent (Transform 외 컴포넌트 — ComponentRegistry 의 raw byte API 활용).
 4. **Despawn 정확한 undo** — 현재 v1은 history 클리어. `EntityAllocator::restore_at_generation(id, gen)` 추가 + 컴포넌트 스냅샷 백업 형태로 풀 undo 지원. World API 변경이라 별 commit 필요.
-5. **viewport raycast 픽킹 + gizmo** — viewport 안에서 마우스 클릭 → ray cast → 엔티티 선택 (`session.selected`). gizmo (translate/rotate/scale 핸들) 도 dispatch path 경유.
-6. ~~**Lua API 확장**~~ — ✅ Phase 8-6 (12개 함수). 다음: AddChild/RemoveChild, get_world_transform, find_all_by_tag 같은 collection 반환.
+5. ~~**viewport raycast 픽킹**~~ — ✅ Phase 8-7. 좌클릭 → ray cast → `session.selected` (sphere 근사). **gizmo (translate/rotate/scale 핸들)** 은 미구현 — 다음 chunk 후보.
+6. ~~**Lua API 확장**~~ — ✅ Phase 8-7 (15개 함수). 다음: get_world_transform, query 결과를 Lua iterator 로 노출 등.
 7. ~~**survivor_game을 ECS/Physics로 재작성**~~ — ✅ 완료 (2026-05-20).
+8. **메시 AABB 기반 picking** — 현재 v1은 sphere 근사. ECS Transform 외에 mesh bounds 컴포넌트가 들어오면 OBB/AABB picking 으로 업그레이드.
 
 ## 다른 기기에서 이어서 작업하기
 

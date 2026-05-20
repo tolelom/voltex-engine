@@ -159,3 +159,12 @@
 
 - ~~**per-entity dynamic UBO**~~ ✅ GPU 인스턴싱 (InstanceData, InstanceBuffer, instanced pipeline) 완료.
 - **max_bind_groups=4** — 리소스 합치기로 해결 중.
+
+## Phase 8-7 (Picking + Editor 후속)
+
+- ~~**viewport raycast picking**~~ ✅ sphere 기반 (`picking::pick_entity`). 좌클릭 → `session.selected`.
+- ~~**Lua hierarchy API**~~ ✅ add_child / remove_child / find_all_by_tag 추가.
+- ~~**editor_demo 시드의 command 경로 통합**~~ ✅ Save/Load round-trip 일관성 확보.
+- **메시 AABB picking** — 현재 sphere 근사 (반경 = default × max(scale)). ECS에 mesh bounds 컴포넌트가 들어오면 OBB/AABB 교차로 업그레이드.
+- **gizmo (translate/rotate/scale)** — viewport 안에서 3축 핸들 드래그. 렌더러 작업 동반 → 다음 chunk 후보.
+- **Despawn 정확한 undo** — v1은 history 클리어. 풀 undo 위해 EntityAllocator의 generation 복원 + 컴포넌트 스냅샷 필요.

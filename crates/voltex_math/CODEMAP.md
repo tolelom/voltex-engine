@@ -23,8 +23,9 @@
 - 거의 모든 crate가 의존 (ai, audio, ecs, editor, physics, platform, renderer, script)
 - 시그니처/메모리 레이아웃 변경 시 GPU 셰이더(WGSL)와 정렬 깨질 수 있음 (vec3는 16바이트 padding 필요)
 - Mat4 row-major vs column-major 선택은 셰이더와 일치해야 함
+- `Mat4::inverse`는 3x3 minor 기반 표준 cofactor 전개. 이전의 2x2 minor 단축 구현은 행 0+1 또는 2+3 안에 들지 않는 3x3 minor 엔트리에서 잘못된 결과를 냈음 (8-7에서 수정). 변경 시 `test_inverse_composes_to_identity` 회귀 테스트 유지
 
 ## 테스트
 - 단위 테스트: src/**/*.rs `#[cfg(test)]`
 - 실행: `cargo test -p voltex_math --lib`
-- 현재 테스트 개수: 37개
+- 현재 테스트 개수: 39개 (8-7 +2: inverse roundtrip × VP+translation)

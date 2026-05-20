@@ -24,6 +24,7 @@ Immediate-mode UI 에디터 — 도킹/플로팅/뷰포트/인스펙터/에셋 �
 - `OrbitCamera` (src/orbit_camera.rs)
 - `ViewportTexture`, `VIEWPORT_COLOR_FORMAT`, `VIEWPORT_DEPTH_FORMAT` (src/viewport_texture.rs)
 - `ViewportRenderer` (src/viewport_renderer.rs)
+- `picking::pick_entity` + helpers (ndc_from_viewport / ray_from_ndc / ray_vs_sphere_t) — 좌클릭 → ray → sphere intersection → 가장 가까운 entity. 반경은 default × max(scale). 메시 바운드 미구현 (DEFERRED). (src/picking.rs)
 
 ### Panels (통합 완료, 단일 경로)
 - `panels::hierarchy::hierarchy_panel` — 트리 뷰, click 으로 `session.selected` 설정 (src/panels/hierarchy.rs)
@@ -60,9 +61,10 @@ Immediate-mode UI 에디터 — 도킹/플로팅/뷰포트/인스펙터/에셋 �
 - `InspectorState` 는 text_input 버퍼 (Tag 등) 만 보관. Transform 값은 매 프레임 World 에서 다시 읽어 슬라이더에 표시.
 - widgets는 src/widgets/ 디렉토리로 분리됨 (M3 완료). dock.rs (558줄), ttf_parser.rs (518줄)는 spec 만족 (600줄 이하), 분리 대상 아님
 - 탭 드래그 이동, 커스텀 컴포넌트 인스펙터 리플렉션, 에셋 프리뷰는 DEFERRED
-- examples/editor_demo의 ground/cube 시드 엔티티는 커맨드 미경유로 생성되어 Save/Load 후에도 살아남음 (의도 확인 필요)
+- examples/editor_demo의 시드 엔티티는 8-7에서 `EditorCommand::Spawn/SetTransform/SetTag/AddChild` 경로로 옮김 → 로그/Save/Load와 일치
+- 픽킹은 v1에서 sphere 근사. 메시 AABB picking은 ECS에 mesh bounds가 들어온 뒤로 미룸 (DEFERRED.md "렌더링 한계")
 
 ## 테스트
 - 단위 테스트: src/**/*.rs `#[cfg(test)]`
 - 실행: `cargo test -p voltex_editor --lib`
-- 현재 테스트 개수: 102개 (inspector 통합으로 dual path 테스트 제거 후 신규 8개 추가)
+- 현재 테스트 개수: 127개 (8-7 +13: picking::* ndc/ray/sphere/pick × 다양한 케이스)
