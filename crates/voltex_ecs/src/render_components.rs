@@ -73,6 +73,37 @@ impl Component for MaterialHandle {
     }
 }
 
+impl Component for Bounds {
+    const NAME: &'static str = "bounds";
+
+    fn serialize(world: &World, entity: Entity) -> Option<Vec<u8>> {
+        let b = world.get::<Bounds>(entity)?;
+        let mut data = Vec::with_capacity(24);
+        for &v in &[
+            b.0.min.x, b.0.min.y, b.0.min.z,
+            b.0.max.x, b.0.max.y, b.0.max.z,
+        ] {
+            data.extend_from_slice(&v.to_le_bytes());
+        }
+        Some(data)
+    }
+
+    fn deserialize(world: &mut World, entity: Entity, data: &[u8]) -> crate::Result<()> {
+        if data.len() < 24 {
+            return Err("Bounds data too short".into());
+        }
+        let f = |off: usize| {
+            f32::from_le_bytes([data[off], data[off + 1], data[off + 2], data[off + 3]])
+        };
+        let aabb = AABB::new(
+            voltex_math::Vec3::new(f(0), f(4), f(8)),
+            voltex_math::Vec3::new(f(12), f(16), f(20)),
+        );
+        world.add(entity, Bounds(aabb));
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -128,6 +159,39 @@ mod tests {
         let mut world = World::new();
         let e = world.spawn();
         let result = <MaterialHandle as Component>::deserialize(&mut world, e, &[0u8; 7]);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_bounds_roundtrip() {
+        use voltex_math::Vec3;
+        let mut world = World::new();
+        let e = world.spawn();
+        let aabb = AABB::new(Vec3::new(-1.5, -2.0, -3.25), Vec3::new(4.0, 5.5, 6.0));
+        world.add(e, Bounds(aabb));
+
+        let data = <Bounds as Component>::serialize(&world, e)
+            .expect("serialize Bounds should return Some");
+        assert_eq!(data.len(), 24);
+
+        let mut world2 = World::new();
+        let e2 = world2.spawn();
+        <Bounds as Component>::deserialize(&mut world2, e2, &data).unwrap();
+
+        let b = world2.get::<Bounds>(e2).expect("Bounds present");
+        assert!((b.0.min.x - (-1.5)).abs() < 1e-6);
+        assert!((b.0.min.y - (-2.0)).abs() < 1e-6);
+        assert!((b.0.min.z - (-3.25)).abs() < 1e-6);
+        assert!((b.0.max.x - 4.0).abs() < 1e-6);
+        assert!((b.0.max.y - 5.5).abs() < 1e-6);
+        assert!((b.0.max.z - 6.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_bounds_deserialize_too_short() {
+        let mut world = World::new();
+        let e = world.spawn();
+        let result = <Bounds as Component>::deserialize(&mut world, e, &[0u8; 23]);
         assert!(result.is_err());
     }
 }
