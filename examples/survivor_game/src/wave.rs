@@ -1,4 +1,4 @@
-use voltex_math::Vec3;
+use voltex::prelude::Vec3;
 
 pub struct WaveSystem {
     pub wave_number: u32,

@@ -1,135 +1,157 @@
-use voltex_math::Vec3;
-use voltex_platform::InputState;
-use crate::player::Player;
-use crate::projectile::Projectile;
-use crate::enemy::Enemy;
+//! ECS-based game state. Owns the World and the wave spawner.
+//!
+//! The renderer reads from this through `*_positions()` / `player_*()`
+//! query helpers so main.rs never touches the World directly.
+
+use voltex::ecs::Entity;
+use voltex::platform::InputState;
+use voltex::prelude::{Transform, Vec3, World};
+
+use crate::components::{EnemyTag, FireCooldown, Health, InvincibleTimer, ProjectileTag};
+use crate::systems::{
+    collision_system, enemy_chase_system, lifetime_system, player_input_system,
+    projectile_motion_system, spawn_enemy, spawn_player, spawn_projectile, CollisionEvents,
+};
 use crate::wave::WaveSystem;
 
+const FIRE_COOLDOWN_SEC: f32 = 0.2;
+const PROJECTILE_SPEED: f32 = 20.0;
+const PROJECTILE_ORIGIN_OFFSET: Vec3 = Vec3 {
+    x: 0.0,
+    y: 0.5,
+    z: 0.0,
+};
+
+#[derive(Default)]
 pub struct FrameEvents {
-    pub shot_fired: bool,
     pub enemies_killed: u32,
     pub player_hit: bool,
 }
 
-pub struct GameState {
-    pub player: Player,
-    pub projectiles: Vec<Projectile>,
-    pub enemies: Vec<Enemy>,
+pub struct Game {
+    pub world: World,
+    pub player_entity: Entity,
     pub wave: WaveSystem,
     pub score: u32,
     pub game_over: bool,
 }
 
-impl GameState {
+impl Game {
     pub fn new() -> Self {
+        let mut world = World::new();
+        let player_entity = spawn_player(&mut world);
         Self {
-            player: Player::new(),
-            projectiles: Vec::new(),
-            enemies: Vec::new(),
+            world,
+            player_entity,
             wave: WaveSystem::new(),
             score: 0,
             game_over: false,
         }
     }
 
-    pub fn try_shoot(&mut self, aim_dir: Vec3) -> bool {
-        if self.player.fire_cooldown <= 0.0 {
-            let origin = self.player.position + Vec3::new(0.0, 0.5, 0.0);
-            self.projectiles.push(Projectile::new(origin, aim_dir, 20.0));
-            self.player.fire_cooldown = 0.2;
-            true
-        } else {
-            false
-        }
+    pub fn restart(&mut self) {
+        *self = Self::new();
     }
 
     pub fn update(&mut self, input: &InputState, dt: f32) -> FrameEvents {
-        let mut events = FrameEvents {
-            shot_fired: false,
-            enemies_killed: 0,
-            player_hit: false,
-        };
-
+        let mut events = FrameEvents::default();
         if self.game_over {
             return events;
         }
 
-        self.player.update(input, dt);
-        self.player.fire_cooldown = (self.player.fire_cooldown - dt).max(0.0);
+        // Player + projectile motion.
+        player_input_system(&mut self.world, input, dt);
+        projectile_motion_system(&mut self.world, dt);
 
-        // Update projectiles and remove dead ones
-        for proj in &mut self.projectiles {
-            proj.update(dt);
-        }
-        self.projectiles.retain(|p| p.is_alive());
+        // Enemy chase needs the latest player position.
+        let player_pos = self.player_pos();
+        enemy_chase_system(&mut self.world, player_pos, dt);
 
-        // Wave system spawns
-        let alive_count = self.enemies.iter().filter(|e| e.alive).count();
-        let spawns = self.wave.update(dt, alive_count);
-        for pos in spawns {
-            self.enemies.push(Enemy::new(pos));
+        // Wave spawning.
+        let alive = self.alive_enemy_count();
+        for pos in self.wave.update(dt, alive) {
+            spawn_enemy(&mut self.world, pos);
         }
 
-        // Update enemies (chase player)
-        let player_pos = self.player.position;
-        for enemy in &mut self.enemies {
-            if enemy.alive {
-                enemy.update(player_pos, dt);
-            }
+        // Despawn expired projectiles before collision so dead bullets don't hit.
+        for e in lifetime_system(&mut self.world, dt) {
+            self.world.despawn(e);
         }
 
-        // Remove dead enemies
-        self.enemies.retain(|e| e.alive);
+        // Collisions: projectile×enemy + enemy×player.
+        let CollisionEvents {
+            enemies_killed,
+            player_hit,
+        } = collision_system(&mut self.world);
+        self.score += enemies_killed * 100;
+        events.enemies_killed = enemies_killed;
+        events.player_hit = player_hit;
 
-        // Collision: projectile vs enemy
-        let mut killed_enemies = Vec::new();
-        let mut killed_projectiles = Vec::new();
-
-        for (pi, proj) in self.projectiles.iter().enumerate() {
-            for (ei, enemy) in self.enemies.iter().enumerate() {
-                let dist = (proj.position - enemy.position).length();
-                if dist < 0.55 {
-                    // projectile radius 0.15 + enemy radius 0.4
-                    killed_enemies.push(ei);
-                    killed_projectiles.push(pi);
-                    self.score += 100;
-                    events.enemies_killed += 1;
-                }
-            }
+        if self.player_health().0 <= 0 {
+            self.game_over = true;
         }
-
-        // Remove killed (reverse order to preserve indices)
-        killed_enemies.sort();
-        killed_enemies.dedup();
-        for &i in killed_enemies.iter().rev() {
-            self.enemies.remove(i);
-        }
-        killed_projectiles.sort();
-        killed_projectiles.dedup();
-        for &i in killed_projectiles.iter().rev() {
-            self.projectiles.remove(i);
-        }
-
-        // Collision: enemy vs player
-        if self.player.invincible_timer <= 0.0 {
-            for enemy in self.enemies.iter() {
-                let dist = (enemy.position - self.player.position).length();
-                if dist < 0.9 {
-                    // player radius 0.5 + enemy radius 0.4
-                    self.player.hp -= 1;
-                    self.player.invincible_timer = 1.0;
-                    events.player_hit = true;
-                    if self.player.hp <= 0 {
-                        self.game_over = true;
-                    }
-                    break;
-                }
-            }
-        }
-
-        // Update invincible timer
-        self.player.invincible_timer = (self.player.invincible_timer - dt).max(0.0);
 
         events
+    }
+
+    /// Spawns a projectile if FireCooldown allows. Returns true when fired.
+    pub fn try_shoot(&mut self, aim_dir: Vec3) -> bool {
+        let ready = self
+            .world
+            .get::<FireCooldown>(self.player_entity)
+            .map(|c| c.0 <= 0.0)
+            .unwrap_or(false);
+        if !ready {
+            return false;
+        }
+        let origin = self.player_pos() + PROJECTILE_ORIGIN_OFFSET;
+        spawn_projectile(&mut self.world, origin, aim_dir, PROJECTILE_SPEED);
+        if let Some(c) = self.world.get_mut::<FireCooldown>(self.player_entity) {
+            c.0 = FIRE_COOLDOWN_SEC;
+        }
+        true
+    }
+
+    // ── Query helpers (renderer / HUD consumers) ────────────────────
+
+    pub fn player_pos(&self) -> Vec3 {
+        self.world
+            .get::<Transform>(self.player_entity)
+            .map(|t| t.position)
+            .unwrap_or(Vec3::ZERO)
+    }
+
+    /// (current_hp, max_hp).
+    pub fn player_health(&self) -> (i32, i32) {
+        self.world
+            .get::<Health>(self.player_entity)
+            .map(|h| (h.hp, h.max_hp))
+            .unwrap_or((0, 0))
+    }
+
+    /// Seconds remaining on invincibility, or 0.0 when not active.
+    pub fn player_invincible(&self) -> f32 {
+        self.world
+            .get::<InvincibleTimer>(self.player_entity)
+            .map(|t| t.0)
+            .unwrap_or(0.0)
+    }
+
+    pub fn alive_enemy_count(&self) -> usize {
+        self.world.query::<EnemyTag>().count()
+    }
+
+    pub fn projectile_positions(&self) -> Vec<Vec3> {
+        self.world
+            .query::<ProjectileTag>()
+            .filter_map(|(e, _)| self.world.get::<Transform>(e).map(|t| t.position))
+            .collect()
+    }
+
+    pub fn enemy_positions(&self) -> Vec<Vec3> {
+        self.world
+            .query::<EnemyTag>()
+            .filter_map(|(e, _)| self.world.get::<Transform>(e).map(|t| t.position))
+            .collect()
     }
 }

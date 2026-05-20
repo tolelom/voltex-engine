@@ -1884,11 +1884,8 @@ dependencies = [
  "env_logger",
  "log",
  "pollster",
- "voltex_audio",
- "voltex_editor",
- "voltex_math",
- "voltex_platform",
- "voltex_renderer",
+ "voltex",
+ "voltex_physics",
  "wgpu",
  "winit",
 ]

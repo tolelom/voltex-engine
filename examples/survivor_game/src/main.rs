@@ -1,9 +1,8 @@
 mod arena;
 mod camera;
-mod enemy;
+mod components;
 mod game;
-mod player;
-mod projectile;
+mod systems;
 mod wave;
 
 use winit::{
@@ -13,23 +12,20 @@ use winit::{
     keyboard::{KeyCode, PhysicalKey},
     window::WindowId,
 };
-use voltex_math::{Vec3, Mat4};
-use voltex_platform::{VoltexWindow, WindowConfig, InputState, GameTimer};
-use voltex_renderer::{
-    GpuContext, CameraUniform, LightsUniform, LightData,
-    Mesh, GpuTexture, MaterialUniform, create_pbr_pipeline,
-    ShadowMap, ShadowUniform, ShadowPassUniform, SHADOW_MAP_SIZE,
-    create_shadow_pipeline, shadow_pass_bind_group_layout,
-    IblResources, pbr_texture_bind_group_layout, create_pbr_texture_bind_group,
-    generate_sphere,
+use voltex::prelude::*;
+use voltex::renderer::{
+    create_pbr_pipeline, create_pbr_texture_bind_group, create_shadow_pipeline, generate_sphere,
+    pbr_texture_bind_group_layout, shadow_pass_bind_group_layout, CameraUniform, GpuContext,
+    GpuTexture, IblResources, LightData, LightsUniform, MaterialUniform, Mesh, ShadowMap,
+    ShadowPassUniform, ShadowUniform, SHADOW_MAP_SIZE,
 };
-use voltex_editor::{UiContext, UiRenderer};
-use voltex_audio::{AudioClip, AudioSystem};
+use voltex::editor::{UiContext, UiRenderer};
+use voltex::audio::{AudioClip, AudioSystem};
 use wgpu::util::DeviceExt;
 
 use arena::{generate_arena, arena_model_matrices};
 use camera::QuarterViewCamera;
-use game::GameState;
+use game::Game;
 
 const ARENA_ENTITIES: usize = 5; // 1 floor + 4 obstacles
 const MAX_ENTITIES: usize = 100; // pre-allocate for future enemies/projectiles
@@ -60,7 +56,7 @@ struct AppState {
     entities: Vec<RenderEntity>,
     player_mesh: Mesh,
     camera: QuarterViewCamera,
-    game: GameState,
+    game: Game,
     // Color pass resources
     camera_buffer: wgpu::Buffer,
     light_buffer: wgpu::Buffer,
@@ -164,7 +160,7 @@ impl ApplicationHandler for SurvivorApp {
         let player_mesh = Mesh::new(&gpu.device, &sphere_verts, &sphere_indices);
 
         // Game state
-        let game = GameState::new();
+        let game = Game::new();
 
         // Quarter-view camera
         let camera = QuarterViewCamera::new();
@@ -434,7 +430,7 @@ impl ApplicationHandler for SurvivorApp {
 
                 // Restart on R when game over
                 if state.game.game_over && state.input.is_key_just_pressed(KeyCode::KeyR) {
-                    state.game = GameState::new();
+                    state.game.restart();
                 }
 
                 // Update game logic
@@ -449,7 +445,7 @@ impl ApplicationHandler for SurvivorApp {
                 if let Some(world_pos) =
                     mouse_to_world_xz(mx as f32, my as f32, screen_w, screen_h, &state.camera, aspect)
                 {
-                    let aim = world_pos - state.game.player.position;
+                    let aim = world_pos - state.game.player_pos();
                     let aim_xz = Vec3::new(aim.x, 0.0, aim.z);
                     if aim_xz.length_squared() > 0.01 {
                         let aim_dir = aim_xz.normalize();
@@ -470,15 +466,19 @@ impl ApplicationHandler for SurvivorApp {
                 }
 
                 // Camera follows player
-                state.camera.target = state.game.player.position;
+                state.camera.target = state.game.player_pos();
 
                 // Build per-frame model/material lists: arena entities + player + projectiles + enemies
-                let player_pos = state.game.player.position;
+                let player_pos = state.game.player_pos();
                 let player_model = Mat4::translation(player_pos.x, player_pos.y + 0.5, player_pos.z);
-                let num_projectiles = state.game.projectiles.len().min(MAX_ENTITIES - ARENA_ENTITIES - 1);
+                let projectile_positions = state.game.projectile_positions();
+                let enemy_positions = state.game.enemy_positions();
+                let num_projectiles = projectile_positions.len().min(MAX_ENTITIES - ARENA_ENTITIES - 1);
                 let base_enemy_idx = ARENA_ENTITIES + 1 + num_projectiles;
-                let num_enemies = state.game.enemies.len().min(MAX_ENTITIES.saturating_sub(base_enemy_idx));
+                let num_enemies = enemy_positions.len().min(MAX_ENTITIES.saturating_sub(base_enemy_idx));
                 let num_entities = base_enemy_idx + num_enemies;
+                let invincible_timer = state.game.player_invincible();
+                let (player_hp, player_max_hp) = state.game.player_health();
 
                 // ----- Compute light VP for shadows -----
                 let light_dir = Vec3::new(-1.0, -2.0, -1.0).normalize();
@@ -501,14 +501,12 @@ impl ApplicationHandler for SurvivorApp {
                         player_model
                     } else if i < base_enemy_idx {
                         let pi = i - ARENA_ENTITIES - 1;
-                        let p = &state.game.projectiles[pi];
-                        Mat4::translation(p.position.x, p.position.y, p.position.z)
-                            * Mat4::scale(0.3, 0.3, 0.3)
+                        let p = projectile_positions[pi];
+                        Mat4::translation(p.x, p.y, p.z) * Mat4::scale(0.3, 0.3, 0.3)
                     } else {
                         let ei = i - base_enemy_idx;
-                        let e = &state.game.enemies[ei];
-                        Mat4::translation(e.position.x, e.position.y, e.position.z)
-                            * Mat4::scale(0.4, 0.4, 0.4)
+                        let e = enemy_positions[ei];
+                        Mat4::translation(e.x, e.y, e.z) * Mat4::scale(0.4, 0.4, 0.4)
                     };
                     let sp_uniform = ShadowPassUniform {
                         light_vp_model: (light_vp * model).cols,
@@ -538,9 +536,9 @@ impl ApplicationHandler for SurvivorApp {
                         (state.models[i], c, m, r)
                     } else if i == ARENA_ENTITIES {
                         // Player: blue sphere (flash white when invincible)
-                        let player_color = if state.game.player.invincible_timer > 0.0 {
+                        let player_color = if invincible_timer > 0.0 {
                             // Blink effect
-                            let blink = (state.game.player.invincible_timer * 10.0).sin();
+                            let blink = (invincible_timer * 10.0).sin();
                             if blink > 0.0 {
                                 [1.0, 1.0, 1.0, 1.0]
                             } else {
@@ -553,16 +551,14 @@ impl ApplicationHandler for SurvivorApp {
                     } else if i < base_enemy_idx {
                         // Projectile: yellow sphere
                         let pi = i - ARENA_ENTITIES - 1;
-                        let p = &state.game.projectiles[pi];
-                        let m = Mat4::translation(p.position.x, p.position.y, p.position.z)
-                            * Mat4::scale(0.3, 0.3, 0.3);
+                        let p = projectile_positions[pi];
+                        let m = Mat4::translation(p.x, p.y, p.z) * Mat4::scale(0.3, 0.3, 0.3);
                         (m, [1.0, 0.9, 0.1, 1.0], 0.1, 0.4)
                     } else {
                         // Enemy: red sphere
                         let ei = i - base_enemy_idx;
-                        let e = &state.game.enemies[ei];
-                        let m = Mat4::translation(e.position.x, e.position.y, e.position.z)
-                            * Mat4::scale(0.4, 0.4, 0.4);
+                        let e = enemy_positions[ei];
+                        let m = Mat4::translation(e.x, e.y, e.z) * Mat4::scale(0.4, 0.4, 0.4);
                         (m, [1.0, 0.15, 0.1, 1.0], 0.2, 0.6)
                     };
 
@@ -771,10 +767,10 @@ impl ApplicationHandler for SurvivorApp {
                     state.ui.begin_frame(mx as f32, my as f32, mouse_down);
 
                     // Top-left: game info
-                    state.ui.text(&format!("HP: {}/{}", state.game.player.hp, state.game.player.max_hp));
+                    state.ui.text(&format!("HP: {}/{}", player_hp, player_max_hp));
                     state.ui.text(&format!("Wave: {}", state.game.wave.wave_number));
                     state.ui.text(&format!("Score: {}", state.game.score));
-                    state.ui.text(&format!("Enemies: {}", state.game.enemies.len()));
+                    state.ui.text(&format!("Enemies: {}", num_enemies));
 
                     if state.game.game_over {
                         state.ui.begin_panel(

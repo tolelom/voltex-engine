@@ -1,4 +1,4 @@
-use voltex_math::{Vec3, Mat4};
+use voltex::prelude::{Vec3, Mat4};
 
 /// Fixed quarter-view (isometric-like) camera for the survivor game.
 pub struct QuarterViewCamera {

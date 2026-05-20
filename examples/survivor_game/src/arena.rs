@@ -1,4 +1,4 @@
-use voltex_renderer::vertex::MeshVertex;
+use voltex::renderer::vertex::MeshVertex;
 
 /// Generate a box mesh with the given half-extents centered at the origin.
 /// Returns (vertices, indices) with u32 indices (matching Mesh::new).
@@ -162,8 +162,8 @@ pub fn generate_arena() -> Vec<ArenaEntity> {
 }
 
 /// Model matrices for the 5 entities (floor + 4 obstacles).
-pub fn arena_model_matrices() -> Vec<voltex_math::Mat4> {
-    use voltex_math::Mat4;
+pub fn arena_model_matrices() -> Vec<voltex::math::Mat4> {
+    use voltex::math::Mat4;
 
     let mut models = Vec::new();
 

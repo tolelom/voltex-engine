@@ -188,7 +188,7 @@ crates/
 - triangle, model_viewer, many_cubes, hierarchy_demo, asset_demo
 - pbr_demo, multi_light_demo, shadow_demo, ibl_demo
 - audio_demo, deferred_demo, editor_demo
-- survivor_game (완성 게임)
+- survivor_game (ECS + voltex_physics + voltex facade로 재작성 완료, 2026-05-20)
 
 ## 다음 작업 후보 (2026-05-20 기준)
 
@@ -199,7 +199,7 @@ Phase 8-5 머지 직후 남은 통합/정리 작업:
 3. **EditorCommand 확장** — 현재 6개 variant. 다음 후보: AddChild/RemoveChild (Hierarchy 조작), AddComponent/RemoveComponent (Transform 외 컴포넌트), 그리고 Undo/Redo (커맨드 로그 역연산).
 4. **viewport plan** (master 자동작업으로 이미 구현됨) — 추가 작업: viewport 안에서 raycast로 엔티티 선택, gizmo (translate/rotate/scale 핸들).
 5. **Lua API 확장 + Entity.generation 픽스** — `voltex_script::engine_api`가 여전히 4개 함수만 노출 + `generation: 0` 하드코딩 버그. `docs/superpowers/specs/` 의 자동생성 설계 문서들 참고.
-6. **survivor_game을 ECS/Physics로 재작성** — 엔진 자체 검증을 위해 `Vec<Player>` → ECS 마이그레이션.
+6. ~~**survivor_game을 ECS/Physics로 재작성**~~ — ✅ 완료 (2026-05-20). World 기반, voltex_physics::detect_collisions 사용, voltex facade로 import. `docs/superpowers/plans/2026-05-20-survivor-ecs-rewrite.md` 참고.
 
 ## 다른 기기에서 이어서 작업하기
 
