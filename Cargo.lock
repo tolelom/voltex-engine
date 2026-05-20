@@ -491,11 +491,13 @@ dependencies = [
  "env_logger",
  "log",
  "pollster",
+ "voltex_asset",
  "voltex_ecs",
  "voltex_editor",
  "voltex_math",
  "voltex_platform",
  "voltex_renderer",
+ "voltex_renderer_ecs",
  "wgpu",
  "winit",
 ]
@@ -1886,6 +1888,7 @@ dependencies = [
  "pollster",
  "voltex",
  "voltex_physics",
+ "voltex_renderer_ecs",
  "wgpu",
  "winit",
 ]
