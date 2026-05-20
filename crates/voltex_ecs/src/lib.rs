@@ -12,6 +12,7 @@ pub mod component_registry;
 pub mod binary_scene;
 pub mod archetype;
 pub mod dependency_scheduler;
+pub mod render_components;
 
 pub use error::{EcsError, Result};
 pub use entity::{Entity, EntityAllocator};
@@ -26,3 +27,4 @@ pub use component_registry::{Component, ComponentRegistry};
 pub use binary_scene::{serialize_scene_binary, deserialize_scene_binary};
 pub use archetype::{ArchetypeSignature, Archetype, ArchetypeRegistry};
 pub use dependency_scheduler::{SystemAccess, DependencyScheduler};
+pub use render_components::{MeshAsset, MaterialAsset, MeshHandle, MaterialHandle, Bounds};
