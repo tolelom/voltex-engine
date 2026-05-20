@@ -41,6 +41,9 @@ pub fn register_engine_api(lua: &LuaState, world: *mut World) {
     lua.register_fn("set_tag", lua_set_tag);
     lua.register_fn("get_tag", lua_get_tag);
     lua.register_fn("find_by_tag", lua_find_by_tag);
+    lua.register_fn("find_all_by_tag", lua_find_all_by_tag);
+    lua.register_fn("add_child", lua_add_child);
+    lua.register_fn("remove_child", lua_remove_child);
     lua.register_fn("entity_count", lua_entity_count);
 }
 
@@ -229,6 +232,77 @@ unsafe extern "C" fn lua_get_tag(L: *mut ffi::lua_State) -> c_int {
     }
 }
 
+/// `find_all_by_tag(tag_string)` → table (array) of `{id=, gen=}` for every
+/// entity with that Tag. Returns an empty table if nothing matches (callers can
+/// use `#result` to count). Always pushes exactly one Lua value.
+unsafe extern "C" fn lua_find_all_by_tag(L: *mut ffi::lua_State) -> c_int {
+    let world = get_world(L);
+    let cstr = ffi::lua_tostring(L, 1);
+    ffi::lua_createtable(L, 0, 0);
+    if cstr.is_null() {
+        return 1;
+    }
+    let needle = std::ffi::CStr::from_ptr(cstr).to_string_lossy().into_owned();
+
+    let id_key = std::ffi::CString::new("id").unwrap();
+    let gen_key = std::ffi::CString::new("gen").unwrap();
+    let mut index: ffi::lua_Integer = 1;
+    for (entity, tag) in world.query::<voltex_ecs::scene::Tag>() {
+        if tag.0 == needle {
+            ffi::lua_createtable(L, 0, 2);
+            ffi::lua_pushnumber(L, entity.id as f64);
+            ffi::lua_setfield(L, -2, id_key.as_ptr());
+            ffi::lua_pushnumber(L, entity.generation as f64);
+            ffi::lua_setfield(L, -2, gen_key.as_ptr());
+            // outer table is now at -2, inner at -1 → assign and pop inner.
+            ffi::lua_rawseti(L, -2, index);
+            index += 1;
+        }
+    }
+    1
+}
+
+/// `add_child(parent_id, parent_gen, child_id, child_gen)` — attaches `child`
+/// under `parent`. No-op if either handle is stale.
+unsafe extern "C" fn lua_add_child(L: *mut ffi::lua_State) -> c_int {
+    let world = get_world(L);
+    let mut isnum = 0;
+    let parent = voltex_ecs::Entity {
+        id: ffi::lua_tonumberx(L, 1, &mut isnum) as u32,
+        generation: ffi::lua_tonumberx(L, 2, &mut isnum) as u32,
+    };
+    let child = voltex_ecs::Entity {
+        id: ffi::lua_tonumberx(L, 3, &mut isnum) as u32,
+        generation: ffi::lua_tonumberx(L, 4, &mut isnum) as u32,
+    };
+    if !world.is_alive(parent) || !world.is_alive(child) {
+        return 0;
+    }
+    voltex_ecs::hierarchy::add_child(world, parent, child);
+    0
+}
+
+/// `remove_child(parent_id, parent_gen, child_id, child_gen)` — detaches
+/// `child` from `parent`. No-op if either handle is stale or not currently
+/// attached.
+unsafe extern "C" fn lua_remove_child(L: *mut ffi::lua_State) -> c_int {
+    let world = get_world(L);
+    let mut isnum = 0;
+    let parent = voltex_ecs::Entity {
+        id: ffi::lua_tonumberx(L, 1, &mut isnum) as u32,
+        generation: ffi::lua_tonumberx(L, 2, &mut isnum) as u32,
+    };
+    let child = voltex_ecs::Entity {
+        id: ffi::lua_tonumberx(L, 3, &mut isnum) as u32,
+        generation: ffi::lua_tonumberx(L, 4, &mut isnum) as u32,
+    };
+    if !world.is_alive(parent) || !world.is_alive(child) {
+        return 0;
+    }
+    voltex_ecs::hierarchy::remove_child(world, parent, child);
+    0
+}
+
 /// `find_by_tag(tag_string)` → `id, gen` of the first entity with that Tag,
 /// or nothing if no match. The returned handle is fresh (valid generation).
 unsafe extern "C" fn lua_find_by_tag(L: *mut ffi::lua_State) -> c_int {
@@ -415,6 +489,132 @@ mod tests {
         ").unwrap();
 
         assert_eq!(lua.get_global_number("missing_id"), None);
+    }
+
+    #[test]
+    fn add_child_attaches_via_lua() {
+        use voltex_ecs::hierarchy::{Children, Parent};
+        let lua = LuaState::new();
+        let mut world = World::new();
+        register_engine_api(&lua, &mut world as *mut World);
+
+        lua.exec("
+            local p_id, p_gen = spawn_entity()
+            local c_id, c_gen = spawn_entity()
+            add_child(p_id, p_gen, c_id, c_gen)
+            parent_id = p_id
+            parent_gen = p_gen
+            child_id = c_id
+            child_gen = c_gen
+        ").unwrap();
+
+        let parent = voltex_ecs::Entity {
+            id: lua.get_global_number("parent_id").unwrap() as u32,
+            generation: lua.get_global_number("parent_gen").unwrap() as u32,
+        };
+        let child = voltex_ecs::Entity {
+            id: lua.get_global_number("child_id").unwrap() as u32,
+            generation: lua.get_global_number("child_gen").unwrap() as u32,
+        };
+        assert_eq!(world.get::<Parent>(child).map(|p| p.0), Some(parent));
+        assert_eq!(world.get::<Children>(parent).map(|c| c.0.clone()), Some(vec![child]));
+    }
+
+    #[test]
+    fn remove_child_detaches_via_lua() {
+        use voltex_ecs::hierarchy::Parent;
+        let lua = LuaState::new();
+        let mut world = World::new();
+        register_engine_api(&lua, &mut world as *mut World);
+
+        lua.exec("
+            local p_id, p_gen = spawn_entity()
+            local c_id, c_gen = spawn_entity()
+            add_child(p_id, p_gen, c_id, c_gen)
+            remove_child(p_id, p_gen, c_id, c_gen)
+            child_id = c_id
+            child_gen = c_gen
+        ").unwrap();
+
+        let child = voltex_ecs::Entity {
+            id: lua.get_global_number("child_id").unwrap() as u32,
+            generation: lua.get_global_number("child_gen").unwrap() as u32,
+        };
+        assert!(world.get::<Parent>(child).is_none());
+    }
+
+    #[test]
+    fn add_child_with_stale_handle_is_noop() {
+        use voltex_ecs::hierarchy::Parent;
+        let lua = LuaState::new();
+        let mut world = World::new();
+        register_engine_api(&lua, &mut world as *mut World);
+
+        // Spawn one entity, capture its handle, then despawn from Rust to make
+        // the Lua handle stale.
+        let stale = world.spawn();
+        world.add(stale, Transform::new());
+        world.despawn(stale);
+
+        lua.exec("
+            local c_id, c_gen = spawn_entity()
+            -- Try to attach the new child under the STALE parent (id=0, gen=0).
+            add_child(0, 0, c_id, c_gen)
+            child_id = c_id
+            child_gen = c_gen
+        ").unwrap();
+
+        let child = voltex_ecs::Entity {
+            id: lua.get_global_number("child_id").unwrap() as u32,
+            generation: lua.get_global_number("child_gen").unwrap() as u32,
+        };
+        // Stale parent → add_child rejected; child has no Parent.
+        assert!(world.get::<Parent>(child).is_none());
+    }
+
+    #[test]
+    fn find_all_by_tag_returns_all_matches() {
+        let lua = LuaState::new();
+        let mut world = World::new();
+        register_engine_api(&lua, &mut world as *mut World);
+
+        lua.exec("
+            for i = 1, 3 do
+                local id, gen = spawn_entity()
+                set_tag(id, gen, 'Enemy')
+            end
+            local id, gen = spawn_entity()
+            set_tag(id, gen, 'Hero')
+
+            local enemies = find_all_by_tag('Enemy')
+            enemy_count = #enemies
+            first_id = enemies[1].id
+            first_gen = enemies[1].gen
+        ").unwrap();
+
+        assert_eq!(lua.get_global_number("enemy_count"), Some(3.0));
+        // The first matching entity is the first one we spawned (id=0, gen=0).
+        assert_eq!(lua.get_global_number("first_id"), Some(0.0));
+        assert_eq!(lua.get_global_number("first_gen"), Some(0.0));
+    }
+
+    #[test]
+    fn find_all_by_tag_returns_empty_table_when_no_match() {
+        let lua = LuaState::new();
+        let mut world = World::new();
+        register_engine_api(&lua, &mut world as *mut World);
+
+        lua.exec("
+            local none = find_all_by_tag('Missing')
+            none_count = #none
+            none_is_table = type(none) == 'table'
+        ").unwrap();
+
+        assert_eq!(lua.get_global_number("none_count"), Some(0.0));
+        // Lua converts boolean to number for get_global_number? No — use exec assertion.
+        // Instead, verify by setting a number flag.
+        lua.exec("flag = (type(find_all_by_tag('Missing')) == 'table') and 1 or 0").unwrap();
+        assert_eq!(lua.get_global_number("flag"), Some(1.0));
     }
 
     #[test]
