@@ -27,6 +27,9 @@ pub use picking::pick_entity;
 pub mod gizmo;
 pub use gizmo::{DragResult, GizmoAxis, GizmoMode, GizmoRenderer, GizmoState};
 
+pub mod lifecycle;
+pub use lifecycle::{LifecycleCallback, LifecycleEvent};
+
 pub mod viewport_texture;
 pub use viewport_texture::{ViewportTexture, VIEWPORT_COLOR_FORMAT, VIEWPORT_DEPTH_FORMAT};
 
