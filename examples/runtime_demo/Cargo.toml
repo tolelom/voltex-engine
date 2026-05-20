@@ -1,0 +1,12 @@
+[package]
+name = "runtime_demo"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+voltex.workspace = true
+voltex_runtime.workspace = true
+voltex_renderer.workspace = true
+voltex_renderer_ecs.workspace = true
+wgpu = { workspace = true }
+env_logger = { workspace = true }

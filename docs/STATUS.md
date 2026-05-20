@@ -166,6 +166,17 @@
 - examples/editor_demo: 시드 엔티티 (ground + 3 cube + Cube1↔Cube2 hierarchy)를 `EditorSession::dispatch` 경로로 옮김 → jsonl 로그 + Save/Load round-trip 일관성
 - v1 한계 (문서화): picking은 sphere 근사 (메시 AABB는 미구현). gizmo translate/rotate/scale 핸들은 미구현
 
+### Cycle 6 (B0): voltex_runtime 라이브러리 (2026-05-21)
+- crates/voltex_runtime (L3 신규): **`RuntimeConfig`** 빌더 (8 메서드) + **`RuntimeApp`** + winit `ApplicationHandler` 통합 + `RuntimeError`/`RuntimeResult` (thiserror).
+- **`RuntimeApp::new(config)`** — `register_defaults` → register_components 콜백 → 초기 scene 로드 (silent 실패) → build_scene 콜백 → setup_systems 콜백. GPU/window 는 만들지 않음 (lazy).
+- **`RuntimeApp::tick_systems_only(dt)`** — propagate_transforms → (옵션) physics_step → (옵션) script_start_all + script_update_all + poll_reload → 사용자 등록 시스템. 헤드리스 단위 테스트 가능.
+- **`RuntimeApp::run()`** — winit `EventLoop::run_app` 진입. 첫 `resumed` 에서 GPU/window/BasicRenderer/Camera/Light 초기화 + `with_gpu_init` 콜백 1회 실행. 매 RedrawRequested 에서 input → camera update → `tick_systems_only` → `BasicRenderer::render` → present.
+- **`with_gpu_init`** 콜백 신설 (`&mut RuntimeApp, &Device, &Queue`) — `with_scene_builder` 가 GPU 없이 entity seed, `with_gpu_init` 가 mesh 업로드 + MeshHandle/MaterialHandle 부착.
+- Drop 순서 의도적 정렬: GPU state → user_systems → file_watcher/timer/input/physics_config → script_pool → assets/registry/world → config. LuaState 의 `__voltex_world` 가 dangling 안 됨.
+- examples/runtime_demo: solar system (sun + 3 planet + 1 moon) 자전 데모. `main` 본문 **4줄**.
+- 통합 정책: audio_sync_system v1 미통합 (사용자가 직접 AudioSystem 관리). v1.1+ 후속.
+- 시각 검증: GUI 자동화 부재 → 수동 검증 권장 (`cargo run -p runtime_demo`). 단위 테스트 +11 (config ×5, error ×2, app ×4: registry/scene order, system order, transform propagation, missing-scene graceful).
+
 ### Cycle 5 (S1): per-entity Lua ScriptComponent + iterator (2026-05-21)
 - voltex_ecs::script_component: **`ScriptComponent { script_path: String, instance_id: u32 }`** + `Component` trait impl (NAME="script", `[u32 instance_id LE][UTF-8 path]`). `UNBOUND = u32::MAX` 센티넬. `register_defaults()` 가 자동 등록 (built-in 6번째 컴포넌트).
 - voltex_ecs::World/EntityAllocator: **`live_entities() -> impl Iterator<Item=Entity>`** — 살아있는 entity 만 id 순으로. voltex_script 의 `iter_entities()` 가 사용.
@@ -219,11 +230,12 @@ crates/
 ├── voltex_audio       — WAV(16/24/32), OGG/Vorbis, mixing, WASAPI, Doppler, MixGroup, spatial
 ├── voltex_ai          — NavMesh(+builder), A*, Funnel, steering, obstacle avoidance
 ├── voltex_net         — UDP, NetServer/Client, Reliable/Ordered, Snapshot(delta), Interpolation
-├── voltex_script      — Lua 5.4, LuaState, table interop, coroutine, sandbox, hot reload
-└── voltex_editor      — IMGUI, docking, 3D viewport, inspector, asset browser, TTF font, UiRenderer
+├── voltex_script      — Lua 5.4, LuaState, table interop, coroutine, sandbox, hot reload, ScriptInstancePool + system (S1)
+├── voltex_editor      — IMGUI, docking, 3D viewport, inspector, asset browser, TTF font, UiRenderer
+└── voltex_runtime     — RuntimeApp + RuntimeConfig builder + winit handler (B0, "조립된 앱" 진입점)
 ```
 
-## 테스트: 867개 전부 통과 (Cycle 5 +17 vs Cycle 4 직후 850)
+## 테스트: 878개 전부 통과 (Cycle 6 +11 vs Cycle 5 직후 867; Cycle 5 +17 vs Cycle 4 직후 850)
 
 - voltex: 2 (M6: prelude/module 경로 컴파일 검증)
 - voltex_math: 39 (8-7 +2: inverse roundtrip × VP+translation)
@@ -238,12 +250,14 @@ crates/
 - voltex_net: 47
 - voltex_script: 42 (S1 +12: pool ×6 [get_or_create same/load/reload/unknown/poll_reload/clear], system ×4 [start/update/5-cubes/missing-callbacks], engine_api ×2 [iter_entities/iter_by_tag])
 - voltex_editor: 158 (E2 +12: session::* mode/snapshot/dispatch ×7, lifecycle/callbacks ×4, undo/redo non-Health-snapshot inner test ×1)
+- voltex_runtime: 11 (B0 신규: config ×5, error ×2, app ×4 [registry/scene order, system order, transform propagation, missing-scene graceful])
 
-## Examples (12개 + survivor_game)
+## Examples (13개 + survivor_game)
 
 - triangle, model_viewer, many_cubes, hierarchy_demo, asset_demo
 - pbr_demo, multi_light_demo, shadow_demo, ibl_demo
 - audio_demo, deferred_demo, editor_demo
+- **runtime_demo (B0 신규)** — RuntimeApp 으로 솔라 시스템, main 본문 4줄
 - survivor_game (ECS + voltex_physics + voltex facade로 재작성 완료, 2026-05-20)
 
 ## 다음 작업 후보 (2026-05-20 8-7 이후)

@@ -38,6 +38,20 @@ impl ApplicationHandler for RuntimeHandler {
             fps_controller,
             light,
         });
+        // Run one-shot gpu_init callback now that the GPU exists. We have to
+        // hand the device/queue out of runtime_state, but a re-borrow of the
+        // whole app is safe because the callback signature takes &mut app.
+        if let Some(init) = app.config.gpu_init.take() {
+            // SAFETY: we briefly split the borrow of `app` to give the user
+            // both `&mut RuntimeApp` and `&Device`/`&Queue`. We immediately
+            // drop the device/queue refs after `init` returns.
+            let state_ptr: *const RuntimeState =
+                app.runtime_state.as_ref().expect("just inserted") as *const _;
+            unsafe {
+                let st = &*state_ptr;
+                init(app, &st.gpu.device, &st.gpu.queue);
+            }
+        }
     }
 
     fn window_event(

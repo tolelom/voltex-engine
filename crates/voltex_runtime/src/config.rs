@@ -8,6 +8,12 @@ use voltex_platform::WindowConfig;
 pub type RegistrySetupFn = Box<dyn FnOnce(&mut ComponentRegistry)>;
 pub type SceneBuilderFn = Box<dyn FnOnce(&mut World, &mut ComponentRegistry)>;
 pub type SystemSetupFn = Box<dyn FnOnce(&mut crate::app::RuntimeApp)>;
+/// Callback that runs once on first `resumed`, after `GpuContext` and
+/// `BasicRenderer` exist. Use this to upload meshes to `RenderAssets` and
+/// attach `MeshHandle` / `MaterialHandle` components — those require a
+/// `wgpu::Device` so they cannot live in `with_scene_builder`.
+pub type GpuInitFn =
+    Box<dyn FnOnce(&mut crate::app::RuntimeApp, &wgpu::Device, &wgpu::Queue)>;
 
 /// All knobs `RuntimeApp` exposes. Builder methods return `Self` for chaining.
 pub struct RuntimeConfig {
@@ -16,6 +22,7 @@ pub struct RuntimeConfig {
     pub register_components: Option<RegistrySetupFn>,
     pub build_scene: Option<SceneBuilderFn>,
     pub setup_systems: Option<SystemSetupFn>,
+    pub gpu_init: Option<GpuInitFn>,
     /// When `Some(dt)`, every frame's update step is forced to that delta —
     /// useful for deterministic playback. When `None`, the wallclock-derived
     /// `GameTimer::frame_dt` is used.
@@ -32,6 +39,7 @@ impl Default for RuntimeConfig {
             register_components: None,
             build_scene: None,
             setup_systems: None,
+            gpu_init: None,
             fixed_dt: None,
             enable_physics: true,
             enable_scripts: true,
@@ -81,6 +89,17 @@ impl RuntimeConfig {
         F: FnOnce(&mut crate::app::RuntimeApp) + 'static,
     {
         self.setup_systems = Some(Box::new(f));
+        self
+    }
+
+    /// Register a one-shot callback that runs on first `resumed` (after GPU
+    /// is up). Use for uploading meshes / materials and attaching MeshHandle
+    /// to entities seeded by `with_scene_builder`.
+    pub fn with_gpu_init<F>(mut self, f: F) -> Self
+    where
+        F: FnOnce(&mut crate::app::RuntimeApp, &wgpu::Device, &wgpu::Queue) + 'static,
+    {
+        self.gpu_init = Some(Box::new(f));
         self
     }
 
