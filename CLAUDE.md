@@ -8,6 +8,7 @@ Rust 게임 엔진 프로젝트. wgpu 28.0 + winit 0.30 기반.
 
 ## 스펙
 - `docs/superpowers/specs/2026-03-24-voltex-engine-design.md` — 전체 엔진 설계
+- `docs/superpowers/specs/2026-05-20-engine-restructure-design.md` — AI 친화 재구조화 설계
 
 ## 구현 계획
 - `docs/superpowers/plans/` — 각 Phase별 상세 구현 계획
@@ -25,3 +26,77 @@ cargo test --workspace
 - max_bind_groups=4 (group 0~3). 리소스를 합쳐서 4개 이내로 유지
 - Dynamic UBO 패턴: per-entity uniform은 aligned staging buffer + dynamic offset 사용
 - 기존 예제(triangle, model_viewer 등)는 mesh_shader.wgsl(Blinn-Phong) 사용 — PBR 변경에 영향 없음
+
+## Crate 의존성 그래프
+
+각 crate의 자세한 책임/API는 `crates/<crate>/CODEMAP.md` 참고.
+
+```
+L0 (no voltex deps):
+  voltex_math       — Vec/Mat/AABB/Ray
+  voltex_asset      — Handle, AssetStorage, AssetLoader, FileWatcher
+  voltex_net        — UDP, Packet, Reliable, Snapshot, Interpolation
+
+L1 (depends on math only):
+  voltex_platform   → voltex_math   (winit window/input/timer)
+  voltex_ecs        → voltex_math   (World, Entity, Component, Scheduler)
+  voltex_audio      → voltex_math   (WAV/OGG, WASAPI, 3D, mixer)
+
+L2:
+  voltex_ai         → voltex_math, voltex_ecs        (NavMesh, A*, steering)
+  voltex_physics    → voltex_math, voltex_ecs        (Collider, RigidBody, Raycast)
+  voltex_script     → voltex_math, voltex_ecs        (Lua 5.4, sandbox)
+  voltex_renderer   → voltex_math, voltex_platform   (wgpu, PBR, RT, post-process)
+
+L3:
+  voltex_editor     → voltex_math, voltex_ecs, voltex_renderer
+                      (IMGUI, dock, viewport, inspector, TTF)
+```
+
+**변경 영향도**: L0 변경은 거의 모든 crate에 영향 (특히 voltex_math). L3 변경은 영향 적음. 변경 전 의존 그래프를 따라 영향 범위 확인.
+
+## 도메인 용어집
+
+- **Entity**: ECS의 식별자. `(id: u32, generation: u32)` 쌍. 재사용 안전.
+- **Component**: 데이터 단위. Transform, Tag, Parent 등. `SparseSet<T>`에 저장.
+- **System**: 게임 로직 단위. `Scheduler`가 순차 실행. (의존성 기반 병렬은 `DependencyScheduler`)
+- **World**: 모든 엔티티/컴포넌트를 담는 컨테이너 (`voltex_ecs::World`).
+- **Archetype**: signature 기반 entity 그룹 저장소 (`voltex_ecs::Archetype`).
+- **Handle<T>**: 에셋 핸들. generation 기반 안전 참조 (`voltex_asset`).
+- **Collider**: 충돌 형상. Sphere/Box/Capsule/ConvexHull/Mesh.
+- **RigidBody**: 강체. 질량 + 속도 + 각속도 + 마찰 + sleep 상태.
+- **NavMesh**: 폴리곤 기반 내비메시 (`voltex_ai`).
+- **DockTree**: 에디터 도킹 트리 (binary split layout) (`voltex_editor`).
+- **EditorCommand**: 에디터 작업 단위. Spawn/Despawn/SetTransform 등. EditorSession에 dispatch.
+- **CODEMAP.md**: 각 crate 루트의 메타데이터 파일. 책임/API/의존성/주의점.
+
+## 공통 패턴 인덱스
+
+### 에러 처리 (M4 표준화 예정)
+현재 crate마다 다름. M4 이후: `voltex_<crate>::<Crate>Error` (thiserror 기반).
+
+### 컴포넌트 등록 (M5 표준화 예정)
+현재: `ComponentRegistry::register::<T>()`. 자세한 사용은 `crates/voltex_ecs/CODEMAP.md`.
+
+### 시스템 정의 (M5 표준화 예정)
+현재: `System` trait + `Scheduler`. 의존성 기반은 `DependencyScheduler`.
+
+### 직렬화
+- JSON: `voltex_ecs::serialize_scene_json` / `deserialize_scene_json`
+- VSCN binary: `voltex_ecs::serialize_scene_binary` / `deserialize_scene_binary`
+- VNAV (navmesh): `voltex_ai`의 navmesh 직렬화
+
+### 에디터 작업
+- 사용자 액션은 `EditorCommand`로 표현
+- `EditorSession::dispatch(command)` 호출
+- World 직접 변형은 가급적 피하고 command 경유 (jsonl 로그 + 자동 저장 혜택)
+
+## 변경 워크플로 (AI 작업 기준)
+
+1. **위치 파악**: 수정할 기능이 어느 crate에 있는지 `CLAUDE.md` 의존성 그래프 → 해당 `CODEMAP.md` → 모듈 구조에서 찾기
+2. **변경 영향 점검**: `CODEMAP.md`의 "변경 시 주의점" 확인
+3. **수정**: 단일 책임 원칙, 600줄 한도, 일관된 패턴
+4. **빌드 확인**: `cargo build -p <crate>` (해당 crate만) 후 `cargo build --workspace`
+5. **테스트 확인**: `cargo test -p <crate> --lib` 후 `cargo test --workspace --lib`
+6. **CODEMAP 갱신**: 공개 API/모듈 구조가 바뀌었으면 해당 `CODEMAP.md` 갱신
+7. **Commit**: 단일 책임 단위로 commit (모듈 분리/에러 마이그레이션은 atomic)
