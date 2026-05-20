@@ -70,7 +70,7 @@ pub fn hit_axis(gizmo_origin: Vec3, ray: &Ray) -> Option<GizmoAxis> {
     best.map(|(a, _)| a)
 }
 
-pub fn try_begin(origin: Vec3, ray: &Ray, cam_pos: Vec3, initial: Transform) -> Option<DragState> {
+pub(crate) fn try_begin(origin: Vec3, ray: &Ray, cam_pos: Vec3, initial: Transform) -> Option<DragState> {
     let axis = hit_axis(origin, ray)?;
     let plane_normal = pick_drag_plane_normal(axis, origin, cam_pos);
     let hit = ray_plane_hit(ray, origin, plane_normal)?;
@@ -84,7 +84,7 @@ pub fn try_begin(origin: Vec3, ray: &Ray, cam_pos: Vec3, initial: Transform) -> 
     })
 }
 
-pub fn compute_transform(drag: &DragState, ray: &Ray) -> Transform {
+pub(crate) fn compute_transform(drag: &DragState, ray: &Ray) -> Transform {
     let hit = match ray_plane_hit(ray, drag.gizmo_origin, drag.plane_normal) {
         Some(h) => h,
         None => return drag.initial_transform,
