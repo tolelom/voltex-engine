@@ -81,11 +81,58 @@ L3:
 - 에러 타입이 없는 crate (Result<T,String> 미사용): math, platform, physics
 - voltex_editor: `EditorError`가 기존 `CommandError`를 흡수 (Generic/EntityNotAlive/Io/Parse variants, PartialEq 유지)
 
-### 컴포넌트 등록 (M5 표준화 예정)
-현재: `ComponentRegistry::register::<T>()`. 자세한 사용은 `crates/voltex_ecs/CODEMAP.md`.
+### 컴포넌트 등록 (M5 표준화 완료)
+직렬화 가능한 컴포넌트는 `voltex_ecs::Component` trait를 구현하고 `ComponentRegistry::register::<T>()` 로 등록한다.
 
-### 시스템 정의 (M5 표준화 예정)
-현재: `System` trait + `Scheduler`. 의존성 기반은 `DependencyScheduler`.
+```rust
+use voltex_ecs::{Component, ComponentRegistry, World, Entity};
+
+#[derive(Debug, Clone)]
+struct Health(u32);
+
+impl Component for Health {
+    const NAME: &'static str = "health";  // 변경 시 기존 씬 파일 호환 깨짐
+    fn serialize(world: &World, entity: Entity) -> Option<Vec<u8>> {
+        let h = world.get::<Health>(entity)?;
+        Some(h.0.to_le_bytes().to_vec())
+    }
+    fn deserialize(world: &mut World, entity: Entity, data: &[u8]) -> voltex_ecs::Result<()> {
+        let v = u32::from_le_bytes(data[..4].try_into().map_err(|_| "Health too short")?);
+        world.add(entity, Health(v));
+        Ok(())
+    }
+}
+
+let mut registry = ComponentRegistry::new();
+registry.register::<Health>();           // 표준 경로
+registry.register_defaults();            // Transform + Tag (engine built-in)
+```
+
+- **Escape hatch**: trait 구현이 불가능한 외부 타입은 `registry.register_raw(name, ser, deser)` 사용.
+- `register_defaults()` 는 Transform, Tag 두 built-in을 한 번에 등록.
+- 등록 안 된 컴포넌트는 `serialize_scene_json` / `serialize_scene_binary` 결과에 포함되지 않는다.
+
+### 시스템 정의 (M5 표준화 완료)
+시스템은 `fn(world: &mut World)` 함수 또는 동등한 클로저로 정의한다. `voltex_ecs::System` blanket impl로 자동으로 trait 만족.
+
+```rust
+use voltex_ecs::{Scheduler, World, Transform};
+
+fn move_system(world: &mut World) {
+    for (_, t) in world.query::<Transform>().collect::<Vec<_>>() {
+        // ...
+    }
+}
+
+let mut scheduler = Scheduler::new();
+scheduler.add(move_system);                      // 함수 포인터
+scheduler.add(|w: &mut World| { /* ... */ });    // 클로저도 OK
+scheduler.run_all(&mut world);
+```
+
+- **순차 실행**: `Scheduler::new().add(sys_a).add(sys_b).run_all(&mut world)`.
+- **병렬 그룹 빌드**: `DependencyScheduler` + `SystemAccess::new("name").read::<T>().write::<U>()` 로 충돌 분석 후 그룹화. 현재는 그룹 빌드까지만 제공 (실제 병렬 실행은 future work).
+- 클로저 캡처보다 명시적 함수 + 인자 전달을 선호 (test/재사용 용이).
 
 ### 직렬화
 - JSON: `voltex_ecs::serialize_scene_json` / `deserialize_scene_json`

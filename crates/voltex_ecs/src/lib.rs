@@ -22,7 +22,7 @@ pub use hierarchy::{Parent, Children, add_child, remove_child, despawn_recursive
 pub use world_transform::{WorldTransform, propagate_transforms};
 pub use scene::{Tag, serialize_scene, deserialize_scene, serialize_scene_json, deserialize_scene_json};
 pub use scheduler::{Scheduler, System};
-pub use component_registry::ComponentRegistry;
+pub use component_registry::{Component, ComponentRegistry};
 pub use binary_scene::{serialize_scene_binary, deserialize_scene_binary};
 pub use archetype::{ArchetypeSignature, Archetype, ArchetypeRegistry};
 pub use dependency_scheduler::{SystemAccess, DependencyScheduler};

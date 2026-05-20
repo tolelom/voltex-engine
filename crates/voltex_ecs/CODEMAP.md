@@ -12,7 +12,9 @@ ECS 코어 — Entity/Component/World/Query + Hierarchy + Scene 직렬화 + Syst
 - `WorldTransform` — 부모 변환 propagation (src/world_transform.rs)
 - `serialize_scene_json`/`deserialize_scene_json` — JSON 씬 (src/json.rs, src/scene.rs)
 - VSCN binary format — `serialize_scene_binary` (src/binary_scene.rs)
-- `ComponentRegistry` — 임의 컴포넌트 등록 기반 직렬화 (src/component_registry.rs)
+- `Component` — 직렬화 가능 컴포넌트 trait (`NAME` + `serialize`/`deserialize`) (src/component_registry.rs)
+- `ComponentRegistry::register::<T>()` — Component trait 기반 표준 등록 (src/component_registry.rs)
+- `ComponentRegistry::register_raw` — trait 구현 불가 타입용 escape hatch (src/component_registry.rs)
 - `Scheduler`, `DependencyScheduler` — 시스템 실행 (src/scheduler.rs, src/dependency_scheduler.rs)
 - `Archetype` — signature 기반 그룹 저장소 (src/archetype.rs)
 - `EcsError`, `Result` — thiserror 기반 에러 (Generic/Io) (src/error.rs)
@@ -25,7 +27,7 @@ ECS 코어 — Entity/Component/World/Query + Hierarchy + Scene 직렬화 + Syst
 - `hierarchy` — Parent/Children + 트리 조작 (src/hierarchy.rs)
 - `world_transform` — 변환 propagation (src/world_transform.rs)
 - `scene`, `json`, `binary_scene` — 씬 직렬화 (src/scene.rs, src/json.rs, src/binary_scene.rs)
-- `component_registry` — 등록 기반 다형 직렬화 (src/component_registry.rs)
+- `component_registry` — Component trait + 제네릭 register::<T>() + raw escape hatch (src/component_registry.rs)
 - `scheduler`, `dependency_scheduler` — 시스템 스케줄링 (src/scheduler.rs, src/dependency_scheduler.rs)
 - `archetype` — Archetype 저장 (src/archetype.rs)
 
@@ -42,4 +44,4 @@ ECS 코어 — Entity/Component/World/Query + Hierarchy + Scene 직렬화 + Syst
 ## 테스트
 - 단위 테스트: src/**/*.rs `#[cfg(test)]`
 - 실행: `cargo test -p voltex_ecs --lib`
-- 현재 테스트 개수: 104개
+- 현재 테스트 개수: 107개 (M5에서 +3: 제네릭 register / 커스텀 컴포넌트 roundtrip / register_raw 검증)
