@@ -166,32 +166,43 @@
 - examples/editor_demo: 시드 엔티티 (ground + 3 cube + Cube1↔Cube2 hierarchy)를 `EditorSession::dispatch` 경로로 옮김 → jsonl 로그 + Save/Load round-trip 일관성
 - v1 한계 (문서화): picking은 sphere 근사 (메시 AABB는 미구현). gizmo translate/rotate/scale 핸들은 미구현
 
+### Cycle 2 (C0b): Renderer 브릿지 + ECS-driven 렌더링 (2026-05-20)
+- **voltex_renderer_ecs**: 신규 L3 crate. `RenderAssets` (id/generation lockstep wrapper around voltex_asset::Assets — C0a 의 phantom-typed `Handle<MeshAsset>` 과 내부 `Handle<Mesh>` 핸들이 lockstep), `BasicRenderer` (mesh_shader.wgsl pipeline + per-entity dynamic UBO, 한 메서드 render), `RenderItem` + `collect_render_items` (자체 PBR pipeline 호출자용 helper)
+- voltex (facade): `voltex::renderer_ecs` 모듈 re-export 추가 (prelude 변경 없음 — 도메인 특화 정책)
+- C0a 컴포넌트 (MeshHandle / MaterialHandle / Bounds) 가 처음으로 실제 렌더링 경로에서 사용됨
+- examples/editor_demo: 평행 `scene_meshes: Vec<Mesh>` (4개, 위치 baked-in) 제거. 단일 unit cube + unit ground mesh 공유. 시드 엔티티에 MeshHandle/MaterialHandle 직접 부착 (E3 의 AddComponent command 도입 전 임시 처치). Toolbar Spawn 버튼이 visible cube 생성. 뷰포트 렌더 패스가 `BasicRenderer::render()` 한 줄로 축소.
+- examples/survivor_game: 평행 `Vec<RenderEntity>` / `Vec<Mat4>` / `Vec<material>` 배열 + per-frame 모델/머티리얼 재구축 루프 제거. `RenderHandles` 가 per-type MeshHandle/MaterialHandle 보관, `spawn_player/enemy/projectile` 에 전달. arena 5개 + player + dynamic projectile/enemy 모두 ECS entity. shadow + color pass 둘 다 `collect_render_items` 결과 iterate.
+- 부수 정리: player Transform Y=0.5 (render-time +0.5 offset 제거), enemy/projectile scale (0.4/0.3) 을 Transform.scale 에 baked. player 무적 깜빡임 효과는 v1 에서 생략 (material swap 패턴 future work).
+- 시각 검증: GUI 자동화 환경 부재로 빌드/타입 검증 + Inspector 슬라이더 ↔ 뷰포트 큐브 이동 흐름은 수동 검증 권장.
+
 ## Crate 구조
 
 ```
 crates/
-├── voltex           — Facade (M6): 모든 sub-crate re-export + prelude
-├── voltex_math      — Vec2, Vec3, Vec4, Mat4(+inverse), AABB, Ray
-├── voltex_platform  — VoltexWindow, InputState, GameTimer
-├── voltex_renderer  — GPU, Mesh, OBJ, glTF, JPG, PNG, Camera, PBR, Shadow(CSM/Point/Spot), IBL(SH), Frustum
-├── voltex_ecs       — Entity, SparseSet, World, Transform, Hierarchy, Scene(JSON/Binary), Scheduler
-├── voltex_asset     — Handle<T>, AssetStorage<T>, Assets, AssetLoader, FileWatcher
-├── voltex_physics   — Collider, GJK/EPA, BVH(refit), RigidBody(angular+sleep), CCD, raycast_all
-├── voltex_audio     — WAV(16/24/32), OGG/Vorbis, mixing, WASAPI, Doppler, MixGroup, spatial
-├── voltex_ai        — NavMesh(+builder), A*, Funnel, steering, obstacle avoidance
-├── voltex_net       — UDP, NetServer/Client, Reliable/Ordered, Snapshot(delta), Interpolation
-├── voltex_script    — Lua 5.4, LuaState, table interop, coroutine, sandbox, hot reload
-└── voltex_editor    — IMGUI, docking, 3D viewport, inspector, asset browser, TTF font, UiRenderer
+├── voltex             — Facade (M6): 모든 sub-crate re-export + prelude
+├── voltex_math        — Vec2, Vec3, Vec4, Mat4(+inverse), AABB, Ray
+├── voltex_platform    — VoltexWindow, InputState, GameTimer
+├── voltex_renderer    — GPU, Mesh, OBJ, glTF, JPG, PNG, Camera, PBR, Shadow(CSM/Point/Spot), IBL(SH), Frustum
+├── voltex_renderer_ecs — RenderAssets, BasicRenderer, RenderItem + collect_render_items (ECS-driven 렌더링 브릿지)
+├── voltex_ecs         — Entity, SparseSet, World, Transform, Hierarchy, Scene(JSON/Binary), Scheduler, MeshHandle/MaterialHandle/Bounds (C0a)
+├── voltex_asset       — Handle<T>, AssetStorage<T>, Assets, AssetLoader, FileWatcher
+├── voltex_physics     — Collider, GJK/EPA, BVH(refit), RigidBody(angular+sleep), CCD, raycast_all
+├── voltex_audio       — WAV(16/24/32), OGG/Vorbis, mixing, WASAPI, Doppler, MixGroup, spatial
+├── voltex_ai          — NavMesh(+builder), A*, Funnel, steering, obstacle avoidance
+├── voltex_net         — UDP, NetServer/Client, Reliable/Ordered, Snapshot(delta), Interpolation
+├── voltex_script      — Lua 5.4, LuaState, table interop, coroutine, sandbox, hot reload
+└── voltex_editor      — IMGUI, docking, 3D viewport, inspector, asset browser, TTF font, UiRenderer
 ```
 
-## 테스트: 803개 전부 통과 (Phase 8-7 +20)
+## 테스트: 819개 전부 통과 (Cycle 2 +16 vs STATUS.md 8-7 직후 803)
 
 - voltex: 2 (M6: prelude/module 경로 컴파일 검증)
 - voltex_math: 39 (8-7 +2: inverse roundtrip × VP+translation)
 - voltex_platform: 3
-- voltex_ecs: 109 (M5 +3; 8-6 +2: World::clear roundtrip)
-- voltex_asset: 22
+- voltex_ecs: 116 (C0a +7: MeshHandle/MaterialHandle/Bounds Component roundtrip + register_defaults)
+- voltex_asset: 24 (C0a +2: Handle::from_raw_parts / id+generation 접근자)
 - voltex_renderer: 200
+- voltex_renderer_ecs: 7 (C0b 신규: RenderAssets material roundtrip ×2, missing handle ×2, items empty/skip-no-mesh/stale/hierarchy)
 - voltex_physics: 106
 - voltex_audio: 84
 - voltex_ai: 34
