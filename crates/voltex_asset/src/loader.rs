@@ -5,6 +5,7 @@ use std::sync::mpsc::{channel, Receiver, Sender};
 use std::thread::{self, JoinHandle};
 
 use crate::assets::Assets;
+use crate::error::Result;
 use crate::handle::Handle;
 
 #[derive(Debug)]
@@ -17,12 +18,12 @@ pub enum LoadState {
 struct LoadRequest {
     id: u64,
     path: PathBuf,
-    parse: Box<dyn FnOnce(&[u8]) -> Result<Box<dyn Any + Send>, String> + Send>,
+    parse: Box<dyn FnOnce(&[u8]) -> Result<Box<dyn Any + Send>> + Send>,
 }
 
 struct LoadResult {
     id: u64,
-    result: Result<Box<dyn Any + Send>, String>,
+    result: Result<Box<dyn Any + Send>>,
 }
 
 struct PendingEntry {
@@ -60,7 +61,7 @@ impl AssetLoader {
             while let Ok(req) = request_rx.recv() {
                 let result = match std::fs::read(&req.path) {
                     Ok(data) => (req.parse)(&data),
-                    Err(e) => Err(format!("Failed to read {}: {}", req.path.display(), e)),
+                    Err(e) => Err(format!("Failed to read {}: {}", req.path.display(), e).into()),
                 };
                 let _ = result_tx.send(LoadResult {
                     id: req.id,
@@ -92,7 +93,7 @@ impl AssetLoader {
     pub fn load<T, F>(&mut self, path: PathBuf, parse_fn: F) -> Handle<T>
     where
         T: Send + 'static,
-        F: FnOnce(&[u8]) -> Result<T, String> + Send + 'static,
+        F: FnOnce(&[u8]) -> Result<T> + Send + 'static,
     {
         let id = self.next_id;
         self.next_id += 1;
@@ -129,7 +130,7 @@ impl AssetLoader {
 
         // Wrap parse_fn to erase the type
         let boxed_parse: Box<
-            dyn FnOnce(&[u8]) -> Result<Box<dyn Any + Send>, String> + Send,
+            dyn FnOnce(&[u8]) -> Result<Box<dyn Any + Send>> + Send,
         > = Box::new(move |data: &[u8]| {
             parse_fn(data).map(|v| Box::new(v) as Box<dyn Any + Send>)
         });
@@ -196,7 +197,7 @@ impl AssetLoader {
                         entry.state = PendingState::Ready;
                     }
                     Err(e) => {
-                        entry.state = PendingState::Failed(e);
+                        entry.state = PendingState::Failed(e.to_string());
                     }
                 }
             }
