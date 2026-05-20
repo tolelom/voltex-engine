@@ -19,11 +19,11 @@ pub struct LuaCoroutine {
 impl crate::state::LuaState {
     /// Create a coroutine from a global Lua function name.
     /// The function must already be defined in the Lua state.
-    pub fn create_coroutine(&self, func_name: &str) -> Result<LuaCoroutine, String> {
+    pub fn create_coroutine(&self, func_name: &str) -> crate::Result<LuaCoroutine> {
         unsafe {
             let co_state = ffi::lua_newthread(self.raw());
             if co_state.is_null() {
-                return Err("failed to create Lua thread".to_string());
+                return Err("failed to create Lua thread".into());
             }
             // Pop the thread from the main stack (it's anchored in the registry)
             // Actually, we need to keep the thread referenced. lua_newthread pushes it
@@ -35,11 +35,11 @@ impl crate::state::LuaState {
             ffi::lua_pop(self.raw(), 1);
 
             // Push the function onto the coroutine stack
-            let c_name = CString::new(func_name).map_err(|e| e.to_string())?;
+            let c_name = CString::new(func_name).map_err(|e| crate::ScriptError::from(e.to_string()))?;
             let ty = ffi::lua_getglobal(co_state, c_name.as_ptr());
             if ty != ffi::LUA_TFUNCTION {
                 ffi::lua_pop(co_state, 1);
-                return Err(format!("'{}' is not a Lua function", func_name));
+                return Err(format!("'{}' is not a Lua function", func_name).into());
             }
 
             Ok(LuaCoroutine {
@@ -53,9 +53,9 @@ impl crate::state::LuaState {
 impl LuaCoroutine {
     /// Resume the coroutine. Returns Yielded if the coroutine yielded,
     /// or Finished if it completed.
-    pub fn resume(&mut self) -> Result<CoroutineStatus, String> {
+    pub fn resume(&mut self) -> crate::Result<CoroutineStatus> {
         if self.finished {
-            return Err("coroutine already finished".to_string());
+            return Err("coroutine already finished".into());
         }
         unsafe {
             let mut nresults: std::os::raw::c_int = 0;
@@ -79,7 +79,7 @@ impl LuaCoroutine {
                         std::ffi::CStr::from_ptr(ptr).to_string_lossy().into_owned()
                     };
                     ffi::lua_pop(self.state, 1);
-                    Err(msg)
+                    Err(msg.into())
                 }
             }
         }

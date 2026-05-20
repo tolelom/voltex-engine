@@ -28,36 +28,36 @@ impl LuaState {
     }
 
     /// Execute a Lua code string.
-    pub fn exec(&self, code: &str) -> Result<(), String> {
-        let c_code = CString::new(code).map_err(|e| e.to_string())?;
+    pub fn exec(&self, code: &str) -> crate::Result<()> {
+        let c_code = CString::new(code).map_err(|e| crate::ScriptError::from(e.to_string()))?;
         unsafe {
             let result = ffi::luaL_loadstring(self.state, c_code.as_ptr());
             if result != ffi::LUA_OK {
                 let err = self.pop_error();
-                return Err(err);
+                return Err(err.into());
             }
             let result = ffi::lua_pcall(self.state, 0, ffi::LUA_MULTRET, 0);
             if result != ffi::LUA_OK {
                 let err = self.pop_error();
-                return Err(err);
+                return Err(err.into());
             }
             Ok(())
         }
     }
 
     /// Execute a Lua file.
-    pub fn exec_file(&self, path: &str) -> Result<(), String> {
-        let c_path = CString::new(path).map_err(|e| e.to_string())?;
+    pub fn exec_file(&self, path: &str) -> crate::Result<()> {
+        let c_path = CString::new(path).map_err(|e| crate::ScriptError::from(e.to_string()))?;
         unsafe {
             let result = ffi::luaL_loadfilex(self.state, c_path.as_ptr(), std::ptr::null());
             if result != ffi::LUA_OK {
                 let err = self.pop_error();
-                return Err(err);
+                return Err(err.into());
             }
             let result = ffi::lua_pcall(self.state, 0, ffi::LUA_MULTRET, 0);
             if result != ffi::LUA_OK {
                 let err = self.pop_error();
-                return Err(err);
+                return Err(err.into());
             }
             Ok(())
         }
@@ -153,10 +153,10 @@ impl LuaState {
     }
 
     /// Read a Lua table at the given stack index into key-value pairs.
-    pub fn read_table(&self, index: i32) -> Result<Vec<(String, LuaValue)>, String> {
+    pub fn read_table(&self, index: i32) -> crate::Result<Vec<(String, LuaValue)>> {
         unsafe {
             if ffi::lua_type(self.state, index) != ffi::LUA_TTABLE {
-                return Err("expected table".to_string());
+                return Err("expected table".into());
             }
             let abs_idx = if index < 0 {
                 ffi::lua_gettop(self.state) + index + 1
@@ -188,10 +188,10 @@ impl LuaState {
 
     /// Read a Vec3 table from the stack. Supports {x=, y=, z=} named fields
     /// or {[1]=, [2]=, [3]=} array-style fields.
-    pub fn read_vec3(&self, index: i32) -> Result<[f32; 3], String> {
+    pub fn read_vec3(&self, index: i32) -> crate::Result<[f32; 3]> {
         unsafe {
             if ffi::lua_type(self.state, index) != ffi::LUA_TTABLE {
-                return Err("expected table for vec3".to_string());
+                return Err("expected table for vec3".into());
             }
             let abs_idx = if index < 0 {
                 ffi::lua_gettop(self.state) + index + 1
@@ -230,7 +230,7 @@ impl LuaState {
                 vals[i] = ffi::lua_tonumberx(self.state, -1, &mut isnum) as f32;
                 ffi::lua_pop(self.state, 1);
                 if isnum == 0 {
-                    return Err("vec3 array element is not a number".to_string());
+                    return Err("vec3 array element is not a number".into());
                 }
             }
             Ok(vals)
@@ -295,7 +295,7 @@ impl LuaState {
     }
 
     /// Re-execute a Lua script file on the existing state (hot reload).
-    pub fn reload_file(&mut self, path: &str) -> Result<(), String> {
+    pub fn reload_file(&mut self, path: &str) -> crate::Result<()> {
         self.exec_file(path)
     }
 

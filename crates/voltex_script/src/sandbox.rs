@@ -21,7 +21,7 @@ const BLOCKED_GLOBALS: &[&str] = &[
 ///
 /// Allowed: math, string, table, pairs, ipairs, print, type, tostring, tonumber,
 /// pcall, xpcall, error, select, unpack, next, coroutine, assert
-pub fn create_sandbox(state: &LuaState) -> Result<(), String> {
+pub fn create_sandbox(state: &LuaState) -> crate::Result<()> {
     let mut code = String::new();
     for global in BLOCKED_GLOBALS {
         code.push_str(&format!("{} = nil\n", global));
