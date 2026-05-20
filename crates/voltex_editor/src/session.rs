@@ -721,6 +721,89 @@ mod tests {
         cleanup(&scene);
     }
 
+    use crate::lifecycle::LifecycleEvent;
+    use std::sync::{Arc, Mutex};
+
+    #[test]
+    fn dispatch_in_play_mode_returns_mode_mismatch() {
+        let scene = temp_path("voltex_e2_dispatch.vscn");
+        cleanup(&scene);
+        let mut session = EditorSession::new(scene.clone());
+        let _ = session.dispatch(EditorCommand::Spawn).unwrap();
+        session.set_mode(EditorMode::Play);
+
+        let result = session.dispatch(EditorCommand::Spawn);
+        assert!(matches!(
+            result,
+            Err(EditorError::ModeMismatch { current: EditorMode::Play })
+        ));
+        cleanup(&scene);
+    }
+
+    #[test]
+    fn play_start_callback_invoked_with_world() {
+        let scene = temp_path("voltex_e2_cb_start.vscn");
+        cleanup(&scene);
+        let mut session = EditorSession::new(scene.clone());
+        let e = session.dispatch(EditorCommand::Spawn).unwrap();
+
+        let log = Arc::new(Mutex::new(Vec::new()));
+        let log_cb = log.clone();
+        session.add_lifecycle(move |event, world| {
+            let has_entity = world.is_alive(e);
+            log_cb.lock().unwrap().push((event, has_entity));
+        });
+
+        session.set_mode(EditorMode::Play);
+        let entries = log.lock().unwrap().clone();
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].0, LifecycleEvent::PlayStart);
+        assert!(entries[0].1, "PlayStart callback must see the live world");
+        cleanup(&scene);
+    }
+
+    #[test]
+    fn play_stop_callback_invoked_before_clear() {
+        let scene = temp_path("voltex_e2_cb_stop.vscn");
+        cleanup(&scene);
+        let mut session = EditorSession::new(scene.clone());
+        let e = session.dispatch(EditorCommand::Spawn).unwrap();
+
+        let log = Arc::new(Mutex::new(Vec::new()));
+        let log_cb = log.clone();
+        session.add_lifecycle(move |event, world| {
+            log_cb.lock().unwrap().push((event, world.is_alive(e)));
+        });
+
+        session.set_mode(EditorMode::Play);
+        session.set_mode(EditorMode::Edit);
+
+        let entries = log.lock().unwrap().clone();
+        assert_eq!(entries.len(), 2);
+        assert_eq!(entries[1].0, LifecycleEvent::PlayStop);
+        assert!(entries[1].1, "PlayStop must run before World::clear");
+        cleanup(&scene);
+    }
+
+    #[test]
+    fn lifecycles_called_in_registration_order() {
+        let scene = temp_path("voltex_e2_order.vscn");
+        cleanup(&scene);
+        let mut session = EditorSession::new(scene.clone());
+
+        let order = Arc::new(Mutex::new(Vec::<u32>::new()));
+        for id in [1u32, 2, 3] {
+            let order_cb = order.clone();
+            session.add_lifecycle(move |_event, _world| {
+                order_cb.lock().unwrap().push(id);
+            });
+        }
+        session.set_mode(EditorMode::Play);
+        let captured = order.lock().unwrap().clone();
+        assert_eq!(captured, vec![1, 2, 3]);
+        cleanup(&scene);
+    }
+
     #[test]
     fn multi_step_undo_redo_walks_both_ways() {
         let scene = temp_path("voltex_undo_multi.vscn");
