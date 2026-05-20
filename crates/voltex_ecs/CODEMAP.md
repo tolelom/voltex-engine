@@ -13,6 +13,8 @@ ECS 코어 — Entity/Component/World/Query + Hierarchy + Scene 직렬화 + Syst
 - `serialize_scene_json`/`deserialize_scene_json` — JSON 씬 (src/json.rs, src/scene.rs)
 - VSCN binary format — `serialize_scene_binary` (src/binary_scene.rs)
 - `Component` — 직렬화 가능 컴포넌트 trait (`NAME` + `serialize`/`deserialize`) (src/component_registry.rs)
+- `MeshHandle`, `MaterialHandle`, `Bounds` — 렌더링 데이터 컴포넌트 (src/render_components.rs)
+- `MeshAsset`, `MaterialAsset` — Handle<T> 의 phantom marker (src/render_components.rs)
 - `ComponentRegistry::register::<T>()` — Component trait 기반 표준 등록 (src/component_registry.rs)
 - `ComponentRegistry::register_raw` — trait 구현 불가 타입용 escape hatch (src/component_registry.rs)
 - `Scheduler`, `DependencyScheduler` — 시스템 실행 (src/scheduler.rs, src/dependency_scheduler.rs)
@@ -30,9 +32,10 @@ ECS 코어 — Entity/Component/World/Query + Hierarchy + Scene 직렬화 + Syst
 - `component_registry` — Component trait + 제네릭 register::<T>() + raw escape hatch (src/component_registry.rs)
 - `scheduler`, `dependency_scheduler` — 시스템 스케줄링 (src/scheduler.rs, src/dependency_scheduler.rs)
 - `archetype` — Archetype 저장 (src/archetype.rs)
+- `render_components` — Mesh/Material handle + Bounds + phantom marker (src/render_components.rs)
 
 ## 의존성
-- voltex crate: voltex_math (Vec3, Mat4 등)
+- voltex crate: voltex_math (Vec3, Mat4, AABB), voltex_asset (Handle<T>)
 - 외부 crate: 없음
 
 ## 변경 시 주의점
@@ -44,4 +47,4 @@ ECS 코어 — Entity/Component/World/Query + Hierarchy + Scene 직렬화 + Syst
 ## 테스트
 - 단위 테스트: src/**/*.rs `#[cfg(test)]`
 - 실행: `cargo test -p voltex_ecs --lib`
-- 현재 테스트 개수: 109개 (M5 +3; 8-6 +2: World::clear roundtrip)
+- 현재 테스트 개수: 116개 (M5 +3; 8-6 +2; C0a +7: render_components 6 + register_defaults 1)

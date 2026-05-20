@@ -39,7 +39,7 @@ L0 (no voltex deps):
 
 L1 (depends on math only):
   voltex_platform   → voltex_math   (winit window/input/timer)
-  voltex_ecs        → voltex_math   (World, Entity, Component, Scheduler)
+  voltex_ecs        → voltex_math, voltex_asset   (World, Entity, Component, Scheduler, Handle 컴포넌트)
   voltex_audio      → voltex_math   (WAV/OGG, WASAPI, 3D, mixer)
 
 L2:

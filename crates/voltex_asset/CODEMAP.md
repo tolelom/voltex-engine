@@ -4,7 +4,7 @@
 에셋 핸들 + 저장소 + 비동기 로더 + 핫 리로드.
 
 ## 공개 API 진입점
-- `Handle<T>` — generation 기반 에셋 핸들 (src/handle.rs)
+- `Handle<T>` — generation 기반 에셋 핸들; `id()`, `generation()`, `from_raw_parts()` 공개 (src/handle.rs)
 - `AssetStorage<T>` — 타입별 저장소 (ref counting) (src/storage.rs)
 - `Assets` — type-erased 다중 저장소 (src/assets.rs)
 - `AssetLoader` — 워커 스레드 비동기 로딩 (src/loader.rs)
@@ -29,4 +29,4 @@
 ## 테스트
 - 단위 테스트: src/**/*.rs `#[cfg(test)]`
 - 실행: `cargo test -p voltex_asset --lib`
-- 현재 테스트 개수: 22개
+- 현재 테스트 개수: 24개 (C0a +2: Handle accessors)
