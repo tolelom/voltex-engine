@@ -24,3 +24,62 @@ pub struct MaterialHandle(pub Handle<MaterialAsset>);
 /// 메시의 로컬 공간 AABB 캐시. 월드 공간 변환은 시스템 책임.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Bounds(pub AABB);
+
+use crate::component_registry::Component;
+use crate::entity::Entity;
+use crate::world::World;
+
+impl Component for MeshHandle {
+    const NAME: &'static str = "mesh_handle";
+
+    fn serialize(world: &World, entity: Entity) -> Option<Vec<u8>> {
+        let h = world.get::<MeshHandle>(entity)?;
+        let mut data = Vec::with_capacity(8);
+        data.extend_from_slice(&h.0.id().to_le_bytes());
+        data.extend_from_slice(&h.0.generation().to_le_bytes());
+        Some(data)
+    }
+
+    fn deserialize(world: &mut World, entity: Entity, data: &[u8]) -> crate::Result<()> {
+        if data.len() < 8 {
+            return Err("MeshHandle data too short".into());
+        }
+        let id = u32::from_le_bytes([data[0], data[1], data[2], data[3]]);
+        let gen = u32::from_le_bytes([data[4], data[5], data[6], data[7]]);
+        world.add(entity, MeshHandle(Handle::from_raw_parts(id, gen)));
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::component_registry::Component;
+    use crate::world::World;
+
+    #[test]
+    fn test_mesh_handle_roundtrip() {
+        let mut world = World::new();
+        let e = world.spawn();
+        world.add(e, MeshHandle(Handle::from_raw_parts(42, 7)));
+
+        let data = <MeshHandle as Component>::serialize(&world, e)
+            .expect("serialize MeshHandle should return Some");
+
+        let mut world2 = World::new();
+        let e2 = world2.spawn();
+        <MeshHandle as Component>::deserialize(&mut world2, e2, &data).unwrap();
+
+        let h = world2.get::<MeshHandle>(e2).expect("MeshHandle present");
+        assert_eq!(h.0.id(), 42);
+        assert_eq!(h.0.generation(), 7);
+    }
+
+    #[test]
+    fn test_mesh_handle_deserialize_too_short() {
+        let mut world = World::new();
+        let e = world.spawn();
+        let result = <MeshHandle as Component>::deserialize(&mut world, e, &[0u8; 7]);
+        assert!(result.is_err());
+    }
+}
