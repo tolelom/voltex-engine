@@ -49,4 +49,4 @@ pub mod floating_panel;
 pub use floating_panel::{FloatingPanel, FloatingPanelManager};
 
 pub use command::EditorCommand;
-pub use session::EditorSession;
+pub use session::{EditorMode, EditorSession};

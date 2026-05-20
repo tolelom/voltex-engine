@@ -16,10 +16,12 @@ use voltex_editor::{
     EditorSession, EditorCommand,
     pick_entity,
     GizmoMode, GizmoRenderer, GizmoState,
+    EditorMode, LifecycleEvent,
 };
 use voltex_ecs::entity::Entity;
 use voltex_ecs::{Bounds, MaterialHandle, MeshHandle};
 use voltex_math::{Vec3, AABB};
+use voltex_physics::{physics_step, Collider, PhysicsConfig, RigidBody};
 
 struct EditorDemoApp {
     state: Option<AppState>,
@@ -52,6 +54,8 @@ struct AppState {
     gizmo_state: GizmoState,
     gizmo_renderer: GizmoRenderer,
     gizmo_dragging: bool,
+    // Physics config for Play mode (E2)
+    physics_config: PhysicsConfig,
     // Asset browser
     asset_browser: AssetBrowser,
     // Mouse tracking
@@ -225,6 +229,32 @@ impl ApplicationHandler for EditorDemoApp {
             child: cube2_e,
         }).unwrap();
 
+        // E2: lifecycle callback. On Play, attach RigidBody+Collider to the
+        // cubes so physics_step pulls them down; ground gets a static body
+        // with a Box collider. Stop restores via snapshot — these components
+        // vanish because RigidBody/Collider are not in ComponentRegistry.
+        let cube_ids = [cube1_e, cube2_e, cube3_e];
+        let ground_id = ground_e;
+        session.add_lifecycle(move |event, world| {
+            if event == LifecycleEvent::PlayStart {
+                for &cube in &cube_ids {
+                    if world.is_alive(cube) {
+                        world.add(cube, RigidBody::dynamic(1.0));
+                        world.add(cube, Collider::Sphere { radius: 0.5 });
+                    }
+                }
+                if world.is_alive(ground_id) {
+                    world.add(ground_id, RigidBody::statik());
+                    world.add(ground_id, Collider::Box {
+                        half_extents: Vec3::new(5.0, 0.05, 5.0),
+                    });
+                }
+            }
+            // PlayStop: no-op. snapshot restore handles cleanup.
+        });
+
+        let physics_config = PhysicsConfig::default();
+
         self.state = Some(AppState {
             window,
             gpu,
@@ -244,6 +274,7 @@ impl ApplicationHandler for EditorDemoApp {
             gizmo_state,
             gizmo_renderer,
             gizmo_dragging: false,
+            physics_config,
             asset_browser,
             session,
             inspector_state: InspectorState::default(),
