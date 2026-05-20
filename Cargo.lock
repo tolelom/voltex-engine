@@ -2116,6 +2116,7 @@ name = "voltex_ecs"
 version = "0.1.0"
 dependencies = [
  "thiserror 2.0.18",
+ "voltex_asset",
  "voltex_math",
 ]
 
@@ -2171,6 +2172,19 @@ dependencies = [
  "voltex_platform",
  "wgpu",
  "winit",
+]
+
+[[package]]
+name = "voltex_renderer_ecs"
+version = "0.1.0"
+dependencies = [
+ "bytemuck",
+ "thiserror 2.0.18",
+ "voltex_asset",
+ "voltex_ecs",
+ "voltex_math",
+ "voltex_renderer",
+ "wgpu",
 ]
 
 [[package]]

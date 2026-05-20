@@ -5,6 +5,7 @@ members = [
     "crates/voltex_math",
     "crates/voltex_platform",
     "crates/voltex_renderer",
+    "crates/voltex_renderer_ecs",
     "crates/voltex_ecs",
     "crates/voltex_asset",
     "examples/triangle",
@@ -33,6 +34,7 @@ voltex = { path = "crates/voltex" }
 voltex_math = { path = "crates/voltex_math" }
 voltex_platform = { path = "crates/voltex_platform" }
 voltex_renderer = { path = "crates/voltex_renderer" }
+voltex_renderer_ecs = { path = "crates/voltex_renderer_ecs" }
 voltex_ecs = { path = "crates/voltex_ecs" }
 voltex_asset = { path = "crates/voltex_asset" }
 voltex_physics = { path = "crates/voltex_physics" }

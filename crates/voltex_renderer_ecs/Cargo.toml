@@ -1,0 +1,13 @@
+[package]
+name = "voltex_renderer_ecs"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+voltex_math.workspace = true
+voltex_ecs.workspace = true
+voltex_asset.workspace = true
+voltex_renderer.workspace = true
+wgpu.workspace = true
+bytemuck.workspace = true
+thiserror.workspace = true
