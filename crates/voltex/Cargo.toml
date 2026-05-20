@@ -1,0 +1,17 @@
+[package]
+name = "voltex"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+voltex_math = { workspace = true }
+voltex_platform = { workspace = true }
+voltex_renderer = { workspace = true }
+voltex_ecs = { workspace = true }
+voltex_asset = { workspace = true }
+voltex_physics = { workspace = true }
+voltex_audio = { workspace = true }
+voltex_ai = { workspace = true }
+voltex_net = { workspace = true }
+voltex_script = { workspace = true }
+voltex_editor = { workspace = true }
