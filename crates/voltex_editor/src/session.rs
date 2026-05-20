@@ -55,6 +55,8 @@ pub struct EditorSession {
     pub selected: Option<Entity>,
     pub scene_path: String,
     pub log_path: String,
+    pub mode: EditorMode,
+    play_snapshot: Option<Vec<u8>>,
     /// Stack of pairs: (forward command, inverse). Top is the most recent action.
     undo_stack: Vec<(EditorCommand, Inverse)>,
     /// Stack of pairs cleared by every new forward dispatch; populated by undo().
@@ -75,8 +77,42 @@ impl EditorSession {
             selected: None,
             scene_path,
             log_path,
+            mode: EditorMode::Edit,
+            play_snapshot: None,
             undo_stack: Vec::new(),
             redo_stack: Vec::new(),
+        }
+    }
+
+    /// Transition between Edit and Play. Edit→Play captures a binary
+    /// snapshot of the world; Play→Edit clears the world and deserialises
+    /// the snapshot. Both transitions clear undo/redo history. Same-mode
+    /// calls are a no-op.
+    pub fn set_mode(&mut self, target: EditorMode) {
+        if self.mode == target {
+            return;
+        }
+        match (self.mode, target) {
+            (EditorMode::Edit, EditorMode::Play) => {
+                self.play_snapshot = Some(
+                    voltex_ecs::serialize_scene_binary(&self.world, &self.registry),
+                );
+                self.mode = EditorMode::Play;
+                self.undo_stack.clear();
+                self.redo_stack.clear();
+            }
+            (EditorMode::Play, EditorMode::Edit) => {
+                self.world.clear();
+                if let Some(data) = self.play_snapshot.take() {
+                    let _ = voltex_ecs::deserialize_scene_binary(
+                        &mut self.world, &data, &self.registry,
+                    );
+                }
+                self.mode = EditorMode::Edit;
+                self.undo_stack.clear();
+                self.redo_stack.clear();
+            }
+            _ => {}
         }
     }
 
