@@ -17,6 +17,12 @@ pub enum EditorError {
     /// Parse 에러 (씬 파일 파싱 실패 등).
     #[error("parse: {0}")]
     Parse(String),
+
+    /// Dispatch was attempted while the editor is in Play mode.
+    /// Policy: Play mode is read-only from the user's command surface; only
+    /// systems registered via lifecycle callbacks may mutate the World.
+    #[error("dispatch rejected: current mode is {current:?}")]
+    ModeMismatch { current: crate::session::EditorMode },
 }
 
 impl From<String> for EditorError {

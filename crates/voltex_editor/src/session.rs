@@ -16,6 +16,14 @@ use voltex_ecs::scene::Tag;
 use voltex_ecs::{ComponentRegistry, Entity, Transform, World};
 use voltex_math::Vec3;
 
+/// Editor mode: Edit allows mutation, Play freezes the user-facing dispatch
+/// and lets systems (physics, scripts) drive the World instead.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EditorMode {
+    Edit,
+    Play,
+}
+
 /// The inverse of a dispatched command. The undo stack stores one of these per
 /// undoable command. Commands that don't have a tractable inverse (Despawn,
 /// SaveScene, LoadScene) clear the undo/redo history when they run.
