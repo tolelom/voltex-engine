@@ -3,7 +3,7 @@
 
 use crate::deflate;
 
-pub fn parse_png(data: &[u8]) -> Result<(Vec<u8>, u32, u32), String> {
+pub fn parse_png(data: &[u8]) -> crate::Result<(Vec<u8>, u32, u32)> {
     // 1. Verify PNG signature
     let signature: [u8; 8] = [137, 80, 78, 71, 13, 10, 26, 10];
     if data.len() < 8 || data[..8] != signature {
@@ -50,13 +50,13 @@ pub fn parse_png(data: &[u8]) -> Result<(Vec<u8>, u32, u32), String> {
                 let interlace = chunk_data[12];
 
                 if bit_depth != 8 {
-                    return Err(format!("Unsupported bit depth: {} (only 8 supported)", bit_depth));
+                    return Err(format!("Unsupported bit depth: {} (only 8 supported)", bit_depth).into());
                 }
                 if color_type != 2 && color_type != 6 {
                     return Err(format!(
                         "Unsupported color type: {} (only RGB=2 and RGBA=6 supported)",
                         color_type
-                    ));
+                    ).into());
                 }
                 if compression != 0 {
                     return Err("Unsupported compression method".into());
@@ -103,7 +103,7 @@ pub fn parse_png(data: &[u8]) -> Result<(Vec<u8>, u32, u32), String> {
             "Decompressed data too small: got {} expected {}",
             decompressed.len(),
             expected_size
-        ));
+        ).into());
     }
 
     let mut image_data = vec![0u8; height as usize * stride];
@@ -148,7 +148,7 @@ pub fn parse_png(data: &[u8]) -> Result<(Vec<u8>, u32, u32), String> {
     Ok((rgba, width, height))
 }
 
-fn reconstruct_row(filter_type: u8, current: &mut [u8], previous: &[u8], bpp: usize) -> Result<(), String> {
+fn reconstruct_row(filter_type: u8, current: &mut [u8], previous: &[u8], bpp: usize) -> crate::Result<()> {
     match filter_type {
         0 => {} // None
         1 => {
@@ -180,7 +180,7 @@ fn reconstruct_row(filter_type: u8, current: &mut [u8], previous: &[u8], bpp: us
                 current[i] = current[i].wrapping_add(paeth_predictor(a, b, c) as u8);
             }
         }
-        _ => return Err(format!("Unknown PNG filter type: {}", filter_type)),
+        _ => return Err(format!("Unknown PNG filter type: {}", filter_type).into()),
     }
     Ok(())
 }

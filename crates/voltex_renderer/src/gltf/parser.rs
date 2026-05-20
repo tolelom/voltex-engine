@@ -7,7 +7,7 @@ const GLB_VERSION: u32 = 2;
 const CHUNK_JSON: u32 = 0x4E4F534A;
 const CHUNK_BIN: u32 = 0x004E4942;
 
-pub fn parse_gltf(data: &[u8]) -> Result<GltfData, String> {
+pub fn parse_gltf(data: &[u8]) -> crate::Result<GltfData> {
     if data.len() < 4 {
         return Err("Data too short".into());
     }
@@ -23,13 +23,13 @@ pub fn parse_gltf(data: &[u8]) -> Result<GltfData, String> {
     }
 }
 
-fn parse_glb(data: &[u8]) -> Result<GltfData, String> {
+fn parse_glb(data: &[u8]) -> crate::Result<GltfData> {
     if data.len() < 12 {
         return Err("GLB header too short".into());
     }
     let version = u32::from_le_bytes([data[4], data[5], data[6], data[7]]);
     if version != GLB_VERSION {
-        return Err(format!("Unsupported GLB version: {} (expected 2)", version));
+        return Err(format!("Unsupported GLB version: {} (expected 2)", version).into());
     }
     let _total_len = u32::from_le_bytes([data[8], data[9], data[10], data[11]]) as usize;
 
@@ -50,7 +50,7 @@ fn parse_glb(data: &[u8]) -> Result<GltfData, String> {
         match chunk_type {
             CHUNK_JSON => {
                 json_str = std::str::from_utf8(&data[pos..pos + chunk_len])
-                    .map_err(|_| "Invalid UTF-8 in JSON chunk".to_string())?
+                    .map_err(|_| crate::RendererError::from("Invalid UTF-8 in JSON chunk"))?
                     .to_string();
             }
             CHUNK_BIN => {
@@ -72,8 +72,8 @@ fn parse_glb(data: &[u8]) -> Result<GltfData, String> {
     extract_meshes(&json, &buffers)
 }
 
-fn parse_gltf_json(data: &[u8]) -> Result<GltfData, String> {
-    let json_str = std::str::from_utf8(data).map_err(|_| "Invalid UTF-8".to_string())?;
+fn parse_gltf_json(data: &[u8]) -> crate::Result<GltfData> {
+    let json_str = std::str::from_utf8(data).map_err(|_| crate::RendererError::from("Invalid UTF-8"))?;
     let json = json_parser::parse_json(json_str)?;
 
     // Resolve buffers (embedded base64 URIs)
@@ -86,7 +86,7 @@ fn parse_gltf_json(data: &[u8]) -> Result<GltfData, String> {
                 } else if let Some(b64) = uri.strip_prefix("data:application/gltf-buffer;base64,") {
                     buffers.push(decode_base64(b64)?);
                 } else {
-                    return Err(format!("External buffer URIs not supported: {}", uri));
+                    return Err(format!("External buffer URIs not supported: {}", uri).into());
                 }
             } else {
                 buffers.push(Vec::new());
@@ -97,8 +97,8 @@ fn parse_gltf_json(data: &[u8]) -> Result<GltfData, String> {
     extract_meshes(&json, &buffers)
 }
 
-pub(super) fn decode_base64(input: &str) -> Result<Vec<u8>, String> {
-    let table = |c: u8| -> Result<u8, String> {
+pub(super) fn decode_base64(input: &str) -> crate::Result<Vec<u8>> {
+    let table = |c: u8| -> crate::Result<u8> {
         match c {
             b'A'..=b'Z' => Ok(c - b'A'),
             b'a'..=b'z' => Ok(c - b'a' + 26),
@@ -106,7 +106,7 @@ pub(super) fn decode_base64(input: &str) -> Result<Vec<u8>, String> {
             b'+' => Ok(62),
             b'/' => Ok(63),
             b'=' => Ok(0), // padding
-            _ => Err(format!("Invalid base64 character: {}", c as char)),
+            _ => Err(format!("Invalid base64 character: {}", c as char).into()),
         }
     };
 

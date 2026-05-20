@@ -31,7 +31,7 @@ pub(super) struct HuffTable {
 // Marker parsers
 // ---------------------------------------------------------------------------
 
-pub(super) fn parse_dqt(data: &[u8], pos: usize, qt_tables: &mut [[u16; 64]; 4]) -> Result<usize, String> {
+pub(super) fn parse_dqt(data: &[u8], pos: usize, qt_tables: &mut [[u16; 64]; 4]) -> crate::Result<usize> {
     if pos + 2 > data.len() {
         return Err("DQT too short".into());
     }
@@ -48,7 +48,7 @@ pub(super) fn parse_dqt(data: &[u8], pos: usize, qt_tables: &mut [[u16; 64]; 4])
         let table_id = (pq_tq & 0x0F) as usize;
         off += 1;
         if table_id >= 4 {
-            return Err(format!("DQT table id {} out of range", table_id));
+            return Err(format!("DQT table id {} out of range", table_id).into());
         }
 
         if precision == 0 {
@@ -73,7 +73,7 @@ pub(super) fn parse_dqt(data: &[u8], pos: usize, qt_tables: &mut [[u16; 64]; 4])
     Ok(seg_len)
 }
 
-pub(super) fn parse_sof(data: &[u8], pos: usize) -> Result<(SofData, usize), String> {
+pub(super) fn parse_sof(data: &[u8], pos: usize) -> crate::Result<(SofData, usize)> {
     if pos + 2 > data.len() {
         return Err("SOF too short".into());
     }
@@ -84,7 +84,7 @@ pub(super) fn parse_sof(data: &[u8], pos: usize) -> Result<(SofData, usize), Str
 
     let precision = data[pos + 2];
     if precision != 8 {
-        return Err(format!("Unsupported sample precision: {}", precision));
+        return Err(format!("Unsupported sample precision: {}", precision).into());
     }
 
     let height = u16::from_be_bytes([data[pos + 3], data[pos + 4]]);
@@ -129,7 +129,7 @@ pub(super) fn parse_dht(
     pos: usize,
     dc_tables: &mut [Option<HuffTable>; 4],
     ac_tables: &mut [Option<HuffTable>; 4],
-) -> Result<usize, String> {
+) -> crate::Result<usize> {
     if pos + 2 > data.len() {
         return Err("DHT too short".into());
     }
@@ -146,7 +146,7 @@ pub(super) fn parse_dht(
         let table_id = (tc_th & 0x0F) as usize;
         off += 1;
         if table_id >= 4 {
-            return Err(format!("DHT table id {} out of range", table_id));
+            return Err(format!("DHT table id {} out of range", table_id).into());
         }
 
         if off + 16 > seg_end {

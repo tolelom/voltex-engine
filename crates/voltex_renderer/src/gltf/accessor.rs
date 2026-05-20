@@ -5,7 +5,7 @@ use super::types::{GltfData, GltfMesh};
 use super::node::{parse_nodes, parse_skins, parse_animations};
 use super::material::extract_material;
 
-pub(super) fn extract_meshes(json: &JsonValue, buffers: &[Vec<u8>]) -> Result<GltfData, String> {
+pub(super) fn extract_meshes(json: &JsonValue, buffers: &[Vec<u8>]) -> crate::Result<GltfData> {
     let empty_arr: Vec<JsonValue> = Vec::new();
     let accessors = json.get("accessors").and_then(|v| v.as_array()).unwrap_or(&empty_arr);
     let buffer_views = json.get("bufferViews").and_then(|v| v.as_array()).unwrap_or(&empty_arr);
@@ -111,7 +111,7 @@ fn get_buffer_data<'a>(
     accessor: &JsonValue,
     buffer_views: &[JsonValue],
     buffers: &'a [Vec<u8>],
-) -> Result<(&'a [u8], usize), String> {
+) -> crate::Result<(&'a [u8], usize)> {
     let bv_idx = accessor.get("bufferView").and_then(|v| v.as_u32())
         .ok_or("Accessor missing bufferView")? as usize;
     let bv = buffer_views.get(bv_idx).ok_or("BufferView index out of range")?;
@@ -125,7 +125,7 @@ fn get_buffer_data<'a>(
 
 fn read_accessor_vec3(
     accessors: &[JsonValue], buffer_views: &[JsonValue], buffers: &[Vec<u8>], idx: usize,
-) -> Result<Vec<[f32; 3]>, String> {
+) -> crate::Result<Vec<[f32; 3]>> {
     let acc = accessors.get(idx).ok_or("Accessor index out of range")?;
     let count = acc.get("count").and_then(|v| v.as_u32()).ok_or("Missing count")? as usize;
     let (buffer, offset) = get_buffer_data(acc, buffer_views, buffers)?;
@@ -143,7 +143,7 @@ fn read_accessor_vec3(
 
 fn read_accessor_vec2(
     accessors: &[JsonValue], buffer_views: &[JsonValue], buffers: &[Vec<u8>], idx: usize,
-) -> Result<Vec<[f32; 2]>, String> {
+) -> crate::Result<Vec<[f32; 2]>> {
     let acc = accessors.get(idx).ok_or("Accessor index out of range")?;
     let count = acc.get("count").and_then(|v| v.as_u32()).ok_or("Missing count")? as usize;
     let (buffer, offset) = get_buffer_data(acc, buffer_views, buffers)?;
@@ -160,7 +160,7 @@ fn read_accessor_vec2(
 
 fn read_accessor_vec4(
     accessors: &[JsonValue], buffer_views: &[JsonValue], buffers: &[Vec<u8>], idx: usize,
-) -> Result<Vec<[f32; 4]>, String> {
+) -> crate::Result<Vec<[f32; 4]>> {
     let acc = accessors.get(idx).ok_or("Accessor index out of range")?;
     let count = acc.get("count").and_then(|v| v.as_u32()).ok_or("Missing count")? as usize;
     let (buffer, offset) = get_buffer_data(acc, buffer_views, buffers)?;
@@ -179,7 +179,7 @@ fn read_accessor_vec4(
 
 fn read_accessor_indices(
     accessors: &[JsonValue], buffer_views: &[JsonValue], buffers: &[Vec<u8>], idx: usize,
-) -> Result<Vec<u32>, String> {
+) -> crate::Result<Vec<u32>> {
     let acc = accessors.get(idx).ok_or("Accessor index out of range")?;
     let count = acc.get("count").and_then(|v| v.as_u32()).ok_or("Missing count")? as usize;
     let comp_type = acc.get("componentType").and_then(|v| v.as_u32()).ok_or("Missing componentType")?;
@@ -207,14 +207,14 @@ fn read_accessor_indices(
                 result.push(u32::from_le_bytes([buffer[o], buffer[o+1], buffer[o+2], buffer[o+3]]));
             }
         }
-        _ => return Err(format!("Unsupported index component type: {}", comp_type)),
+        _ => return Err(format!("Unsupported index component type: {}", comp_type).into()),
     }
     Ok(result)
 }
 
 fn read_accessor_joints(
     accessors: &[JsonValue], buffer_views: &[JsonValue], buffers: &[Vec<u8>], idx: usize,
-) -> Result<Vec<[u16; 4]>, String> {
+) -> crate::Result<Vec<[u16; 4]>> {
     let acc = accessors.get(idx).ok_or("Accessor index out of range")?;
     let count = acc.get("count").and_then(|v| v.as_u32()).ok_or("Missing count")? as usize;
     let comp_type = acc.get("componentType").and_then(|v| v.as_u32()).unwrap_or(5123);
@@ -243,14 +243,14 @@ fn read_accessor_joints(
                 ]);
             }
         }
-        _ => return Err(format!("Unsupported joints component type: {}", comp_type)),
+        _ => return Err(format!("Unsupported joints component type: {}", comp_type).into()),
     }
     Ok(result)
 }
 
 pub(super) fn read_accessor_mat4(
     accessors: &[JsonValue], buffer_views: &[JsonValue], buffers: &[Vec<u8>], idx: usize,
-) -> Result<Vec<[[f32; 4]; 4]>, String> {
+) -> crate::Result<Vec<[[f32; 4]; 4]>> {
     let acc = accessors.get(idx).ok_or("Accessor index out of range")?;
     let count = acc.get("count").and_then(|v| v.as_u32()).ok_or("Missing count")? as usize;
     let (buffer, offset) = get_buffer_data(acc, buffer_views, buffers)?;
@@ -272,7 +272,7 @@ pub(super) fn read_accessor_mat4(
 
 pub(super) fn read_accessor_floats(
     accessors: &[JsonValue], buffer_views: &[JsonValue], buffers: &[Vec<u8>], idx: usize,
-) -> Result<Vec<f32>, String> {
+) -> crate::Result<Vec<f32>> {
     let acc = accessors.get(idx).ok_or("Accessor index out of range")?;
     let count = acc.get("count").and_then(|v| v.as_u32()).ok_or("Missing count")? as usize;
     let acc_type = acc.get("type").and_then(|v| v.as_str()).unwrap_or("SCALAR");

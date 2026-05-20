@@ -11,7 +11,7 @@ impl<'a> BitReader<'a> {
         Self { data, pos: 0, bit: 0 }
     }
 
-    fn read_bits(&mut self, n: u8) -> Result<u32, String> {
+    fn read_bits(&mut self, n: u8) -> crate::Result<u32> {
         let mut value: u32 = 0;
         for i in 0..n {
             if self.pos >= self.data.len() {
@@ -36,7 +36,7 @@ impl<'a> BitReader<'a> {
         }
     }
 
-    fn read_byte(&mut self) -> Result<u8, String> {
+    fn read_byte(&mut self) -> crate::Result<u8> {
         self.align();
         if self.pos >= self.data.len() {
             return Err("Unexpected end of deflate stream".into());
@@ -46,7 +46,7 @@ impl<'a> BitReader<'a> {
         Ok(b)
     }
 
-    fn read_u16_le(&mut self) -> Result<u16, String> {
+    fn read_u16_le(&mut self) -> crate::Result<u16> {
         let lo = self.read_byte()? as u16;
         let hi = self.read_byte()? as u16;
         Ok(lo | (hi << 8))
@@ -71,7 +71,7 @@ struct HuffmanTree {
 }
 
 impl HuffmanTree {
-    fn from_lengths(lengths: &[u8]) -> Result<Self, String> {
+    fn from_lengths(lengths: &[u8]) -> crate::Result<Self> {
         let max_bits = lengths.iter().copied().max().unwrap_or(0);
         if max_bits == 0 {
             return Ok(Self {
@@ -122,7 +122,7 @@ impl HuffmanTree {
         })
     }
 
-    fn decode(&self, reader: &mut BitReader) -> Result<u16, String> {
+    fn decode(&self, reader: &mut BitReader) -> crate::Result<u16> {
         let mut code: u32 = 0;
         let mut first: u32 = 0;
         let mut index: usize = 0;
@@ -209,7 +209,7 @@ fn decode_huffman_block(
     lit_tree: &HuffmanTree,
     dist_tree: &HuffmanTree,
     output: &mut Vec<u8>,
-) -> Result<(), String> {
+) -> crate::Result<()> {
     loop {
         let sym = lit_tree.decode(reader)?;
         if sym < 256 {
@@ -220,7 +220,7 @@ fn decode_huffman_block(
             // Length code
             let len_idx = (sym - 257) as usize;
             if len_idx >= LENGTH_BASE.len() {
-                return Err(format!("Invalid length code: {}", sym));
+                return Err(format!("Invalid length code: {}", sym).into());
             }
             let length = LENGTH_BASE[len_idx] as usize
                 + reader.read_bits(LENGTH_EXTRA[len_idx])? as usize;
@@ -228,7 +228,7 @@ fn decode_huffman_block(
             // Distance code
             let dist_sym = dist_tree.decode(reader)? as usize;
             if dist_sym >= DIST_BASE.len() {
-                return Err(format!("Invalid distance code: {}", dist_sym));
+                return Err(format!("Invalid distance code: {}", dist_sym).into());
             }
             let distance = DIST_BASE[dist_sym] as usize
                 + reader.read_bits(DIST_EXTRA[dist_sym])? as usize;
@@ -238,7 +238,7 @@ fn decode_huffman_block(
                     "Distance {} exceeds output length {}",
                     distance,
                     output.len()
-                ));
+                ).into());
             }
 
             // Copy from back-reference
@@ -251,7 +251,7 @@ fn decode_huffman_block(
     }
 }
 
-fn decode_dynamic_trees(reader: &mut BitReader) -> Result<(HuffmanTree, HuffmanTree), String> {
+fn decode_dynamic_trees(reader: &mut BitReader) -> crate::Result<(HuffmanTree, HuffmanTree)> {
     let hlit = reader.read_bits(5)? as usize + 257;
     let hdist = reader.read_bits(5)? as usize + 1;
     let hclen = reader.read_bits(4)? as usize + 4;
@@ -277,7 +277,7 @@ fn decode_dynamic_trees(reader: &mut BitReader) -> Result<(HuffmanTree, HuffmanT
             16 => {
                 // Repeat previous length 3-6 times
                 let repeat = reader.read_bits(2)? as usize + 3;
-                let prev = *lengths.last().ok_or("Code 16 with no previous length")?;
+                let prev = *lengths.last().ok_or_else(|| crate::RendererError::from("Code 16 with no previous length"))?;
                 for _ in 0..repeat {
                     lengths.push(prev);
                 }
@@ -296,7 +296,7 @@ fn decode_dynamic_trees(reader: &mut BitReader) -> Result<(HuffmanTree, HuffmanT
                     lengths.push(0);
                 }
             }
-            _ => return Err(format!("Invalid code length symbol: {}", sym)),
+            _ => return Err(format!("Invalid code length symbol: {}", sym).into()),
         }
     }
 
@@ -307,7 +307,7 @@ fn decode_dynamic_trees(reader: &mut BitReader) -> Result<(HuffmanTree, HuffmanT
 }
 
 /// Decompress zlib-wrapped deflate data.
-pub fn inflate(data: &[u8]) -> Result<Vec<u8>, String> {
+pub fn inflate(data: &[u8]) -> crate::Result<Vec<u8>> {
     if data.len() < 6 {
         return Err("Data too short for zlib stream".into());
     }
@@ -316,7 +316,7 @@ pub fn inflate(data: &[u8]) -> Result<Vec<u8>, String> {
     let cmf = data[0];
     let cm = cmf & 0x0F;
     if cm != 8 {
-        return Err(format!("Unsupported compression method: {}", cm));
+        return Err(format!("Unsupported compression method: {}", cm).into());
     }
 
     let mut reader = BitReader::new(&data[2..]);

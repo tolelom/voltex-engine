@@ -37,7 +37,7 @@ impl JsonValue {
     }
 }
 
-pub fn parse_json(input: &str) -> Result<JsonValue, String> {
+pub fn parse_json(input: &str) -> crate::Result<JsonValue> {
     let mut parser = JsonParser::new(input);
     let val = parser.parse_value()?;
     Ok(val)
@@ -66,7 +66,7 @@ impl<'a> JsonParser<'a> {
         self.input.get(self.pos).copied()
     }
 
-    fn advance(&mut self) -> Result<u8, String> {
+    fn advance(&mut self) -> crate::Result<u8> {
         if self.pos >= self.input.len() {
             return Err("Unexpected end of JSON".into());
         }
@@ -75,15 +75,15 @@ impl<'a> JsonParser<'a> {
         Ok(b)
     }
 
-    fn expect(&mut self, ch: u8) -> Result<(), String> {
+    fn expect(&mut self, ch: u8) -> crate::Result<()> {
         let b = self.advance()?;
         if b != ch {
-            return Err(format!("Expected '{}', got '{}'", ch as char, b as char));
+            return Err(format!("Expected '{}', got '{}'", ch as char, b as char).into());
         }
         Ok(())
     }
 
-    fn parse_value(&mut self) -> Result<JsonValue, String> {
+    fn parse_value(&mut self) -> crate::Result<JsonValue> {
         self.skip_whitespace();
         match self.peek() {
             Some(b'"') => self.parse_string().map(JsonValue::String),
@@ -93,12 +93,12 @@ impl<'a> JsonParser<'a> {
             Some(b'f') => self.parse_literal("false", JsonValue::Bool(false)),
             Some(b'n') => self.parse_literal("null", JsonValue::Null),
             Some(b'-') | Some(b'0'..=b'9') => self.parse_number(),
-            Some(ch) => Err(format!("Unexpected character: '{}'", ch as char)),
+            Some(ch) => Err(format!("Unexpected character: '{}'", ch as char).into()),
             None => Err("Unexpected end of JSON".into()),
         }
     }
 
-    fn parse_string(&mut self) -> Result<String, String> {
+    fn parse_string(&mut self) -> crate::Result<String> {
         self.expect(b'"')?;
         let mut s = String::new();
         loop {
@@ -127,7 +127,7 @@ impl<'a> JsonParser<'a> {
                                 s.push(ch);
                             }
                         }
-                        _ => return Err(format!("Invalid escape: \\{}", esc as char)),
+                        _ => return Err(format!("Invalid escape: \\{}", esc as char).into()),
                     }
                 }
                 _ => s.push(b as char),
@@ -135,7 +135,7 @@ impl<'a> JsonParser<'a> {
         }
     }
 
-    fn parse_number(&mut self) -> Result<JsonValue, String> {
+    fn parse_number(&mut self) -> crate::Result<JsonValue> {
         let start = self.pos;
         if self.peek() == Some(b'-') { self.pos += 1; }
         while self.pos < self.input.len() && self.input[self.pos].is_ascii_digit() {
@@ -157,12 +157,12 @@ impl<'a> JsonParser<'a> {
             }
         }
         let s = std::str::from_utf8(&self.input[start..self.pos])
-            .map_err(|_| "Invalid UTF-8 in number".to_string())?;
-        let n: f64 = s.parse().map_err(|_| format!("Invalid number: {}", s))?;
+            .map_err(|_| crate::RendererError::from("Invalid UTF-8 in number"))?;
+        let n: f64 = s.parse().map_err(|_| crate::RendererError::from(format!("Invalid number: {}", s)))?;
         Ok(JsonValue::Number(n))
     }
 
-    fn parse_object(&mut self) -> Result<JsonValue, String> {
+    fn parse_object(&mut self) -> crate::Result<JsonValue> {
         self.expect(b'{')?;
         self.skip_whitespace();
         let mut pairs = Vec::new();
@@ -186,7 +186,7 @@ impl<'a> JsonParser<'a> {
         }
     }
 
-    fn parse_array(&mut self) -> Result<JsonValue, String> {
+    fn parse_array(&mut self) -> crate::Result<JsonValue> {
         self.expect(b'[')?;
         self.skip_whitespace();
         let mut items = Vec::new();
@@ -206,11 +206,11 @@ impl<'a> JsonParser<'a> {
         }
     }
 
-    fn parse_literal(&mut self, expected: &str, value: JsonValue) -> Result<JsonValue, String> {
+    fn parse_literal(&mut self, expected: &str, value: JsonValue) -> crate::Result<JsonValue> {
         for &b in expected.as_bytes() {
             let actual = self.advance()?;
             if actual != b {
-                return Err(format!("Expected '{}', got '{}'", b as char, actual as char));
+                return Err(format!("Expected '{}', got '{}'", b as char, actual as char).into());
             }
         }
         Ok(value)

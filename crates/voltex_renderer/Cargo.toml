@@ -11,3 +11,4 @@ winit.workspace = true
 bytemuck.workspace = true
 pollster.workspace = true
 log.workspace = true
+thiserror = { workspace = true }

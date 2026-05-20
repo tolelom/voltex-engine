@@ -21,7 +21,7 @@ impl<'a> BitReader<'a> {
         }
     }
 
-    fn read_byte(&mut self) -> Result<u8, String> {
+    fn read_byte(&mut self) -> crate::Result<u8> {
         if self.pos >= self.data.len() {
             return Err("Unexpected end of scan data".into());
         }
@@ -45,7 +45,7 @@ impl<'a> BitReader<'a> {
         Ok(byte)
     }
 
-    fn ensure_bits(&mut self) -> Result<(), String> {
+    fn ensure_bits(&mut self) -> crate::Result<()> {
         if self.bit_pos == 0 {
             self.current = self.read_byte()?;
             self.bit_pos = 8;
@@ -53,13 +53,13 @@ impl<'a> BitReader<'a> {
         Ok(())
     }
 
-    fn read_bit(&mut self) -> Result<u8, String> {
+    fn read_bit(&mut self) -> crate::Result<u8> {
         self.ensure_bits()?;
         self.bit_pos -= 1;
         Ok((self.current >> self.bit_pos) & 1)
     }
 
-    pub(super) fn read_bits(&mut self, count: u8) -> Result<u16, String> {
+    pub(super) fn read_bits(&mut self, count: u8) -> crate::Result<u16> {
         let mut val: u16 = 0;
         for _ in 0..count {
             val = (val << 1) | self.read_bit()? as u16;
@@ -67,7 +67,7 @@ impl<'a> BitReader<'a> {
         Ok(val)
     }
 
-    pub(super) fn decode_huffman(&mut self, table: &HuffTable) -> Result<u8, String> {
+    pub(super) fn decode_huffman(&mut self, table: &HuffTable) -> crate::Result<u8> {
         let mut code: u16 = 0;
         for len in 0..16 {
             code = (code << 1) | self.read_bit()? as u16;
@@ -86,7 +86,7 @@ impl<'a> BitReader<'a> {
     }
 
     /// Find and skip RST marker in the byte stream
-    pub(super) fn skip_to_rst_marker(&mut self) -> Result<(), String> {
+    pub(super) fn skip_to_rst_marker(&mut self) -> crate::Result<()> {
         // Align to byte boundary
         self.align_to_byte();
         // Look for 0xFF 0xDn marker

@@ -12,7 +12,7 @@ mod mcu;
 use headers::{HuffTable, JpegComponent, parse_dqt, parse_sof, parse_dht};
 use decoder::decode_scan;
 
-pub fn parse_jpg(data: &[u8]) -> Result<(Vec<u8>, u32, u32), String> {
+pub fn parse_jpg(data: &[u8]) -> crate::Result<(Vec<u8>, u32, u32)> {
     if data.len() < 2 || data[0] != 0xFF || data[1] != 0xD8 {
         return Err("Invalid JPEG: missing SOI marker".into());
     }
@@ -30,7 +30,7 @@ pub fn parse_jpg(data: &[u8]) -> Result<(Vec<u8>, u32, u32), String> {
 
     while pos + 1 < data.len() {
         if data[pos] != 0xFF {
-            return Err(format!("Expected marker at position {}", pos));
+            return Err(format!("Expected marker at position {}", pos).into());
         }
         // Skip padding 0xFF bytes
         while pos + 1 < data.len() && data[pos + 1] == 0xFF {
@@ -112,7 +112,7 @@ pub fn parse_jpg(data: &[u8]) -> Result<(Vec<u8>, u32, u32), String> {
             _ => {
                 // Unknown marker with length — skip
                 if pos + 2 > data.len() {
-                    return Err(format!("Unknown marker 0x{:02X}", marker));
+                    return Err(format!("Unknown marker 0x{:02X}", marker).into());
                 }
                 let seg_len = u16::from_be_bytes([data[pos], data[pos + 1]]) as usize;
                 pos += seg_len;

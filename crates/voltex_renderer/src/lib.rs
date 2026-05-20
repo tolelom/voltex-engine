@@ -1,3 +1,4 @@
+pub mod error;
 pub mod json_parser;
 pub mod gltf;
 pub mod deflate;
@@ -47,6 +48,7 @@ pub mod ssr;
 pub mod motion_blur;
 pub mod dof;
 
+pub use error::{RendererError, Result};
 pub use motion_blur::MotionBlur;
 pub use dof::DepthOfField;
 pub use gpu::{GpuContext, DEPTH_FORMAT};

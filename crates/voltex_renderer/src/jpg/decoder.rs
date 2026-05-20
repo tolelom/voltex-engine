@@ -19,7 +19,7 @@ pub(super) fn decode_scan(
     dc_tables: &[Option<HuffTable>; 4],
     ac_tables: &[Option<HuffTable>; 4],
     restart_interval: u16,
-) -> Result<(Vec<u8>, usize), String> {
+) -> crate::Result<(Vec<u8>, usize)> {
     // Parse SOS header
     if pos + 2 > data.len() {
         return Err("SOS too short".into());
@@ -128,7 +128,7 @@ fn decode_block(
     ac_table: &HuffTable,
     dc_pred: &mut i32,
     qt: &[u16; 64],
-) -> Result<[i32; 64], String> {
+) -> crate::Result<[i32; 64]> {
     let mut coeffs = [0i32; 64];
 
     // DC coefficient
