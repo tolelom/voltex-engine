@@ -2130,6 +2130,7 @@ version = "0.1.0"
 dependencies = [
  "bytemuck",
  "thiserror 2.0.18",
+ "voltex_asset",
  "voltex_ecs",
  "voltex_math",
  "voltex_renderer",

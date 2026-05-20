@@ -525,6 +525,171 @@ mod tests {
         cleanup(&scene);
     }
 
+    use voltex_ecs::{Bounds, MaterialHandle, MeshHandle};
+    use voltex_asset::Handle;
+    use voltex_math::AABB;
+
+    #[test]
+    fn set_mode_edit_to_play_stores_snapshot_and_changes_mode() {
+        let scene = temp_path("voltex_e2_e2p.vscn");
+        cleanup(&scene);
+        let mut session = EditorSession::new(scene.clone());
+        let _ = session.dispatch(EditorCommand::Spawn).unwrap();
+
+        assert_eq!(session.mode, EditorMode::Edit);
+        session.set_mode(EditorMode::Play);
+        assert_eq!(session.mode, EditorMode::Play);
+        assert!(session.play_snapshot.is_some(),
+            "snapshot must be present after entering Play");
+        cleanup(&scene);
+    }
+
+    #[test]
+    fn set_mode_play_to_edit_restores_world_state() {
+        let scene = temp_path("voltex_e2_restore.vscn");
+        cleanup(&scene);
+        let mut session = EditorSession::new(scene.clone());
+        let e = session.dispatch(EditorCommand::Spawn).unwrap();
+        session.dispatch(EditorCommand::SetTransform {
+            entity: e,
+            position: Vec3::new(10.0, 0.0, 0.0),
+            rotation: Vec3::ZERO,
+            scale: Vec3::new(1.0, 1.0, 1.0),
+        }).unwrap();
+
+        session.set_mode(EditorMode::Play);
+        // Simulate physics moving the cube while in Play mode.
+        if let Some(t) = session.world.get_mut::<Transform>(e) {
+            t.position = Vec3::new(10.0, -5.0, 0.0);
+        }
+
+        session.set_mode(EditorMode::Edit);
+        assert_eq!(session.mode, EditorMode::Edit);
+
+        // The restored World should hold a new entity (entity allocator may
+        // assign a fresh id), so look it up via Transform query.
+        let positions: Vec<Vec3> = session.world
+            .query::<Transform>()
+            .map(|(_, t)| t.position)
+            .collect();
+        assert_eq!(positions.len(), 1);
+        assert_eq!(positions[0], Vec3::new(10.0, 0.0, 0.0),
+            "Transform must restore to the pre-Play value, not the mutated one");
+        cleanup(&scene);
+    }
+
+    #[test]
+    fn set_mode_same_mode_is_noop() {
+        let scene = temp_path("voltex_e2_noop.vscn");
+        cleanup(&scene);
+        let mut session = EditorSession::new(scene.clone());
+        session.set_mode(EditorMode::Edit);
+        assert!(session.play_snapshot.is_none());
+        assert_eq!(session.mode, EditorMode::Edit);
+        cleanup(&scene);
+    }
+
+    #[test]
+    fn play_to_edit_drops_components_added_during_play() {
+        let scene = temp_path("voltex_e2_drop.vscn");
+        cleanup(&scene);
+        let mut session = EditorSession::new(scene.clone());
+        let e = session.dispatch(EditorCommand::Spawn).unwrap();
+
+        session.set_mode(EditorMode::Play);
+
+        // Health is not in ComponentRegistry → snapshot won't preserve it.
+        #[derive(Debug, Clone, Copy, PartialEq)]
+        struct Health(i32);
+        session.world.add(e, Health(42));
+        assert!(session.world.get::<Health>(e).is_some());
+
+        session.set_mode(EditorMode::Edit);
+
+        let any_health = session.world
+            .query::<Transform>()
+            .any(|(ent, _)| session.world.get::<Health>(ent).is_some());
+        assert!(!any_health, "non-registered component must be dropped on Stop");
+        cleanup(&scene);
+    }
+
+    #[test]
+    fn entering_play_clears_undo_redo_history() {
+        let scene = temp_path("voltex_e2_clear_in.vscn");
+        cleanup(&scene);
+        let mut session = EditorSession::new(scene.clone());
+        let e = session.dispatch(EditorCommand::Spawn).unwrap();
+        session.dispatch(EditorCommand::SetTag { entity: e, tag: "X".into() }).unwrap();
+        assert!(session.undo_depth() >= 2);
+
+        session.set_mode(EditorMode::Play);
+        assert_eq!(session.undo_depth(), 0);
+        assert_eq!(session.redo_depth(), 0);
+        cleanup(&scene);
+    }
+
+    #[test]
+    fn exiting_play_clears_undo_redo_history() {
+        let scene = temp_path("voltex_e2_clear_out.vscn");
+        cleanup(&scene);
+        let mut session = EditorSession::new(scene.clone());
+        session.dispatch(EditorCommand::Spawn).unwrap();
+        session.set_mode(EditorMode::Play);
+        session.set_mode(EditorMode::Edit);
+        assert_eq!(session.undo_depth(), 0);
+        assert_eq!(session.redo_depth(), 0);
+        cleanup(&scene);
+    }
+
+    #[test]
+    fn snapshot_preserves_hierarchy() {
+        use voltex_ecs::hierarchy::Parent;
+        let scene = temp_path("voltex_e2_hier.vscn");
+        cleanup(&scene);
+        let mut session = EditorSession::new(scene.clone());
+        let p = session.dispatch(EditorCommand::Spawn).unwrap();
+        let c = session.dispatch(EditorCommand::Spawn).unwrap();
+        session.dispatch(EditorCommand::AddChild { parent: p, child: c }).unwrap();
+        assert_eq!(session.world.get::<Parent>(c).map(|x| x.0), Some(p));
+
+        session.set_mode(EditorMode::Play);
+        session.set_mode(EditorMode::Edit);
+
+        let parent_edges: Vec<(Entity, Entity)> = session.world
+            .query::<Parent>()
+            .map(|(child, parent)| (child, parent.0))
+            .collect();
+        assert_eq!(parent_edges.len(), 1, "exactly one parent edge after restore");
+        cleanup(&scene);
+    }
+
+    #[test]
+    fn snapshot_preserves_render_handles() {
+        let scene = temp_path("voltex_e2_handles.vscn");
+        cleanup(&scene);
+        let mut session = EditorSession::new(scene.clone());
+        let e = session.dispatch(EditorCommand::Spawn).unwrap();
+        session.world.add(e, MeshHandle(Handle::from_raw_parts(7, 1)));
+        session.world.add(e, MaterialHandle(Handle::from_raw_parts(9, 2)));
+        session.world.add(e, Bounds(AABB::new(
+            Vec3::new(-1.0, -1.0, -1.0), Vec3::new(1.0, 1.0, 1.0),
+        )));
+
+        session.set_mode(EditorMode::Play);
+        session.set_mode(EditorMode::Edit);
+
+        let restored = session.world.query::<Transform>().next().expect("entity").0;
+        let mh = session.world.get::<MeshHandle>(restored).expect("MeshHandle");
+        let math = session.world.get::<MaterialHandle>(restored).expect("MaterialHandle");
+        let bounds = session.world.get::<Bounds>(restored).expect("Bounds");
+        assert_eq!(mh.0.id(), 7);
+        assert_eq!(mh.0.generation(), 1);
+        assert_eq!(math.0.id(), 9);
+        assert_eq!(math.0.generation(), 2);
+        assert!((bounds.0.min.x - (-1.0)).abs() < 1e-6);
+        cleanup(&scene);
+    }
+
     #[test]
     fn multi_step_undo_redo_walks_both_ways() {
         let scene = temp_path("voltex_undo_multi.vscn");

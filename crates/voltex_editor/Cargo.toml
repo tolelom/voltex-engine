@@ -10,3 +10,6 @@ voltex_ecs = { workspace = true }
 voltex_renderer = { workspace = true }
 wgpu = { workspace = true }
 thiserror = { workspace = true }
+
+[dev-dependencies]
+voltex_asset = { workspace = true }
