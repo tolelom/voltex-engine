@@ -7,6 +7,8 @@
 use voltex_ecs::Entity;
 use voltex_math::Vec3;
 
+use crate::error::EditorError;
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum EditorCommand {
     Spawn,
@@ -22,25 +24,6 @@ pub enum EditorCommand {
     LoadScene { path: String },
 }
 
-#[derive(Debug, Clone, PartialEq)]
-pub enum CommandError {
-    EntityNotAlive(Entity),
-    Io(String),
-    Parse(String),
-}
-
-impl std::fmt::Display for CommandError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            CommandError::EntityNotAlive(e) => write!(f, "entity not alive: id={} gen={}", e.id, e.generation),
-            CommandError::Io(msg) => write!(f, "io: {}", msg),
-            CommandError::Parse(msg) => write!(f, "parse: {}", msg),
-        }
-    }
-}
-
-impl std::error::Error for CommandError {}
-
 use voltex_ecs::{World, Transform};
 use voltex_ecs::ComponentRegistry;
 
@@ -54,7 +37,7 @@ pub fn apply_command(
     world: &mut World,
     registry: &ComponentRegistry,
     cmd: &EditorCommand,
-) -> Result<Entity, CommandError> {
+) -> Result<Entity, EditorError> {
     match cmd {
         EditorCommand::Spawn => {
             let e = world.spawn();
@@ -63,14 +46,14 @@ pub fn apply_command(
         }
         EditorCommand::Despawn { entity } => {
             if !world.is_alive(*entity) {
-                return Err(CommandError::EntityNotAlive(*entity));
+                return Err(EditorError::EntityNotAlive(*entity));
             }
             world.despawn(*entity);
             Ok(*entity)
         }
         EditorCommand::SetTransform { entity, position, rotation, scale } => {
             if !world.is_alive(*entity) {
-                return Err(CommandError::EntityNotAlive(*entity));
+                return Err(EditorError::EntityNotAlive(*entity));
             }
             if let Some(t) = world.get_mut::<Transform>(*entity) {
                 t.position = *position;
@@ -83,7 +66,7 @@ pub fn apply_command(
         }
         EditorCommand::SetTag { entity, tag } => {
             if !world.is_alive(*entity) {
-                return Err(CommandError::EntityNotAlive(*entity));
+                return Err(EditorError::EntityNotAlive(*entity));
             }
             // Replace existing tag if any
             world.remove::<voltex_ecs::scene::Tag>(*entity);
@@ -92,13 +75,13 @@ pub fn apply_command(
         }
         EditorCommand::SaveScene { path } => {
             let json = voltex_ecs::serialize_scene_json(world, registry);
-            std::fs::write(path, json).map_err(|e| CommandError::Io(e.to_string()))?;
+            std::fs::write(path, json).map_err(|e| EditorError::Io(e.to_string()))?;
             Ok(Entity { id: 0, generation: 0 })
         }
         EditorCommand::LoadScene { path } => {
-            let text = std::fs::read_to_string(path).map_err(|e| CommandError::Io(e.to_string()))?;
+            let text = std::fs::read_to_string(path).map_err(|e| EditorError::Io(e.to_string()))?;
             voltex_ecs::deserialize_scene_json(world, &text, registry)
-                .map_err(CommandError::Parse)?;
+                .map_err(|e| EditorError::Parse(e.to_string()))?;
             Ok(Entity { id: 0, generation: 0 })
         }
     }
@@ -117,7 +100,7 @@ mod tests {
 
     #[test]
     fn command_error_display_entity_not_alive() {
-        let err = CommandError::EntityNotAlive(Entity { id: 7, generation: 2 });
+        let err = EditorError::EntityNotAlive(Entity { id: 7, generation: 2 });
         let s = format!("{}", err);
         assert!(s.contains("id=7"));
         assert!(s.contains("gen=2"));
@@ -145,7 +128,7 @@ mod tests {
         let entity = world.spawn();
         world.despawn(entity);
         let result = apply_command(&mut world, &registry, &EditorCommand::Despawn { entity });
-        assert_eq!(result, Err(CommandError::EntityNotAlive(entity)));
+        assert_eq!(result, Err(EditorError::EntityNotAlive(entity)));
     }
 
     #[test]
@@ -192,7 +175,7 @@ mod tests {
         };
         assert_eq!(
             apply_command(&mut world, &registry, &cmd),
-            Err(CommandError::EntityNotAlive(entity)),
+            Err(EditorError::EntityNotAlive(entity)),
         );
     }
 
@@ -265,7 +248,7 @@ mod tests {
             path: tmp.to_string_lossy().into_owned(),
         });
         match result {
-            Err(CommandError::Parse(_)) => {}
+            Err(EditorError::Parse(_)) => {}
             other => panic!("expected Parse error, got {:?}", other),
         }
         fs::remove_file(&tmp).ok();

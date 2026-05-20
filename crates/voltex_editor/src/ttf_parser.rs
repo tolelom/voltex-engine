@@ -66,7 +66,7 @@ pub struct TtfParser {
 
 impl TtfParser {
     /// Parse a TTF file from raw bytes.
-    pub fn parse(data: Vec<u8>) -> Result<Self, String> {
+    pub fn parse(data: Vec<u8>) -> crate::Result<Self> {
         if data.len() < 12 {
             return Err("File too short for offset table".into());
         }

@@ -5,7 +5,8 @@
 //! re-saves the active scene file so that a watcher / AI / human reading from
 //! disk always sees the latest state.
 
-use crate::command::{apply_command, CommandError, EditorCommand};
+use crate::command::{apply_command, EditorCommand};
+use crate::error::EditorError;
 use std::fs::OpenOptions;
 use std::io::Write;
 use voltex_ecs::{ComponentRegistry, Entity, World};
@@ -37,7 +38,7 @@ impl EditorSession {
 
     /// Execute a command, append a jsonl log entry, and (for state-mutating
     /// commands) re-save the scene to disk so the file is always current.
-    pub fn dispatch(&mut self, cmd: EditorCommand) -> Result<Entity, CommandError> {
+    pub fn dispatch(&mut self, cmd: EditorCommand) -> Result<Entity, EditorError> {
         let result = apply_command(&mut self.world, &self.registry, &cmd);
         self.append_log(&cmd, &result);
 
@@ -50,12 +51,12 @@ impl EditorSession {
         if result.is_ok() && !is_save_or_load {
             let json = voltex_ecs::serialize_scene_json(&self.world, &self.registry);
             std::fs::write(&self.scene_path, json)
-                .map_err(|e| CommandError::Io(e.to_string()))?;
+                .map_err(|e| EditorError::Io(e.to_string()))?;
         }
         result
     }
 
-    fn append_log(&self, cmd: &EditorCommand, result: &Result<Entity, CommandError>) {
+    fn append_log(&self, cmd: &EditorCommand, result: &Result<Entity, EditorError>) {
         let outcome = match result {
             Ok(e) => format!("{{\"ok\":{{\"id\":{},\"generation\":{}}}}}", e.id, e.generation),
             Err(e) => format!("{{\"err\":{:?}}}", format!("{}", e)),

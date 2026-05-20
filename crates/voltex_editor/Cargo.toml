@@ -9,3 +9,4 @@ voltex_math = { workspace = true }
 voltex_ecs = { workspace = true }
 voltex_renderer = { workspace = true }
 wgpu = { workspace = true }
+thiserror = { workspace = true }

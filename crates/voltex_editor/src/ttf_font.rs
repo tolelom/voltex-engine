@@ -13,7 +13,7 @@ pub struct TtfFont {
 }
 
 impl TtfFont {
-    pub fn new(data: &[u8], font_size: f32) -> Result<Self, String> {
+    pub fn new(data: &[u8], font_size: f32) -> crate::Result<Self> {
         let parser = TtfParser::parse(data.to_vec())?;
         let scale = font_size / parser.units_per_em as f32;
         let ascender = parser.ascender as f32 * scale;

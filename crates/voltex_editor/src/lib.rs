@@ -1,3 +1,4 @@
+pub mod error;
 pub mod font;
 pub mod draw_list;
 pub mod layout;
@@ -11,6 +12,7 @@ pub mod command;
 pub mod session;
 pub mod panels;
 
+pub use error::{EditorError, Result};
 pub use font::FontAtlas;
 pub use draw_list::{DrawVertex, DrawCommand, DrawList};
 pub use layout::LayoutState;
@@ -38,5 +40,5 @@ pub use ttf_font::TtfFont;
 pub mod floating_panel;
 pub use floating_panel::{FloatingPanel, FloatingPanelManager};
 
-pub use command::{EditorCommand, CommandError};
+pub use command::EditorCommand;
 pub use session::EditorSession;
