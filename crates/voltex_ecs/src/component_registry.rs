@@ -69,13 +69,14 @@ impl ComponentRegistry {
         &self.entries
     }
 
-    /// Engine built-in 컴포넌트(Transform, Tag, MeshHandle, MaterialHandle, Bounds) 등록.
+    /// Engine built-in 컴포넌트(Transform, Tag, MeshHandle, MaterialHandle, Bounds, ScriptComponent) 등록.
     pub fn register_defaults(&mut self) {
         self.register::<crate::Transform>();
         self.register::<crate::scene::Tag>();
         self.register::<crate::MeshHandle>();
         self.register::<crate::MaterialHandle>();
         self.register::<crate::Bounds>();
+        self.register::<crate::ScriptComponent>();
     }
 }
 
@@ -154,8 +155,8 @@ mod tests {
     fn test_entries_count() {
         let mut registry = ComponentRegistry::new();
         registry.register_defaults();
-        // Transform + Tag + MeshHandle + MaterialHandle + Bounds = 5
-        assert_eq!(registry.entries().len(), 5);
+        // Transform + Tag + MeshHandle + MaterialHandle + Bounds + ScriptComponent = 6
+        assert_eq!(registry.entries().len(), 6);
     }
 
     #[test]
@@ -165,6 +166,13 @@ mod tests {
         assert!(registry.find("mesh_handle").is_some());
         assert!(registry.find("material_handle").is_some());
         assert!(registry.find("bounds").is_some());
+    }
+
+    #[test]
+    fn test_register_defaults_includes_script() {
+        let mut registry = ComponentRegistry::new();
+        registry.register_defaults();
+        assert!(registry.find("script").is_some());
     }
 
     #[test]

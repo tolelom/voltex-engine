@@ -67,6 +67,18 @@ impl EntityAllocator {
     pub fn alive_count(&self) -> usize {
         self.alive_count
     }
+
+    /// Iterate every currently alive entity, in id order.
+    pub fn live_entities(&self) -> impl Iterator<Item = Entity> + '_ {
+        self.entries
+            .iter()
+            .enumerate()
+            .filter(|(_, entry)| entry.alive)
+            .map(|(id, entry)| Entity {
+                id: id as u32,
+                generation: entry.generation,
+            })
+    }
 }
 
 impl Default for EntityAllocator {

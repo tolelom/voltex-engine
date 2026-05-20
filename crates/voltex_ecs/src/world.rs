@@ -38,6 +38,12 @@ impl World {
         self.allocator.alive_count()
     }
 
+    /// Iterate every currently alive entity. Used by script systems and the
+    /// Lua `iter_entities()` API to walk the world without component filters.
+    pub fn live_entities(&self) -> impl Iterator<Item = Entity> + '_ {
+        self.allocator.live_entities()
+    }
+
     /// Drop every entity, every component storage, and the entity allocator.
     /// Any externally-held `Entity` handles become invalid (their `is_alive`
     /// returns false). Use before loading a scene from disk to enforce
