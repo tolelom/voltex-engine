@@ -7,6 +7,7 @@ pub mod ui_context;
 pub mod widgets;
 pub mod dock;
 pub mod orbit_camera;
+pub mod picking;
 pub mod command;
 pub mod session;
 pub mod panels;
@@ -21,6 +22,7 @@ pub use dock::{DockTree, DockNode, Axis, Rect, LeafLayout};
 pub use panels::hierarchy::{hierarchy_panel, count_entity_nodes};
 pub use panels::inspector::{inspector_panel, InspectorState};
 pub use orbit_camera::OrbitCamera;
+pub use picking::pick_entity;
 
 pub mod viewport_texture;
 pub use viewport_texture::{ViewportTexture, VIEWPORT_COLOR_FORMAT, VIEWPORT_DEPTH_FORMAT};

@@ -13,6 +13,7 @@ use voltex_editor::{
     hierarchy_panel, inspector_panel, InspectorState,
     AssetBrowser, asset_browser_panel,
     EditorSession, EditorCommand,
+    pick_entity,
 };
 use voltex_ecs::entity::Entity;
 use voltex_ecs::transform::Transform;
@@ -59,6 +60,12 @@ struct AppState {
     left_dragging: bool,
     middle_dragging: bool,
     scroll_delta: f32,
+    // Track left-button-down position so we can distinguish a click (pick)
+    // from a drag (orbit). Set on press, consumed on release.
+    left_down_pos: Option<(f32, f32)>,
+    // Single-shot click event: Some((x, y)) on the frame the left button is
+    // released without significant drag. Consumed by the picking step.
+    pending_click: Option<(f32, f32)>,
 }
 
 fn camera_light_bind_group_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
@@ -346,6 +353,8 @@ impl ApplicationHandler for EditorDemoApp {
             left_dragging: false,
             middle_dragging: false,
             scroll_delta: 0.0,
+            left_down_pos: None,
+            pending_click: None,
         });
     }
 
@@ -390,7 +399,21 @@ impl ApplicationHandler for EditorDemoApp {
                 let pressed = btn_state == winit::event::ElementState::Pressed;
                 state.input.process_mouse_button(button, pressed);
                 match button {
-                    winit::event::MouseButton::Left => state.left_dragging = pressed,
+                    winit::event::MouseButton::Left => {
+                        state.left_dragging = pressed;
+                        let pos = state.input.mouse_position();
+                        let p = (pos.0 as f32, pos.1 as f32);
+                        if pressed {
+                            state.left_down_pos = Some(p);
+                        } else if let Some(down) = state.left_down_pos.take() {
+                            // Treat as a click if total movement is small.
+                            let dx = (p.0 - down.0).abs();
+                            let dy = (p.1 - down.1).abs();
+                            if dx + dy < 4.0 {
+                                state.pending_click = Some(p);
+                            }
+                        }
+                    }
                     winit::event::MouseButton::Middle => state.middle_dragging = pressed,
                     _ => {}
                 }
@@ -492,6 +515,26 @@ impl ApplicationHandler for EditorDemoApp {
                         }
                     }
                 }
+
+                // Viewport click → raycast pick → update session.selected.
+                // Runs only if the release lands inside the viewport rect.
+                if let (Some(click), Some(vr)) = (state.pending_click.take(), viewport_rect) {
+                    if vr.contains(click.0, click.1) {
+                        let aspect = vr.w / vr.h.max(1.0);
+                        let vp = state.orbit_cam.view_projection(aspect);
+                        let cam_pos = state.orbit_cam.position();
+                        let hit = pick_entity(
+                            &state.session.world,
+                            &vp,
+                            cam_pos,
+                            vr.x, vr.y, vr.w, vr.h,
+                            click.0, click.1,
+                            0.7,
+                        );
+                        state.session.selected = hit;
+                    }
+                }
+
                 state.prev_mouse = (mx, my);
                 state.scroll_delta = 0.0;
 
