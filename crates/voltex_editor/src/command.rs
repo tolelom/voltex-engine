@@ -20,6 +20,13 @@ pub enum EditorCommand {
         scale: Vec3,
     },
     SetTag { entity: Entity, tag: String },
+    /// Attach `child` under `parent` (sets Parent on child, adds to Children).
+    /// No-op (still Ok) if the relationship already exists. Fails if either
+    /// entity is not alive.
+    AddChild { parent: Entity, child: Entity },
+    /// Detach `child` from `parent` (clears Parent on child, removes from
+    /// parent's Children). No-op (still Ok) if not currently a child.
+    RemoveChild { parent: Entity, child: Entity },
     SaveScene { path: String },
     LoadScene { path: String },
 }
@@ -72,6 +79,26 @@ pub fn apply_command(
             world.remove::<voltex_ecs::scene::Tag>(*entity);
             world.add(*entity, voltex_ecs::scene::Tag(tag.clone()));
             Ok(*entity)
+        }
+        EditorCommand::AddChild { parent, child } => {
+            if !world.is_alive(*parent) {
+                return Err(EditorError::EntityNotAlive(*parent));
+            }
+            if !world.is_alive(*child) {
+                return Err(EditorError::EntityNotAlive(*child));
+            }
+            voltex_ecs::hierarchy::add_child(world, *parent, *child);
+            Ok(*child)
+        }
+        EditorCommand::RemoveChild { parent, child } => {
+            if !world.is_alive(*parent) {
+                return Err(EditorError::EntityNotAlive(*parent));
+            }
+            if !world.is_alive(*child) {
+                return Err(EditorError::EntityNotAlive(*child));
+            }
+            voltex_ecs::hierarchy::remove_child(world, *parent, *child);
+            Ok(*child)
         }
         EditorCommand::SaveScene { path } => {
             let json = voltex_ecs::serialize_scene_json(world, registry);
@@ -232,6 +259,34 @@ mod tests {
         assert_eq!(loaded_tag.0, "Hero");
 
         fs::remove_file(&tmp).ok();
+    }
+
+    #[test]
+    fn add_child_attaches_and_remove_child_detaches() {
+        use voltex_ecs::hierarchy::{Children, Parent};
+        let mut world = World::new();
+        let registry = ComponentRegistry::new();
+        let p = world.spawn();
+        let c = world.spawn();
+
+        apply_command(&mut world, &registry, &EditorCommand::AddChild { parent: p, child: c }).unwrap();
+        assert_eq!(world.get::<Parent>(c).map(|x| x.0), Some(p));
+        assert_eq!(world.get::<Children>(p).map(|x| x.0.clone()), Some(vec![c]));
+
+        apply_command(&mut world, &registry, &EditorCommand::RemoveChild { parent: p, child: c }).unwrap();
+        assert!(world.get::<Parent>(c).is_none());
+        assert!(world.get::<Children>(p).unwrap().0.is_empty());
+    }
+
+    #[test]
+    fn add_child_fails_when_parent_dead() {
+        let mut world = World::new();
+        let registry = ComponentRegistry::new();
+        let p = world.spawn();
+        let c = world.spawn();
+        world.despawn(p);
+        let result = apply_command(&mut world, &registry, &EditorCommand::AddChild { parent: p, child: c });
+        assert!(matches!(result, Err(EditorError::EntityNotAlive(_))));
     }
 
     #[test]

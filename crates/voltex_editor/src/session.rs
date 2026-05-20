@@ -35,6 +35,10 @@ enum Inverse {
         entity: Entity,
         prev: Option<String>,
     },
+    /// Undo AddChild: detach the child from the parent.
+    RemoveChild { parent: Entity, child: Entity },
+    /// Undo RemoveChild: re-attach the child to the parent.
+    AddChild { parent: Entity, child: Entity },
 }
 
 pub struct EditorSession {
@@ -86,7 +90,10 @@ impl EditorSession {
                         .push((cmd.clone(), Inverse::DespawnSpawned(*applied_entity)));
                     self.redo_stack.clear();
                 }
-                EditorCommand::SetTransform { .. } | EditorCommand::SetTag { .. } => {
+                EditorCommand::SetTransform { .. }
+                | EditorCommand::SetTag { .. }
+                | EditorCommand::AddChild { .. }
+                | EditorCommand::RemoveChild { .. } => {
                     if let Some(inv) = pre_inverse {
                         self.undo_stack.push((cmd.clone(), inv));
                         self.redo_stack.clear();
@@ -158,7 +165,6 @@ impl EditorSession {
         match cmd {
             EditorCommand::Spawn => {
                 // We don't know the entity yet; resolved post-apply in dispatch.
-                // Use a placeholder and patch it in below. Simpler: capture after apply.
                 None
             }
             EditorCommand::SetTransform { entity, .. } => {
@@ -174,6 +180,27 @@ impl EditorSession {
                 entity: *entity,
                 prev: self.world.get::<Tag>(*entity).map(|t| t.0.clone()),
             }),
+            EditorCommand::AddChild { parent, child } => Some(Inverse::RemoveChild {
+                parent: *parent,
+                child: *child,
+            }),
+            EditorCommand::RemoveChild { parent, child } => {
+                // Only undoable if the child is currently attached to this parent
+                // (otherwise the RemoveChild is a no-op and we shouldn't record one).
+                let is_attached = self
+                    .world
+                    .get::<voltex_ecs::hierarchy::Parent>(*child)
+                    .map(|p| p.0 == *parent)
+                    .unwrap_or(false);
+                if is_attached {
+                    Some(Inverse::AddChild {
+                        parent: *parent,
+                        child: *child,
+                    })
+                } else {
+                    None
+                }
+            }
             EditorCommand::Despawn { .. }
             | EditorCommand::SaveScene { .. }
             | EditorCommand::LoadScene { .. } => None,
@@ -206,6 +233,16 @@ impl EditorSession {
                 self.world.remove::<Tag>(*entity);
                 if let Some(tag) = prev {
                     self.world.add(*entity, Tag(tag.clone()));
+                }
+            }
+            Inverse::AddChild { parent, child } => {
+                if self.world.is_alive(*parent) && self.world.is_alive(*child) {
+                    voltex_ecs::hierarchy::add_child(&mut self.world, *parent, *child);
+                }
+            }
+            Inverse::RemoveChild { parent, child } => {
+                if self.world.is_alive(*parent) && self.world.is_alive(*child) {
+                    voltex_ecs::hierarchy::remove_child(&mut self.world, *parent, *child);
                 }
             }
         }
@@ -380,6 +417,67 @@ mod tests {
         session.dispatch(EditorCommand::Despawn { entity: e }).unwrap();
         assert_eq!(session.undo_depth(), 0);
         assert_eq!(session.redo_depth(), 0);
+        cleanup(&scene);
+    }
+
+    #[test]
+    fn undo_add_child_detaches() {
+        use voltex_ecs::hierarchy::{Children, Parent};
+        let scene = temp_path("voltex_undo_addchild.vscn");
+        cleanup(&scene);
+        let mut session = EditorSession::new(scene.clone());
+        let p = session.dispatch(EditorCommand::Spawn).unwrap();
+        let c = session.dispatch(EditorCommand::Spawn).unwrap();
+        session
+            .dispatch(EditorCommand::AddChild { parent: p, child: c })
+            .unwrap();
+        assert_eq!(session.world.get::<Parent>(c).map(|x| x.0), Some(p));
+
+        assert!(session.undo());
+        assert!(session.world.get::<Parent>(c).is_none());
+        assert!(session.world.get::<Children>(p).map(|x| x.0.is_empty()).unwrap_or(true));
+
+        assert!(session.redo());
+        assert_eq!(session.world.get::<Parent>(c).map(|x| x.0), Some(p));
+        cleanup(&scene);
+    }
+
+    #[test]
+    fn undo_remove_child_reattaches() {
+        use voltex_ecs::hierarchy::Parent;
+        let scene = temp_path("voltex_undo_rmchild.vscn");
+        cleanup(&scene);
+        let mut session = EditorSession::new(scene.clone());
+        let p = session.dispatch(EditorCommand::Spawn).unwrap();
+        let c = session.dispatch(EditorCommand::Spawn).unwrap();
+        // Manually attach (not via command — we want to test RemoveChild's undo path
+        // without conflating with the AddChild undo case above).
+        voltex_ecs::hierarchy::add_child(&mut session.world, p, c);
+
+        session
+            .dispatch(EditorCommand::RemoveChild { parent: p, child: c })
+            .unwrap();
+        assert!(session.world.get::<Parent>(c).is_none());
+
+        assert!(session.undo());
+        assert_eq!(session.world.get::<Parent>(c).map(|x| x.0), Some(p));
+        cleanup(&scene);
+    }
+
+    #[test]
+    fn remove_child_when_not_attached_is_not_recorded() {
+        let scene = temp_path("voltex_rmchild_noop.vscn");
+        cleanup(&scene);
+        let mut session = EditorSession::new(scene.clone());
+        let p = session.dispatch(EditorCommand::Spawn).unwrap();
+        let c = session.dispatch(EditorCommand::Spawn).unwrap();
+        let depth_before = session.undo_depth();
+
+        // Not currently attached → RemoveChild is a no-op and should not push history.
+        session
+            .dispatch(EditorCommand::RemoveChild { parent: p, child: c })
+            .unwrap();
+        assert_eq!(session.undo_depth(), depth_before);
         cleanup(&scene);
     }
 

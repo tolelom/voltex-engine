@@ -32,13 +32,13 @@ Immediate-mode UI 에디터 — 도킹/플로팅/뷰포트/인스펙터/에셋 �
 - `AssetBrowser`, `asset_browser_panel` (src/asset_browser.rs)
 
 ### Editor Command / Error
-- `EditorCommand` — Spawn/Despawn/SetTransform/SetTag/SaveScene/LoadScene (src/command.rs)
+- `EditorCommand` — Spawn / Despawn / SetTransform / SetTag / **AddChild** / **RemoveChild** / SaveScene / LoadScene (src/command.rs)
 - `EditorError`, `Result` — Generic / EntityNotAlive(Entity) / Io(String) / Parse(String) (src/error.rs, PartialEq 유지)
 - `EditorSession` — World + ComponentRegistry + 자동저장 + jsonl 로그 + **Undo/Redo 스택** (src/session.rs)
   - `dispatch(cmd)` — apply + log + auto-save + history push
   - `undo() / redo() -> bool` — 마지막 액션 복원 / 재적용
   - `undo_depth() / redo_depth() -> usize` — UI/test 용
-  - **v1 undoable**: Spawn / SetTransform / SetTag.  **v1 non-undoable**: Despawn / SaveScene / LoadScene (실행 시 history 클리어)
+  - **v1 undoable**: Spawn / SetTransform / SetTag / AddChild / RemoveChild.  **v1 non-undoable**: Despawn / SaveScene / LoadScene (실행 시 history 클리어)
 
 ## 모듈 구조
 - 코어: ui_context, renderer, draw_list, font, layout, ttf_* (parser, font, rasterizer, glyph_cache)
