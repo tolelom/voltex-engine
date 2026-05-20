@@ -16,8 +16,6 @@ use voltex_editor::{
     pick_entity,
 };
 use voltex_ecs::entity::Entity;
-use voltex_ecs::transform::Transform;
-use voltex_ecs::scene::Tag;
 use voltex_math::{Mat4, Vec3};
 
 struct EditorDemoApp {
@@ -298,32 +296,39 @@ impl ApplicationHandler for EditorDemoApp {
         let cube3 = make_cube(&gpu.device, -1.5, 0.5, -1.0, 1.0);
 
         // ECS Session setup — World lives inside the EditorSession so Toolbar
-        // actions can be logged and auto-saved. Direct seeding (below) bypasses
-        // the command log: that's fine for one-time demo scene init, but
-        // because EditorCommand::LoadScene now clears the world before
-        // deserializing, the seed entities disappear if the user clicks Load
-        // without first clicking Save.
+        // actions can be logged and auto-saved. Seed entities go through the
+        // command dispatcher so they appear in the jsonl log and survive a
+        // Save → Load round-trip (LoadScene wipes the world before reading
+        // disk; if we'd seeded directly via World::spawn the demo scene would
+        // be empty after Load).
         std::fs::create_dir_all("scenes").ok();
         let mut session = EditorSession::new("scenes/editor_demo.vscn");
 
-        let ground_e = session.world.spawn();
-        session.world.add(ground_e, Transform::from_position(Vec3::new(0.0, 0.0, 0.0)));
-        session.world.add(ground_e, Tag("Ground".to_string()));
+        let seed = |session: &mut EditorSession, pos: Vec3, tag: &str| -> Entity {
+            let e = session.dispatch(EditorCommand::Spawn).unwrap();
+            session.dispatch(EditorCommand::SetTransform {
+                entity: e,
+                position: pos,
+                rotation: Vec3::ZERO,
+                scale: Vec3::new(1.0, 1.0, 1.0),
+            }).unwrap();
+            session.dispatch(EditorCommand::SetTag {
+                entity: e,
+                tag: tag.to_string(),
+            }).unwrap();
+            e
+        };
+        let _ground_e = seed(&mut session, Vec3::new(0.0, 0.0, 0.0), "Ground");
+        let cube1_e = seed(&mut session, Vec3::new(0.0, 0.5, 0.0), "Cube1");
+        let cube2_e = seed(&mut session, Vec3::new(2.0, 0.5, 1.0), "Cube2");
+        let _cube3_e = seed(&mut session, Vec3::new(-1.5, 0.5, -1.0), "Cube3");
 
-        let cube1_e = session.world.spawn();
-        session.world.add(cube1_e, Transform::from_position(Vec3::new(0.0, 0.5, 0.0)));
-        session.world.add(cube1_e, Tag("Cube1".to_string()));
-
-        let cube2_e = session.world.spawn();
-        session.world.add(cube2_e, Transform::from_position(Vec3::new(2.0, 0.5, 1.0)));
-        session.world.add(cube2_e, Tag("Cube2".to_string()));
-
-        let cube3_e = session.world.spawn();
-        session.world.add(cube3_e, Transform::from_position(Vec3::new(-1.5, 0.5, -1.0)));
-        session.world.add(cube3_e, Tag("Cube3".to_string()));
-
-        // Cube2 is child of Cube1
-        voltex_ecs::hierarchy::add_child(&mut session.world, cube1_e, cube2_e);
+        // Cube2 is child of Cube1 — through the command path so undo/redo and
+        // the log capture the relationship.
+        session.dispatch(EditorCommand::AddChild {
+            parent: cube1_e,
+            child: cube2_e,
+        }).unwrap();
 
         self.state = Some(AppState {
             window,
