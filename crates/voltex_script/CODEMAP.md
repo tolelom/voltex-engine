@@ -26,11 +26,11 @@ Lua 5.4 내장 + 엔진 API 바인딩 + 샌드박싱 + 핫 리로드.
 
 ## 변경 시 주의점
 - engine_api는 현재 4개 함수만 노출 (DEFERRED 확장)
-- Entity.generation은 하드코딩 0 버그 있음 (DEFERRED)
+- **Entity handle 규약**: Lua ↔ Rust 모든 함수가 `(id, gen)` **두 값**으로 entity 전달. spawn_entity → 2 returns; set/get_position → id+gen+payload. stale handle은 `is_alive` 로 거부.
 - state.rs는 505줄 (spec 만족, 분리 대상 아님)
 - Lua 5.4는 cc로 내장 빌드 — Windows MSVC 환경 의존
 
 ## 테스트
 - 단위 테스트: src/**/*.rs `#[cfg(test)]`
 - 실행: `cargo test -p voltex_script --lib`
-- 현재 테스트 개수: 18개
+- 현재 테스트 개수: 21개 (engine_api +3: stale-handle 거부, multi-return spawn, multi-arg set/get)
