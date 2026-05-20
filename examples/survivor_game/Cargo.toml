@@ -5,6 +5,7 @@ edition = "2021"
 
 [dependencies]
 voltex = { workspace = true }
+voltex_renderer_ecs = { workspace = true }
 voltex_physics = { workspace = true }
 wgpu.workspace = true
 winit.workspace = true

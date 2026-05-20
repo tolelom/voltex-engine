@@ -5,6 +5,7 @@
 
 use std::collections::HashSet;
 use voltex::ecs::Entity;
+use voltex::ecs::{MaterialHandle, MeshHandle};
 use voltex::platform::InputState;
 use voltex::prelude::{Transform, Vec3, World};
 use voltex_physics::{detect_collisions, Collider};
@@ -182,33 +183,52 @@ pub fn collision_system(world: &mut World) -> CollisionEvents {
 
 // ── Spawn helpers ───────────────────────────────────────────────────
 
-pub fn spawn_player(world: &mut World) -> Entity {
+pub fn spawn_player(world: &mut World, mesh: MeshHandle, material: MaterialHandle) -> Entity {
     let e = world.spawn();
     world.add(e, PlayerTag);
-    world.add(e, Transform::from_position(Vec3::ZERO));
+    // Y=0.5 so the sphere mesh (radius 0.4 at scale 1) sits above the ground.
+    // Previously a render-time +0.5 Y offset existed; baking it into Transform
+    // lets collect_render_items produce the correct model matrix without
+    // per-entity post-processing.
+    world.add(e, Transform::from_position(Vec3::new(0.0, 0.5, 0.0)));
     world.add(e, MoveSpeed(8.0));
     world.add(e, Health { hp: 3, max_hp: 3 });
     world.add(e, FireCooldown(0.0));
     world.add(e, InvincibleTimer(0.0));
     world.add(e, Collider::Sphere { radius: 0.5 });
+    world.add(e, mesh);
+    world.add(e, material);
     e
 }
 
-pub fn spawn_enemy(world: &mut World, position: Vec3) -> Entity {
+pub fn spawn_enemy(world: &mut World, position: Vec3, mesh: MeshHandle, material: MaterialHandle) -> Entity {
     let e = world.spawn();
     world.add(e, EnemyTag);
-    world.add(e, Transform::from_position(position));
+    // Bake the previous render-time scale(0.4) into Transform.
+    world.add(e, Transform::from_position_scale(position, Vec3::new(0.4, 0.4, 0.4)));
     world.add(e, MoveSpeed(3.0));
     world.add(e, Collider::Sphere { radius: 0.4 });
+    world.add(e, mesh);
+    world.add(e, material);
     e
 }
 
-pub fn spawn_projectile(world: &mut World, origin: Vec3, direction: Vec3, speed: f32) -> Entity {
+pub fn spawn_projectile(
+    world: &mut World,
+    origin: Vec3,
+    direction: Vec3,
+    speed: f32,
+    mesh: MeshHandle,
+    material: MaterialHandle,
+) -> Entity {
     let e = world.spawn();
     world.add(e, ProjectileTag);
-    world.add(e, Transform::from_position(origin));
+    // Bake the previous render-time scale(0.3) into Transform.
+    world.add(e, Transform::from_position_scale(origin, Vec3::new(0.3, 0.3, 0.3)));
     world.add(e, Velocity(direction * speed));
     world.add(e, Lifetime(2.0));
     world.add(e, Collider::Sphere { radius: 0.15 });
+    world.add(e, mesh);
+    world.add(e, material);
     e
 }

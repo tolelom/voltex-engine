@@ -4,10 +4,11 @@
 //! query helpers so main.rs never touches the World directly.
 
 use voltex::ecs::Entity;
+use voltex::ecs::{MaterialHandle, MeshHandle};
 use voltex::platform::InputState;
 use voltex::prelude::{Transform, Vec3, World};
 
-use crate::components::{EnemyTag, FireCooldown, Health, InvincibleTimer, ProjectileTag};
+use crate::components::{EnemyTag, FireCooldown, Health};
 use crate::systems::{
     collision_system, enemy_chase_system, lifetime_system, player_input_system,
     projectile_motion_system, spawn_enemy, spawn_player, spawn_projectile, CollisionEvents,
@@ -16,11 +17,25 @@ use crate::wave::WaveSystem;
 
 const FIRE_COOLDOWN_SEC: f32 = 0.2;
 const PROJECTILE_SPEED: f32 = 20.0;
+// Player is now spawned at Y=0.5 (see spawn_player), so projectiles fire from
+// the player's exact position without an extra Y offset.
 const PROJECTILE_ORIGIN_OFFSET: Vec3 = Vec3 {
     x: 0.0,
-    y: 0.5,
+    y: 0.0,
     z: 0.0,
 };
+
+/// Mesh/material handles for each entity type. Owned by Game so that
+/// dynamic spawns (enemy, projectile) can attach the right render handles.
+#[derive(Clone, Copy)]
+pub struct RenderHandles {
+    pub player_mesh: MeshHandle,
+    pub player_material: MaterialHandle,
+    pub enemy_mesh: MeshHandle,
+    pub enemy_material: MaterialHandle,
+    pub projectile_mesh: MeshHandle,
+    pub projectile_material: MaterialHandle,
+}
 
 #[derive(Default)]
 pub struct FrameEvents {
@@ -34,23 +49,25 @@ pub struct Game {
     pub wave: WaveSystem,
     pub score: u32,
     pub game_over: bool,
+    pub handles: RenderHandles,
 }
 
 impl Game {
-    pub fn new() -> Self {
+    pub fn new(handles: RenderHandles) -> Self {
         let mut world = World::new();
-        let player_entity = spawn_player(&mut world);
+        let player_entity = spawn_player(&mut world, handles.player_mesh, handles.player_material);
         Self {
             world,
             player_entity,
             wave: WaveSystem::new(),
             score: 0,
             game_over: false,
+            handles,
         }
     }
 
     pub fn restart(&mut self) {
-        *self = Self::new();
+        *self = Self::new(self.handles);
     }
 
     pub fn update(&mut self, input: &InputState, dt: f32) -> FrameEvents {
@@ -70,7 +87,12 @@ impl Game {
         // Wave spawning.
         let alive = self.alive_enemy_count();
         for pos in self.wave.update(dt, alive) {
-            spawn_enemy(&mut self.world, pos);
+            spawn_enemy(
+                &mut self.world,
+                pos,
+                self.handles.enemy_mesh,
+                self.handles.enemy_material,
+            );
         }
 
         // Despawn expired projectiles before collision so dead bullets don't hit.
@@ -105,7 +127,14 @@ impl Game {
             return false;
         }
         let origin = self.player_pos() + PROJECTILE_ORIGIN_OFFSET;
-        spawn_projectile(&mut self.world, origin, aim_dir, PROJECTILE_SPEED);
+        spawn_projectile(
+            &mut self.world,
+            origin,
+            aim_dir,
+            PROJECTILE_SPEED,
+            self.handles.projectile_mesh,
+            self.handles.projectile_material,
+        );
         if let Some(c) = self.world.get_mut::<FireCooldown>(self.player_entity) {
             c.0 = FIRE_COOLDOWN_SEC;
         }
@@ -129,29 +158,7 @@ impl Game {
             .unwrap_or((0, 0))
     }
 
-    /// Seconds remaining on invincibility, or 0.0 when not active.
-    pub fn player_invincible(&self) -> f32 {
-        self.world
-            .get::<InvincibleTimer>(self.player_entity)
-            .map(|t| t.0)
-            .unwrap_or(0.0)
-    }
-
     pub fn alive_enemy_count(&self) -> usize {
         self.world.query::<EnemyTag>().count()
-    }
-
-    pub fn projectile_positions(&self) -> Vec<Vec3> {
-        self.world
-            .query::<ProjectileTag>()
-            .filter_map(|(e, _)| self.world.get::<Transform>(e).map(|t| t.position))
-            .collect()
-    }
-
-    pub fn enemy_positions(&self) -> Vec<Vec3> {
-        self.world
-            .query::<EnemyTag>()
-            .filter_map(|(e, _)| self.world.get::<Transform>(e).map(|t| t.position))
-            .collect()
     }
 }

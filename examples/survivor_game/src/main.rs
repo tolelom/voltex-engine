@@ -13,6 +13,7 @@ use winit::{
     window::WindowId,
 };
 use voltex::prelude::*;
+use voltex::ecs::{MaterialHandle, MeshHandle, Transform};
 use voltex::renderer::{
     create_pbr_full_texture_bind_group, create_pbr_pipeline, create_shadow_pipeline,
     generate_sphere, pbr_full_texture_bind_group_layout, shadow_pass_bind_group_layout,
@@ -21,14 +22,14 @@ use voltex::renderer::{
 };
 use voltex::editor::{UiContext, UiRenderer};
 use voltex::audio::{AudioClip, AudioSystem};
+use voltex_renderer_ecs::{collect_render_items, RenderAssets};
 use wgpu::util::DeviceExt;
 
-use arena::{generate_arena, arena_model_matrices};
+use arena::{arena_model_matrices, generate_arena};
 use camera::QuarterViewCamera;
-use game::Game;
+use game::{Game, RenderHandles};
 
-const ARENA_ENTITIES: usize = 5; // 1 floor + 4 obstacles
-const MAX_ENTITIES: usize = 100; // pre-allocate for future enemies/projectiles
+const MAX_ENTITIES: usize = 100; // pre-allocate for player + projectiles + enemies + arena
 
 fn generate_sine(freq: f32, duration: f32, sample_rate: u32) -> AudioClip {
     let samples = (sample_rate as f32 * duration) as usize;
@@ -44,17 +45,14 @@ struct SurvivorApp {
     state: Option<AppState>,
 }
 
-struct RenderEntity {
-    mesh: Mesh,
-}
-
 struct AppState {
     window: VoltexWindow,
     gpu: GpuContext,
     pbr_pipeline: wgpu::RenderPipeline,
     shadow_pipeline: wgpu::RenderPipeline,
-    entities: Vec<RenderEntity>,
-    player_mesh: Mesh,
+    // ECS-driven rendering. RenderAssets owns the GPU meshes/materials;
+    // Game owns the ECS World and the per-type render handles.
+    render_assets: RenderAssets,
     camera: QuarterViewCamera,
     game: Game,
     // Color pass resources
@@ -86,9 +84,6 @@ struct AppState {
     cam_aligned_size: u32,
     mat_aligned_size: u32,
     shadow_pass_aligned_size: u32,
-    // Arena data
-    models: Vec<Mat4>,
-    materials: Vec<([f32; 4], f32, f32)>,
 }
 
 fn camera_light_bind_group_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
@@ -125,6 +120,11 @@ fn align_up(size: u32, alignment: u32) -> u32 {
     ((size + alignment - 1) / alignment) * alignment
 }
 
+/// Extract translation (last column) from a column-major Mat4.
+fn extract_translation(m: &Mat4) -> Vec3 {
+    Vec3::new(m.cols[3][0], m.cols[3][1], m.cols[3][2])
+}
+
 impl ApplicationHandler for SurvivorApp {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         let config = WindowConfig {
@@ -143,26 +143,50 @@ impl ApplicationHandler for SurvivorApp {
         let shadow_pass_aligned_size =
             align_up(std::mem::size_of::<ShadowPassUniform>() as u32, alignment);
 
-        // Generate arena geometry
+        // ── Register all meshes + materials in RenderAssets ──
+        let mut render_assets = RenderAssets::new();
+
+        // Arena entities (5: floor + 4 obstacles)
         let arena_entities = generate_arena();
-        let models = arena_model_matrices();
-
-        // Collect materials and create GPU meshes
-        let mut render_entities = Vec::new();
-        let mut materials = Vec::new();
-
-        for entity in &arena_entities {
+        let arena_models = arena_model_matrices();
+        let mut arena_handles: Vec<(MeshHandle, MaterialHandle, Vec3)> = Vec::new();
+        for (i, entity) in arena_entities.iter().enumerate() {
             let mesh = Mesh::new(&gpu.device, &entity.vertices, &entity.indices);
-            render_entities.push(RenderEntity { mesh });
-            materials.push((entity.base_color, entity.metallic, entity.roughness));
+            let mh = render_assets.add_mesh(mesh);
+            let mat = MaterialUniform::with_params(entity.base_color, entity.metallic, entity.roughness);
+            let mat_h = render_assets.add_material(mat);
+            let position = extract_translation(&arena_models[i]);
+            arena_handles.push((mh, mat_h, position));
         }
 
-        // Player sphere mesh (radius 0.4, 16 sectors/stacks)
+        // Shared sphere mesh for player/projectile/enemy
         let (sphere_verts, sphere_indices) = generate_sphere(0.4, 16, 16);
-        let player_mesh = Mesh::new(&gpu.device, &sphere_verts, &sphere_indices);
+        let sphere_mesh_h = render_assets.add_mesh(Mesh::new(&gpu.device, &sphere_verts, &sphere_indices));
+        let player_mat_h = render_assets
+            .add_material(MaterialUniform::with_params([0.2, 0.4, 1.0, 1.0], 0.3, 0.5));
+        let projectile_mat_h = render_assets
+            .add_material(MaterialUniform::with_params([1.0, 0.9, 0.1, 1.0], 0.1, 0.4));
+        let enemy_mat_h = render_assets
+            .add_material(MaterialUniform::with_params([1.0, 0.15, 0.1, 1.0], 0.2, 0.6));
 
-        // Game state
-        let game = Game::new();
+        // Game owns the ECS World + render handles
+        let handles = RenderHandles {
+            player_mesh: sphere_mesh_h,
+            player_material: player_mat_h,
+            enemy_mesh: sphere_mesh_h,
+            enemy_material: enemy_mat_h,
+            projectile_mesh: sphere_mesh_h,
+            projectile_material: projectile_mat_h,
+        };
+        let mut game = Game::new(handles);
+
+        // Spawn arena entities into the same World (static — never despawned).
+        for (mh, mat_h, position) in &arena_handles {
+            let e = game.world.spawn();
+            game.world.add(e, Transform::from_position(*position));
+            game.world.add(e, MeshHandle(mh.0));
+            game.world.add(e, MaterialHandle(mat_h.0));
+        }
 
         // Quarter-view camera
         let camera = QuarterViewCamera::new();
@@ -347,8 +371,7 @@ impl ApplicationHandler for SurvivorApp {
             gpu,
             pbr_pipeline,
             shadow_pipeline,
-            entities: render_entities,
-            player_mesh,
+            render_assets,
             camera,
             game,
             camera_buffer,
@@ -375,8 +398,6 @@ impl ApplicationHandler for SurvivorApp {
             cam_aligned_size,
             mat_aligned_size,
             shadow_pass_aligned_size,
-            models,
-            materials,
         });
     }
 
@@ -480,17 +501,9 @@ impl ApplicationHandler for SurvivorApp {
                 // Camera follows player
                 state.camera.target = state.game.player_pos();
 
-                // Build per-frame model/material lists: arena entities + player + projectiles + enemies
-                let player_pos = state.game.player_pos();
-                let player_model = Mat4::translation(player_pos.x, player_pos.y + 0.5, player_pos.z);
-                let projectile_positions = state.game.projectile_positions();
-                let enemy_positions = state.game.enemy_positions();
-                let num_projectiles = projectile_positions.len().min(MAX_ENTITIES - ARENA_ENTITIES - 1);
-                let base_enemy_idx = ARENA_ENTITIES + 1 + num_projectiles;
-                let num_enemies = enemy_positions.len().min(MAX_ENTITIES.saturating_sub(base_enemy_idx));
-                let num_entities = base_enemy_idx + num_enemies;
-                let invincible_timer = state.game.player_invincible();
+                // HUD data captured before the borrow of state.game.world below.
                 let (player_hp, player_max_hp) = state.game.player_health();
+                let num_enemies = state.game.alive_enemy_count();
 
                 // ----- Compute light VP for shadows -----
                 let light_dir = Vec3::new(-1.0, -2.0, -1.0).normalize();
@@ -499,106 +512,51 @@ impl ApplicationHandler for SurvivorApp {
                 let light_proj = Mat4::orthographic(-15.0, 15.0, -15.0, 15.0, 0.1, 60.0);
                 let light_vp = light_proj * light_view;
 
-                let cam_aligned = state.cam_aligned_size as usize;
-                let mat_aligned = state.mat_aligned_size as usize;
-                let sp_aligned = state.shadow_pass_aligned_size as usize;
-
-                // ----- Build shadow pass staging data -----
-                let sp_total = sp_aligned * num_entities;
-                let mut sp_staging = vec![0u8; sp_total];
-                for i in 0..num_entities {
-                    let model = if i < ARENA_ENTITIES {
-                        state.models[i]
-                    } else if i == ARENA_ENTITIES {
-                        player_model
-                    } else if i < base_enemy_idx {
-                        let pi = i - ARENA_ENTITIES - 1;
-                        let p = projectile_positions[pi];
-                        Mat4::translation(p.x, p.y, p.z) * Mat4::scale(0.3, 0.3, 0.3)
-                    } else {
-                        let ei = i - base_enemy_idx;
-                        let e = enemy_positions[ei];
-                        Mat4::translation(e.x, e.y, e.z) * Mat4::scale(0.4, 0.4, 0.4)
-                    };
-                    let sp_uniform = ShadowPassUniform {
-                        light_vp_model: (light_vp * model).cols,
-                    };
-                    let bytes = bytemuck::bytes_of(&sp_uniform);
-                    let offset = i * sp_aligned;
-                    sp_staging[offset..offset + bytes.len()].copy_from_slice(bytes);
-                }
-                state
-                    .gpu
-                    .queue
-                    .write_buffer(&state.shadow_pass_buffer, 0, &sp_staging);
-
-                // ----- Build color pass staging data -----
                 let view_proj = state.camera.view_projection(aspect);
                 let eye = state.camera.eye_position();
                 let cam_pos = [eye.x, eye.y, eye.z];
 
-                let cam_total = cam_aligned * num_entities;
-                let mat_total = mat_aligned * num_entities;
-                let mut cam_staging = vec![0u8; cam_total];
-                let mut mat_staging = vec![0u8; mat_total];
+                // ----- Collect RenderItems from ECS World (single source of truth) -----
+                let items = collect_render_items(&mut state.game.world, &state.render_assets);
+                let num_entities = items.len().min(MAX_ENTITIES);
 
-                for i in 0..num_entities {
-                    let (model, color, metallic, roughness) = if i < ARENA_ENTITIES {
-                        let (c, m, r) = state.materials[i];
-                        (state.models[i], c, m, r)
-                    } else if i == ARENA_ENTITIES {
-                        // Player: blue sphere (flash white when invincible)
-                        let player_color = if invincible_timer > 0.0 {
-                            // Blink effect
-                            let blink = (invincible_timer * 10.0).sin();
-                            if blink > 0.0 {
-                                [1.0, 1.0, 1.0, 1.0]
-                            } else {
-                                [0.2, 0.4, 1.0, 1.0]
-                            }
-                        } else {
-                            [0.2, 0.4, 1.0, 1.0]
-                        };
-                        (player_model, player_color, 0.3, 0.5)
-                    } else if i < base_enemy_idx {
-                        // Projectile: yellow sphere
-                        let pi = i - ARENA_ENTITIES - 1;
-                        let p = projectile_positions[pi];
-                        let m = Mat4::translation(p.x, p.y, p.z) * Mat4::scale(0.3, 0.3, 0.3);
-                        (m, [1.0, 0.9, 0.1, 1.0], 0.1, 0.4)
-                    } else {
-                        // Enemy: red sphere
-                        let ei = i - base_enemy_idx;
-                        let e = enemy_positions[ei];
-                        let m = Mat4::translation(e.x, e.y, e.z) * Mat4::scale(0.4, 0.4, 0.4);
-                        (m, [1.0, 0.15, 0.1, 1.0], 0.2, 0.6)
-                    };
+                // ----- Build staging data for all three dynamic UBOs -----
+                let cam_aligned = state.cam_aligned_size as usize;
+                let mat_aligned = state.mat_aligned_size as usize;
+                let sp_aligned = state.shadow_pass_aligned_size as usize;
 
-                    let cam_uniform = CameraUniform {
+                let mut cam_staging = vec![0u8; cam_aligned * num_entities];
+                let mut mat_staging = vec![0u8; mat_aligned * num_entities];
+                let mut sp_staging = vec![0u8; sp_aligned * num_entities];
+
+                for (i, item) in items.iter().take(num_entities).enumerate() {
+                    let cam = CameraUniform {
                         view_proj: view_proj.cols,
-                        model: model.cols,
+                        model: item.model.cols,
                         camera_pos: cam_pos,
                         _padding: 0.0,
                     };
-                    let bytes = bytemuck::bytes_of(&cam_uniform);
-                    let offset = i * cam_aligned;
-                    cam_staging[offset..offset + bytes.len()].copy_from_slice(bytes);
+                    let bytes = bytemuck::bytes_of(&cam);
+                    cam_staging[i * cam_aligned..i * cam_aligned + bytes.len()]
+                        .copy_from_slice(bytes);
 
-                    let mat_uniform =
-                        MaterialUniform::with_params(color, metallic, roughness);
-                    let bytes = bytemuck::bytes_of(&mat_uniform);
-                    let offset = i * mat_aligned;
-                    mat_staging[offset..offset + bytes.len()].copy_from_slice(bytes);
+                    let mat_bytes = bytemuck::bytes_of(&item.material);
+                    mat_staging[i * mat_aligned..i * mat_aligned + mat_bytes.len()]
+                        .copy_from_slice(mat_bytes);
+
+                    let sp = ShadowPassUniform {
+                        light_vp_model: (light_vp * item.model).cols,
+                    };
+                    let sp_bytes = bytemuck::bytes_of(&sp);
+                    sp_staging[i * sp_aligned..i * sp_aligned + sp_bytes.len()]
+                        .copy_from_slice(sp_bytes);
                 }
 
-                state
-                    .gpu
-                    .queue
-                    .write_buffer(&state.camera_buffer, 0, &cam_staging);
-                state
-                    .gpu
-                    .queue
-                    .write_buffer(&state.material_buffer, 0, &mat_staging);
+                if num_entities > 0 {
+                    state.gpu.queue.write_buffer(&state.camera_buffer, 0, &cam_staging);
+                    state.gpu.queue.write_buffer(&state.material_buffer, 0, &mat_staging);
+                    state.gpu.queue.write_buffer(&state.shadow_pass_buffer, 0, &sp_staging);
+                }
 
                 // Update shadow uniform with light VP
                 let shadow_uniform = ShadowUniform {
@@ -616,7 +574,7 @@ impl ApplicationHandler for SurvivorApp {
                     bytemuck::cast_slice(&[shadow_uniform]),
                 );
 
-                // Write light uniform
+                // Refresh light UBO each frame.
                 let mut lights_uniform = LightsUniform::new();
                 lights_uniform.ambient_color = [0.08, 0.08, 0.08];
                 lights_uniform.add_light(LightData::directional(
@@ -655,30 +613,6 @@ impl ApplicationHandler for SurvivorApp {
                     },
                 );
 
-                // Helper: draw a mesh at entity index i in shadow pass
-                macro_rules! draw_shadow {
-                    ($pass:expr, $mesh:expr, $idx:expr) => {
-                        let offset = ($idx as u32) * state.shadow_pass_aligned_size;
-                        $pass.set_bind_group(0, &state.shadow_pass_bind_group, &[offset]);
-                        $pass.set_vertex_buffer(0, $mesh.vertex_buffer.slice(..));
-                        $pass.set_index_buffer($mesh.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
-                        $pass.draw_indexed(0..$mesh.num_indices, 0, 0..1);
-                    };
-                }
-
-                // Helper: draw a mesh at entity index i in color pass
-                macro_rules! draw_color {
-                    ($pass:expr, $mesh:expr, $idx:expr) => {
-                        let cam_offset = ($idx as u32) * state.cam_aligned_size;
-                        let mat_offset = ($idx as u32) * state.mat_aligned_size;
-                        $pass.set_bind_group(0, &state.camera_light_bind_group, &[cam_offset]);
-                        $pass.set_bind_group(2, &state.material_bind_group, &[mat_offset]);
-                        $pass.set_vertex_buffer(0, $mesh.vertex_buffer.slice(..));
-                        $pass.set_index_buffer($mesh.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
-                        $pass.draw_indexed(0..$mesh.num_indices, 0, 0..1);
-                    };
-                }
-
                 // ===== Pass 1: Shadow =====
                 {
                     let mut shadow_pass =
@@ -702,19 +636,19 @@ impl ApplicationHandler for SurvivorApp {
 
                     shadow_pass.set_pipeline(&state.shadow_pipeline);
 
-                    // Arena entities
-                    for (i, entity) in state.entities.iter().enumerate() {
-                        draw_shadow!(shadow_pass, entity.mesh, i);
-                    }
-                    // Player sphere
-                    draw_shadow!(shadow_pass, state.player_mesh, ARENA_ENTITIES);
-                    // Projectiles
-                    for pi in 0..num_projectiles {
-                        draw_shadow!(shadow_pass, state.player_mesh, ARENA_ENTITIES + 1 + pi);
-                    }
-                    // Enemies
-                    for ei in 0..num_enemies {
-                        draw_shadow!(shadow_pass, state.player_mesh, base_enemy_idx + ei);
+                    for (i, item) in items.iter().take(num_entities).enumerate() {
+                        let mesh = state
+                            .render_assets
+                            .mesh(item.mesh)
+                            .expect("collect_render_items already skipped stale handles");
+                        let offset = (i as u32) * state.shadow_pass_aligned_size;
+                        shadow_pass.set_bind_group(0, &state.shadow_pass_bind_group, &[offset]);
+                        shadow_pass.set_vertex_buffer(0, mesh.vertex_buffer.slice(..));
+                        shadow_pass.set_index_buffer(
+                            mesh.index_buffer.slice(..),
+                            wgpu::IndexFormat::Uint32,
+                        );
+                        shadow_pass.draw_indexed(0..mesh.num_indices, 0, 0..1);
                     }
                 }
 
@@ -753,23 +687,24 @@ impl ApplicationHandler for SurvivorApp {
                         });
 
                     render_pass.set_pipeline(&state.pbr_pipeline);
-                    render_pass
-                        .set_bind_group(1, &state.pbr_texture_bind_group, &[]);
+                    render_pass.set_bind_group(1, &state.pbr_texture_bind_group, &[]);
                     render_pass.set_bind_group(3, &state.shadow_bind_group, &[]);
 
-                    // Arena entities
-                    for (i, entity) in state.entities.iter().enumerate() {
-                        draw_color!(render_pass, entity.mesh, i);
-                    }
-                    // Player sphere
-                    draw_color!(render_pass, state.player_mesh, ARENA_ENTITIES);
-                    // Projectiles
-                    for pi in 0..num_projectiles {
-                        draw_color!(render_pass, state.player_mesh, ARENA_ENTITIES + 1 + pi);
-                    }
-                    // Enemies
-                    for ei in 0..num_enemies {
-                        draw_color!(render_pass, state.player_mesh, base_enemy_idx + ei);
+                    for (i, item) in items.iter().take(num_entities).enumerate() {
+                        let mesh = state
+                            .render_assets
+                            .mesh(item.mesh)
+                            .expect("collect_render_items already skipped stale handles");
+                        let cam_offset = (i as u32) * state.cam_aligned_size;
+                        let mat_offset = (i as u32) * state.mat_aligned_size;
+                        render_pass.set_bind_group(0, &state.camera_light_bind_group, &[cam_offset]);
+                        render_pass.set_bind_group(2, &state.material_bind_group, &[mat_offset]);
+                        render_pass.set_vertex_buffer(0, mesh.vertex_buffer.slice(..));
+                        render_pass.set_index_buffer(
+                            mesh.index_buffer.slice(..),
+                            wgpu::IndexFormat::Uint32,
+                        );
+                        render_pass.draw_indexed(0..mesh.num_indices, 0, 0..1);
                     }
                 }
 
