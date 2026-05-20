@@ -16,7 +16,7 @@
 //! bounds. Documented in docs/DEFERRED.md.
 
 use voltex_ecs::{Entity, Transform, World};
-use voltex_math::{Mat4, Ray, Vec3, Vec4};
+use voltex_math::{Mat4, Ray, Vec3, Vec4, AABB};
 
 /// Convert a pixel mouse position to NDC space within a viewport rect.
 ///
@@ -70,6 +70,74 @@ pub fn ray_vs_sphere_t(ray: &Ray, center: Vec3, radius: f32) -> Option<f32> {
     } else {
         None
     }
+}
+
+/// Ray vs axis-aligned bounding box (slab method).
+/// Returns the smallest non-negative `t` (clamped to 0 if ray starts inside),
+/// or `None` if the ray misses or only intersects behind the origin.
+///
+/// voltex_physics has an equivalent — this is duplicated here to avoid a
+/// voltex_editor → voltex_physics dependency.
+pub fn ray_vs_aabb(ray: &Ray, aabb: &AABB) -> Option<f32> {
+    let mut t_min = f32::NEG_INFINITY;
+    let mut t_max = f32::INFINITY;
+    let o = [ray.origin.x, ray.origin.y, ray.origin.z];
+    let d = [ray.direction.x, ray.direction.y, ray.direction.z];
+    let bmin = [aabb.min.x, aabb.min.y, aabb.min.z];
+    let bmax = [aabb.max.x, aabb.max.y, aabb.max.z];
+    for i in 0..3 {
+        if d[i].abs() < 1e-8 {
+            if o[i] < bmin[i] || o[i] > bmax[i] {
+                return None;
+            }
+        } else {
+            let inv = 1.0 / d[i];
+            let mut t1 = (bmin[i] - o[i]) * inv;
+            let mut t2 = (bmax[i] - o[i]) * inv;
+            if t1 > t2 {
+                std::mem::swap(&mut t1, &mut t2);
+            }
+            t_min = t_min.max(t1);
+            t_max = t_max.min(t2);
+            if t_min > t_max {
+                return None;
+            }
+        }
+    }
+    if t_max < 0.0 {
+        return None;
+    }
+    Some(t_min.max(0.0))
+}
+
+/// Transform a mesh-local AABB into world space by transforming the 8 corners
+/// and rebuilding an axis-aligned AABB. Loose for rotated meshes (OBB picking
+/// is out of scope per E1 spec).
+pub fn world_aabb_from_local(local: &AABB, world: &Mat4) -> AABB {
+    let corners = [
+        Vec3::new(local.min.x, local.min.y, local.min.z),
+        Vec3::new(local.max.x, local.min.y, local.min.z),
+        Vec3::new(local.min.x, local.max.y, local.min.z),
+        Vec3::new(local.max.x, local.max.y, local.min.z),
+        Vec3::new(local.min.x, local.min.y, local.max.z),
+        Vec3::new(local.max.x, local.min.y, local.max.z),
+        Vec3::new(local.min.x, local.max.y, local.max.z),
+        Vec3::new(local.max.x, local.max.y, local.max.z),
+    ];
+    let mut min = Vec3::new(f32::INFINITY, f32::INFINITY, f32::INFINITY);
+    let mut max = Vec3::new(f32::NEG_INFINITY, f32::NEG_INFINITY, f32::NEG_INFINITY);
+    for c in &corners {
+        let w = *world * Vec4::new(c.x, c.y, c.z, 1.0);
+        let inv_w = if w.w.abs() < 1e-8 { 1.0 } else { 1.0 / w.w };
+        let p = Vec3::new(w.x * inv_w, w.y * inv_w, w.z * inv_w);
+        min.x = min.x.min(p.x);
+        min.y = min.y.min(p.y);
+        min.z = min.z.min(p.z);
+        max.x = max.x.max(p.x);
+        max.y = max.y.max(p.y);
+        max.z = max.z.max(p.z);
+    }
+    AABB::new(min, max)
 }
 
 /// Walk every entity that has a `Transform` and return the closest hit using
@@ -298,5 +366,49 @@ mod tests {
             0.5,   // small radius
         );
         assert_ne!(result, Some(e));
+    }
+
+    #[test]
+    fn aabb_hit_front_face() {
+        let ray = Ray::new(Vec3::new(-5.0, 0.0, 0.0), Vec3::new(1.0, 0.0, 0.0));
+        let aabb = AABB::new(Vec3::new(-1.0, -1.0, -1.0), Vec3::new(1.0, 1.0, 1.0));
+        let t = ray_vs_aabb(&ray, &aabb).unwrap();
+        assert!(approx(t, 4.0, 1e-4));
+    }
+
+    #[test]
+    fn aabb_miss_parallel() {
+        let ray = Ray::new(Vec3::new(-5.0, 5.0, 0.0), Vec3::new(1.0, 0.0, 0.0));
+        let aabb = AABB::new(Vec3::new(-1.0, -1.0, -1.0), Vec3::new(1.0, 1.0, 1.0));
+        assert!(ray_vs_aabb(&ray, &aabb).is_none());
+    }
+
+    #[test]
+    fn aabb_inside_returns_zero() {
+        let ray = Ray::new(Vec3::ZERO, Vec3::new(1.0, 0.0, 0.0));
+        let aabb = AABB::new(Vec3::new(-1.0, -1.0, -1.0), Vec3::new(1.0, 1.0, 1.0));
+        let t = ray_vs_aabb(&ray, &aabb).unwrap();
+        assert!(approx(t, 0.0, 1e-4));
+    }
+
+    #[test]
+    fn world_aabb_translation_only() {
+        let local = AABB::new(Vec3::new(-1.0, -1.0, -1.0), Vec3::new(1.0, 1.0, 1.0));
+        let m = Mat4::translation(10.0, 20.0, 30.0);
+        let world = world_aabb_from_local(&local, &m);
+        assert!(approx(world.min.x, 9.0, 1e-4));
+        assert!(approx(world.max.z, 31.0, 1e-4));
+    }
+
+    #[test]
+    fn world_aabb_rotation_loosens() {
+        // 45° rotation around Y expands the X-Z footprint of a unit AABB.
+        let local = AABB::new(Vec3::new(-1.0, -1.0, -1.0), Vec3::new(1.0, 1.0, 1.0));
+        let m = Mat4::rotation_y(std::f32::consts::FRAC_PI_4);
+        let world = world_aabb_from_local(&local, &m);
+        // After 45° rotation, the corners of a unit cube reach sqrt(2) ≈ 1.414 in x or z.
+        assert!(world.max.x > 1.3 && world.max.x < 1.5,
+            "expected ~sqrt(2), got {}", world.max.x);
+        assert!(world.max.z > 1.3 && world.max.z < 1.5);
     }
 }
