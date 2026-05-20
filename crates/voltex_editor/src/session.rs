@@ -57,6 +57,7 @@ pub struct EditorSession {
     pub log_path: String,
     pub mode: EditorMode,
     play_snapshot: Option<Vec<u8>>,
+    lifecycles: Vec<crate::lifecycle::LifecycleCallback>,
     /// Stack of pairs: (forward command, inverse). Top is the most recent action.
     undo_stack: Vec<(EditorCommand, Inverse)>,
     /// Stack of pairs cleared by every new forward dispatch; populated by undo().
@@ -79,9 +80,31 @@ impl EditorSession {
             log_path,
             mode: EditorMode::Edit,
             play_snapshot: None,
+            lifecycles: Vec::new(),
             undo_stack: Vec::new(),
             redo_stack: Vec::new(),
         }
+    }
+
+    /// Register a callback fired on every PlayStart/PlayStop transition.
+    /// Callbacks run in registration order; a panicking callback aborts the
+    /// remainder of the firing pass (panic-as-bug policy).
+    pub fn add_lifecycle<F>(&mut self, callback: F)
+    where
+        F: FnMut(crate::lifecycle::LifecycleEvent, &mut World) + 'static,
+    {
+        self.lifecycles.push(Box::new(callback));
+    }
+
+    fn fire_lifecycle(&mut self, event: crate::lifecycle::LifecycleEvent) {
+        let mut callbacks = std::mem::take(&mut self.lifecycles);
+        for cb in &mut callbacks {
+            cb(event, &mut self.world);
+        }
+        // Preserve any callbacks registered during the fire.
+        let added_during_fire = std::mem::take(&mut self.lifecycles);
+        callbacks.extend(added_during_fire);
+        self.lifecycles = callbacks;
     }
 
     /// Transition between Edit and Play. Edit→Play captures a binary
@@ -98,10 +121,12 @@ impl EditorSession {
                     voltex_ecs::serialize_scene_binary(&self.world, &self.registry),
                 );
                 self.mode = EditorMode::Play;
+                self.fire_lifecycle(crate::lifecycle::LifecycleEvent::PlayStart);
                 self.undo_stack.clear();
                 self.redo_stack.clear();
             }
             (EditorMode::Play, EditorMode::Edit) => {
+                self.fire_lifecycle(crate::lifecycle::LifecycleEvent::PlayStop);
                 self.world.clear();
                 if let Some(data) = self.play_snapshot.take() {
                     let _ = voltex_ecs::deserialize_scene_binary(
@@ -118,7 +143,13 @@ impl EditorSession {
 
     /// Execute a command, append a jsonl log entry, and (for state-mutating
     /// commands) re-save the scene to disk so the file is always current.
+    ///
+    /// In Play mode all dispatches return `EditorError::ModeMismatch` — only
+    /// lifecycle callbacks may mutate the World while Play is active.
     pub fn dispatch(&mut self, cmd: EditorCommand) -> Result<Entity, EditorError> {
+        if self.mode != EditorMode::Edit {
+            return Err(EditorError::ModeMismatch { current: self.mode });
+        }
         // Capture the inverse BEFORE applying, so we read the pre-state.
         // For Spawn this returns None — we'll patch it post-apply once we know
         // the entity id.
