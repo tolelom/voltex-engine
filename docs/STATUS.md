@@ -138,6 +138,7 @@
 
 ```
 crates/
+├── voltex           — Facade (M6): 모든 sub-crate re-export + prelude
 ├── voltex_math      — Vec2, Vec3, Vec4, Mat4(+inverse), AABB, Ray
 ├── voltex_platform  — VoltexWindow, InputState, GameTimer
 ├── voltex_renderer  — GPU, Mesh, OBJ, glTF, JPG, PNG, Camera, PBR, Shadow(CSM/Point/Spot), IBL(SH), Frustum
@@ -151,8 +152,9 @@ crates/
 └── voltex_editor    — IMGUI, docking, 3D viewport, inspector, asset browser, TTF font, UiRenderer
 ```
 
-## 테스트: 763개 전부 통과
+## 테스트: 765개 전부 통과
 
+- voltex: 2 (M6: prelude/module 경로 컴파일 검증)
 - voltex_math: 37
 - voltex_platform: 3
 - voltex_ecs: 107 (M5 +3: Component trait 제네릭 register / 커스텀 컴포넌트 roundtrip / register_raw)

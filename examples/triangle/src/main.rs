@@ -5,8 +5,8 @@ use winit::{
     keyboard::{KeyCode, PhysicalKey},
     window::WindowId,
 };
-use voltex_platform::{VoltexWindow, WindowConfig, InputState, GameTimer};
-use voltex_renderer::{GpuContext, pipeline, vertex::Vertex};
+use voltex::prelude::*;
+use voltex::renderer::{GpuContext, pipeline, vertex::Vertex};
 use wgpu::util::DeviceExt;
 
 const TRIANGLE_VERTICES: &[Vertex] = &[

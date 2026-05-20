@@ -51,6 +51,10 @@ L2:
 L3:
   voltex_editor     → voltex_math, voltex_ecs, voltex_renderer
                       (IMGUI, dock, viewport, inspector, TTF)
+
+L4 (facade):
+  voltex            → 모든 sub-crate를 모듈로 re-export + prelude
+                      (사용자 진입점, 신규/외부 코드는 여기부터 import)
 ```
 
 **변경 영향도**: L0 변경은 거의 모든 crate에 영향 (특히 voltex_math). L3 변경은 영향 적음. 변경 전 의존 그래프를 따라 영향 범위 확인.
@@ -143,6 +147,20 @@ scheduler.run_all(&mut world);
 - 사용자 액션은 `EditorCommand`로 표현
 - `EditorSession::dispatch(command)` 호출
 - World 직접 변형은 가급적 피하고 command 경유 (jsonl 로그 + 자동 저장 혜택)
+
+### Facade crate 사용 (M6 표준화 완료)
+신규/외부 코드는 `voltex` facade crate를 단일 진입점으로 사용한다.
+
+```rust
+use voltex::prelude::*;                       // Vec3, World, Entity, Transform, ...
+use voltex::renderer::{GpuContext, pipeline}; // 도메인 특화는 명시 경로
+use voltex::physics::{Collider, RigidBody};
+```
+
+- **prelude 포함**: Vec2/3/4, Mat4, AABB, Ray, Entity, World, Transform, Component, ComponentRegistry, Parent, Children, VoltexWindow, WindowConfig, InputState, GameTimer, Handle, Assets
+- **prelude 미포함 (의도적)**: GpuContext, RigidBody, Collider, LuaState, EditorSession 등 도메인 특화 타입 — 명시 경로 사용
+- 각 sub-crate의 `Result<T>` alias는 이름 충돌로 prelude 제외 — `voltex::ecs::Result` 형식 명시
+- 기존 코드는 `voltex_<crate>::Type` 경로 그대로 사용해도 무방 (facade는 추가 레이어, 강제 아님)
 
 ## 변경 워크플로 (AI 작업 기준)
 

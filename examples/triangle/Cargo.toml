@@ -4,9 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-voltex_math.workspace = true
-voltex_platform.workspace = true
-voltex_renderer.workspace = true
+voltex = { workspace = true }
 wgpu.workspace = true
 winit.workspace = true
 bytemuck.workspace = true
