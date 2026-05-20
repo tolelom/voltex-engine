@@ -10,7 +10,7 @@ use voltex_renderer::{GpuContext, Mesh, MeshVertex, CameraUniform, LightUniform,
 use voltex_editor::{
     UiContext, UiRenderer, DockTree, DockNode, Axis, Rect,
     OrbitCamera, ViewportTexture, ViewportRenderer, VIEWPORT_COLOR_FORMAT,
-    hierarchy_panel, inspector_panel,
+    hierarchy_panel, inspector_panel, InspectorState,
     AssetBrowser, asset_browser_panel,
     EditorSession, EditorCommand,
 };
@@ -35,10 +35,10 @@ struct AppState {
     counter: u32,
     speed: f32,
     show_grid: bool,
-    // ECS — wrapped in EditorSession for command-based mutation + auto-save
+    // ECS — wrapped in EditorSession for command-based mutation + auto-save.
+    // `session.selected` is the single source of truth for the selected entity.
     session: EditorSession,
-    selected_entity: Option<Entity>,
-    tag_buffer: String,
+    inspector_state: InspectorState,
     // Viewport state
     orbit_cam: OrbitCamera,
     viewport_tex: ViewportTexture,
@@ -338,8 +338,7 @@ impl ApplicationHandler for EditorDemoApp {
             asset_browser,
             scene_meshes: vec![ground, cube1, cube2, cube3],
             session,
-            selected_entity: None,
-            tag_buffer: String::new(),
+            inspector_state: InspectorState::default(),
             prev_mouse: (0.0, 0.0),
             left_dragging: false,
             middle_dragging: false,
@@ -425,7 +424,7 @@ impl ApplicationHandler for EditorDemoApp {
                 state.ui.begin_panel("Toolbar", 0.0, 0.0, screen_w, TOOLBAR_H);
                 if state.ui.button("Spawn") {
                     if let Ok(e) = state.session.dispatch(EditorCommand::Spawn) {
-                        state.selected_entity = Some(e);
+                        state.session.selected = Some(e);
                     }
                 }
                 if state.ui.button("Save") {
@@ -435,7 +434,7 @@ impl ApplicationHandler for EditorDemoApp {
                 if state.ui.button("Load") {
                     let path = state.session.scene_path.clone();
                     let _ = state.session.dispatch(EditorCommand::LoadScene { path });
-                    state.selected_entity = None;
+                    state.session.selected = None;
                 }
                 state.ui.end_panel();
 
@@ -449,16 +448,19 @@ impl ApplicationHandler for EditorDemoApp {
                 for (panel_id, rect) in &areas {
                     match panel_id {
                         0 => {
-                            // Hierarchy panel
-                            hierarchy_panel(&mut state.ui, &state.session.world, &mut state.selected_entity, rect);
+                            hierarchy_panel(&mut state.ui, &mut state.session, rect.x, rect.y, rect.w, rect.h);
                         }
                         1 => {
-                            // Viewport panel (keep existing 3D rendering code exactly as-is)
+                            // Viewport panel (3D rendering happens below)
                             viewport_rect = Some(*rect);
                         }
                         2 => {
-                            // Inspector panel (8-4: slider-based; mutates world directly — slider edits aren't logged yet)
-                            inspector_panel(&mut state.ui, &mut state.session.world, state.selected_entity, rect, &mut state.tag_buffer);
+                            inspector_panel(
+                                &mut state.ui,
+                                &mut state.session,
+                                &mut state.inspector_state,
+                                rect.x, rect.y, rect.w, rect.h,
+                            );
                         }
                         3 => {
                             asset_browser_panel(&mut state.ui, &mut state.asset_browser, rect);
