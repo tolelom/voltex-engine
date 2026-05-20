@@ -5,15 +5,11 @@ use winit::{
     keyboard::{KeyCode, PhysicalKey},
     window::WindowId,
 };
-use voltex_math::{Vec3, Mat4};
-use voltex_platform::{VoltexWindow, WindowConfig, InputState, GameTimer};
-use voltex_renderer::{
+use voltex::prelude::*;
+use voltex::renderer::{
     GpuContext, Camera, FpsController, CameraUniform, LightUniform, Mesh, GpuTexture, pipeline, obj,
 };
-use voltex_ecs::{
-    World, Transform, Tag, Entity,
-    add_child, propagate_transforms, WorldTransform,
-};
+use voltex::ecs::{Tag, add_child, propagate_transforms, WorldTransform};
 use wgpu::util::DeviceExt;
 
 const MAX_ENTITIES: usize = 64;
@@ -274,7 +270,7 @@ impl ApplicationHandler for HierarchyDemoApp {
                         KeyCode::KeyP => {
                             // Print serialized scene to stdout
                             let scene_str =
-                                voltex_ecs::serialize_scene(&state.world);
+                                voltex::ecs::serialize_scene(&state.world);
                             println!("--- Scene Snapshot ---\n{}", scene_str);
                         }
                         _ => {}
