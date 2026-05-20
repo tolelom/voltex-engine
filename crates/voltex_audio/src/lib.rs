@@ -1,3 +1,4 @@
+pub mod error;
 pub mod audio_clip;
 pub mod wav;
 pub mod mixing;
@@ -11,6 +12,7 @@ pub mod audio_source;
 pub mod reverb;
 pub mod occlusion;
 
+pub use error::{AudioError, Result};
 pub use audio_clip::AudioClip;
 pub use audio_source::AudioSource;
 pub use wav::{parse_wav, generate_wav_bytes};

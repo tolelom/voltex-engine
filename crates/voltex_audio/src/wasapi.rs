@@ -275,12 +275,12 @@ unsafe impl Send for WasapiDevice {}
 impl WasapiDevice {
     /// Initialize WASAPI: COM, default endpoint, IAudioClient, mix format,
     /// Initialize shared mode (50 ms buffer), GetBufferSize, GetService, Start.
-    pub fn new() -> Result<Self, String> {
+    pub fn new() -> crate::Result<Self> {
         unsafe {
             // 1. CoInitializeEx
             let hr = CoInitializeEx(std::ptr::null_mut(), COINIT_APARTMENTTHREADED);
             if hr < 0 {
-                return Err(format!("CoInitializeEx failed: 0x{:08X}", hr as u32));
+                return Err(format!("CoInitializeEx failed: 0x{:08X}", hr as u32).into());
             }
 
             // 2. CoCreateInstance -> IMMDeviceEnumerator
@@ -294,7 +294,7 @@ impl WasapiDevice {
             );
             if hr < 0 || enumerator.is_null() {
                 CoUninitialize();
-                return Err(format!("CoCreateInstance(MMDeviceEnumerator) failed: 0x{:08X}", hr as u32));
+                return Err(format!("CoCreateInstance(MMDeviceEnumerator) failed: 0x{:08X}", hr as u32).into());
             }
 
             // 3. GetDefaultAudioEndpoint -> IMMDevice
@@ -305,7 +305,7 @@ impl WasapiDevice {
                 ((*vtbl).base.Release)(enumerator);
                 if hr < 0 || device.is_null() {
                     CoUninitialize();
-                    return Err(format!("GetDefaultAudioEndpoint failed: 0x{:08X}", hr as u32));
+                    return Err(format!("GetDefaultAudioEndpoint failed: 0x{:08X}", hr as u32).into());
                 }
             }
 
@@ -323,7 +323,7 @@ impl WasapiDevice {
                 ((*vtbl).base.Release)(device);
                 if hr < 0 || client.is_null() {
                     CoUninitialize();
-                    return Err(format!("IMMDevice::Activate(IAudioClient) failed: 0x{:08X}", hr as u32));
+                    return Err(format!("IMMDevice::Activate(IAudioClient) failed: 0x{:08X}", hr as u32).into());
                 }
             }
 
@@ -335,7 +335,7 @@ impl WasapiDevice {
                 if hr < 0 || mix_format_ptr.is_null() {
                     ((*vtbl).base.Release)(client);
                     CoUninitialize();
-                    return Err(format!("GetMixFormat failed: 0x{:08X}", hr as u32));
+                    return Err(format!("GetMixFormat failed: 0x{:08X}", hr as u32).into());
                 }
             }
 
@@ -370,7 +370,7 @@ impl WasapiDevice {
                 let vtbl = *(client as *mut *const IAudioClientVtbl);
                 ((*vtbl).base.Release)(client);
                 CoUninitialize();
-                return Err(format!("IAudioClient::Initialize failed: 0x{:08X}", hr as u32));
+                return Err(format!("IAudioClient::Initialize failed: 0x{:08X}", hr as u32).into());
             }
 
             // 7. GetBufferSize
@@ -381,7 +381,7 @@ impl WasapiDevice {
                 if hr < 0 {
                     ((*vtbl).base.Release)(client);
                     CoUninitialize();
-                    return Err(format!("GetBufferSize failed: 0x{:08X}", hr as u32));
+                    return Err(format!("GetBufferSize failed: 0x{:08X}", hr as u32).into());
                 }
             }
 
@@ -393,7 +393,7 @@ impl WasapiDevice {
                 if hr < 0 || render_client.is_null() {
                     ((*vtbl).base.Release)(client);
                     CoUninitialize();
-                    return Err(format!("GetService(IAudioRenderClient) failed: 0x{:08X}", hr as u32));
+                    return Err(format!("GetService(IAudioRenderClient) failed: 0x{:08X}", hr as u32).into());
                 }
             }
 
@@ -406,7 +406,7 @@ impl WasapiDevice {
                     ((*rc_vtbl).base.Release)(render_client);
                     ((*vtbl).base.Release)(client);
                     CoUninitialize();
-                    return Err(format!("IAudioClient::Start failed: 0x{:08X}", hr as u32));
+                    return Err(format!("IAudioClient::Start failed: 0x{:08X}", hr as u32).into());
                 }
             }
 
@@ -424,7 +424,7 @@ impl WasapiDevice {
 
     /// Write f32 samples to the audio device.
     /// Returns the number of frames actually written.
-    pub fn write_samples(&self, samples: &[f32]) -> Result<usize, String> {
+    pub fn write_samples(&self, samples: &[f32]) -> crate::Result<usize> {
         unsafe {
             // GetCurrentPadding
             let mut padding: UINT32 = 0;
@@ -432,7 +432,7 @@ impl WasapiDevice {
                 let vtbl = *(self.client as *mut *const IAudioClientVtbl);
                 let hr = ((*vtbl).GetCurrentPadding)(self.client, &mut padding);
                 if hr < 0 {
-                    return Err(format!("GetCurrentPadding failed: 0x{:08X}", hr as u32));
+                    return Err(format!("GetCurrentPadding failed: 0x{:08X}", hr as u32).into());
                 }
             }
 
@@ -456,7 +456,7 @@ impl WasapiDevice {
                 let vtbl = *(self.render_client as *mut *const IAudioRenderClientVtbl);
                 let hr = ((*vtbl).GetBuffer)(self.render_client, frames_to_write, &mut data_ptr);
                 if hr < 0 || data_ptr.is_null() {
-                    return Err(format!("GetBuffer failed: 0x{:08X}", hr as u32));
+                    return Err(format!("GetBuffer failed: 0x{:08X}", hr as u32).into());
                 }
             }
 
@@ -486,7 +486,7 @@ impl WasapiDevice {
                 let vtbl = *(self.render_client as *mut *const IAudioRenderClientVtbl);
                 let hr = ((*vtbl).ReleaseBuffer)(self.render_client, frames_to_write, 0);
                 if hr < 0 {
-                    return Err(format!("ReleaseBuffer failed: 0x{:08X}", hr as u32));
+                    return Err(format!("ReleaseBuffer failed: 0x{:08X}", hr as u32).into());
                 }
             }
 

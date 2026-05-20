@@ -60,7 +60,7 @@ impl AudioSystem {
     ///
     /// Spawns a background audio thread that owns the clips and drives the
     /// WASAPI device (on Windows) or runs in silent mode (other platforms).
-    pub fn new(clips: Vec<AudioClip>) -> Result<Self, String> {
+    pub fn new(clips: Vec<AudioClip>) -> crate::Result<Self> {
         let clips = Arc::new(clips);
         let (tx, rx) = mpsc::channel::<AudioCommand>();
 
@@ -70,7 +70,7 @@ impl AudioSystem {
             .spawn(move || {
                 audio_thread(rx, clips_arc);
             })
-            .map_err(|e| format!("Failed to spawn audio thread: {}", e))?;
+            .map_err(|e| crate::AudioError::from(format!("Failed to spawn audio thread: {}", e)))?;
 
         Ok(AudioSystem { sender: tx })
     }

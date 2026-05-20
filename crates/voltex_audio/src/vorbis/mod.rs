@@ -38,9 +38,9 @@ use headers::{parse_id_header, parse_setup_header};
 /// 3. Setup header
 ///
 /// All subsequent packets are audio packets.
-pub fn decode_vorbis(packets: &[Vec<u8>]) -> Result<AudioClip, String> {
+pub fn decode_vorbis(packets: &[Vec<u8>]) -> crate::Result<AudioClip> {
     if packets.len() < 3 {
-        return Err("Need at least 3 Vorbis packets (id, comment, setup)".to_string());
+        return Err("Need at least 3 Vorbis packets (id, comment, setup)".into());
     }
 
     // Parse identification header
@@ -48,7 +48,7 @@ pub fn decode_vorbis(packets: &[Vec<u8>]) -> Result<AudioClip, String> {
 
     // Skip comment header (packet[1]) — just verify it starts with type 3
     if packets[1].is_empty() || packets[1][0] != 3 {
-        return Err("Invalid Vorbis comment header".to_string());
+        return Err("Invalid Vorbis comment header".into());
     }
 
     // Parse setup header
@@ -220,7 +220,7 @@ mod tests {
         let packets = vec![vec![1], vec![3]];
         let result = decode_vorbis(&packets);
         assert!(result.is_err());
-        assert!(result.unwrap_err().contains("at least 3"));
+        assert!(result.unwrap_err().to_string().contains("at least 3"));
     }
 
     #[test]

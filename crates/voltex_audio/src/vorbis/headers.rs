@@ -22,10 +22,10 @@ pub(super) struct Mapping {
     pub(super) submap_residue: Vec<u8>,
 }
 
-pub(super) fn decode_mapping(reader: &mut BitReader, channels: u8) -> Result<Mapping, String> {
+pub(super) fn decode_mapping(reader: &mut BitReader, channels: u8) -> crate::Result<Mapping> {
     let mapping_type = reader.read_bits(16)?;
     if mapping_type != 0 {
-        return Err(format!("Unsupported mapping type: {}", mapping_type));
+        return Err(format!("Unsupported mapping type: {}", mapping_type).into());
     }
 
     let submaps = if reader.read_bit()? {
@@ -51,7 +51,7 @@ pub(super) fn decode_mapping(reader: &mut BitReader, channels: u8) -> Result<Map
 
     let reserved = reader.read_bits(2)?;
     if reserved != 0 {
-        return Err("Mapping reserved field is non-zero".to_string());
+        return Err("Mapping reserved field is non-zero".into());
     }
 
     let mut mux = vec![0u8; channels as usize];
@@ -92,7 +92,7 @@ pub(super) struct Mode {
     pub(super) mapping: u8,
 }
 
-pub(super) fn decode_mode(reader: &mut BitReader) -> Result<Mode, String> {
+pub(super) fn decode_mode(reader: &mut BitReader) -> crate::Result<Mode> {
     let block_flag = reader.read_bit()?;
     let window_type = reader.read_bits(16)? as u16;
     let transform_type = reader.read_bits(16)? as u16;
@@ -117,9 +117,9 @@ pub(super) struct VorbisIdHeader {
     pub(super) blocksize_1: u32,
 }
 
-pub(super) fn parse_id_header(packet: &[u8]) -> Result<VorbisIdHeader, String> {
+pub(super) fn parse_id_header(packet: &[u8]) -> crate::Result<VorbisIdHeader> {
     if packet.len() < 30 {
-        return Err("Vorbis ID header too short".to_string());
+        return Err("Vorbis ID header too short".into());
     }
 
     let mut reader = BitReader::new(packet);
@@ -127,7 +127,7 @@ pub(super) fn parse_id_header(packet: &[u8]) -> Result<VorbisIdHeader, String> {
     // Packet type (1 = identification)
     let ptype = reader.read_u8()?;
     if ptype != 1 {
-        return Err(format!("Expected Vorbis ID header (type 1), got type {}", ptype));
+        return Err(format!("Expected Vorbis ID header (type 1), got type {}", ptype).into());
     }
 
     // "vorbis" magic
@@ -136,22 +136,22 @@ pub(super) fn parse_id_header(packet: &[u8]) -> Result<VorbisIdHeader, String> {
         *b = reader.read_u8()?;
     }
     if &magic != b"vorbis" {
-        return Err("Missing 'vorbis' magic in ID header".to_string());
+        return Err("Missing 'vorbis' magic in ID header".into());
     }
 
     let version = reader.read_u32()?;
     if version != 0 {
-        return Err(format!("Unsupported Vorbis version: {}", version));
+        return Err(format!("Unsupported Vorbis version: {}", version).into());
     }
 
     let channels = reader.read_u8()?;
     if channels == 0 {
-        return Err("Zero channels in Vorbis ID header".to_string());
+        return Err("Zero channels in Vorbis ID header".into());
     }
 
     let sample_rate = reader.read_u32()?;
     if sample_rate == 0 {
-        return Err("Zero sample rate in Vorbis ID header".to_string());
+        return Err("Zero sample rate in Vorbis ID header".into());
     }
 
     let _bitrate_max = reader.read_u32()?;
@@ -163,12 +163,12 @@ pub(super) fn parse_id_header(packet: &[u8]) -> Result<VorbisIdHeader, String> {
     let blocksize_1 = 1u32 << ((blocksize_raw >> 4) & 0x0F);
 
     if blocksize_0 > blocksize_1 {
-        return Err("blocksize_0 > blocksize_1".to_string());
+        return Err("blocksize_0 > blocksize_1".into());
     }
 
     let framing = reader.read_bit()?;
     if !framing {
-        return Err("Missing framing bit in ID header".to_string());
+        return Err("Missing framing bit in ID header".into());
     }
 
     Ok(VorbisIdHeader {
@@ -192,13 +192,13 @@ pub(super) struct VorbisSetup {
     pub(super) modes: Vec<Mode>,
 }
 
-pub(super) fn parse_setup_header(packet: &[u8], channels: u8) -> Result<VorbisSetup, String> {
+pub(super) fn parse_setup_header(packet: &[u8], channels: u8) -> crate::Result<VorbisSetup> {
     let mut reader = BitReader::new(packet);
 
     // Packet type (5 = setup)
     let ptype = reader.read_u8()?;
     if ptype != 5 {
-        return Err(format!("Expected Vorbis setup header (type 5), got type {}", ptype));
+        return Err(format!("Expected Vorbis setup header (type 5), got type {}", ptype).into());
     }
 
     // "vorbis" magic
@@ -207,7 +207,7 @@ pub(super) fn parse_setup_header(packet: &[u8], channels: u8) -> Result<VorbisSe
         *b = reader.read_u8()?;
     }
     if &magic != b"vorbis" {
-        return Err("Missing 'vorbis' magic in setup header".to_string());
+        return Err("Missing 'vorbis' magic in setup header".into());
     }
 
     // Codebooks
@@ -222,7 +222,7 @@ pub(super) fn parse_setup_header(packet: &[u8], channels: u8) -> Result<VorbisSe
     for _ in 0..time_count {
         let t = reader.read_bits(16)?;
         if t != 0 {
-            return Err(format!("Unsupported time domain transform: {}", t));
+            return Err(format!("Unsupported time domain transform: {}", t).into());
         }
     }
 
@@ -232,7 +232,7 @@ pub(super) fn parse_setup_header(packet: &[u8], channels: u8) -> Result<VorbisSe
     for _ in 0..floor_count {
         let floor_type = reader.read_bits(16)?;
         if floor_type != 1 {
-            return Err(format!("Only floor type 1 is supported, got type {}", floor_type));
+            return Err(format!("Only floor type 1 is supported, got type {}", floor_type).into());
         }
         floors.push(decode_floor1_config(&mut reader)?);
     }
@@ -243,7 +243,7 @@ pub(super) fn parse_setup_header(packet: &[u8], channels: u8) -> Result<VorbisSe
     for _ in 0..residue_count {
         let residue_type = reader.read_bits(16)? as u16;
         if residue_type > 2 {
-            return Err(format!("Unsupported residue type: {}", residue_type));
+            return Err(format!("Unsupported residue type: {}", residue_type).into());
         }
         residues.push(decode_residue_config(&mut reader, residue_type)?);
     }
@@ -265,7 +265,7 @@ pub(super) fn parse_setup_header(packet: &[u8], channels: u8) -> Result<VorbisSe
     // Framing bit
     let framing = reader.read_bit()?;
     if !framing {
-        return Err("Missing framing bit in setup header".to_string());
+        return Err("Missing framing bit in setup header".into());
     }
 
     Ok(VorbisSetup {

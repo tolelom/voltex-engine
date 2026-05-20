@@ -4,16 +4,16 @@ use crate::AudioClip;
 // Helper readers
 // ---------------------------------------------------------------------------
 
-fn read_u16_le(data: &[u8], offset: usize) -> Result<u16, String> {
+fn read_u16_le(data: &[u8], offset: usize) -> crate::Result<u16> {
     if offset + 2 > data.len() {
-        return Err(format!("read_u16_le: offset {} out of bounds (len={})", offset, data.len()));
+        return Err(format!("read_u16_le: offset {} out of bounds (len={})", offset, data.len()).into());
     }
     Ok(u16::from_le_bytes([data[offset], data[offset + 1]]))
 }
 
-fn read_u32_le(data: &[u8], offset: usize) -> Result<u32, String> {
+fn read_u32_le(data: &[u8], offset: usize) -> crate::Result<u32> {
     if offset + 4 > data.len() {
-        return Err(format!("read_u32_le: offset {} out of bounds (len={})", offset, data.len()));
+        return Err(format!("read_u32_le: offset {} out of bounds (len={})", offset, data.len()).into());
     }
     Ok(u32::from_le_bytes([
         data[offset],
@@ -23,9 +23,9 @@ fn read_u32_le(data: &[u8], offset: usize) -> Result<u32, String> {
     ]))
 }
 
-fn read_i16_le(data: &[u8], offset: usize) -> Result<i16, String> {
+fn read_i16_le(data: &[u8], offset: usize) -> crate::Result<i16> {
     if offset + 2 > data.len() {
-        return Err(format!("read_i16_le: offset {} out of bounds (len={})", offset, data.len()));
+        return Err(format!("read_i16_le: offset {} out of bounds (len={})", offset, data.len()).into());
     }
     Ok(i16::from_le_bytes([data[offset], data[offset + 1]]))
 }
@@ -63,9 +63,9 @@ fn find_chunk(data: &[u8], id: &[u8; 4], start: usize) -> Option<(usize, u32)> {
 // ---------------------------------------------------------------------------
 
 /// Read a 24-bit signed integer (little-endian) from 3 bytes and return as i32.
-fn read_i24_le(data: &[u8], offset: usize) -> Result<i32, String> {
+fn read_i24_le(data: &[u8], offset: usize) -> crate::Result<i32> {
     if offset + 3 > data.len() {
-        return Err(format!("read_i24_le: offset {} out of bounds (len={})", offset, data.len()));
+        return Err(format!("read_i24_le: offset {} out of bounds (len={})", offset, data.len()).into());
     }
     let lo = data[offset] as u32;
     let mid = data[offset + 1] as u32;
@@ -80,9 +80,9 @@ fn read_i24_le(data: &[u8], offset: usize) -> Result<i32, String> {
 }
 
 /// Read a 32-bit float (little-endian).
-fn read_f32_le(data: &[u8], offset: usize) -> Result<f32, String> {
+fn read_f32_le(data: &[u8], offset: usize) -> crate::Result<f32> {
     if offset + 4 > data.len() {
-        return Err(format!("read_f32_le: offset {} out of bounds (len={})", offset, data.len()));
+        return Err(format!("read_f32_le: offset {} out of bounds (len={})", offset, data.len()).into());
     }
     Ok(f32::from_le_bytes([
         data[offset],
@@ -98,32 +98,32 @@ fn read_f32_le(data: &[u8], offset: usize) -> Result<f32, String> {
 /// - PCM 16-bit (format_tag=1, bits_per_sample=16)
 /// - PCM 24-bit (format_tag=1, bits_per_sample=24)
 /// - IEEE float 32-bit (format_tag=3, bits_per_sample=32)
-pub fn parse_wav(data: &[u8]) -> Result<AudioClip, String> {
+pub fn parse_wav(data: &[u8]) -> crate::Result<AudioClip> {
     // Minimum viable WAV: RIFF(4) + size(4) + WAVE(4) = 12 bytes
     if data.len() < 12 {
-        return Err("WAV data too short".to_string());
+        return Err("WAV data too short".into());
     }
 
     // RIFF header
     if &data[0..4] != b"RIFF" {
-        return Err("Missing RIFF header".to_string());
+        return Err("Missing RIFF header".into());
     }
     if &data[8..12] != b"WAVE" {
-        return Err("Missing WAVE format identifier".to_string());
+        return Err("Missing WAVE format identifier".into());
     }
 
     // --- fmt chunk (search from byte 12) ---
     let (fmt_offset, fmt_size) =
-        find_chunk(data, b"fmt ", 12).ok_or("Missing fmt chunk")?;
+        find_chunk(data, b"fmt ", 12).ok_or_else(|| crate::AudioError::from("Missing fmt chunk"))?;
 
     if fmt_size < 16 {
-        return Err(format!("fmt chunk too small: {}", fmt_size));
+        return Err(format!("fmt chunk too small: {}", fmt_size).into());
     }
 
     let format_tag = read_u16_le(data, fmt_offset)?;
     let channels = read_u16_le(data, fmt_offset + 2)?;
     if channels != 1 && channels != 2 {
-        return Err(format!("Unsupported channel count: {}", channels));
+        return Err(format!("Unsupported channel count: {}", channels).into());
     }
 
     let sample_rate = read_u32_le(data, fmt_offset + 4)?;
@@ -136,18 +136,18 @@ pub fn parse_wav(data: &[u8]) -> Result<AudioClip, String> {
         (1, 16) => 2,   // PCM 16-bit
         (1, 24) => 3,   // PCM 24-bit
         (3, 32) => 4,   // IEEE float 32-bit
-        (1, bps) => return Err(format!("Unsupported PCM bits per sample: {}", bps)),
-        (3, bps) => return Err(format!("Unsupported float bits per sample: {} (only 32-bit supported)", bps)),
-        (tag, _) => return Err(format!("Unsupported WAV format tag: {} (only PCM=1 and IEEE_FLOAT=3 are supported)", tag)),
+        (1, bps) => return Err(format!("Unsupported PCM bits per sample: {}", bps).into()),
+        (3, bps) => return Err(format!("Unsupported float bits per sample: {} (only 32-bit supported)", bps).into()),
+        (tag, _) => return Err(format!("Unsupported WAV format tag: {} (only PCM=1 and IEEE_FLOAT=3 are supported)", tag).into()),
     };
 
     // --- data chunk ---
     let (data_offset, data_size) =
-        find_chunk(data, b"data", 12).ok_or("Missing data chunk")?;
+        find_chunk(data, b"data", 12).ok_or_else(|| crate::AudioError::from("Missing data chunk"))?;
 
     let data_end = data_offset + data_size as usize;
     if data_end > data.len() {
-        return Err("data chunk extends beyond end of file".to_string());
+        return Err("data chunk extends beyond end of file".into());
     }
 
     let sample_count = data_size as usize / bytes_per_sample;
@@ -344,7 +344,7 @@ mod tests {
         let bad_data = b"BADH\x00\x00\x00\x00WAVE";
         let result = parse_wav(bad_data);
         assert!(result.is_err());
-        assert!(result.unwrap_err().contains("RIFF"));
+        assert!(result.unwrap_err().to_string().contains("RIFF"));
     }
 
     #[test]
@@ -352,7 +352,7 @@ mod tests {
         let short_data = b"RIF";
         let result = parse_wav(short_data);
         assert!(result.is_err());
-        assert!(result.unwrap_err().contains("too short"));
+        assert!(result.unwrap_err().to_string().contains("too short"));
     }
 
     #[test]
@@ -473,6 +473,6 @@ mod tests {
         wav[21] = 0;
         let result = parse_wav(&wav);
         assert!(result.is_err());
-        assert!(result.unwrap_err().contains("Unsupported WAV format tag"));
+        assert!(result.unwrap_err().to_string().contains("Unsupported WAV format tag"));
     }
 }

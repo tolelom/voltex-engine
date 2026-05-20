@@ -14,19 +14,19 @@ pub(super) fn decode_audio_packet(
     setup: &VorbisSetup,
     prev_window: &mut Vec<Vec<f32>>,
     prev_block_flag: &mut Option<bool>,
-) -> Result<Vec<f32>, String> {
+) -> crate::Result<Vec<f32>> {
     let mut reader = BitReader::new(packet);
 
     // Packet type must be 0 (audio)
     let ptype = reader.read_bit()?;
     if ptype {
-        return Err("Expected audio packet (type 0)".to_string());
+        return Err("Expected audio packet (type 0)".into());
     }
 
     let mode_bits = ilog(setup.modes.len() as u32 - 1);
     let mode_number = reader.read_bits(mode_bits)? as usize;
     if mode_number >= setup.modes.len() {
-        return Err(format!("Mode number {} out of range", mode_number));
+        return Err(format!("Mode number {} out of range", mode_number).into());
     }
 
     let mode = &setup.modes[mode_number];

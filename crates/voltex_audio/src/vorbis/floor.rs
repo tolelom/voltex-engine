@@ -18,7 +18,7 @@ pub(super) struct Floor1Config {
     pub(super) sorted_order: Vec<usize>,
 }
 
-pub(super) fn decode_floor1_config(reader: &mut BitReader) -> Result<Floor1Config, String> {
+pub(super) fn decode_floor1_config(reader: &mut BitReader) -> crate::Result<Floor1Config> {
     let partitions = reader.read_bits(5)? as u8;
     let mut partition_class = Vec::with_capacity(partitions as usize);
     let mut max_class: i32 = -1;
@@ -86,7 +86,7 @@ pub(super) fn decode_floor1_packet(
     floor: &Floor1Config,
     codebooks: &[Codebook],
     n_half: usize,
-) -> Result<Option<Vec<f32>>, String> {
+) -> crate::Result<Option<Vec<f32>>> {
     let nonzero = reader.read_bit()?;
     if !nonzero {
         return Ok(None); // This channel is unused in this frame
@@ -97,7 +97,7 @@ pub(super) fn decode_floor1_packet(
         2 => 128,
         3 => 86,
         4 => 64,
-        _ => return Err(format!("Invalid floor multiplier: {}", floor.multiplier)),
+        _ => return Err(format!("Invalid floor multiplier: {}", floor.multiplier).into()),
     };
 
     let range_bits = ilog(range - 1);
@@ -116,7 +116,7 @@ pub(super) fn decode_floor1_packet(
         let cval = if subclass_bits > 0 {
             let masterbook_idx = floor.class_masterbook[cls] as usize;
             if masterbook_idx >= codebooks.len() {
-                return Err("Floor masterbook index out of range".to_string());
+                return Err("Floor masterbook index out of range".into());
             }
             codebooks[masterbook_idx].decode_scalar(reader)?
         } else {
@@ -131,7 +131,7 @@ pub(super) fn decode_floor1_packet(
             if book_idx >= 0 {
                 let book_idx = book_idx as usize;
                 if book_idx >= codebooks.len() {
-                    return Err("Floor subclass book index out of range".to_string());
+                    return Err("Floor subclass book index out of range".into());
                 }
                 y_list[offset] = codebooks[book_idx].decode_scalar(reader)? as i32;
             } else {

@@ -24,19 +24,19 @@ impl<'a> BitReader<'a> {
         (self.data.len() - self.byte_pos) * 8 - self.bit_pos as usize
     }
 
-    pub(super) fn read_bits(&mut self, n: u32) -> Result<u32, String> {
+    pub(super) fn read_bits(&mut self, n: u32) -> crate::Result<u32> {
         if n == 0 {
             return Ok(0);
         }
         if n > 32 {
-            return Err("read_bits: n > 32".to_string());
+            return Err("read_bits: n > 32".into());
         }
         let mut result: u32 = 0;
         let mut bits_read = 0u32;
 
         while bits_read < n {
             if self.byte_pos >= self.data.len() {
-                return Err("read_bits: unexpected end of data".to_string());
+                return Err("read_bits: unexpected end of data".into());
             }
             let remaining_in_byte = 8 - self.bit_pos as u32;
             let to_read = (n - bits_read).min(remaining_in_byte);
@@ -53,19 +53,19 @@ impl<'a> BitReader<'a> {
         Ok(result)
     }
 
-    pub(super) fn read_bit(&mut self) -> Result<bool, String> {
+    pub(super) fn read_bit(&mut self) -> crate::Result<bool> {
         Ok(self.read_bits(1)? != 0)
     }
 
-    pub(super) fn read_u8(&mut self) -> Result<u8, String> {
+    pub(super) fn read_u8(&mut self) -> crate::Result<u8> {
         Ok(self.read_bits(8)? as u8)
     }
 
-    pub(super) fn read_u16(&mut self) -> Result<u16, String> {
+    pub(super) fn read_u16(&mut self) -> crate::Result<u16> {
         Ok(self.read_bits(16)? as u16)
     }
 
-    pub(super) fn read_u32(&mut self) -> Result<u32, String> {
+    pub(super) fn read_u32(&mut self) -> crate::Result<u32> {
         self.read_bits(32)
     }
 }

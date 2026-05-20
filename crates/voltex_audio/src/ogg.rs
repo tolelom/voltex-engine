@@ -23,7 +23,7 @@ pub struct OggPage {
 }
 
 /// Parse all OGG pages from raw bytes.
-pub fn parse_ogg_pages(data: &[u8]) -> Result<Vec<OggPage>, String> {
+pub fn parse_ogg_pages(data: &[u8]) -> crate::Result<Vec<OggPage>> {
     let mut pages = Vec::new();
     let mut offset = 0;
 
@@ -34,12 +34,12 @@ pub fn parse_ogg_pages(data: &[u8]) -> Result<Vec<OggPage>, String> {
 
         // Capture pattern "OggS"
         if &data[offset..offset + 4] != b"OggS" {
-            return Err(format!("Invalid OGG capture pattern at offset {}", offset));
+            return Err(format!("Invalid OGG capture pattern at offset {}", offset).into());
         }
 
         let version = data[offset + 4];
         if version != 0 {
-            return Err(format!("Unsupported OGG version: {}", version));
+            return Err(format!("Unsupported OGG version: {}", version).into());
         }
 
         let header_type = data[offset + 5];
@@ -74,7 +74,7 @@ pub fn parse_ogg_pages(data: &[u8]) -> Result<Vec<OggPage>, String> {
         let segment_count = data[offset + 26] as usize;
 
         if offset + 27 + segment_count > data.len() {
-            return Err("OGG page segment table extends beyond data".to_string());
+            return Err("OGG page segment table extends beyond data".into());
         }
 
         let segment_table: Vec<u8> = data[offset + 27..offset + 27 + segment_count].to_vec();
@@ -83,7 +83,7 @@ pub fn parse_ogg_pages(data: &[u8]) -> Result<Vec<OggPage>, String> {
         let data_start = offset + 27 + segment_count;
 
         if data_start + total_data_size > data.len() {
-            return Err("OGG page data extends beyond file".to_string());
+            return Err("OGG page data extends beyond file".into());
         }
 
         let page_data = data[data_start..data_start + total_data_size].to_vec();
@@ -102,7 +102,7 @@ pub fn parse_ogg_pages(data: &[u8]) -> Result<Vec<OggPage>, String> {
     }
 
     if pages.is_empty() {
-        return Err("No OGG pages found".to_string());
+        return Err("No OGG pages found".into());
     }
 
     Ok(pages)
@@ -112,7 +112,7 @@ pub fn parse_ogg_pages(data: &[u8]) -> Result<Vec<OggPage>, String> {
 ///
 /// Packets can span multiple segments (segment length = 255 means continuation).
 /// Packets can also span multiple pages (header_type bit 0x01 = continuation).
-pub fn extract_packets(pages: &[OggPage]) -> Result<Vec<Vec<u8>>, String> {
+pub fn extract_packets(pages: &[OggPage]) -> crate::Result<Vec<Vec<u8>>> {
     let mut packets: Vec<Vec<u8>> = Vec::new();
     let mut current_packet: Vec<u8> = Vec::new();
 
@@ -147,7 +147,7 @@ pub fn extract_packets(pages: &[OggPage]) -> Result<Vec<Vec<u8>>, String> {
 }
 
 /// Convenience function: parse OGG container and extract all Vorbis packets.
-pub fn parse_ogg(data: &[u8]) -> Result<Vec<Vec<u8>>, String> {
+pub fn parse_ogg(data: &[u8]) -> crate::Result<Vec<Vec<u8>>> {
     let pages = parse_ogg_pages(data)?;
     extract_packets(&pages)
 }
@@ -273,7 +273,7 @@ mod tests {
         let data = b"NotOGGdata";
         let result = parse_ogg_pages(data);
         assert!(result.is_err());
-        assert!(result.unwrap_err().contains("capture pattern"));
+        assert!(result.unwrap_err().to_string().contains("capture pattern"));
     }
 
     #[test]

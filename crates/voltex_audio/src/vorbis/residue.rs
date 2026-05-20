@@ -17,7 +17,7 @@ pub(super) struct ResidueConfig {
     pub(super) books: Vec<Vec<i16>>,
 }
 
-pub(super) fn decode_residue_config(reader: &mut BitReader, residue_type: u16) -> Result<ResidueConfig, String> {
+pub(super) fn decode_residue_config(reader: &mut BitReader, residue_type: u16) -> crate::Result<ResidueConfig> {
     let begin = reader.read_bits(24)?;
     let end = reader.read_bits(24)?;
     let partition_size = reader.read_bits(24)? + 1;
@@ -64,7 +64,7 @@ pub(super) fn decode_residue(
     n_half: usize,
     ch: usize,
     do_not_decode: &[bool],
-) -> Result<Vec<Vec<f32>>, String> {
+) -> crate::Result<Vec<Vec<f32>>> {
     let mut residue_vectors = vec![vec![0.0f32; n_half]; ch];
 
     let actual_size = if residue.residue_type == 2 {

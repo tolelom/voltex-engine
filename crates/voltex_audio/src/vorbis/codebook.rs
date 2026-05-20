@@ -21,7 +21,7 @@ pub(super) struct Codebook {
 }
 
 impl Codebook {
-    pub(super) fn decode_scalar(&self, reader: &mut BitReader) -> Result<u32, String> {
+    pub(super) fn decode_scalar(&self, reader: &mut BitReader) -> crate::Result<u32> {
         // Walk the codeword bit by bit, matching against sorted entries.
         // This is a simple but not optimal approach.
         let mut code: u32 = 0;
@@ -44,24 +44,24 @@ impl Codebook {
             }
         }
 
-        Err("Codebook: no matching codeword found".to_string())
+        Err("Codebook: no matching codeword found".into())
     }
 
-    pub(super) fn decode_vq(&self, reader: &mut BitReader) -> Result<&[f32], String> {
+    pub(super) fn decode_vq(&self, reader: &mut BitReader) -> crate::Result<&[f32]> {
         let entry = self.decode_scalar(reader)? as usize;
         if entry < self.vq_table.len() {
             Ok(&self.vq_table[entry])
         } else {
-            Err(format!("VQ entry {} out of range", entry))
+            Err(format!("VQ entry {} out of range", entry).into())
         }
     }
 }
 
-pub(super) fn decode_codebook(reader: &mut BitReader) -> Result<Codebook, String> {
+pub(super) fn decode_codebook(reader: &mut BitReader) -> crate::Result<Codebook> {
     // Sync pattern
     let sync = reader.read_bits(24)?;
     if sync != 0x564342 {
-        return Err(format!("Invalid codebook sync pattern: 0x{:06X}", sync));
+        return Err(format!("Invalid codebook sync pattern: 0x{:06X}", sync).into());
     }
 
     let dimensions = reader.read_bits(16)? as u16;
@@ -92,7 +92,7 @@ pub(super) fn decode_codebook(reader: &mut BitReader) -> Result<Codebook, String
             let num = ilog(entries - i as u32);
             let number = reader.read_bits(num)? as usize;
             if i + number > entries as usize {
-                return Err("Codebook ordered length overflow".to_string());
+                return Err("Codebook ordered length overflow".into());
             }
             for j in i..i + number {
                 lengths[j] = current_length;
@@ -188,7 +188,7 @@ pub(super) fn decode_codebook(reader: &mut BitReader) -> Result<Codebook, String
             vq_table.push(vec);
         }
     } else if lookup_type != 0 {
-        return Err(format!("Unsupported codebook lookup type: {}", lookup_type));
+        return Err(format!("Unsupported codebook lookup type: {}", lookup_type).into());
     }
 
     Ok(Codebook {
