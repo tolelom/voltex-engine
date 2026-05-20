@@ -130,7 +130,7 @@ pub fn compute_sh_coefficients_with_samples(
             // But for uniform sphere sampling with stratified grid:
             // weight = (4*pi / total) * radiance * basis
             // sin_theta is already accounted for by the area element
-            let weight = 4.0 * PI * sin_theta / total as f32;
+            let _weight = 4.0 * PI * sin_theta / total as f32;
             // Actually the correct formula for stratified spherical integration:
             // dA = sin(theta) * dtheta * dphi
             // dtheta = pi/n, dphi = 2*pi/n
