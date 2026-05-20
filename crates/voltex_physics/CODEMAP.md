@@ -28,7 +28,7 @@
 - 외부 crate: 없음
 
 ## 변경 시 주의점
-- solver.rs(574줄), gjk.rs(524줄)는 M3 분리 예정
+- solver.rs(574줄), gjk.rs(524줄)는 spec 만족 (600줄 이하), 분리 대상 아님
 - detect_collisions(world)는 ECS와 강하게 결합 — World 구조 변경 시 영향
 - CCD는 sphere vs AABB만 구현 (다른 형상은 DEFERRED)
 

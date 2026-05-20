@@ -12,7 +12,7 @@ Lua 5.4 내장 + 엔진 API 바인딩 + 샌드박싱 + 핫 리로드.
 - ffi — Lua C API FFI (src/ffi.rs)
 
 ## 모듈 구조
-- `state` — LuaState + push/read table/vec3, register_fn, exec (src/state.rs, 505줄 — M3)
+- `state` — LuaState + push/read table/vec3, register_fn, exec (src/state.rs, 505줄)
 - `coroutine` — LuaCoroutine (src/coroutine.rs)
 - `sandbox` — 샌드박싱 (src/sandbox.rs)
 - `engine_api` — Rust ↔ Lua 엔진 API (src/engine_api.rs)
@@ -26,7 +26,7 @@ Lua 5.4 내장 + 엔진 API 바인딩 + 샌드박싱 + 핫 리로드.
 ## 변경 시 주의점
 - engine_api는 현재 4개 함수만 노출 (DEFERRED 확장)
 - Entity.generation은 하드코딩 0 버그 있음 (DEFERRED)
-- state.rs는 505줄 (M3 분리 예정)
+- state.rs는 505줄 (spec 만족, 분리 대상 아님)
 - Lua 5.4는 cc로 내장 빌드 — Windows MSVC 환경 의존
 
 ## 테스트

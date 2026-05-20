@@ -31,7 +31,7 @@
 ## 변경 시 주의점
 - WASAPI는 Windows 전용 — macOS/Linux 백엔드 미구현
 - vorbis는 src/vorbis/ 디렉토리로 분리됨 (bit_reader, codebook, floor, residue, headers, imdct, decoder)
-- wasapi.rs는 521줄 (M3 분리 예정)
+- wasapi.rs는 521줄 (spec 만족, 분리 대상 아님)
 - AudioSource 컴포넌트는 ECS와 함께 사용
 
 ## 테스트

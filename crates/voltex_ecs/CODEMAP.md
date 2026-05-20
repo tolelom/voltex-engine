@@ -36,7 +36,7 @@ ECS 코어 — Entity/Component/World/Query + Hierarchy + Scene 직렬화 + Syst
 - ECS 인터페이스 변경은 모든 example, voltex_physics, voltex_ai, voltex_script, voltex_editor에 영향
 - ComponentRegistry에 등록된 타입의 직렬화 포맷 변경 시 기존 .vscn 파일 호환 깨짐
 - World의 query 시그니처 변경은 game 코드에 광범위 영향
-- world.rs는 589줄로 큰 편 (M3 분리 예정)
+- world.rs는 589줄로 큰 편이나 spec 만족 (600줄 이하), 분리 대상 아님
 
 ## 테스트
 - 단위 테스트: src/**/*.rs `#[cfg(test)]`
