@@ -1,3 +1,4 @@
+pub mod error;
 pub mod packet;
 pub mod socket;
 pub mod server;
@@ -8,6 +9,7 @@ pub mod interpolation;
 pub mod lag_compensation;
 pub mod encryption;
 
+pub use error::{NetError, Result};
 pub use packet::Packet;
 pub use socket::NetSocket;
 pub use server::{NetServer, ServerEvent, ClientInfo};

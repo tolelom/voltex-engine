@@ -43,12 +43,12 @@ impl Packet {
     }
 
     /// Deserialize a packet from bytes.
-    pub fn from_bytes(data: &[u8]) -> Result<Packet, String> {
+    pub fn from_bytes(data: &[u8]) -> crate::Result<Packet> {
         if data.len() < HEADER_SIZE {
             return Err(format!(
                 "Buffer too short for header: {} bytes",
                 data.len()
-            ));
+            ).into());
         }
 
         let type_id = data[0];
@@ -60,7 +60,7 @@ impl Packet {
                 "Buffer too short: expected {} bytes, got {}",
                 HEADER_SIZE + payload_len,
                 data.len()
-            ));
+            ).into());
         }
 
         let payload = &data[HEADER_SIZE..HEADER_SIZE + payload_len];
@@ -68,11 +68,11 @@ impl Packet {
         match type_id {
             TYPE_CONNECT => {
                 if payload.len() < 2 {
-                    return Err("Connect payload too short".to_string());
+                    return Err("Connect payload too short".into());
                 }
                 let name_len = u16::from_le_bytes([payload[0], payload[1]]) as usize;
                 if payload.len() < 2 + name_len {
-                    return Err("Connect name bytes too short".to_string());
+                    return Err("Connect name bytes too short".into());
                 }
                 let client_name = String::from_utf8(payload[2..2 + name_len].to_vec())
                     .map_err(|e| format!("Invalid UTF-8 in client_name: {}", e))?;
@@ -80,21 +80,21 @@ impl Packet {
             }
             TYPE_ACCEPT => {
                 if payload.len() < 4 {
-                    return Err("Accept payload too short".to_string());
+                    return Err("Accept payload too short".into());
                 }
                 let client_id = u32::from_le_bytes([payload[0], payload[1], payload[2], payload[3]]);
                 Ok(Packet::Accept { client_id })
             }
             TYPE_DISCONNECT => {
                 if payload.len() < 4 {
-                    return Err("Disconnect payload too short".to_string());
+                    return Err("Disconnect payload too short".into());
                 }
                 let client_id = u32::from_le_bytes([payload[0], payload[1], payload[2], payload[3]]);
                 Ok(Packet::Disconnect { client_id })
             }
             TYPE_PING => {
                 if payload.len() < 8 {
-                    return Err("Ping payload too short".to_string());
+                    return Err("Ping payload too short".into());
                 }
                 let timestamp = u64::from_le_bytes([
                     payload[0], payload[1], payload[2], payload[3],
@@ -104,7 +104,7 @@ impl Packet {
             }
             TYPE_PONG => {
                 if payload.len() < 8 {
-                    return Err("Pong payload too short".to_string());
+                    return Err("Pong payload too short".into());
                 }
                 let timestamp = u64::from_le_bytes([
                     payload[0], payload[1], payload[2], payload[3],
@@ -114,7 +114,7 @@ impl Packet {
             }
             TYPE_USER_DATA => {
                 if payload.len() < 4 {
-                    return Err("UserData payload too short".to_string());
+                    return Err("UserData payload too short".into());
                 }
                 let client_id = u32::from_le_bytes([payload[0], payload[1], payload[2], payload[3]]);
                 let data = payload[4..].to_vec();
@@ -122,7 +122,7 @@ impl Packet {
             }
             TYPE_RELIABLE => {
                 if payload.len() < 2 {
-                    return Err("Reliable payload too short".to_string());
+                    return Err("Reliable payload too short".into());
                 }
                 let sequence = u16::from_le_bytes([payload[0], payload[1]]);
                 let data = payload[2..].to_vec();
@@ -130,14 +130,14 @@ impl Packet {
             }
             TYPE_ACK => {
                 if payload.len() < 2 {
-                    return Err("Ack payload too short".to_string());
+                    return Err("Ack payload too short".into());
                 }
                 let sequence = u16::from_le_bytes([payload[0], payload[1]]);
                 Ok(Packet::Ack { sequence })
             }
             TYPE_SNAPSHOT => {
                 if payload.len() < 4 {
-                    return Err("Snapshot payload too short".to_string());
+                    return Err("Snapshot payload too short".into());
                 }
                 let tick = u32::from_le_bytes([payload[0], payload[1], payload[2], payload[3]]);
                 let data = payload[4..].to_vec();
@@ -145,14 +145,14 @@ impl Packet {
             }
             TYPE_SNAPSHOT_DELTA => {
                 if payload.len() < 8 {
-                    return Err("SnapshotDelta payload too short".to_string());
+                    return Err("SnapshotDelta payload too short".into());
                 }
                 let base_tick = u32::from_le_bytes([payload[0], payload[1], payload[2], payload[3]]);
                 let tick = u32::from_le_bytes([payload[4], payload[5], payload[6], payload[7]]);
                 let data = payload[8..].to_vec();
                 Ok(Packet::SnapshotDelta { base_tick, tick, data })
             }
-            _ => Err(format!("Unknown packet type_id: {}", type_id)),
+            _ => Err(format!("Unknown packet type_id: {}", type_id).into()),
         }
     }
 

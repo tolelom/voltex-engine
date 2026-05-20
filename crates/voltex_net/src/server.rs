@@ -28,7 +28,7 @@ pub struct NetServer {
 
 impl NetServer {
     /// Bind the server to the given address.
-    pub fn new(addr: &str) -> Result<Self, String> {
+    pub fn new(addr: &str) -> crate::Result<Self> {
         let socket = NetSocket::bind(addr)?;
         Ok(NetServer {
             socket,

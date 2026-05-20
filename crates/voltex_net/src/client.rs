@@ -24,7 +24,7 @@ impl NetClient {
     /// - `local_addr`: local bind address (e.g. "127.0.0.1:0")
     /// - `server_addr`: the server's `SocketAddr`
     /// - `name`: client display name used in Connect packet
-    pub fn new(local_addr: &str, server_addr: SocketAddr, name: &str) -> Result<Self, String> {
+    pub fn new(local_addr: &str, server_addr: SocketAddr, name: &str) -> crate::Result<Self> {
         let socket = NetSocket::bind(local_addr)?;
         Ok(NetClient {
             socket,
@@ -35,7 +35,7 @@ impl NetClient {
     }
 
     /// Send a Connect packet to the server.
-    pub fn connect(&self) -> Result<(), String> {
+    pub fn connect(&self) -> crate::Result<()> {
         let packet = Packet::Connect {
             client_name: self.name.clone(),
         };
@@ -70,7 +70,7 @@ impl NetClient {
     }
 
     /// Send an arbitrary packet to the server.
-    pub fn send(&self, packet: Packet) -> Result<(), String> {
+    pub fn send(&self, packet: Packet) -> crate::Result<()> {
         self.socket.send_to(&packet, self.server_addr)
     }
 
@@ -85,7 +85,7 @@ impl NetClient {
     }
 
     /// Send a Disconnect packet to the server and clear local state.
-    pub fn disconnect(&mut self) -> Result<(), String> {
+    pub fn disconnect(&mut self) -> crate::Result<()> {
         if let Some(id) = self.client_id {
             let packet = Packet::Disconnect { client_id: id };
             self.socket.send_to(&packet, self.server_addr)?;

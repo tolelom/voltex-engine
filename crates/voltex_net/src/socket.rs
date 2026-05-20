@@ -12,7 +12,7 @@ pub struct NetSocket {
 
 impl NetSocket {
     /// Bind a new non-blocking UDP socket to the given address.
-    pub fn bind(addr: &str) -> Result<Self, String> {
+    pub fn bind(addr: &str) -> crate::Result<Self> {
         let socket = UdpSocket::bind(addr)
             .map_err(|e| format!("UdpSocket::bind({}) failed: {}", addr, e))?;
         socket
@@ -27,7 +27,7 @@ impl NetSocket {
     }
 
     /// Serialize and send a packet to the given address.
-    pub fn send_to(&self, packet: &Packet, addr: SocketAddr) -> Result<(), String> {
+    pub fn send_to(&self, packet: &Packet, addr: SocketAddr) -> crate::Result<()> {
         let bytes = packet.to_bytes();
         self.inner
             .send_to(&bytes, addr)

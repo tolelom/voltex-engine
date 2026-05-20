@@ -26,15 +26,15 @@ impl PacketCipher {
     }
 
     /// Decrypt data. Validates sequence number.
-    pub fn decrypt(&mut self, ciphertext: &[u8]) -> Result<Vec<u8>, String> {
+    pub fn decrypt(&mut self, ciphertext: &[u8]) -> crate::Result<Vec<u8>> {
         if ciphertext.len() < 8 {
-            return Err("packet too short".to_string());
+            return Err("packet too short".into());
         }
         let seq = u64::from_le_bytes(ciphertext[0..8].try_into().unwrap());
 
         // Anti-replay: sequence must be >= expected
         if seq < self.recv_counter {
-            return Err(format!("replay detected: got seq {}, expected >= {}", seq, self.recv_counter));
+            return Err(format!("replay detected: got seq {}, expected >= {}", seq, self.recv_counter).into());
         }
         self.recv_counter = seq + 1;
 

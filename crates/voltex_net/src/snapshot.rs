@@ -70,9 +70,9 @@ pub fn serialize_snapshot(snapshot: &Snapshot) -> Vec<u8> {
 }
 
 /// Deserialize a snapshot from binary data.
-pub fn deserialize_snapshot(data: &[u8]) -> Result<Snapshot, String> {
+pub fn deserialize_snapshot(data: &[u8]) -> crate::Result<Snapshot> {
     if data.len() < 8 {
-        return Err("Snapshot data too short for header".to_string());
+        return Err("Snapshot data too short for header".into());
     }
     let tick = u32::from_le_bytes([data[0], data[1], data[2], data[3]]);
     let count = u32::from_le_bytes([data[4], data[5], data[6], data[7]]) as usize;
@@ -83,7 +83,7 @@ pub fn deserialize_snapshot(data: &[u8]) -> Result<Snapshot, String> {
             "Snapshot data too short: expected {} bytes, got {}",
             expected,
             data.len()
-        ));
+        ).into());
     }
 
     let mut entities = Vec::with_capacity(count);
@@ -148,9 +148,9 @@ pub fn diff_snapshots(old: &Snapshot, new: &Snapshot) -> Vec<u8> {
 }
 
 /// Apply a delta to a base snapshot to produce an updated snapshot.
-pub fn apply_diff(base: &Snapshot, diff: &[u8]) -> Result<Snapshot, String> {
+pub fn apply_diff(base: &Snapshot, diff: &[u8]) -> crate::Result<Snapshot> {
     if diff.len() < 8 {
-        return Err("Diff data too short for header".to_string());
+        return Err("Diff data too short for header".into());
     }
 
     let tick = u32::from_le_bytes([diff[0], diff[1], diff[2], diff[3]]);
@@ -162,7 +162,7 @@ pub fn apply_diff(base: &Snapshot, diff: &[u8]) -> Result<Snapshot, String> {
 
     for _ in 0..count {
         if offset + 5 > diff.len() {
-            return Err("Diff truncated at entry header".to_string());
+            return Err("Diff truncated at entry header".into());
         }
         let id = u32::from_le_bytes([diff[offset], diff[offset + 1], diff[offset + 2], diff[offset + 3]]);
         let flags = diff[offset + 4];
@@ -171,7 +171,7 @@ pub fn apply_diff(base: &Snapshot, diff: &[u8]) -> Result<Snapshot, String> {
         if flags & 0x80 != 0 {
             // New entity — full state
             if offset + 36 > diff.len() {
-                return Err("Diff truncated at new entity data".to_string());
+                return Err("Diff truncated at new entity data".into());
             }
             let position = read_f32x3(diff, offset);
             let rotation = read_f32x3(diff, offset + 12);
@@ -189,25 +189,25 @@ pub fn apply_diff(base: &Snapshot, diff: &[u8]) -> Result<Snapshot, String> {
         } else {
             // Delta update — find existing entity
             let ent = entities.iter_mut().find(|e| e.id == id)
-                .ok_or_else(|| format!("Diff references unknown entity {}", id))?;
+                .ok_or_else(|| crate::NetError::from(format!("Diff references unknown entity {}", id)))?;
 
             if flags & 0x01 != 0 {
                 if offset + 12 > diff.len() {
-                    return Err("Diff truncated at position".to_string());
+                    return Err("Diff truncated at position".into());
                 }
                 ent.position = read_f32x3(diff, offset);
                 offset += 12;
             }
             if flags & 0x02 != 0 {
                 if offset + 12 > diff.len() {
-                    return Err("Diff truncated at rotation".to_string());
+                    return Err("Diff truncated at rotation".into());
                 }
                 ent.rotation = read_f32x3(diff, offset);
                 offset += 12;
             }
             if flags & 0x04 != 0 {
                 if offset + 12 > diff.len() {
-                    return Err("Diff truncated at velocity".to_string());
+                    return Err("Diff truncated at velocity".into());
                 }
                 ent.velocity = read_f32x3(diff, offset);
                 offset += 12;
