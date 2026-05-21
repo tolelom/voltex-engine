@@ -5,10 +5,11 @@
 > 스크립팅, 멀티 OS 빌드 파이프라인까지 제공한다. 자세한 카운트와 정책은
 > 아래 "의존성 정책" 섹션 참고.
 
-![status: v1.0.6](https://img.shields.io/badge/status-v1.0.6-brightgreen)
+![status: v1.0.7](https://img.shields.io/badge/status-v1.0.7-brightgreen)
 ![clippy: 0 warnings](https://img.shields.io/badge/clippy-0%20warnings-brightgreen)
 ![audit: 0 vulnerabilities](https://img.shields.io/badge/cargo--audit-0%20vulnerabilities-brightgreen)
 ![coverage: 82%](https://img.shields.io/badge/coverage-82%25%20lib-brightgreen)
+![licenses: permissive only](https://img.shields.io/badge/licenses-permissive%20only-brightgreen)
 ![runtime: Windows verified](https://img.shields.io/badge/runtime-Windows%20verified-green)
 ![runtime: Linux/macOS unverified](https://img.shields.io/badge/runtime-Linux%2FmacOS%20unverified-orange)
 ![rust: stable](https://img.shields.io/badge/rust-stable-orange)
@@ -199,8 +200,25 @@ voltex (facade, L4)
 
 ## License
 
-MIT OR Apache-2.0 (사용자 선택). 외부 의존 라이선스 고지는 작업 후속 (v1.0
-release artifact 에 포함 예정).
+Voltex 자체는 **MIT OR Apache-2.0** 듀얼 (사용자 선택) — `LICENSE-MIT`
++ `LICENSE-APACHE` 참고.
+
+트랜지티브 의존성 라이선스 고지는
+[THIRD-PARTY-LICENSES.md](THIRD-PARTY-LICENSES.md) 에 자동 생성됨.
+v1.0.7 시점: **284 crate 전부 permissive** (MIT 264 / Apache-2.0 11 /
+Zlib 3 / BSD 3 / ISC / CC0 / Unicode 각 1). GPL/AGPL/LGPL/proprietary
+의존성 0건 — MIT OR Apache-2.0 와 100% 호환.
+
+재생성 (의존성 변경 후):
+
+```bash
+cargo install --locked cargo-about --features cli
+cargo about generate about.hbs -o THIRD-PARTY-LICENSES.md
+```
+
+CI 가 동일 명령으로 license drift 검출 (`license-check` advisory job).
+새로운 transitive 가 `about.toml` 의 `accepted` 리스트 밖이면 자동
+실패한다.
 
 ---
 

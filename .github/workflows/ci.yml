@@ -90,6 +90,27 @@ jobs:
       - name: cargo test --workspace --lib
         run: cargo test --workspace --lib
 
+  # Non-blocking license check — runs `cargo about generate` against
+  # about.toml's accepted SPDX list. Fails (advisory) if any transitive
+  # crate has a license outside the list. Catches GPL/AGPL/LGPL drift
+  # and unknown licenses without blocking PRs while the policy
+  # stabilizes.
+  license-check:
+    name: license check (ubuntu-latest, advisory)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install Linux audio dev headers (ALSA)
+        run: sudo apt-get update && sudo apt-get install -y libasound2-dev
+      - name: Install cargo-about
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-about
+      - name: cargo about generate (verify no license drift)
+        run: cargo about generate about.hbs -o /tmp/THIRD-PARTY-LICENSES.md
+
   # Non-blocking coverage job — reports line/function/region coverage so
   # contributors can see the trend over time. Threshold enforcement
   # (--fail-under-lines 80) is deferred until GPU/winit code paths are
