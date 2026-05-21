@@ -4,7 +4,7 @@
 > 만으로 PBR, 물리, 오디오, AI, 에디터, Lua 스크립팅, 멀티 OS 빌드 파이프라인까지
 > 제공한다.
 
-![status: v1.0.2](https://img.shields.io/badge/status-v1.0.2-brightgreen)
+![status: v1.0.3](https://img.shields.io/badge/status-v1.0.3-brightgreen)
 ![runtime: Windows verified](https://img.shields.io/badge/runtime-Windows%20verified-green)
 ![runtime: Linux/macOS unverified](https://img.shields.io/badge/runtime-Linux%2FmacOS%20unverified-orange)
 ![rust: stable](https://img.shields.io/badge/rust-stable-orange)

@@ -10,6 +10,53 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## [v1.0.3] — 2026-05-21 — `voltex build` Windows P0 regression fix
+
+### Fixed
+- **P0 — `voltex build` failed on every Windows host**.
+  `crates/voltex_cli/src/build.rs:96-97` (and `run.rs:20`) called
+  `std::fs::canonicalize`, which on Windows always returns the
+  extended-length `\\?\C:\...` verbatim form. That prefix landed in the
+  generated `dist/wrapper/Cargo.toml` as
+  `path = "\\\\?\\C:\\...\\voltex_runtime"`, and Cargo rejected it with
+  `invalid path url '//?/C:\\...\\voltex_runtime'`. Result: the
+  README's 5-minute quickstart (`voltex new my_game && cd my_game &&
+  voltex build`) was 100 % broken for external users. The flagship
+  `games/voltex_survivor` and `examples/tutorial_minigame` were
+  unaffected because they are workspace members built directly with
+  `cargo build`, hiding the regression from internal verification.
+
+### Added
+- `voltex_cli::util::canonicalize_friendly(&Path) -> Result<PathBuf>`:
+  canonicalize, then strip the Windows `\\?\` verbatim prefix for
+  drive-letter paths (`\\?\C:\foo` → `C:\foo`). UNC paths
+  (`\\?\UNC\server\share\...`) are intentionally left untouched —
+  rewriting them is lossy. No new external dependencies (engine policy
+  forbids `dunce` etc.).
+- Regression tests (+4): `strip_verbatim_prefix` drive-letter strip,
+  UNC passthrough, non-verbatim passthrough (all Windows-gated), and
+  cross-platform `canonicalize_friendly_returns_non_verbatim_path`.
+
+### Verified
+- End-to-end CLI workflow re-run on Windows host: `voltex new my_game`
+  → `voltex build --engine-path <repo>` → `dist/my_game.exe` produced
+  in 61 s, wrapper `Cargo.toml` contains
+  `voltex_runtime = { path = "C:/Users/<user>/..." }` (no `\\?\`).
+- 921 lib tests still pass. `voltex_cli`: 26 → 30 (+4).
+- Workspace build: 0 warnings, 0 errors.
+
+### Cleanup
+- `examples/many_cubes/src/main.rs:8` — removed unused `Mat4` import
+  (only `Vec3` is actually used). Was the lone warning in the
+  workspace build.
+
+### Not changed
+- No behavior change for `voltex_survivor`, examples, or any engine
+  crate. Patch is confined to `voltex_cli` (and the trivial
+  many_cubes import cleanup).
+
+---
+
 ## [v1.0.2] — 2026-05-21 — 600-line rule re-enforcement + full example runtime sweep
 
 ### Changed (refactor only — no behavior change)

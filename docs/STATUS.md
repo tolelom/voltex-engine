@@ -166,10 +166,25 @@
 - examples/editor_demo: 시드 엔티티 (ground + 3 cube + Cube1↔Cube2 hierarchy)를 `EditorSession::dispatch` 경로로 옮김 → jsonl 로그 + Save/Load round-trip 일관성
 - v1 한계 (문서화): picking은 sphere 근사 (메시 AABB는 미구현). gizmo translate/rotate/scale 핸들은 미구현
 
-## 🎉 v1.0 release — 2026-05-21 (tag `v1.0.0`) → **v1.0.1** + **v1.0.2** patches
+## 🎉 v1.0 release — 2026-05-21 (tag `v1.0.0`) → **v1.0.1** + **v1.0.2** + **v1.0.3** patches
 
 15 cycle / 37 세션 / 약 4 일에 걸쳐 진행된 v1.0 로드맵 완료. 회고는
 [docs/v1.0-retrospective.md](v1.0-retrospective.md). 미뤄진 항목은 v1.1+ 후속.
+
+### v1.0.3 (2026-05-21) — `voltex build` Windows P0 회귀 fix
+
+**P0** — `voltex build` 가 **모든 Windows 호스트에서 항상 실패** 하던 회귀를 fix.
+
+원인: `voltex_cli/src/build.rs:96-97` (+ `run.rs:20`) 의 `std::fs::canonicalize` 가 Windows 에서 `\\?\C:\...` 확장 길이 verbatim 형식을 반환 → 생성된 `dist/wrapper/Cargo.toml` 의 `path = "\\\\?\\C:\\..."` 가 cargo 의 path dependency 파서를 통과하지 못해 `invalid path url '//?/C:\\...'` 로 거부. README 5분 quickstart (`voltex new && cd && voltex build`) 외부 사용자 워크플로가 100% 깨졌음. 워크스페이스 멤버인 flagship 게임/예제는 직접 `cargo build` 로 빌드돼 회귀를 가려옴.
+
+fix: `voltex_cli::util::canonicalize_friendly` 신규 — canonicalize 후 Windows `\\?\` 접두사를 drive-letter 형식에 한해 strip. UNC (`\\?\UNC\...`) 는 의도적 보존 (lossy rewrite 회피). 외부 의존성 0 (정책 준수).
+
+검증:
+- 빈 디렉토리에서 `voltex new my_game` → `cd my_game` → `voltex build --engine-path <repo>` → `dist/my_game.exe` (61초) 정상 산출. 생성된 wrapper `Cargo.toml` 의 path dep 가 `C:/Users/<user>/...` (no `\\?\`).
+- 회귀 테스트 +4 (Windows 분기 3 + 크로스 OS 1). `voltex_cli`: 26 → 30.
+- 921 lib tests 유지. workspace 빌드 워닝/에러 0 (`examples/many_cubes` 의 unused `Mat4` import 같이 정리).
+
+영향 범위: `voltex_cli` 한정. engine crate / `voltex_survivor` / examples 동작 변경 없음.
 
 ### v1.0.2 (2026-05-21) — 600 줄 한도 회복 + 전체 examples smoke-test + stale docs 동기화
 **600 줄 한도 재분리** (M3 시점 0건 → v1.0.1 시점 위반 4건):
@@ -360,7 +375,7 @@ crates/
 └── voltex_cli         — bin "voltex" (new/build/run), voltex.toml 매니페스트, .vpkg packing (B1+B2)
 ```
 
-## 테스트: 947개 통과 (Windows host, `cargo test --workspace`). `--lib` 기준은 921 (voltex_cli 는 bin-only 라 lib count 에서 빠지나 `cargo test -p voltex_cli` 로 26 개 실행됨). macOS host 에서는 +2 (CoreAudio 모듈) = 949 예상. v1.0.1 +5 (input_system 순서/참조 ×2, Bounds default ×2, ScriptComponent default ×1).
+## 테스트: 951개 통과 (Windows host, `cargo test --workspace`). `--lib` 기준은 921 (voltex_cli 는 bin-only 라 lib count 에서 빠지나 `cargo test -p voltex_cli` 로 30 개 실행됨). macOS host 에서는 +2 (CoreAudio 모듈) = 953 예상. v1.0.1 +5 (input_system 순서/참조 ×2, Bounds default ×2, ScriptComponent default ×1). v1.0.3 +4 (canonicalize_friendly Windows verbatim strip ×3 + cross-OS integration ×1).
 
 - voltex: 2 (M6: prelude/module 경로 컴파일 검증)
 - voltex_math: 39 (8-7 +2: inverse roundtrip × VP+translation)
@@ -376,7 +391,7 @@ crates/
 - voltex_script: 42 (S1 +12: pool ×6 [get_or_create same/load/reload/unknown/poll_reload/clear], system ×4 [start/update/5-cubes/missing-callbacks], engine_api ×2 [iter_entities/iter_by_tag])
 - voltex_editor: 169 (E3 +11: command ×5 add/remove/unknown/dead-entity + session ×4 add_undo/remove_undo/despawn_restores/despawn_history/slot_reused + inspector ×2 - 1 obsolete despawn_clears test)
 - voltex_runtime: 11 (B0 신규: config ×5, error ×2, app ×4 [registry/scene order, system order, transform propagation, missing-scene graceful])
-- voltex_cli: 26 (B1-spike +3, B1 +16, B2 +1, B3 +6: validate_target ×5 + cross_compile_error_message)
+- voltex_cli: 30 (B1-spike +3, B1 +16, B2 +1, B3 +6, v1.0.3 +4: canonicalize_friendly ×4 covering Windows verbatim strip, UNC passthrough, non-verbatim passthrough, cross-OS integration)
 
 ## Examples (14개) + Games (1개) + 기존 survivor_game (archived)
 
