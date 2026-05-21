@@ -166,6 +166,17 @@
 - examples/editor_demo: 시드 엔티티 (ground + 3 cube + Cube1↔Cube2 hierarchy)를 `EditorSession::dispatch` 경로로 옮김 → jsonl 로그 + Save/Load round-trip 일관성
 - v1 한계 (문서화): picking은 sphere 근사 (메시 AABB는 미구현). gizmo translate/rotate/scale 핸들은 미구현
 
+### Cycle 11 (B3): CoreAudio + multi-OS native build (2026-05-21)
+- voltex_audio::backend::coreaudio (cfg(target_os = "macos") 신규): **`CoreAudioBackend`** — AudioToolbox.framework 의 AudioQueue API 를 raw FFI 로 호출. `#[link(name = "AudioToolbox", kind = "framework")]`. f32 LE stereo @48kHz 고정. 4 buffer × 1024 frame.
+- AudioQueue 콜백 모델을 push-style trait 에 wrap: `FreeQueue { Mutex<VecDeque<AudioQueueBufferRef>> + Condvar }` 로 동기화. write() 가 free 버퍼 pop 후 enqueue, output_callback 이 빈 버퍼를 free 큐에 push + notify. 100ms timeout 으로 deadlock 방지. `std::panic::catch_unwind` 로 FFI 콜백 panic 차폐.
+- voltex_audio::backend::mod: `make_backend()` 에 cfg(macos) 분기 추가, init 실패 시 NullBackend fallback.
+- voltex_cli::build::**validate_target(manifest, target_arg, host)** — native-only 정책 enforcement. `--target` 이 host 와 불일치하면 `CrossCompileNotSupported` 친화 에러. manifest 의 `targets` 배열이 host 를 포함하지 않으면 `HostNotInManifestTargets` 친화 에러.
+- voltex_cli::error: `CrossCompileNotSupported { host, requested }` + `HostNotInManifestTargets { host, listed }` variants 추가. Display impl 이 사용자에게 다음 행동 (`run on a <X> machine`) 을 안내.
+- **docs/build-matrix.md (신규)**: 3 OS 사전 요구 + 빌드 명령 + voltex.toml multi-target 예시 + GitHub Actions matrix 스니펫 + 검증 한계 명시.
+- 검증 한계: CoreAudio 코드 작성은 Windows 개발 머신에서 수행 → Mac 머신에서 `cargo build --target aarch64-apple-darwin` + audio_demo 소리 출력 실제 검증은 후속. Windows 에서는 `cargo check --target aarch64-apple-darwin` 으로 type 정상성 확인.
+- 테스트 +8: voltex_audio +2 (macOS 전용: 포맷 상수 + ASBD 구조체 크기), voltex_cli +6 (validate_target 5 시나리오 + 에러 Display).
+- spec: docs/superpowers/specs/2026-05-21-b3-multi-os-build-design.md
+
 ### Cycle 10 (P1): AudioBackend trait + ALSA (2026-05-21)
 - voltex_audio::backend (신규 디렉토리): **`AudioBackend` trait** (sample_rate/channels/buffer_frames/write/shutdown), `BackendError` (InitFailed/WriteFailed/NotSupported), `make_backend()` 가 OS 분기 + null fallback.
 - `WasapiBackend` — 기존 src/wasapi.rs 의 `WasapiDevice` 를 trait impl 로 래핑 (Windows only).
@@ -268,7 +279,7 @@ crates/
 └── voltex_cli         — bin "voltex" (new/build/run), voltex.toml 매니페스트, .vpkg packing (B1+B2)
 ```
 
-## 테스트: 895개 전부 통과 (Cycle 7-10 +17 vs Cycle 6 직후 878; Cycle 6 +11 vs Cycle 5 직후 867)
+## 테스트: 921개 통과 (Windows host, `cargo test --workspace`). `--lib` 기준은 895 (voltex_cli 는 bin-only 라 lib count 에서 빠지나 `cargo test -p voltex_cli` 로 26 개 실행됨). macOS host 에서는 +2 (CoreAudio 모듈) = 923 예상.
 
 - voltex: 2 (M6: prelude/module 경로 컴파일 검증)
 - voltex_math: 39 (8-7 +2: inverse roundtrip × VP+translation)
@@ -278,13 +289,13 @@ crates/
 - voltex_renderer: 200
 - voltex_renderer_ecs: 7 (C0b 신규: RenderAssets material roundtrip ×2, missing handle ×2, items empty/skip-no-mesh/stale/hierarchy)
 - voltex_physics: 106
-- voltex_audio: 89 (P1 +5: backend null ×3, make_backend smoke, BackendError Display)
+- voltex_audio: 89 (Windows host). macOS host: 91 (B3 +2: format constants + ASBD struct size, cfg(target_os = "macos"))
 - voltex_ai: 34
 - voltex_net: 47
 - voltex_script: 42 (S1 +12: pool ×6 [get_or_create same/load/reload/unknown/poll_reload/clear], system ×4 [start/update/5-cubes/missing-callbacks], engine_api ×2 [iter_entities/iter_by_tag])
 - voltex_editor: 158 (E2 +12: session::* mode/snapshot/dispatch ×7, lifecycle/callbacks ×4, undo/redo non-Health-snapshot inner test ×1)
 - voltex_runtime: 11 (B0 신규: config ×5, error ×2, app ×4 [registry/scene order, system order, transform propagation, missing-scene graceful])
-- voltex_cli: 20 (B1-spike +3, B1 +16, B2 +1: manifest ×9, new ×3, build ×2 + pack_archive, util ×3, strip_glob, host_triple)
+- voltex_cli: 26 (B1-spike +3, B1 +16, B2 +1, B3 +6: validate_target ×5 + cross_compile_error_message)
 
 ## Examples (13개 + survivor_game)
 
