@@ -9,16 +9,25 @@ use voltex_math::Vec3;
 
 use crate::error::EditorError;
 
+/// Every editor action the user (or AI) can take. Dispatch goes through
+/// [`crate::session::EditorSession::dispatch`], which logs the command,
+/// records its inverse for undo, and re-saves the scene file.
 #[derive(Debug, Clone, PartialEq)]
 pub enum EditorCommand {
+    /// Create a new entity with a default [`Transform`] attached.
     Spawn,
+    /// Despawn `entity` and drop its components. Undoable since E3 —
+    /// the session snapshots every registered component first.
     Despawn { entity: Entity },
+    /// Replace `entity`'s Transform with the given values. If no Transform
+    /// is currently attached, one is added.
     SetTransform {
         entity: Entity,
         position: Vec3,
         rotation: Vec3,
         scale: Vec3,
     },
+    /// Replace `entity`'s Tag with `tag`. Adds the component if missing.
     SetTag { entity: Entity, tag: String },
     /// Attach `child` under `parent` (sets Parent on child, adds to Children).
     /// No-op (still Ok) if the relationship already exists. Fails if either
@@ -33,7 +42,9 @@ pub enum EditorCommand {
     /// Detach a registered component from `entity` by name (E3). No-op
     /// (still Ok) if the component is absent.
     RemoveComponent { entity: Entity, name: String },
+    /// Serialize the world to `path` as JSON. Clears the undo history.
     SaveScene { path: String },
+    /// Read `path` as JSON and replace the world contents. Clears the undo history.
     LoadScene { path: String },
 }
 

@@ -57,12 +57,34 @@ enum Inverse {
     RestoreEntity { entity: Entity, components: Vec<(String, Vec<u8>)> },
 }
 
+/// Owns the editor's mutable state — World, ComponentRegistry, selection,
+/// Edit/Play mode, lifecycle callbacks, and the undo/redo + jsonl log
+/// machinery. Every mutation flows through [`EditorSession::dispatch`].
+///
+/// External code typically does:
+///
+/// ```ignore
+/// let mut session = EditorSession::new("scene.vscn");
+/// let e = session.dispatch(EditorCommand::Spawn)?;
+/// session.dispatch(EditorCommand::SetTag { entity: e, tag: "Hero".into() })?;
+/// session.undo();
+/// ```
 pub struct EditorSession {
+    /// The ECS world being edited. Library callers may read but should
+    /// prefer [`EditorSession::dispatch`] for mutations so they show up in
+    /// the log + undo stack.
     pub world: World,
+    /// Component registration table — drives scene serialization and the
+    /// AddComponent/RemoveComponent commands.
     pub registry: ComponentRegistry,
+    /// The single source of truth for "currently focused" entity (Inspector,
+    /// gizmo, viewport picking all read this).
     pub selected: Option<Entity>,
+    /// Scene file path written on every successful Edit-mode dispatch.
     pub scene_path: String,
+    /// jsonl log path — one line per dispatch with cmd + result.
     pub log_path: String,
+    /// Edit (default) or Play. Dispatch is rejected while in Play mode.
     pub mode: EditorMode,
     play_snapshot: Option<Vec<u8>>,
     lifecycles: Vec<crate::lifecycle::LifecycleCallback>,

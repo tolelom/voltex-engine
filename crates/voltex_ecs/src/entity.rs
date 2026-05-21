@@ -1,6 +1,12 @@
+/// Generation-tracked entity handle. Composed of a stable id (slot index) and
+/// a generation counter that increments on each despawn, so handles to slots
+/// that have been reused refer to a different generation and `World::is_alive`
+/// returns false. Cheap to copy; small enough to pass by value everywhere.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct Entity {
+    /// Slot index. Stable across the lifetime of the slot, but reused after despawn.
     pub id: u32,
+    /// Generation counter bumped on each despawn. Used to detect stale handles.
     pub generation: u32,
 }
 

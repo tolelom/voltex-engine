@@ -3,12 +3,19 @@ use std::collections::HashMap;
 use crate::entity::{Entity, EntityAllocator};
 use crate::sparse_set::{SparseSet, ComponentStorage};
 
+/// The container that owns every entity and every component storage.
+///
+/// `World` is the single source of truth for the editor and the runtime. Entity
+/// lifecycle goes through [`World::spawn`] / [`World::despawn`]; component
+/// access goes through [`World::add`] / [`World::get`] / [`World::get_mut`]
+/// / [`World::remove`]; cross-cutting iteration uses [`World::query`].
 pub struct World {
     allocator: EntityAllocator,
     storages: HashMap<TypeId, Box<dyn ComponentStorage>>,
 }
 
 impl World {
+    /// Create an empty world with no entities and no component storages.
     pub fn new() -> Self {
         Self {
             allocator: EntityAllocator::new(),
@@ -16,10 +23,15 @@ impl World {
         }
     }
 
+    /// Allocate a fresh entity. Reuses freed slots with bumped generations
+    /// so prior [`Entity`] handles to dead slots stay stale.
     pub fn spawn(&mut self) -> Entity {
         self.allocator.allocate()
     }
 
+    /// Mark `entity` dead and drop every attached component. Returns false
+    /// if the entity was already dead. Stale handles (same id, lower
+    /// generation) are rejected without side effects.
     pub fn despawn(&mut self, entity: Entity) -> bool {
         if !self.allocator.deallocate(entity) {
             return false;
@@ -30,10 +42,13 @@ impl World {
         true
     }
 
+    /// True if `entity` refers to a currently alive slot at the matching
+    /// generation. Used by every command/system to reject stale handles.
     pub fn is_alive(&self, entity: Entity) -> bool {
         self.allocator.is_alive(entity)
     }
 
+    /// Number of currently alive entities.
     pub fn entity_count(&self) -> usize {
         self.allocator.alive_count()
     }
@@ -63,6 +78,8 @@ impl World {
         *self = Self::new();
     }
 
+    /// Attach (or overwrite) a component of type `T` on `entity`. The
+    /// underlying storage is created lazily on first call per type.
     pub fn add<T: 'static>(&mut self, entity: Entity, component: T) {
         let type_id = TypeId::of::<T>();
         let storage = self.storages
@@ -72,6 +89,7 @@ impl World {
         set.insert(entity, component);
     }
 
+    /// Borrow the component of type `T` on `entity`, or `None` if absent.
     pub fn get<T: 'static>(&self, entity: Entity) -> Option<&T> {
         let type_id = TypeId::of::<T>();
         let storage = self.storages.get(&type_id)?;
@@ -79,6 +97,7 @@ impl World {
         set.get(entity)
     }
 
+    /// Mutably borrow the component of type `T` on `entity`, or `None` if absent.
     pub fn get_mut<T: 'static>(&mut self, entity: Entity) -> Option<&mut T> {
         let type_id = TypeId::of::<T>();
         let storage = self.storages.get_mut(&type_id)?;
@@ -86,6 +105,8 @@ impl World {
         set.get_mut(entity)
     }
 
+    /// Detach the component of type `T` from `entity` and return it, or
+    /// `None` if it wasn't present.
     pub fn remove<T: 'static>(&mut self, entity: Entity) -> Option<T> {
         let type_id = TypeId::of::<T>();
         let storage = self.storages.get_mut(&type_id)?;

@@ -2101,6 +2101,7 @@ dependencies = [
  "voltex_platform",
  "voltex_renderer",
  "voltex_renderer_ecs",
+ "voltex_runtime",
  "voltex_script",
 ]
 
