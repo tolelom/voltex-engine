@@ -15,11 +15,48 @@ pub fn cmd(args: &[String]) -> Result<()> {
     let engine_path = resolve_engine_path(args)?;
 
     let manifest = Manifest::load_from_dir(&manifest_dir)?;
-    let target = target_arg
-        .or_else(|| manifest.build.targets.first().cloned())
-        .unwrap_or_else(|| host_triple().to_string());
+    let target = validate_target(&manifest, target_arg.as_deref(), host_triple())?;
 
     build_target(&manifest_dir, &engine_path, &manifest, &target)
+}
+
+/// Pick the build target and reject impossible requests up front (B3).
+///
+/// Policy: `voltex build` only produces native binaries. Cross-compiling
+/// to a different OS/arch is explicitly out of scope — toolchain setup
+/// (Apple frameworks, Windows SDK, ALSA headers) makes it impractical for
+/// an engine that links three different audio backends at runtime.
+///
+/// Resolution order:
+/// 1. If `target_arg` is set, it must equal `host`.
+/// 2. Otherwise, if the manifest lists targets, the host triple must be in
+///    that list.
+/// 3. Otherwise, fall back to `host`.
+pub fn validate_target(
+    manifest: &Manifest,
+    target_arg: Option<&str>,
+    host: &str,
+) -> Result<String> {
+    if let Some(req) = target_arg {
+        if req != host {
+            return Err(CliError::CrossCompileNotSupported {
+                host: host.to_string(),
+                requested: req.to_string(),
+            });
+        }
+        return Ok(req.to_string());
+    }
+    let listed = &manifest.build.targets;
+    if listed.is_empty() {
+        return Ok(host.to_string());
+    }
+    if listed.iter().any(|t| t == host) {
+        return Ok(host.to_string());
+    }
+    Err(CliError::HostNotInManifestTargets {
+        host: host.to_string(),
+        listed: listed.clone(),
+    })
 }
 
 fn parse_manifest_path(args: &[String]) -> Result<PathBuf> {
@@ -313,6 +350,69 @@ mod tests {
         assert!(paths.contains(&"scripts/a.lua".to_string()));
         assert!(paths.contains(&"assets/sub/b.png".to_string()));
         let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn validate_target_accepts_host_match_via_arg() {
+        let mut m = dummy("X", 100, 100);
+        m.build.targets = vec!["windows-x64".into(), "linux-x64".into()];
+        let t = validate_target(&m, Some("windows-x64"), "windows-x64").unwrap();
+        assert_eq!(t, "windows-x64");
+    }
+
+    #[test]
+    fn validate_target_accepts_host_from_manifest_when_arg_absent() {
+        let mut m = dummy("X", 100, 100);
+        m.build.targets = vec!["windows-x64".into(), "linux-x64".into()];
+        let t = validate_target(&m, None, "linux-x64").unwrap();
+        assert_eq!(t, "linux-x64");
+    }
+
+    #[test]
+    fn validate_target_falls_back_to_host_when_manifest_empty() {
+        let mut m = dummy("X", 100, 100);
+        m.build.targets = vec![];
+        let t = validate_target(&m, None, "macos-arm64").unwrap();
+        assert_eq!(t, "macos-arm64");
+    }
+
+    #[test]
+    fn validate_target_rejects_cross_compile_via_arg() {
+        let m = dummy("X", 100, 100);
+        let err = validate_target(&m, Some("macos-arm64"), "windows-x64").unwrap_err();
+        match err {
+            CliError::CrossCompileNotSupported { host, requested } => {
+                assert_eq!(host, "windows-x64");
+                assert_eq!(requested, "macos-arm64");
+            }
+            other => panic!("unexpected error: {:?}", other),
+        }
+    }
+
+    #[test]
+    fn validate_target_rejects_host_missing_from_manifest_list() {
+        let mut m = dummy("X", 100, 100);
+        m.build.targets = vec!["windows-x64".into(), "macos-arm64".into()];
+        let err = validate_target(&m, None, "linux-x64").unwrap_err();
+        match err {
+            CliError::HostNotInManifestTargets { host, listed } => {
+                assert_eq!(host, "linux-x64");
+                assert_eq!(listed, vec!["windows-x64", "macos-arm64"]);
+            }
+            other => panic!("unexpected error: {:?}", other),
+        }
+    }
+
+    #[test]
+    fn cross_compile_error_message_lists_both_triples() {
+        let e = CliError::CrossCompileNotSupported {
+            host: "windows-x64".into(),
+            requested: "macos-arm64".into(),
+        };
+        let s = format!("{}", e);
+        assert!(s.contains("windows-x64"));
+        assert!(s.contains("macos-arm64"));
+        assert!(s.contains("cross-compile"));
     }
 
     #[test]

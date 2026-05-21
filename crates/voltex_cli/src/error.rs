@@ -16,6 +16,12 @@ pub enum CliError {
     CargoMissing,
     CargoBuildFailed(i32),
     Io(String),
+    /// User asked to build for a target that does not match the host triple.
+    /// `voltex build` does not cross-compile.
+    CrossCompileNotSupported { host: String, requested: String },
+    /// Manifest `targets = [...]` listed only non-host triples — we cannot
+    /// build any of them from the current machine.
+    HostNotInManifestTargets { host: String, listed: Vec<String> },
 }
 
 impl fmt::Display for CliError {
@@ -62,6 +68,20 @@ impl fmt::Display for CliError {
                 write!(f, "cargo build failed (exit code {})", code)
             }
             CliError::Io(s) => write!(f, "io error: {}", s),
+            CliError::CrossCompileNotSupported { host, requested } => {
+                write!(
+                    f,
+                    "cross-compile not supported.\n  current host: {}\n  requested target: {}\n  hint: run `voltex build --target {}` on a {} machine.",
+                    host, requested, requested, requested
+                )
+            }
+            CliError::HostNotInManifestTargets { host, listed } => {
+                write!(
+                    f,
+                    "manifest targets do not include host triple.\n  current host: {}\n  manifest targets = {:?}\n  hint: add \"{}\" to the targets array, or pass --target {} explicitly.",
+                    host, listed, host, host
+                )
+            }
         }
     }
 }
