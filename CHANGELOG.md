@@ -10,6 +10,94 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## [v1.0.6] — 2026-05-21 — coverage baseline (82%) + advisory CI job + CLI engine-path friendliness
+
+### Measured (coverage baseline)
+
+First time the project has a number for `rules/common/testing.md`'s
+"80%+ coverage" target. `cargo install cargo-llvm-cov` + `rustup
+component add llvm-tools-preview` was needed once; result:
+
+| metric    | covered / total | percent |
+|-----------|-----------------|---------|
+| Functions | 34878 / 42505   | **82.06%** |
+| Lines     | 18142 / 24849   | **82.74%** |
+| Regions   | (see report)    | **73.01%** |
+
+Per-crate breakdown (function coverage), 14 crates:
+
+- **🟢 80%+ (10 crates)**: voltex 100%, voltex_math 95.85%,
+  voltex_script 94.33%, voltex_ecs 93.31%, voltex_asset 93.17%,
+  voltex_ai 92.85%, voltex_net 92.08%, voltex_physics 89.85%,
+  voltex_audio 88.26%, voltex_editor 82.27%.
+- **🟡 below 80% (4 crates, all GPU/winit-dependent)**:
+  voltex_renderer 65.94% (`shadow.rs` / `shadow_pipeline.rs` /
+  `rt_*.rs` / `taa.rs` / `ssgi.rs` / `ssr.rs` / `temporal_accum.rs`
+  — GPU compute shader paths, need a `wgpu::Device` to exercise),
+  voltex_runtime 61.22% (`handler.rs` 0% — winit `ApplicationHandler`
+  callbacks), voltex_renderer_ecs 53.83% (`BasicRenderer::render`,
+  GPU pass), voltex_platform 46.38% (`ApplicationHandler` callbacks +
+  per-platform key mapping).
+
+→ The four low-coverage crates share a single root cause: their
+public surface is **GPU + winit integration code that cannot be
+reached from a headless `cargo test --lib`**. Their unit-testable
+internals (`app.rs`, `config.rs`, `error.rs`, `RenderItem`
+collection, etc.) all sit at 80%+. Closing the gap requires
+integration tests against a headless GPU adapter and a stubbed
+event loop — scheduled for v1.1+.
+
+### Added (infrastructure)
+
+- **`.github/workflows/ci.yml` — new `coverage` job** (Ubuntu,
+  `continue-on-error: true`). Installs llvm-tools + cargo-llvm-cov
+  via `taiki-e/install-action`, then runs `cargo llvm-cov
+  --workspace --lib --summary-only`. Advisory only — threshold
+  enforcement (`--fail-under-lines 80`) postponed until GPU paths
+  are covered by integration tests.
+- **README "Contributing" → "Coverage" subsection**: documents the
+  one-time install commands, the current baseline number, and why
+  the 4 low-coverage crates are low.
+- **README badge**: `coverage 82% lib`. Status badge bumped 1.0.5
+  → 1.0.6.
+
+### Improved (CLI friendliness — P1 #5)
+
+- **`voltex build` engine-path missing error** rewritten as a
+  multi-line help block. Old (1 line): `"engine path unknown — set
+  VOLTEX_REPO or pass --engine-path <repo-root>"`. New (7 lines):
+  scaffolded-project example + both shell-specific export commands
+  (bash/zsh + PowerShell), so new users get a copy-pasteable fix in
+  the error itself.
+- **README 5-min quickstart**: split into "예제 실행" + "새 게임
+  만들기" subsections. The second one walks through `cargo install
+  --path crates/voltex_cli` → `export VOLTEX_REPO=$(pwd)` → `voltex
+  new` → `voltex build`. Closes the discoverability gap where users
+  saw `cargo run --example triangle` but could not figure out how
+  to scaffold their own project.
+
+### Verified (self-feedback at each stage)
+
+- Stage 1: cargo-llvm-cov install + baseline measurement (82.06%).
+- Stage 2: per-crate analysis, low crates identified and justified.
+- Stage 3: README + CI yml updated, no behavior change.
+- Stage 4: CLI tweak — empty-directory repro of `voltex new && cd &&
+  voltex build` (without VOLTEX_REPO env) now prints the 7-line
+  help block instead of the 1-line one.
+- Stage 5: `cargo build --workspace` clean, `cargo test --workspace
+  --lib` = 921, `cargo test -p voltex_cli` = 30. clippy still 0.
+
+### Not in scope (deferred to v1.1+)
+
+- Lifting the 4 low-coverage crates above 80% — requires headless
+  GPU adapter testing + winit event-loop stubbing.
+- Enabling `--fail-under-lines 80` as a CI gate — depends on the
+  above.
+- HTML coverage report upload (codecov / coveralls) — depends on
+  the CI workflow actually running on a runner.
+
+---
+
 ## [v1.0.5] — 2026-05-21 — clippy clean (warnings 84 → 0) + cargo audit + CI workflow
 
 This is the "quality gate" patch. v1.0.3 (Windows build P0) and v1.0.4

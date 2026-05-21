@@ -166,10 +166,42 @@
 - examples/editor_demo: 시드 엔티티 (ground + 3 cube + Cube1↔Cube2 hierarchy)를 `EditorSession::dispatch` 경로로 옮김 → jsonl 로그 + Save/Load round-trip 일관성
 - v1 한계 (문서화): picking은 sphere 근사 (메시 AABB는 미구현). gizmo translate/rotate/scale 핸들은 미구현
 
-## 🎉 v1.0 release — 2026-05-21 (tag `v1.0.0`) → **v1.0.1** + **v1.0.2** + **v1.0.3** + **v1.0.4** + **v1.0.5** patches
+## 🎉 v1.0 release — 2026-05-21 (tag `v1.0.0`) → **v1.0.1** ~ **v1.0.6** patches
 
 15 cycle / 37 세션 / 약 4 일에 걸쳐 진행된 v1.0 로드맵 완료. 회고는
 [docs/v1.0-retrospective.md](v1.0-retrospective.md). 미뤄진 항목은 v1.1+ 후속.
+
+### v1.0.6 (2026-05-21) — coverage baseline (82%) + advisory CI + CLI 친화성
+
+**측정** — `cargo-llvm-cov` 설치 후 `cargo llvm-cov --workspace --lib --summary-only` 첫 실행:
+
+| 메트릭 | covered/total | % |
+|---|---|---|
+| Functions | 34878 / 42505 | **82.06%** |
+| Lines | 18142 / 24849 | **82.74%** |
+| Regions | — | **73.01%** |
+
+`rules/common/testing.md` 의 80%+ 목표 (function/line 기준) **첫 달성**.
+
+**Per-crate 분포** (14 crates, function coverage):
+- 🟢 80%+ (10 개): voltex 100% / math 95.85 / script 94.33 / ecs 93.31 / asset 93.17 / ai 92.85 / net 92.08 / physics 89.85 / audio 88.26 / editor 82.27.
+- 🟡 80% 미만 (4 개, 모두 GPU/winit 의존): voltex_renderer 65.94 (shadow/rt/taa/ssgi/ssr 컴퓨트 셰이더), voltex_runtime 61.22 (`handler.rs` 0%, winit ApplicationHandler), voltex_renderer_ecs 53.83 (BasicRenderer::render GPU pass), voltex_platform 46.38 (ApplicationHandler + per-platform key map).
+- 4 crate 모두 단일 원인: headless `cargo test --lib` 으로 도달 불가능한 GPU/winit 통합 경로. unit-testable 내부 (`app.rs`/`config.rs`/`error.rs` 등) 는 80%+. headless GPU adapter + event-loop stub 으로 닫을 수 있으나 v1.1+ 후속.
+
+**CI advisory job 추가** — `.github/workflows/ci.yml` 에 `coverage` 잡 추가 (Ubuntu, `continue-on-error: true`). `taiki-e/install-action@cargo-llvm-cov` 으로 도구 설치 → `cargo llvm-cov --workspace --lib --summary-only` 실행. 임계치 enforcement (`--fail-under-lines 80`) 는 GPU 패스 integration test 후 활성.
+
+**README "Coverage" 섹션 + 배지** 추가 — 1회 install 명령 + baseline 수치 + 낮은 crate 정당화 문서화. `coverage 82% lib` 배지.
+
+**CLI 친화성 (P1 #5)** — `voltex build` engine-path 누락 에러를 1줄 → 7줄 help block 으로 확장. scaffolded-project 사용 예시 + bash/zsh export + PowerShell `$env:` 모두 안내. README 5분 quickstart 도 "예제 실행" / "새 게임 만들기" 두 서브섹션으로 분리 — `cargo install --path crates/voltex_cli` → `VOLTEX_REPO` → `voltex new/build` 흐름 명시.
+
+**셀프 피드백** (각 단계 후 검증):
+- 단계 1 baseline: 82.06% 달성.
+- 단계 2 분석: 낮은 4 crate 가 모두 GPU/winit 정당화 가능.
+- 단계 3 infrastructure: README + CI yml 변경, 코드 변경 0.
+- 단계 4 CLI tweak: 빈 디렉토리에서 `voltex new && cd && voltex build` (without VOLTEX_REPO) 가 7-line help 출력 확인.
+- 단계 5: 921 lib + 30 cli tests 유지, clippy 0 유지, workspace 빌드 클린.
+
+deferred to v1.1+: 4 low-coverage crate 들의 GPU/winit 통합 테스트, `--fail-under-lines 80` CI gate, HTML coverage 리포트 upload.
 
 ### v1.0.5 (2026-05-21) — clippy clean (84 → 0) + cargo audit + CI 워크플로
 

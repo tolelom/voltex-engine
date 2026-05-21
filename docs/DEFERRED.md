@@ -169,7 +169,7 @@
 - ~~**gizmo (translate/rotate/scale)**~~ ✅ Cycle 3 (E1) — translate/rotate/scale 3축 핸들 + LINE wgpu 파이프라인. End-drag 시 SetTransform 단일 undo 엔트리.
 - ~~**Despawn 정확한 undo**~~ ✅ Cycle 12 (E3) — `EntityAllocator::restore_at_generation` + 등록된 모든 컴포넌트 snapshot/restore. 슬롯 재사용 시 silent skip.
 
-## v1.0 / v1.0.1 / v1.0.2 / v1.0.3 / v1.0.4 / v1.0.5 추가 한계
+## v1.0 / v1.0.1 / v1.0.2 / v1.0.3 / v1.0.4 / v1.0.5 / v1.0.6 추가 한계
 
 - **3 OS exe artifact 검증** — Windows host 빌드 + runtime 검증만. Linux + macOS 실 머신 검증 v1.1 사용자 PR.
 - **Lua input API** — 입력은 Rust `add_input_system` 만. Lua 측 `input.is_key_pressed(...)` v1.1 후속.
@@ -186,3 +186,8 @@
 - **CI 워크플로 (.github/workflows/ci.yml)** ✅ v1.0.5 추가. 단, **실제 GitHub runner 첫 green run 은 mirror 필요** — git.tolelom.xyz 가 GitHub Actions 실행 환경 미보유 시 inert. self-hosted gitea/forgejo runner 또는 GitHub mirror push 가 v1.1 후속.
 - **`cargo audit` CI 통합** — cargo-audit binary install step 추가 필요. v1.1 후속.
 - **GUI 시각 검증** — viewport / gizmo / editor / 게임 화면 실제 동작 0건 확인. 6초 smoke-test 는 panic 없음만 보장.
+- **coverage 측정** ✅ v1.0.6 — baseline 82.06% functions / 82.74% lines (cargo llvm-cov --workspace --lib). 80% 목표 평균 달성.
+- **CLI 친화 메시지 (engine-path)** ✅ v1.0.6 — 1-line → 7-line help block (bash + PowerShell 양쪽 안내).
+- **GPU/winit 의존 4 crate (renderer 66 / runtime 61 / renderer_ecs 54 / platform 46%) 의 coverage 보완** — headless GPU adapter + event-loop stub 필요. v1.1+.
+- **`--fail-under-lines 80` CI gate** — 4 low-coverage crate 통합 테스트 도입 후 활성. v1.1+.
+- **HTML coverage 리포트 (codecov/coveralls upload)** — CI 가 실제 runner 에서 동작한 후. v1.1+.
