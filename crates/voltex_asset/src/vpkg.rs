@@ -19,13 +19,19 @@
 
 use crate::error::{AssetError, Result};
 
+/// Magic bytes at the start of every `.vpkg` archive.
 pub const VPKG_MAGIC: &[u8; 4] = b"VPKG";
+/// Format version this crate writes and accepts on parse.
 pub const VPKG_VERSION: u32 = 1;
 
+/// One file entry in a `.vpkg` index.
 #[derive(Debug, Clone)]
 pub struct VpkgEntry {
+    /// Forward-slash-delimited relative path inside the archive.
     pub path: String,
+    /// Absolute byte offset of this blob within the archive.
     pub offset: u32,
+    /// Byte length of this blob.
     pub size: u32,
 }
 
@@ -67,6 +73,8 @@ pub struct VpkgReader<'a> {
 }
 
 impl<'a> VpkgReader<'a> {
+    /// Parses the header + index. Returns `Err` if the magic/version is wrong
+    /// or the index is truncated / refers to out-of-range blobs.
     pub fn parse(bytes: &'a [u8]) -> Result<Self> {
         if bytes.len() < 12 {
             return Err(AssetError::Generic("vpkg too short for header".into()));
@@ -122,14 +130,17 @@ impl<'a> VpkgReader<'a> {
         Ok(Self { bytes, entries })
     }
 
+    /// Borrows the parsed entry list, in original order.
     pub fn entries(&self) -> &[VpkgEntry] {
         &self.entries
     }
 
+    /// Iterates over all entry paths.
     pub fn list(&self) -> impl Iterator<Item = &str> {
         self.entries.iter().map(|e| e.path.as_str())
     }
 
+    /// Returns the blob bytes for `path`, or `None` if not in the archive.
     pub fn read(&self, path: &str) -> Option<&[u8]> {
         let entry = self.entries.iter().find(|e| e.path == path)?;
         let start = entry.offset as usize;

@@ -1,3 +1,5 @@
+//! Single-type slab storage with ref counting and generation-checked handles.
+
 use std::any::Any;
 
 use crate::handle::Handle;
@@ -8,12 +10,19 @@ struct AssetEntry<T> {
     ref_count: u32,
 }
 
+/// Slab storage for a single asset type `T`.
+///
+/// Slots are recycled via a free list — but each reuse bumps the generation
+/// counter so old [`Handle`]s pointing at the freed slot are rejected. Each
+/// live entry carries a reference count; the asset is removed when it drops
+/// to zero (see [`release`](Self::release)).
 pub struct AssetStorage<T> {
     entries: Vec<Option<AssetEntry<T>>>,
     free_ids: Vec<u32>,
 }
 
 impl<T> AssetStorage<T> {
+    /// Creates an empty storage.
     pub fn new() -> Self {
         Self {
             entries: Vec::new(),
@@ -21,6 +30,7 @@ impl<T> AssetStorage<T> {
         }
     }
 
+    /// Inserts a new asset and returns a handle with initial ref count = 1.
     pub fn insert(&mut self, asset: T) -> Handle<T> {
         if let Some(id) = self.free_ids.pop() {
             let generation = self.entries[id as usize]
@@ -45,6 +55,7 @@ impl<T> AssetStorage<T> {
         }
     }
 
+    /// Returns a reference to the asset, or `None` if the handle is stale.
     pub fn get(&self, handle: Handle<T>) -> Option<&T> {
         self.entries
             .get(handle.id as usize)?
@@ -53,6 +64,7 @@ impl<T> AssetStorage<T> {
             .map(|e| &e.asset)
     }
 
+    /// Returns a mutable reference to the asset, or `None` if stale.
     pub fn get_mut(&mut self, handle: Handle<T>) -> Option<&mut T> {
         self.entries
             .get_mut(handle.id as usize)?
@@ -61,6 +73,7 @@ impl<T> AssetStorage<T> {
             .map(|e| &mut e.asset)
     }
 
+    /// Bumps the asset's ref count by one. No-op for stale handles.
     pub fn add_ref(&mut self, handle: Handle<T>) {
         if let Some(Some(entry)) = self.entries.get_mut(handle.id as usize) {
             if entry.generation == handle.generation {
@@ -86,14 +99,17 @@ impl<T> AssetStorage<T> {
         false
     }
 
+    /// Number of currently-live entries.
     pub fn len(&self) -> usize {
         self.entries.iter().filter(|e| e.is_some()).count()
     }
 
+    /// `true` if [`len`](Self::len) is zero.
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
 
+    /// Returns the ref count for `handle`, or `0` if it is stale.
     pub fn ref_count(&self, handle: Handle<T>) -> u32 {
         self.entries
             .get(handle.id as usize)
@@ -115,6 +131,7 @@ impl<T> AssetStorage<T> {
         false
     }
 
+    /// Iterates `(handle, &asset)` over every live entry.
     pub fn iter(&self) -> impl Iterator<Item = (Handle<T>, &T)> {
         self.entries
             .iter()
@@ -133,7 +150,9 @@ impl<T> Default for AssetStorage<T> {
 
 /// Trait for type-erased access to an AssetStorage.
 pub trait AssetStorageDyn: Any {
+    /// Downcast view of `self` as `&dyn Any`.
     fn as_any(&self) -> &dyn Any;
+    /// Downcast view of `self` as `&mut dyn Any`.
     fn as_any_mut(&mut self) -> &mut dyn Any;
     /// Number of live assets in this storage.
     fn count(&self) -> usize;

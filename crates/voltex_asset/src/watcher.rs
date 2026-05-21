@@ -1,7 +1,14 @@
+//! mtime-polling file watcher used to trigger hot reload.
+//!
+//! No OS notifications — we read each watched file's `modified()` time at
+//! `poll_interval` and report any whose timestamp moved. First poll establishes
+//! baseline (no false-positive change on first call).
+
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant, SystemTime};
 
+/// Polls a set of file paths for `mtime` changes.
 pub struct FileWatcher {
     watched: HashMap<PathBuf, Option<SystemTime>>,
     poll_interval: Duration,
@@ -9,6 +16,7 @@ pub struct FileWatcher {
 }
 
 impl FileWatcher {
+    /// Creates a watcher that re-checks at most every `poll_interval`.
     pub fn new(poll_interval: Duration) -> Self {
         Self {
             watched: HashMap::new(),
@@ -17,15 +25,20 @@ impl FileWatcher {
         }
     }
 
+    /// Starts watching `path`. First poll after this call will not flag it
+    /// as changed — it only records the baseline mtime.
     pub fn watch(&mut self, path: PathBuf) {
         // Store None initially — first poll will record the mtime without reporting change
         self.watched.insert(path, None);
     }
 
+    /// Stops watching `path`. No-op if not watched.
     pub fn unwatch(&mut self, path: &Path) {
         self.watched.remove(path);
     }
 
+    /// Returns the paths whose mtime changed since the previous poll. Returns
+    /// an empty vec if the poll interval has not elapsed yet.
     pub fn poll_changes(&mut self) -> Vec<PathBuf> {
         let now = Instant::now();
         if now.duration_since(self.last_poll) < self.poll_interval {
@@ -50,6 +63,7 @@ impl FileWatcher {
         changed
     }
 
+    /// Number of paths currently being watched.
     pub fn watched_count(&self) -> usize {
         self.watched.len()
     }

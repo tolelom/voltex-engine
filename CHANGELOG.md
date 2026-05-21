@@ -10,6 +10,28 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## [v1.0.21] — 2026-05-21 — `voltex_asset` 100% documented (64 → 0 `missing_docs`)
+
+Third crate in the workspace `missing_docs` sweep. Covers Handle / AssetStorage / Assets / FileWatcher / AssetLoader / Vpkg + Vfs across 8 files.
+
+### Added
+
+- Crate-level docstring listing each public type plus its role; `#![warn(missing_docs)]` locks the count.
+- Module headers for `error` / `handle` / `storage` / `assets` / `watcher` / `loader` / `vfs`.
+- Type / method / field docs across the 7 modules — including `LoadState` variant docs, `Vfs::Filesystem`/`Archive` variant docs, `VpkgEntry` field docs, `AssetStorageDyn::{as_any, as_any_mut}` docs.
+
+### Verified
+
+- `cargo build -p voltex_asset` — zero `missing_docs` warnings (clean from previous 64).
+- `cargo test -p voltex_asset --lib` — 36 passed (no regression).
+- `cargo clippy --workspace --all-targets -- -D warnings` — clean.
+
+### Notes
+
+Pattern matches v1.0.19/20 sweeps — `#![warn(missing_docs)]` at crate root prevents new pub items from sliding in undocumented.
+
+---
+
 ## [v1.0.20] — 2026-05-21 — `voltex_platform` 100% documented (38 → 0 `missing_docs`)
 
 Second crate in the workspace `missing_docs` sweep (after v1.0.19).

@@ -1,14 +1,20 @@
+//! Type-erased aggregate over many [`AssetStorage<T>`]s, keyed by `TypeId`.
+
 use std::any::TypeId;
 use std::collections::HashMap;
 
 use crate::handle::Handle;
 use crate::storage::{AssetStorage, AssetStorageDyn};
 
+/// Holds one [`AssetStorage<T>`] per concrete asset type `T: 'static`.
+///
+/// Storages are created lazily on first `insert::<T>`.
 pub struct Assets {
     storages: HashMap<TypeId, Box<dyn AssetStorageDyn>>,
 }
 
 impl Assets {
+    /// Creates an empty `Assets` (no storages allocated yet).
     pub fn new() -> Self {
         Self {
             storages: HashMap::new(),
@@ -24,10 +30,12 @@ impl Assets {
             .unwrap()
     }
 
+    /// Inserts an asset of type `T`, allocating the per-type storage on demand.
     pub fn insert<T: 'static>(&mut self, asset: T) -> Handle<T> {
         self.storage_mut_or_insert::<T>().insert(asset)
     }
 
+    /// Returns the asset for `handle`, or `None` if stale / type never inserted.
     pub fn get<T: 'static>(&self, handle: Handle<T>) -> Option<&T> {
         self.storages
             .get(&TypeId::of::<T>())?
@@ -36,6 +44,7 @@ impl Assets {
             .get(handle)
     }
 
+    /// Mutable equivalent of [`get`](Self::get).
     pub fn get_mut<T: 'static>(&mut self, handle: Handle<T>) -> Option<&mut T> {
         self.storages
             .get_mut(&TypeId::of::<T>())?
@@ -44,6 +53,7 @@ impl Assets {
             .get_mut(handle)
     }
 
+    /// See [`AssetStorage::add_ref`]. No-op if `T` has no storage yet.
     pub fn add_ref<T: 'static>(&mut self, handle: Handle<T>) {
         if let Some(storage) = self
             .storages
@@ -54,6 +64,7 @@ impl Assets {
         }
     }
 
+    /// See [`AssetStorage::release`]. Returns `false` if `T` has no storage.
     pub fn release<T: 'static>(&mut self, handle: Handle<T>) -> bool {
         if let Some(storage) = self
             .storages
@@ -66,6 +77,7 @@ impl Assets {
         }
     }
 
+    /// Number of live assets of type `T` (0 if `T` has no storage yet).
     pub fn count<T: 'static>(&self) -> usize {
         self.storages
             .get(&TypeId::of::<T>())
@@ -73,6 +85,7 @@ impl Assets {
             .unwrap_or(0)
     }
 
+    /// Borrows the underlying [`AssetStorage<T>`], if it exists yet.
     pub fn storage<T: 'static>(&self) -> Option<&AssetStorage<T>> {
         self.storages
             .get(&TypeId::of::<T>())?
@@ -80,6 +93,7 @@ impl Assets {
             .downcast_ref::<AssetStorage<T>>()
     }
 
+    /// Mutably borrows the [`AssetStorage<T>`], creating it if absent.
     pub fn storage_mut<T: 'static>(&mut self) -> &mut AssetStorage<T> {
         self.storage_mut_or_insert::<T>()
     }

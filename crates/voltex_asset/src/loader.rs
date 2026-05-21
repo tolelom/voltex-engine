@@ -1,3 +1,7 @@
+//! Background asset loader. The worker thread reads bytes from disk and the
+//! caller's parse closure converts them to `T`; the main thread drains results
+//! via [`AssetLoader::process_loaded`] and inserts each asset into [`Assets`].
+
 use std::any::{Any, TypeId};
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -15,10 +19,14 @@ type ParseFn = Box<dyn FnOnce(&[u8]) -> Result<Box<dyn Any + Send>> + Send>;
 /// assigned handle as a raw (id, generation) pair.
 type InserterFn = Box<dyn FnOnce(&mut Assets, Box<dyn Any + Send>) -> (u32, u32)>;
 
+/// Current state of an in-flight load.
 #[derive(Debug)]
 pub enum LoadState {
+    /// Worker has not yet finished reading + parsing.
     Loading,
+    /// Asset has been inserted into [`Assets`] and is usable.
     Ready,
+    /// Read or parse failed; carries the human-readable error message.
     Failed(String),
 }
 
@@ -49,6 +57,9 @@ enum PendingState {
     Ready,
 }
 
+/// Background worker thread + per-load tracking. Owns a single worker that
+/// reads files sequentially; submit loads with [`AssetLoader::load`] and drain
+/// completed ones with [`AssetLoader::process_loaded`].
 pub struct AssetLoader {
     request_tx: Option<Sender<LoadRequest>>,
     result_rx: Receiver<LoadResult>,
@@ -60,6 +71,7 @@ pub struct AssetLoader {
 }
 
 impl AssetLoader {
+    /// Spawns the worker thread and returns a ready-to-use loader.
     pub fn new() -> Self {
         let (request_tx, request_rx) = channel::<LoadRequest>();
         let (result_tx, result_rx) = channel::<LoadResult>();
@@ -208,6 +220,8 @@ impl AssetLoader {
         }
     }
 
+    /// Signals the worker to stop, joins the thread. Pending requests still in
+    /// the queue are dropped.
     pub fn shutdown(mut self) {
         // Drop the sender to signal the worker to stop
         self.request_tx = None;

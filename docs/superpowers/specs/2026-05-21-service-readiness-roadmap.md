@@ -80,7 +80,8 @@
 | 9 | v1.0.17 structured logger | `[✅]` | (inline STATUS § v1.0.17) | de19527 |
 | 10 | v1.0.18 panic hook relocation to new() | `[✅]` | (inline STATUS § v1.0.18) | 6f55371 |
 | 11 | v1.0.19 voltex_math missing_docs 59→0 | `[✅]` | (inline STATUS § v1.0.19) | 8b44fed |
-| 12 | v1.0.20 voltex_platform missing_docs 38→0 | `[✅]` | (inline STATUS § v1.0.20) | (pending commit) |
+| 12 | v1.0.20 voltex_platform missing_docs 38→0 | `[✅]` | (inline STATUS § v1.0.20) | ced2333 |
+| 13 | v1.0.21 voltex_asset missing_docs 64→0 | `[✅]` | (inline STATUS § v1.0.21) | (pending commit) |
 | 7 | v1.0.15 cargo-deny | `[ ]` | — | — |
 | 8 | v1.0.16 CHANGELOG enforcement | `[ ]` | — | — |
 | 9 | v1.0.17 SemVer check | `[ ]` | — | — |

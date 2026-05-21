@@ -7,8 +7,11 @@ use std::path::{Path, PathBuf};
 use crate::error::{AssetError, Result};
 use crate::vpkg::{VpkgEntry, VpkgReader};
 
+/// Read-through abstraction over an on-disk root or an embedded `.vpkg` archive.
 pub enum Vfs {
+    /// Files are resolved relative to this base directory on real disk.
     Filesystem(PathBuf),
+    /// Files come from an embedded archive (e.g. `include_bytes!`).
     Archive(VpkgReaderOwned),
 }
 
@@ -27,6 +30,7 @@ impl VpkgReaderOwned {
         Ok(Self { bytes, entries })
     }
 
+    /// Returns the blob bytes for `path`, or `None` if not present.
     pub fn read(&self, path: &str) -> Option<&[u8]> {
         let entry = self.entries.iter().find(|e| e.path == path)?;
         let start = entry.offset as usize;
@@ -34,20 +38,25 @@ impl VpkgReaderOwned {
         Some(&self.bytes[start..end])
     }
 
+    /// Iterates over every entry path in the archive.
     pub fn list(&self) -> impl Iterator<Item = &str> {
         self.entries.iter().map(|e| e.path.as_str())
     }
 }
 
 impl Vfs {
+    /// Constructs a filesystem-backed VFS rooted at `base`.
     pub fn fs(base: impl Into<PathBuf>) -> Self {
         Vfs::Filesystem(base.into())
     }
 
+    /// Constructs an archive-backed VFS over an embedded `.vpkg` byte slice.
     pub fn archive_from_bytes(bytes: &'static [u8]) -> Result<Self> {
         Ok(Vfs::Archive(VpkgReaderOwned::from_static(bytes)?))
     }
 
+    /// Reads the file at `path` into a `Vec<u8>`. Returns `Err` on missing
+    /// file / IO error.
     pub fn read(&self, path: &str) -> Result<Vec<u8>> {
         match self {
             Vfs::Filesystem(base) => std::fs::read(base.join(path)).map_err(AssetError::from),
@@ -58,6 +67,7 @@ impl Vfs {
         }
     }
 
+    /// Returns `true` if `path` resolves to a file in this VFS.
     pub fn exists(&self, path: &str) -> bool {
         match self {
             Vfs::Filesystem(base) => base.join(path).exists(),
@@ -65,6 +75,8 @@ impl Vfs {
         }
     }
 
+    /// Returns every file path in this VFS, relative to the root, using
+    /// forward slashes.
     pub fn list(&self) -> Vec<String> {
         match self {
             Vfs::Filesystem(base) => list_dir_recursive(base, base),

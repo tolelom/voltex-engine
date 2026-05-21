@@ -173,6 +173,31 @@
 
 v1.0.9 부터는 **서비스 배포 완성도** 로드맵 (`docs/superpowers/specs/2026-05-21-service-readiness-roadmap.md`) 기준으로 진행.
 
+### v1.0.21 (2026-05-21) — voltex_asset 100% missing_docs (64 → 0) + `#![warn(missing_docs)]`
+
+세 번째 crate. 약 800 라인 / 8 파일 (lib/error/handle/storage/assets/watcher/loader/vpkg/vfs).
+
+**작업**:
+- crate-level docstring (모든 7 public type + 한 줄 책임 명시) + `#![warn(missing_docs)]`.
+- 모듈 헤더 7개 (handle/storage/assets/watcher/loader/vfs/error).
+- Public API doc:
+  - `Handle<T>` (struct + `Copy` semantics 명시)
+  - `AssetStorage<T>` (new/insert/get/get_mut/add_ref/release/len/is_empty/ref_count/replace_in_place/iter)
+  - `AssetStorageDyn` (as_any / as_any_mut / count)
+  - `Assets` (new/insert/get/get_mut/add_ref/release/count/storage/storage_mut)
+  - `FileWatcher` (new/watch/unwatch/poll_changes/watched_count)
+  - `AssetLoader` (new/shutdown), `LoadState` (Loading/Ready/Failed variant)
+  - `VpkgEntry` (path/offset/size fields), `VPKG_MAGIC`, `VPKG_VERSION`
+  - `VpkgReader` (parse/entries/list/read)
+  - `Vfs` (Filesystem/Archive variants + fs/archive_from_bytes/read/exists/list)
+  - `VpkgReaderOwned` (read/list)
+  - `AssetError` enum (이미 doc 있던 variants 유지)
+
+**검증**:
+- `cargo build -p voltex_asset` — 0 missing_docs warning (64 → 0).
+- `cargo test -p voltex_asset --lib` — 36 통과.
+- 워크스페이스 clippy 0 warning.
+
 ### v1.0.20 (2026-05-21) — voltex_platform 100% missing_docs (38 → 0) + `#![warn(missing_docs)]`
 
 v1.0.19 의 패턴을 두 번째 crate 에 적용. voltex_platform 은 ~250 라인 4 파일 (lib/window/input/game_loop).

@@ -1,7 +1,16 @@
+//! Generation-checked asset reference. Stale handles (slot was freed and the
+//! id reused) are detected by the `generation` field instead of dangling.
+
 use std::fmt;
 use std::hash::{Hash, Hasher};
 use std::marker::PhantomData;
 
+/// Typed reference to an asset stored in an [`AssetStorage`](crate::AssetStorage)
+/// or [`Assets`](crate::Assets).
+///
+/// Implements `Copy` so handles can be cloned freely. Equality compares both
+/// the slot id and the generation — a handle whose slot was freed and reused
+/// will never compare equal to the new occupant's handle.
 pub struct Handle<T> {
     pub(crate) id: u32,
     pub(crate) generation: u32,
