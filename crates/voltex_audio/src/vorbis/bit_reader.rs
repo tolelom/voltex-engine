@@ -61,6 +61,7 @@ impl<'a> BitReader<'a> {
         Ok(self.read_bits(8)? as u8)
     }
 
+    #[allow(dead_code)] // Vorbis spec method; reserved for full PCM-output wire (v1.1+).
     pub(super) fn read_u16(&mut self) -> crate::Result<u16> {
         Ok(self.read_bits(16)? as u16)
     }

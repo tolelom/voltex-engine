@@ -319,4 +319,68 @@ mod tests {
 
         glb
     }
+
+    // ── Panic-resistance fuzz tests ────────────────────────────────
+    //
+    // parse_gltf must return Result on any input — never panic on
+    // truncated GLB headers, corrupted chunk lengths, or JSON garbage.
+
+    fn fuzz_bytes(seed: u32, len: usize) -> Vec<u8> {
+        let mut s: u32 = if seed == 0 { 0xDEAD_BEEF } else { seed };
+        (0..len)
+            .map(|_| {
+                s ^= s << 13;
+                s ^= s >> 17;
+                s ^= s << 5;
+                (s & 0xFF) as u8
+            })
+            .collect()
+    }
+
+    #[test]
+    fn fuzz_parse_gltf_no_panic_on_empty() {
+        let _ = parse_gltf(&[]);
+    }
+
+    #[test]
+    fn fuzz_parse_gltf_no_panic_on_truncated_header() {
+        let header_full: [u8; 12] = [
+            0x67, 0x6C, 0x54, 0x46, // magic "glTF"
+            0x02, 0x00, 0x00, 0x00, // version 2
+            0x0C, 0x00, 0x00, 0x00, // length 12
+        ];
+        for n in 0..=header_full.len() {
+            let _ = parse_gltf(&header_full[..n]);
+        }
+    }
+
+    #[test]
+    fn fuzz_parse_gltf_no_panic_on_random_bytes() {
+        for seed in 1..=128u32 {
+            for &len in &[0usize, 1, 12, 32, 128, 512, 2048] {
+                let _ = parse_gltf(&fuzz_bytes(seed, len));
+            }
+        }
+    }
+
+    #[test]
+    fn fuzz_parse_gltf_no_panic_on_valid_magic_random_tail() {
+        let magic: [u8; 4] = [0x67, 0x6C, 0x54, 0x46];
+        for seed in 1..=64u32 {
+            for &tail_len in &[0usize, 4, 16, 64, 256, 1024] {
+                let mut data = magic.to_vec();
+                data.extend_from_slice(&fuzz_bytes(seed, tail_len));
+                let _ = parse_gltf(&data);
+            }
+        }
+    }
+
+    #[test]
+    fn fuzz_parse_gltf_no_panic_on_truncated_valid_glb() {
+        // Take a valid GLB and feed every prefix of it.
+        let valid = build_minimal_glb_triangle();
+        for n in 0..=valid.len() {
+            let _ = parse_gltf(&valid[..n]);
+        }
+    }
 }

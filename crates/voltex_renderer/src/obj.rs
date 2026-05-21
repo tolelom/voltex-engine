@@ -291,4 +291,83 @@ f 1//1 3//1 2//1
         // 2 triangles → 6 indices
         assert_eq!(data.indices.len(), 6);
     }
+
+    // ── Panic-resistance fuzz tests ────────────────────────────────
+    //
+    // parse_obj returns ObjData directly (no Result) — so the
+    // strongest guarantee we can verify is "never panic". Empty
+    // input, random UTF-8 bytes, malformed face indices, and very
+    // long lines must all return some ObjData (possibly empty).
+
+    fn fuzz_str(seed: u32, len: usize) -> String {
+        // Produce printable ASCII so we hit the OBJ parser's actual
+        // tokenizer rather than UTF-8 decoding paths.
+        let mut s: u32 = if seed == 0 { 0xDEAD_BEEF } else { seed };
+        (0..len)
+            .map(|_| {
+                s ^= s << 13;
+                s ^= s >> 17;
+                s ^= s << 5;
+                // Printable ASCII 32..=126 plus newlines.
+                let r = (s % 96) as u8;
+                if r < 2 { '\n' } else { (32 + (r % 95)) as char }
+            })
+            .collect()
+    }
+
+    #[test]
+    fn fuzz_parse_obj_no_panic_on_empty() {
+        let _ = parse_obj("");
+    }
+
+    #[test]
+    fn fuzz_parse_obj_no_panic_on_random_text() {
+        for seed in 1..=128u32 {
+            for &len in &[0usize, 1, 16, 128, 1024, 4096] {
+                let _ = parse_obj(&fuzz_str(seed, len));
+            }
+        }
+    }
+
+    #[test]
+    fn fuzz_parse_obj_no_panic_on_malformed_directives() {
+        // Each line starts with a known OBJ directive but has
+        // garbage operands — the parser must not panic on missing or
+        // non-numeric fields.
+        let cases = [
+            "v",
+            "v 1.0",
+            "v 1.0 2.0",
+            "v abc def ghi",
+            "vn",
+            "vn 1",
+            "vt",
+            "f",
+            "f 1",
+            "f 1/2",
+            "f 1/2/3 4/5/6",
+            "f 999999 999999 999999", // indices way out of range
+            "f -1 -2 -3",             // negative (relative) indices
+            "f 1/2/3/4 1/2/3/4 1/2/3/4", // too many slashes
+            "g name",
+            "o name",
+            "s 1",
+            "# comment",
+            "",
+        ];
+        for c in &cases {
+            let _ = parse_obj(c);
+            // Also wrap with the previous-directive context to catch
+            // ordering-dependent panics.
+            let _ = parse_obj(&format!("v 1.0 2.0 3.0\n{}", c));
+        }
+    }
+
+    #[test]
+    fn fuzz_parse_obj_no_panic_on_very_long_lines() {
+        // 100 KB single line of "v 1 2 3 " repeated — exercises the
+        // line buffer / splitter, not a normal OBJ shape.
+        let long = "v 1 2 3 ".repeat(12500);
+        let _ = parse_obj(&long);
+    }
 }

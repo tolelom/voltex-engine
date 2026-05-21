@@ -1,6 +1,10 @@
 pub mod error;
 pub mod audio_clip;
 pub mod wav;
+// `ogg` + `vorbis` are intentionally NOT registered here in v1.0.x.
+// Their source exists under src/ but is not in the compilation graph —
+// v1.0.8 surfaced this as an unintentional deferral from Phase 6-1.
+// Wiring (+ clippy/audio-path integration) is scheduled for v1.0.9.
 pub mod mixing;
 #[cfg(target_os = "windows")]
 pub mod wasapi;

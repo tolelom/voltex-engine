@@ -291,4 +291,56 @@ mod tests {
         assert_eq!(pages[0].serial, 42);
         assert_eq!(pages[0].page_sequence, 7);
     }
+
+    // ── Panic-resistance fuzz tests ────────────────────────────────
+    //
+    // parse_ogg must return Result on any input. OGG page parsing
+    // includes a variable segment table whose entries control how
+    // much subsequent data is consumed — a classic source of
+    // off-by-one / out-of-bounds panics.
+
+    fn fuzz_bytes(seed: u32, len: usize) -> Vec<u8> {
+        let mut s: u32 = if seed == 0 { 0xDEAD_BEEF } else { seed };
+        (0..len)
+            .map(|_| {
+                s ^= s << 13;
+                s ^= s >> 17;
+                s ^= s << 5;
+                (s & 0xFF) as u8
+            })
+            .collect()
+    }
+
+    #[test]
+    fn fuzz_parse_ogg_no_panic_on_empty() {
+        let _ = parse_ogg(&[]);
+    }
+
+    #[test]
+    fn fuzz_parse_ogg_no_panic_on_truncated_oggs_capture() {
+        let capture = b"OggS";
+        for n in 0..=capture.len() {
+            let _ = parse_ogg(&capture[..n]);
+        }
+    }
+
+    #[test]
+    fn fuzz_parse_ogg_no_panic_on_random_bytes() {
+        for seed in 1..=128u32 {
+            for &len in &[0usize, 4, 27, 64, 256, 1024] {
+                let _ = parse_ogg(&fuzz_bytes(seed, len));
+            }
+        }
+    }
+
+    #[test]
+    fn fuzz_parse_ogg_no_panic_on_capture_random_tail() {
+        for seed in 1..=128u32 {
+            for &tail_len in &[0usize, 4, 23, 64, 256, 1024] {
+                let mut data = b"OggS".to_vec();
+                data.extend_from_slice(&fuzz_bytes(seed, tail_len));
+                let _ = parse_ogg(&data);
+            }
+        }
+    }
 }

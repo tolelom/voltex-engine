@@ -14,8 +14,13 @@ use super::residue::{decode_residue_config, ResidueConfig};
 #[derive(Debug, Clone)]
 pub(super) struct Mapping {
     pub(super) submaps: u8,
+    // Coupling fields parsed per Vorbis spec but not consumed by the
+    // current decoder path; retained for stereo-coupling decode (v1.1+).
+    #[allow(dead_code)]
     pub(super) coupling_steps: u16,
+    #[allow(dead_code)]
     pub(super) coupling_magnitude: Vec<u8>,
+    #[allow(dead_code)]
     pub(super) coupling_angle: Vec<u8>,
     pub(super) mux: Vec<u8>,
     pub(super) submap_floor: Vec<u8>,
@@ -87,7 +92,11 @@ pub(super) fn decode_mapping(reader: &mut BitReader, channels: u8) -> crate::Res
 #[derive(Debug, Clone)]
 pub(super) struct Mode {
     pub(super) block_flag: bool,
+    // Vorbis I § 4.2.4 forces both fields to 0; parsed and retained for
+    // forward compatibility but the decoder never branches on them.
+    #[allow(dead_code)]
     pub(super) window_type: u16,
+    #[allow(dead_code)]
     pub(super) transform_type: u16,
     pub(super) mapping: u8,
 }

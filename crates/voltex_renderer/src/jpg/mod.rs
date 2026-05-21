@@ -330,4 +330,54 @@ mod tests {
         let data = [0xFF, 0xD8, 0x00]; // SOI then garbage
         assert!(parse_jpg(&data).is_err());
     }
+
+    // ── Panic-resistance fuzz tests ────────────────────────────────
+    //
+    // parse_jpg must return Result on any input. JPEG parsers are
+    // notoriously panic-prone (Huffman tables, RST markers, MCU
+    // boundaries) — this catches index/slice/unwrap panics from
+    // arbitrary input.
+
+    fn fuzz_bytes(seed: u32, len: usize) -> Vec<u8> {
+        let mut s: u32 = if seed == 0 { 0xDEAD_BEEF } else { seed };
+        (0..len)
+            .map(|_| {
+                s ^= s << 13;
+                s ^= s >> 17;
+                s ^= s << 5;
+                (s & 0xFF) as u8
+            })
+            .collect()
+    }
+
+    #[test]
+    fn fuzz_parse_jpg_no_panic_on_empty() {
+        let _ = parse_jpg(&[]);
+    }
+
+    #[test]
+    fn fuzz_parse_jpg_no_panic_on_soi_only() {
+        let _ = parse_jpg(&[0xFF, 0xD8]);
+        let _ = parse_jpg(&[0xFF]);
+    }
+
+    #[test]
+    fn fuzz_parse_jpg_no_panic_on_random_bytes() {
+        for seed in 1..=128u32 {
+            for &len in &[0usize, 1, 2, 8, 64, 256, 1024] {
+                let _ = parse_jpg(&fuzz_bytes(seed, len));
+            }
+        }
+    }
+
+    #[test]
+    fn fuzz_parse_jpg_no_panic_on_soi_random_tail() {
+        for seed in 1..=128u32 {
+            for &tail_len in &[0usize, 1, 16, 64, 256, 1024] {
+                let mut data = vec![0xFF, 0xD8];
+                data.extend_from_slice(&fuzz_bytes(seed, tail_len));
+                let _ = parse_jpg(&data);
+            }
+        }
+    }
 }

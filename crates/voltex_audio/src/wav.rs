@@ -475,4 +475,55 @@ mod tests {
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("Unsupported WAV format tag"));
     }
+
+    // ── Panic-resistance fuzz tests ────────────────────────────────
+    //
+    // parse_wav must return Result on any input. RIFF chunk parsers
+    // are vulnerable to integer underflow on declared chunk sizes
+    // larger than the buffer.
+
+    fn fuzz_bytes(seed: u32, len: usize) -> Vec<u8> {
+        let mut s: u32 = if seed == 0 { 0xDEAD_BEEF } else { seed };
+        (0..len)
+            .map(|_| {
+                s ^= s << 13;
+                s ^= s >> 17;
+                s ^= s << 5;
+                (s & 0xFF) as u8
+            })
+            .collect()
+    }
+
+    #[test]
+    fn fuzz_parse_wav_no_panic_on_empty() {
+        let _ = parse_wav(&[]);
+    }
+
+    #[test]
+    fn fuzz_parse_wav_no_panic_on_truncated_riff_header() {
+        let riff_header = b"RIFF\x00\x00\x00\x00WAVE";
+        for n in 0..=riff_header.len() {
+            let _ = parse_wav(&riff_header[..n]);
+        }
+    }
+
+    #[test]
+    fn fuzz_parse_wav_no_panic_on_random_bytes() {
+        for seed in 1..=128u32 {
+            for &len in &[0usize, 4, 12, 44, 128, 512, 2048] {
+                let _ = parse_wav(&fuzz_bytes(seed, len));
+            }
+        }
+    }
+
+    #[test]
+    fn fuzz_parse_wav_no_panic_on_riff_magic_random_tail() {
+        for seed in 1..=128u32 {
+            for &tail_len in &[0usize, 4, 12, 36, 128, 512] {
+                let mut data = b"RIFF".to_vec();
+                data.extend_from_slice(&fuzz_bytes(seed, tail_len));
+                let _ = parse_wav(&data);
+            }
+        }
+    }
 }

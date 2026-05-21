@@ -447,4 +447,59 @@ mod tests {
         assert_eq!(h, 8);
         assert_eq!(result, pixels);
     }
+
+    // ── Panic-resistance fuzz tests ────────────────────────────────
+    //
+    // parse_png must always return Result, never panic, on any input.
+    // Truncated, corrupted, or random byte sequences must surface as
+    // Err — never as an index-out-of-bounds / unwrap / slice panic.
+
+    /// Deterministic 8-bit byte generator (xorshift32). External
+    /// dependencies are forbidden by the engine's dependency policy,
+    /// so a tiny inline PRNG is used instead of `rand` / `proptest`.
+    fn fuzz_bytes(seed: u32, len: usize) -> Vec<u8> {
+        let mut s: u32 = if seed == 0 { 0xDEAD_BEEF } else { seed };
+        (0..len)
+            .map(|_| {
+                s ^= s << 13;
+                s ^= s >> 17;
+                s ^= s << 5;
+                (s & 0xFF) as u8
+            })
+            .collect()
+    }
+
+    #[test]
+    fn fuzz_parse_png_no_panic_on_empty() {
+        let _ = parse_png(&[]);
+    }
+
+    #[test]
+    fn fuzz_parse_png_no_panic_on_truncated_signature() {
+        let signature: [u8; 8] = [137, 80, 78, 71, 13, 10, 26, 10];
+        for n in 0..=signature.len() {
+            let _ = parse_png(&signature[..n]);
+        }
+    }
+
+    #[test]
+    fn fuzz_parse_png_no_panic_on_random_bytes() {
+        for seed in 1..=128u32 {
+            for &len in &[0usize, 1, 8, 13, 64, 256, 1024] {
+                let _ = parse_png(&fuzz_bytes(seed, len));
+            }
+        }
+    }
+
+    #[test]
+    fn fuzz_parse_png_no_panic_on_valid_signature_random_tail() {
+        let signature: [u8; 8] = [137, 80, 78, 71, 13, 10, 26, 10];
+        for seed in 1..=128u32 {
+            for &tail_len in &[0usize, 1, 16, 64, 256, 1024] {
+                let mut data = signature.to_vec();
+                data.extend_from_slice(&fuzz_bytes(seed, tail_len));
+                let _ = parse_png(&data);
+            }
+        }
+    }
 }

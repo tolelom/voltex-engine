@@ -7,8 +7,12 @@ use super::bit_reader::{bit_reverse, float32_unpack, ilog, lookup1_values, BitRe
 #[derive(Debug, Clone)]
 pub(super) struct Codebook {
     pub(super) dimensions: u16,
+    // `entries` / `lengths` parsed per Vorbis spec but not consumed by the
+    // current decoder path; retained for full PCM-output wire (v1.1+).
+    #[allow(dead_code)]
     pub(super) entries: u32,
     /// Codeword lengths for each entry (0 = unused).
+    #[allow(dead_code)]
     pub(super) lengths: Vec<u8>,
     /// Lookup type (0 = no lookup, 1 = implicitly defined, 2 = explicitly defined).
     pub(super) lookup_type: u8,
