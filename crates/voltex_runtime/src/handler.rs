@@ -145,6 +145,17 @@ fn redraw(app: &mut RuntimeApp, event_loop: &ActiveEventLoop) {
     }
 
     app.tick_systems_only(dt);
+
+    // HUD: feed the per-frame dt, push a new window title when the update
+    // interval elapses. The HUD's tick() returns None either when the
+    // interval has not elapsed or when fps_in_title is disabled — both
+    // paths leave the title alone.
+    if let Some(new_title) = app.hud.tick(dt) {
+        if let Some(state) = app.runtime_state.as_ref() {
+            state.window.handle.set_title(&new_title);
+        }
+    }
+
     // End-of-frame: clear just_pressed / just_released / mouse_delta AFTER
     // user systems have observed them. Previously this ran before
     // tick_systems_only, so `is_key_just_pressed` was always false in user

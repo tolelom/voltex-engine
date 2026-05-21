@@ -68,6 +68,9 @@ pub struct RuntimeApp {
     pub registry: ComponentRegistry,
     /// The ECS world the runtime ticks each frame.
     pub world: World,
+    /// HUD primitive — rolling FPS counter + user-controlled title segment,
+    /// both surfaced through the OS window title. See [`crate::Hud`].
+    pub hud: crate::Hud,
     /// The configuration passed to [`RuntimeApp::new`].
     pub config: RuntimeConfig,
 }
@@ -118,6 +121,7 @@ impl RuntimeApp {
             build(&mut world, &mut registry);
         }
 
+        let hud = crate::Hud::new(config.window.title.clone());
         let mut app = Self {
             runtime_state: None,
             user_systems: Vec::new(),
@@ -130,6 +134,7 @@ impl RuntimeApp {
             assets: RenderAssets::new(),
             registry,
             world,
+            hud,
             config,
         };
         let system_setup = app.config.setup_systems.take();

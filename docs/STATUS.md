@@ -173,6 +173,27 @@
 
 v1.0.9 부터는 **서비스 배포 완성도** 로드맵 (`docs/superpowers/specs/2026-05-21-service-readiness-roadmap.md`) 기준으로 진행.
 
+### v1.0.32 (2026-05-21) — HUD primitive in `voltex_runtime`
+
+P0. shipping 게임의 score/FPS 표시를 위한 최소 HUD. v1 은 title-bar 방식 (rendering pipeline 변경 0). 진짜 in-window overlay 는 v1.1+ (editor 와 공유할 text primitive 가 선행).
+
+**신규**:
+- `crates/voltex_runtime/src/hud.rs` — `Hud` 구조체:
+  - rolling FPS avg (sample window 60 ≈ 1s @60Hz), `average_fps()` / `instantaneous_fps()`
+  - user-controlled segment (`set_user_segment(Some/None)`)
+  - 업데이트 cadence 조정 (`set_update_interval`, default 0.25s) + sample window 조정
+  - `tick(dt) -> Option<String>` cadence 만료 시 새 title 반환
+  - 10개 단위 테스트
+- `RuntimeApp` 에 `pub hud: Hud` 필드, `new()` 에서 `config.window.title` 으로 초기화
+- `handler` redraw: `tick_systems_only` 직후 `app.hud.tick(dt)` → 새 title 이면 winit 윈도우에 적용
+- `examples/runtime_demo`: 시작 시 행성/위성 카운트 → `set_user_segment(Some(..))` 데모
+
+**검증**:
+- `cargo build -p voltex_runtime` 클린, `cargo test -p voltex_runtime --lib`: 46 통과 (36 → +10)
+- 워크스페이스 clippy 0 warning, runtime_demo 빌드 OK
+
+**한계**: `add_system` closure 는 `&mut World` 만 받아서 `app.hud` 접근 불가. game 은 startup 에서 set 하거나 외부에서 호출. system-context API 는 v1.1+.
+
 ### v1.0.31 (2026-05-21) — E2E `voltex new → build` 테스트 + nightly CI
 
 P0. quickstart 흐름이 v1.0.3 / v1.0.9 처럼 우연히 발견되던 패턴을 자동화로 전환.

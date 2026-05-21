@@ -10,6 +10,36 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## [v1.0.32] — 2026-05-21 — HUD primitive in `voltex_runtime`
+
+P0 service-readiness item. Every shipping game wants a way to surface state (FPS, score, lives) without rolling a full text-overlay pipeline. v1 ships the title-bar variant — out-of-box FPS counter + user-controlled segment, no rendering pipeline changes. In-window overlay rendering is deferred to v1.1 (needs a shared text primitive between editor and runtime).
+
+### Added
+
+- `crates/voltex_runtime/src/hud.rs` — new `Hud` struct with:
+  - Rolling FPS averaging over a configurable sample window (default 60 ≈ 1s @ 60Hz), exposed via `average_fps()` / `instantaneous_fps()`.
+  - User-controllable title segment (`set_user_segment(Some/None)`).
+  - Configurable update cadence (`set_update_interval`, default 0.25s) and sample window (`set_sample_window`).
+  - `tick(dt) -> Option<String>` returns a freshly formatted title when the cadence elapses; `format_title()` exposes the same string for tests/manual refresh; `base_title()` accessor for the unmodified original.
+  - 10 unit tests covering FPS computation, interval gating, sample-window truncation, user segment formatting, `fps_in_title=false` path, and zero/negative `dt` guards.
+- `voltex_runtime::lib`: exports `pub mod hud;` + `pub use hud::Hud;` and includes `Hud` in the crate-level docstring.
+- `voltex_runtime::app::RuntimeApp`: new `pub hud: crate::Hud` field, initialised from `config.window.title` in `new()`.
+- `voltex_runtime::handler` redraw path: feeds `frame_dt` into `app.hud.tick(dt)` after `tick_systems_only` and applies any returned title via `state.window.handle.set_title(&new_title)`.
+- `examples/runtime_demo`: demo wiring — sets `app.hud.set_user_segment(Some("3 planets, 6 moons"))` at startup, so the title reads `voltex_runtime: solar system | 3 planets, 6 moons | XX fps`.
+
+### Verified
+
+- `cargo build -p voltex_runtime` clean, 0 `missing_docs` warnings.
+- `cargo test -p voltex_runtime --lib` — 46 passed (was 36, +10 HUD).
+- `cargo clippy --workspace --all-targets -- -D warnings` — clean.
+- `cargo build -p runtime_demo` clean (HUD wiring builds).
+
+### Notes
+
+`add_system` closures cannot borrow `&mut app.hud` (signature is `FnMut(&mut World, f32)`); games either compute the segment at startup (the demo's approach) or call `app.hud.set_user_segment(...)` from outside the system list (e.g. in a Lua FFI binding once that lands). A cleaner "system context" API is v1.1+ work.
+
+---
+
 ## [v1.0.31] — 2026-05-21 — E2E `voltex new → build` test + nightly CI
 
 P0 service-readiness item. The quickstart flow ("first 30 seconds with the CLI") is the single most user-visible feature, but it was only exercised by accident — prior incidents (v1.0.3 manifest validation, v1.0.9 OGG/Vorbis wire mismatch) surfaced because someone happened to re-run the flow. This cycle adds an automated regression detector.

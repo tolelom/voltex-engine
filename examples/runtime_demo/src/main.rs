@@ -85,6 +85,25 @@ fn upload_meshes_and_handles(
 }
 
 fn register_orbit_system(app: &mut RuntimeApp) {
+    // HUD demo: set a one-shot user segment shown in the window title.
+    // The runtime auto-appends the FPS counter, so the title bar reads
+    // "voltex_runtime: solar system | 3 planets, 6 moons | XX fps".
+    let bodies = app
+        .world
+        .query::<Tag>()
+        .filter(|(_, t)| t.0 == PLANET_TAG || t.0 == MOON_TAG)
+        .count();
+    let planets = app
+        .world
+        .query::<Tag>()
+        .filter(|(_, t)| t.0 == PLANET_TAG)
+        .count();
+    app.hud.set_user_segment(Some(format!(
+        "{} planets, {} moons",
+        planets,
+        bodies - planets
+    )));
+
     // Sun spins slowly; planets faster; moons fastest. Two-pass to avoid
     // overlapping borrows: collect (entity, delta) then mutate Transforms.
     app.add_system(|world, dt| {
