@@ -49,6 +49,11 @@ pub mod alsa;
 #[cfg(target_os = "linux")]
 pub use alsa::AlsaBackend;
 
+#[cfg(target_os = "macos")]
+pub mod coreaudio;
+#[cfg(target_os = "macos")]
+pub use coreaudio::CoreAudioBackend;
+
 /// Pick the best backend the OS offers, or fall back to `NullBackend` so the
 /// audio thread can keep running silently in headless or device-less envs.
 pub fn make_backend() -> Box<dyn AudioBackend> {
@@ -64,6 +69,13 @@ pub fn make_backend() -> Box<dyn AudioBackend> {
         match AlsaBackend::new() {
             Ok(b) => return Box::new(b),
             Err(e) => eprintln!("[voltex_audio] ALSA init failed: {} — falling back to null", e),
+        }
+    }
+    #[cfg(target_os = "macos")]
+    {
+        match CoreAudioBackend::new() {
+            Ok(b) => return Box::new(b),
+            Err(e) => eprintln!("[voltex_audio] CoreAudio init failed: {} — falling back to null", e),
         }
     }
     Box::new(NullBackend::new())

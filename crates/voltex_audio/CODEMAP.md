@@ -1,7 +1,7 @@
 # voltex_audio
 
 ## 책임 (한 줄)
-오디오 — WAV/OGG 디코더, AudioBackend (WASAPI/ALSA/Null), 3D 사운드, 믹서, 이펙트.
+오디오 — WAV/OGG 디코더, AudioBackend (WASAPI/ALSA/CoreAudio/Null), 3D 사운드, 믹서, 이펙트.
 
 ## 공개 API 진입점
 - `AudioSystem` — 메인 오디오 시스템 (src/audio_system.rs)
@@ -13,7 +13,7 @@
 - `EffectChain`, `Reverb`, `EchoDelay` — 이펙트 (src/effect_chain.rs, src/reverb.rs)
 - spatial — `distance_attenuation`, `stereo_pan`, `doppler_shift`, HRTF (src/spatial.rs, src/hrtf.rs)
 - `Occlusion` — 레이 기반 차폐 (src/occlusion.rs)
-- `AudioBackend` trait + impls (P1): `WasapiBackend` (Windows), `AlsaBackend` (Linux), `NullBackend` (헤드리스/CI), `make_backend()` (OS 자동 분기) (src/backend/)
+- `AudioBackend` trait + impls (P1+B3): `WasapiBackend` (Windows), `AlsaBackend` (Linux), `CoreAudioBackend` (macOS, B3), `NullBackend` (헤드리스/CI), `make_backend()` (OS 자동 분기) (src/backend/)
 - `BackendError` — backend-level error type
 - `AudioError`, `Result` — thiserror 기반 에러 (Generic/Io) (src/error.rs)
 
@@ -26,7 +26,7 @@
 - `effect_chain`, `reverb`, `fade_curves` — 이펙트 (src/effect_chain.rs 등)
 - `spatial`, `hrtf`, `occlusion` — 3D 오디오 (src/spatial.rs 등)
 - `wasapi` — Windows 백엔드 FFI (src/wasapi.rs)
-- `backend` — `AudioBackend` trait + `null.rs` + `wasapi.rs` (windows) + `alsa.rs` (linux) + `make_backend` (P1)
+- `backend` — `AudioBackend` trait + `null.rs` + `wasapi.rs` (windows) + `alsa.rs` (linux) + `coreaudio.rs` (macos, B3) + `make_backend` (P1+B3)
 
 ## 의존성
 - voltex crate: voltex_math (3D 사운드 좌표)
@@ -35,9 +35,9 @@
 ## 변경 시 주의점
 - WASAPI 는 Windows 전용 FFI — `backend::WasapiBackend` 가 trait impl 로 래핑
 - ALSA 는 Linux 전용 FFI — `backend::AlsaBackend` (cfg(target_os = "linux") only). `#[link(name = "asound")]` → 사용자 시스템에 `libasound2` (apt) 또는 `alsa-lib` (pacman) 설치 필요.
-- ALSA 초기화 실패 시 `make_backend()` 가 stderr 에 경고 출력 후 `NullBackend` 로 fallback — 헤드리스 환경에서도 audio 스레드 panic 없음.
-- macOS CoreAudio 백엔드는 Cycle 11 (B3) 의 일.
-- ALSA backend 는 Windows dev 머신에서 작성됨 → Linux 환경에서 실제 cargo build + audio_demo 검증은 향후 (spec § 8.1).
+- ALSA / CoreAudio 초기화 실패 시 `make_backend()` 가 stderr 에 경고 출력 후 `NullBackend` 로 fallback — 헤드리스 환경에서도 audio 스레드 panic 없음.
+- CoreAudio (`backend::CoreAudioBackend`, cfg(target_os = "macos") only): AudioToolbox 의 AudioQueue API 사용. `#[link(name = "AudioToolbox", kind = "framework")]` — macOS 표준 framework 라 별도 설치 불필요. f32 LE stereo @48kHz 고정. 4 buffer × 1024 frame Condvar 동기화로 push-style trait 에 wrap.
+- ALSA / CoreAudio 둘 다 Windows dev 머신에서 작성됨 → 각 OS 에서 실제 cargo build + audio_demo 검증은 향후 (P1 spec § 8.1, B3 spec § 6).
 - vorbis는 src/vorbis/ 디렉토리로 분리됨 (bit_reader, codebook, floor, residue, headers, imdct, decoder)
 - wasapi.rs는 521줄 (spec 만족, 분리 대상 아님)
 - AudioSource 컴포넌트는 ECS와 함께 사용
@@ -45,4 +45,4 @@
 ## 테스트
 - 단위 테스트: src/**/*.rs `#[cfg(test)]`
 - 실행: `cargo test -p voltex_audio --lib`
-- 현재 테스트 개수: 89개 (P1 +5: backend null ×3, make_backend smoke, BackendError Display)
+- 현재 테스트 개수: 89개 (Windows host 기준). B3 의 CoreAudio 테스트 +2 는 macOS host 에서만 컴파일/실행 (cfg(target_os = "macos")).
