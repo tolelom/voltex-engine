@@ -1,3 +1,7 @@
+//! Narrowphase contact generation between specific shape pairs (sphere-sphere,
+//! sphere-box, capsule-sphere, etc.). Each function returns the contact tuple
+//! `(normal_A_to_B, depth, point_on_a, point_on_b)` or `None`.
+
 use voltex_math::Vec3;
 
 /// Returns (normal A→B, depth, point_on_a, point_on_b) or None if no collision.
@@ -27,6 +31,7 @@ pub fn sphere_vs_sphere(
     Some((normal, depth, point_on_a, point_on_b))
 }
 
+/// Sphere-vs-Box (AABB) contact. Returns `(normal A→B, depth, point_on_a, point_on_b)`.
 pub fn sphere_vs_box(
     sphere_pos: Vec3, radius: f32,
     box_pos: Vec3, half_extents: Vec3,
@@ -101,6 +106,7 @@ pub fn sphere_vs_box(
     Some((normal, depth, point_on_a, point_on_b))
 }
 
+/// Box-vs-Box (AABB) contact. Returns `(normal A→B, depth, point_on_a, point_on_b)`.
 pub fn box_vs_box(
     pos_a: Vec3, half_a: Vec3,
     pos_b: Vec3, half_b: Vec3,

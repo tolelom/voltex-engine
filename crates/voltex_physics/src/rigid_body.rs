@@ -1,21 +1,38 @@
+//! Rigid body component + per-world physics configuration.
+
 use voltex_math::Vec3;
 
+/// Bodies whose linear+angular velocity stay under this threshold for
+/// `SLEEP_TIME_THRESHOLD` seconds are put to sleep.
 pub const SLEEP_VELOCITY_THRESHOLD: f32 = 0.01;
+/// Seconds a body must remain "quiet" before it is put to sleep.
 pub const SLEEP_TIME_THRESHOLD: f32 = 0.5;
 
+/// Rigid body state attached to an entity by the physics solver.
+///
+/// Set `mass = 0` for kinematic / static bodies (see [`RigidBody::statik`]).
 #[derive(Debug, Clone, Copy)]
 pub struct RigidBody {
+    /// Linear velocity in world space.
     pub velocity: Vec3,
+    /// Angular velocity in world space.
     pub angular_velocity: Vec3,
+    /// Body mass in kg. Zero means immovable (infinite mass).
     pub mass: f32,
+    /// Coefficient of restitution in `[0.0, 1.0]` (0 = no bounce).
     pub restitution: f32,
+    /// Per-body multiplier applied to `PhysicsConfig::gravity`.
     pub gravity_scale: f32,
-    pub friction: f32, // Coulomb friction coefficient, default 0.5
+    /// Coulomb friction coefficient (default 0.5).
+    pub friction: f32,
+    /// `true` while the body is asleep (skipped by the integrator).
     pub is_sleeping: bool,
+    /// Seconds the body has been "quiet" (drives the sleep transition).
     pub sleep_timer: f32,
 }
 
 impl RigidBody {
+    /// Creates a dynamic body with the given mass and engine defaults.
     pub fn dynamic(mass: f32) -> Self {
         Self {
             velocity: Vec3::ZERO,
@@ -29,6 +46,8 @@ impl RigidBody {
         }
     }
 
+    /// Creates an immovable body (mass 0, gravity scale 0). Useful for
+    /// terrain, level geometry, kinematic platforms.
     pub fn statik() -> Self {
         Self {
             velocity: Vec3::ZERO,
@@ -42,10 +61,12 @@ impl RigidBody {
         }
     }
 
+    /// `1.0 / mass`, or `0.0` for static bodies (mass == 0).
     pub fn inv_mass(&self) -> f32 {
         if self.mass == 0.0 { 0.0 } else { 1.0 / self.mass }
     }
 
+    /// `true` if this body is treated as immovable (mass == 0).
     pub fn is_static(&self) -> bool {
         self.mass == 0.0
     }
@@ -57,9 +78,13 @@ impl RigidBody {
     }
 }
 
+/// Per-world physics tuning knobs.
 pub struct PhysicsConfig {
+    /// Global acceleration applied each step (default `(0, -9.81, 0)`).
     pub gravity: Vec3,
+    /// Fixed simulation timestep in seconds (default `1/60`).
     pub fixed_dt: f32,
+    /// Sequential-impulse solver iteration count.
     pub solver_iterations: u32,
 }
 

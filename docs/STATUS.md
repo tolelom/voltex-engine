@@ -173,6 +173,27 @@
 
 v1.0.9 부터는 **서비스 배포 완성도** 로드맵 (`docs/superpowers/specs/2026-05-21-service-readiness-roadmap.md`) 기준으로 진행.
 
+### v1.0.25 (2026-05-21) — voltex_physics 100% missing_docs + `#![warn(missing_docs)]`
+
+일곱 번째 crate. 14 파일 (BVH/Colliders/Narrow/GJK+EPA/Contact/RigidBody/Integrator/Solver/Raycast/CCD/MeshCollider).
+
+**작업**:
+- Crate-level docstring + `#![warn(missing_docs)]`.
+- 모듈 헤더 13개 (bvh/ray/collider/contact/narrow/gjk/collision/rigid_body/integrator/solver/raycast/ccd/mesh_collider).
+- Public API:
+  - `RigidBody` 8 field + dynamic/statik/inv_mass/is_static/wake doc
+  - `PhysicsConfig` 3 field + sleep constants
+  - `Collider` 4 variant + 모든 field
+  - `ConvexHull` (vertices field + new/support)
+  - `ContactPoint` 6 field
+  - `RayHit` 4 field, `MeshCollider`/`MeshHit` 4+3 field
+  - `BvhTree` + build, `detect_collisions`, `integrate`, `physics_step`, `resolve_collisions`, `sphere_vs_box`/`box_vs_box`
+
+**검증**:
+- `cargo build -p voltex_physics` — 0 missing_docs warning.
+- `cargo test -p voltex_physics --lib` — 106 통과.
+- 워크스페이스 clippy 0 warning.
+
 ### v1.0.24 (2026-05-21) — voltex_audio 100% missing_docs + `#![warn(missing_docs)]`
 
 여섯 번째 crate. 21 파일 (in-house audio 스택 전체).

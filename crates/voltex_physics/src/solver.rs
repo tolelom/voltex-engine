@@ -1,3 +1,5 @@
+//! Sequential-impulse contact solver + `physics_step` top-level driver.
+
 use voltex_ecs::{World, Entity};
 use voltex_ecs::Transform;
 use voltex_math::Vec3;
@@ -12,6 +14,8 @@ use crate::ccd;
 const POSITION_SLOP: f32 = 0.01;
 const POSITION_PERCENT: f32 = 0.4;
 
+/// Runs `iterations` rounds of sequential-impulse resolution over `contacts`,
+/// updating velocities and applying positional correction (Baumgarte-style).
 pub fn resolve_collisions(world: &mut World, contacts: &[ContactPoint], iterations: u32) {
     // Wake sleeping bodies that are in contact
     wake_colliding_bodies(world, contacts);
@@ -190,6 +194,7 @@ fn wake_colliding_bodies(world: &mut World, contacts: &[ContactPoint]) {
     }
 }
 
+/// Runs one full physics step: CCD → integrate → detect → resolve.
 pub fn physics_step(world: &mut World, config: &PhysicsConfig) {
     // CCD: for fast-moving bodies, check for tunneling
     apply_ccd(world, config);

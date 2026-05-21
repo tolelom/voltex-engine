@@ -1,3 +1,5 @@
+//! Bounding Volume Hierarchy used for fast spatial queries (ray + AABB).
+
 use voltex_ecs::Entity;
 use voltex_math::{AABB, Ray};
 use crate::ray::ray_vs_aabb;
@@ -8,12 +10,14 @@ enum BvhNode {
     Internal { aabb: AABB, left: usize, right: usize },
 }
 
+/// Binary BVH built bottom-up from a list of `(entity, aabb)` entries.
 #[derive(Debug)]
 pub struct BvhTree {
     nodes: Vec<BvhNode>,
 }
 
 impl BvhTree {
+    /// Builds a BVH over `entries`. Empty input produces an empty tree.
     pub fn build(entries: &[(Entity, AABB)]) -> Self {
         let mut tree = BvhTree { nodes: Vec::new() };
         if !entries.is_empty() {

@@ -1,3 +1,5 @@
+//! GJK + EPA distance / penetration solver for convex shapes.
+
 use voltex_math::Vec3;
 use crate::collider::Collider;
 

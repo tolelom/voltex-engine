@@ -1,3 +1,6 @@
+//! World-level collision detection — gathers `(Transform, Collider)`
+//! entities, runs broadphase + narrowphase, returns the contact manifold.
+
 use voltex_ecs::{World, Entity};
 use voltex_ecs::Transform;
 use voltex_math::Vec3;
@@ -8,6 +11,8 @@ use crate::bvh::BvhTree;
 use crate::narrow;
 use crate::gjk;
 
+/// Runs broadphase + narrowphase on every `(Transform, Collider)` pair in the
+/// world. Returns all generated [`ContactPoint`]s.
 pub fn detect_collisions(world: &World) -> Vec<ContactPoint> {
     // 1. Gather entities with Transform + Collider
     let pairs_data: Vec<(Entity, Vec3, Collider)> = world

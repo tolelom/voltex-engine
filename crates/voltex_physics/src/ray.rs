@@ -1,3 +1,6 @@
+//! Geometric ray-vs-shape primitives (sphere, box, capsule, triangle, plane,
+//! AABB). Used by the broadphase + narrowphase + raycasting layers.
+
 use voltex_math::{Vec3, Ray, AABB};
 
 /// Ray vs AABB (slab method). Returns t of nearest intersection, or None.

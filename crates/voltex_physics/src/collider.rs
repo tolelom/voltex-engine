@@ -1,12 +1,18 @@
+//! Collision shape primitives — Sphere / Box / Capsule / ConvexHull —
+//! plus their world-space AABB derivation.
+
 use voltex_math::{Vec3, AABB};
 
 /// A convex hull collider defined by a set of vertices.
 #[derive(Debug, Clone)]
 pub struct ConvexHull {
+    /// Local-space vertex positions defining the hull.
     pub vertices: Vec<Vec3>,
 }
 
 impl ConvexHull {
+    /// Wraps a vertex list into a `ConvexHull`. The caller is responsible for
+    /// the points actually defining a convex set.
     pub fn new(vertices: Vec<Vec3>) -> Self {
         ConvexHull { vertices }
     }
@@ -26,15 +32,32 @@ impl ConvexHull {
     }
 }
 
+/// Supported collision shapes.
 #[derive(Debug, Clone)]
 pub enum Collider {
-    Sphere { radius: f32 },
-    Box { half_extents: Vec3 },
-    Capsule { radius: f32, half_height: f32 },
+    /// Sphere centred at the entity transform.
+    Sphere {
+        /// Sphere radius.
+        radius: f32,
+    },
+    /// Axis-aligned box (in the entity local frame).
+    Box {
+        /// Half-extents along each axis.
+        half_extents: Vec3,
+    },
+    /// Y-axis capsule (cylinder + two hemispherical caps).
+    Capsule {
+        /// Capsule cap radius.
+        radius: f32,
+        /// Distance from the centre to either cap centre.
+        half_height: f32,
+    },
+    /// Arbitrary convex polytope.
     ConvexHull(ConvexHull),
 }
 
 impl Collider {
+    /// World-space AABB enclosing this collider when placed at `position`.
     pub fn aabb(&self, position: Vec3) -> AABB {
         match self {
             Collider::Sphere { radius } => {

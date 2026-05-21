@@ -1,3 +1,6 @@
+//! World-level raycasting — broadphase ray-vs-AABB filter + per-shape
+//! narrowphase. Returns the closest hit or every hit sorted by distance.
+
 use voltex_ecs::{World, Entity};
 use voltex_ecs::Transform;
 use voltex_math::{Vec3, Ray};
@@ -5,14 +8,21 @@ use voltex_math::{Vec3, Ray};
 use crate::collider::Collider;
 use crate::ray as ray_tests;
 
+/// One ray hit produced by [`raycast`] / [`raycast_all`].
 #[derive(Debug, Clone, Copy)]
 pub struct RayHit {
+    /// Entity whose collider was hit.
     pub entity: Entity,
+    /// Distance along the ray to the hit point.
     pub t: f32,
+    /// Hit point in world space.
     pub point: Vec3,
+    /// Surface normal at the hit point.
     pub normal: Vec3,
 }
 
+/// Casts `ray` against every entity with a [`Transform`] + [`Collider`] and
+/// returns the closest hit within `max_dist`, or `None`.
 pub fn raycast(world: &World, ray: &Ray, max_dist: f32) -> Option<RayHit> {
     let entities: Vec<(Entity, Vec3, Collider)> = world
         .query2::<Transform, Collider>()

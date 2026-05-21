@@ -10,6 +10,29 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## [v1.0.25] — 2026-05-21 — `voltex_physics` 100% documented (→ 0 `missing_docs`)
+
+Seventh crate in the workspace `missing_docs` sweep. Covers BVH / Colliders (Sphere/Box/Capsule/ConvexHull/Mesh) / Narrowphase / GJK+EPA / Contact manifold / RigidBody + PhysicsConfig / Integrator / Sequential-Impulse Solver / Raycasting / Swept-sphere CCD across 14 source files.
+
+### Added
+
+- Crate-level docstring + `#![warn(missing_docs)]` guard.
+- Module headers for all 13 sub-modules.
+- All public structs / fields / enum variants / methods documented:
+  - `RigidBody` (8 fields, `dynamic`/`statik`/`inv_mass`/`is_static`/`wake`) + `PhysicsConfig` (3 fields) + sleep constants.
+  - `Collider` enum (4 variants, all fields), `ConvexHull` (vertices + `new`/`support`).
+  - `ContactPoint` (6 fields).
+  - `RayHit` (4 fields), `MeshCollider`/`MeshHit` (4+3 fields).
+  - `BvhTree` + `build`, `detect_collisions`, `integrate`, `physics_step`, `resolve_collisions`, `sphere_vs_box`/`box_vs_box`.
+
+### Verified
+
+- `cargo build -p voltex_physics` — zero `missing_docs` warnings.
+- `cargo test -p voltex_physics --lib` — 106 passed (no regression).
+- `cargo clippy --workspace --all-targets -- -D warnings` — clean.
+
+---
+
 ## [v1.0.24] — 2026-05-21 — `voltex_audio` 100% documented (→ 0 `missing_docs`)
 
 Sixth crate in the workspace `missing_docs` sweep. Covers the in-house audio stack — clips/sources/system/spatial/HRTF/mixer/effects/backend — across 21 source files.

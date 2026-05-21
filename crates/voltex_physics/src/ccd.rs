@@ -1,3 +1,5 @@
+//! Continuous collision detection primitives — currently swept-sphere-vs-AABB.
+
 use voltex_math::{Vec3, AABB, Ray};
 use crate::ray::ray_vs_aabb;
 

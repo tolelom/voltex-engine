@@ -1,3 +1,5 @@
+//! Semi-implicit Euler integrator + inertia tensor helpers for rigid bodies.
+
 use voltex_ecs::World;
 use voltex_ecs::Transform;
 use voltex_math::Vec3;
@@ -63,6 +65,8 @@ pub fn inv_inertia(inertia: Vec3) -> Vec3 {
     )
 }
 
+/// Advances every `(Transform, RigidBody)` entity by one `config.fixed_dt`
+/// step using semi-implicit Euler (linear + angular). Static bodies skipped.
 pub fn integrate(world: &mut World, config: &PhysicsConfig) {
     // 1. Collect linear + angular updates
     let updates: Vec<(voltex_ecs::Entity, Vec3, Vec3, Vec3)> = world

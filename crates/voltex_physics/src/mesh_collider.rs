@@ -1,19 +1,28 @@
+//! Triangle mesh collider — list of vertices + index triples. Supports
+//! ray-vs-mesh queries (closest hit and all hits).
+
 use voltex_math::{Vec3, Ray};
 use crate::ray::ray_vs_triangle;
 
 /// A triangle mesh collider defined by vertices and triangle indices.
 #[derive(Debug, Clone)]
 pub struct MeshCollider {
+    /// Vertex positions in local space.
     pub vertices: Vec<Vec3>,
+    /// Triangle index triples into [`vertices`](Self::vertices).
     pub indices: Vec<[u32; 3]>,
 }
 
 /// Result of a ray-mesh intersection test.
 #[derive(Debug, Clone, Copy)]
 pub struct MeshHit {
+    /// Distance along the ray to the hit (in ray units).
     pub distance: f32,
+    /// Hit point in world space.
     pub point: Vec3,
+    /// Triangle normal at the hit point.
     pub normal: Vec3,
+    /// Index of the hit triangle in `MeshCollider::indices`.
     pub triangle_index: usize,
 }
 

@@ -1,3 +1,19 @@
+//! # voltex_physics
+//!
+//! Physics primitives — collision detection + rigid body simulation.
+//!
+//! - Broadphase: [`BvhTree`].
+//! - Colliders: [`Collider`] (Sphere/Box/Capsule/ConvexHull/Mesh) +
+//!   [`ConvexHull`] + [`MeshCollider`].
+//! - Narrowphase: [`narrow`] + [`gjk`] + [`contact::ContactPoint`].
+//! - Solver: [`physics_step`] / [`resolve_collisions`] (Sequential Impulse).
+//! - Integration: [`integrate`], [`inertia_tensor`], [`inv_inertia`].
+//! - Raycasting: [`raycast`] / [`raycast_all`] + [`ray_vs_triangle`] /
+//!   [`ray_vs_plane`].
+//! - CCD: [`swept_sphere_vs_aabb`].
+
+#![warn(missing_docs)]
+
 pub mod bvh;
 pub mod ray;
 pub mod collider;
