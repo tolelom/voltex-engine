@@ -173,6 +173,28 @@
 
 v1.0.9 부터는 **서비스 배포 완성도** 로드맵 (`docs/superpowers/specs/2026-05-21-service-readiness-roadmap.md`) 기준으로 진행.
 
+### v1.0.22 (2026-05-21) — voltex_net 100% missing_docs (71 → 0) + `#![warn(missing_docs)]`
+
+네 번째 crate. 11 파일 (lib/error/packet/socket/server/client/reliable/snapshot/interpolation/lag_compensation/encryption).
+
+**작업**:
+- Crate-level docstring + `#![warn(missing_docs)]`.
+- 모듈 헤더 9개 (packet/socket/server/client/reliable/snapshot/interpolation/lag_compensation/encryption/error).
+- Public API:
+  - `Packet` 10 variant + 14 field doc (protocol header `[type_id|len_le|reserved|payload]` 명시)
+  - `ServerEvent` 3 variant + 모든 field, `ClientInfo` 3 field
+  - `ClientEvent` 3 variant + payload field
+  - `EntityState` 4 field, `Snapshot` 2 field
+  - `ReliableChannel::new`, `OrderedChannel::new`
+  - `LagCompensation::new` + `history_len` + `max_history_ms` field
+  - `HistoryEntry` 3 field
+  - `PacketCipher::new` (panic 조건 명시)
+  - `AuthToken` 3 field
+
+**검증**:
+- `cargo build -p voltex_net` — 0 missing_docs warning (71 → 0).
+- `cargo test -p voltex_net --lib` — 47 통과.
+
 ### v1.0.21 (2026-05-21) — voltex_asset 100% missing_docs (64 → 0) + `#![warn(missing_docs)]`
 
 세 번째 crate. 약 800 라인 / 8 파일 (lib/error/handle/storage/assets/watcher/loader/vpkg/vfs).

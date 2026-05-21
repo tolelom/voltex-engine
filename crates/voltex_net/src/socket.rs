@@ -1,3 +1,5 @@
+//! Non-blocking UDP socket wrapper. Encodes/decodes [`Packet`]s on send/recv.
+
 use std::net::{SocketAddr, UdpSocket};
 
 use crate::Packet;

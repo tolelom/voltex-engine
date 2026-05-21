@@ -1,3 +1,7 @@
+//! UDP server endpoint. Manages connected clients, dispatches `ServerEvent`s
+//! to the caller, and forwards game packets between the wire and the
+//! application.
+
 use std::collections::HashMap;
 use std::net::SocketAddr;
 
@@ -6,16 +10,35 @@ use crate::socket::NetSocket;
 
 /// Information about a connected client.
 pub struct ClientInfo {
+    /// Server-assigned client id.
     pub id: u32,
+    /// Peer socket address.
     pub addr: SocketAddr,
+    /// Display name as reported in the `Connect` packet.
     pub name: String,
 }
 
 /// Events produced by the server during polling.
 pub enum ServerEvent {
-    ClientConnected { client_id: u32, name: String },
-    ClientDisconnected { client_id: u32 },
-    PacketReceived { client_id: u32, packet: Packet },
+    /// A new client completed its handshake.
+    ClientConnected {
+        /// Newly assigned client id.
+        client_id: u32,
+        /// Self-reported display name from the `Connect` packet.
+        name: String,
+    },
+    /// A client left (received Disconnect or timed out).
+    ClientDisconnected {
+        /// Id of the client that left.
+        client_id: u32,
+    },
+    /// A non-control packet arrived from `client_id`.
+    PacketReceived {
+        /// Sender's client id.
+        client_id: u32,
+        /// Decoded packet payload.
+        packet: Packet,
+    },
 }
 
 /// A non-blocking UDP server that manages multiple clients.

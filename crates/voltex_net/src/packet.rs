@@ -1,3 +1,7 @@
+//! On-wire protocol for the Voltex network layer. Defines the [`Packet`] enum
+//! and its `to_bytes` / `from_bytes` serialisers. Each packet begins with a
+//! 4-byte header: `type_id(1) | payload_len(2 LE) | reserved(1)`.
+
 /// Packet type IDs
 const TYPE_CONNECT: u8 = 1;
 const TYPE_ACCEPT: u8 = 2;
@@ -14,18 +18,70 @@ const TYPE_SNAPSHOT_DELTA: u8 = 10;
 const HEADER_SIZE: usize = 4;
 
 /// All packet variants for the Voltex network protocol.
+///
+/// Wire format: `[type_id(1) | payload_len(2 LE) | reserved(1) | payload..]`.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Packet {
-    Connect { client_name: String },
-    Accept { client_id: u32 },
-    Disconnect { client_id: u32 },
-    Ping { timestamp: u64 },
-    Pong { timestamp: u64 },
-    UserData { client_id: u32, data: Vec<u8> },
-    Reliable { sequence: u16, data: Vec<u8> },
-    Ack { sequence: u16 },
-    Snapshot { tick: u32, data: Vec<u8> },
-    SnapshotDelta { base_tick: u32, tick: u32, data: Vec<u8> },
+    /// Client → server: initial connect request carrying a display name.
+    Connect {
+        /// Self-reported display name.
+        client_name: String,
+    },
+    /// Server → client: accept the connection and assign `client_id`.
+    Accept {
+        /// Server-assigned client id (used to identify the peer afterwards).
+        client_id: u32,
+    },
+    /// Either side: explicit disconnect notice.
+    Disconnect {
+        /// Id of the client being disconnected.
+        client_id: u32,
+    },
+    /// Client → server: latency probe. Echoed back as a [`Packet::Pong`].
+    Ping {
+        /// Sender's local timestamp (caller-defined units, typically ms).
+        timestamp: u64,
+    },
+    /// Server → client: response to a [`Packet::Ping`].
+    Pong {
+        /// `timestamp` from the originating Ping.
+        timestamp: u64,
+    },
+    /// Either side: opaque application-level bytes.
+    UserData {
+        /// Source / target client id.
+        client_id: u32,
+        /// Application bytes (interpretation is up to the user).
+        data: Vec<u8>,
+    },
+    /// Either side: reliable-channel payload (sequence-tagged, retransmitted on loss).
+    Reliable {
+        /// Channel sequence number assigned by the sender.
+        sequence: u16,
+        /// Reliable payload bytes.
+        data: Vec<u8>,
+    },
+    /// Either side: acknowledgement of a previously sent [`Packet::Reliable`].
+    Ack {
+        /// Sequence number being acknowledged.
+        sequence: u16,
+    },
+    /// Server → client: full world snapshot at a given tick.
+    Snapshot {
+        /// Server tick at which this snapshot was captured.
+        tick: u32,
+        /// Serialized snapshot bytes (see [`serialize_snapshot`](crate::serialize_snapshot)).
+        data: Vec<u8>,
+    },
+    /// Server → client: delta from `base_tick` to `tick` (bandwidth save).
+    SnapshotDelta {
+        /// Reference tick the receiver must already hold.
+        base_tick: u32,
+        /// Tick the diff produces when applied to `base_tick`.
+        tick: u32,
+        /// Serialized delta bytes (see [`diff_snapshots`](crate::diff_snapshots)).
+        data: Vec<u8>,
+    },
 }
 
 impl Packet {

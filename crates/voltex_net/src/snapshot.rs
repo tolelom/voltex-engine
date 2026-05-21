@@ -1,16 +1,27 @@
+//! Snapshot + delta encoding for replicated world state. Defines
+//! [`EntityState`] / [`Snapshot`] plus binary `serialize_snapshot` /
+//! `deserialize_snapshot` and `diff_snapshots` / `apply_diff` helpers used by
+//! the `Snapshot` and `SnapshotDelta` packet variants.
+
 /// State of a single entity at a point in time.
 #[derive(Debug, Clone, PartialEq)]
 pub struct EntityState {
+    /// Entity id (typically `Entity::id`).
     pub id: u32,
+    /// World position `[x, y, z]`.
     pub position: [f32; 3],
+    /// Euler rotation `[pitch, yaw, roll]` in radians.
     pub rotation: [f32; 3],
+    /// Linear velocity `[vx, vy, vz]`.
     pub velocity: [f32; 3],
 }
 
 /// A snapshot of the world at a given tick.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Snapshot {
+    /// Server tick this snapshot represents.
     pub tick: u32,
+    /// All entities tracked at this tick.
     pub entities: Vec<EntityState>,
 }
 

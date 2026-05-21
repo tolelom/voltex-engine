@@ -1,3 +1,8 @@
+//! Minimal symmetric "encryption" primitives — XOR + sequence counter, no
+//! real cryptographic guarantees. Suitable for casual tamper resistance and
+//! anti-replay during development. Replace with a real AEAD before relying on
+//! it for security.
+
 /// Simple XOR cipher with rotating key + sequence counter.
 pub struct PacketCipher {
     key: Vec<u8>,
@@ -6,6 +11,7 @@ pub struct PacketCipher {
 }
 
 impl PacketCipher {
+    /// Creates a new cipher seeded with `key`. Panics if `key` is empty.
     pub fn new(key: &[u8]) -> Self {
         assert!(!key.is_empty(), "encryption key must not be empty");
         PacketCipher { key: key.to_vec(), send_counter: 0, recv_counter: 0 }
@@ -57,9 +63,12 @@ impl PacketCipher {
 
 /// Simple token-based authentication.
 pub struct AuthToken {
+    /// Player identifier the token is issued to.
     pub player_id: u32,
+    /// Opaque token bytes (XOR-keyed payload).
     pub token: Vec<u8>,
-    pub expires_at: f64,  // timestamp
+    /// Unix-seconds expiry timestamp.
+    pub expires_at: f64,
 }
 
 impl AuthToken {

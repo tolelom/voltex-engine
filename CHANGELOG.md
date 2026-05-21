@@ -10,6 +10,27 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## [v1.0.22] — 2026-05-21 — `voltex_net` 100% documented (71 → 0 `missing_docs`)
+
+Fourth crate in the workspace `missing_docs` sweep. Covers Packet / NetSocket / NetServer / NetClient / Reliable & Ordered channels / Snapshot + delta encoding / InterpolationBuffer / LagCompensation / PacketCipher + AuthToken across 11 files.
+
+### Added
+
+- Crate-level docstring naming each public primitive + role; `#![warn(missing_docs)]` locks the count.
+- Module headers for all 9 sub-modules.
+- Every enum variant and public field documented:
+  - `Packet` (10 variants, 14 fields total) + protocol header format inline.
+  - `ServerEvent` / `ClientEvent` / `ClientInfo` (server/client public types).
+  - `EntityState` / `Snapshot` fields, `HistoryEntry` fields, `AuthToken` fields.
+  - `ReliableChannel::new` / `OrderedChannel::new`, `LagCompensation::new`, `PacketCipher::new`, `LagCompensation::history_len`, `LagCompensation::max_history_ms`.
+
+### Verified
+
+- `cargo build -p voltex_net` — zero `missing_docs` warnings (from 71).
+- `cargo test -p voltex_net --lib` — 47 passed (no regression).
+
+---
+
 ## [v1.0.21] — 2026-05-21 — `voltex_asset` 100% documented (64 → 0 `missing_docs`)
 
 Third crate in the workspace `missing_docs` sweep. Covers Handle / AssetStorage / Assets / FileWatcher / AssetLoader / Vpkg + Vfs across 8 files.

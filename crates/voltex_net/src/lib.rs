@@ -1,3 +1,24 @@
+//! # voltex_net
+//!
+//! UDP-based networking primitives used by the engine:
+//!
+//! - [`Packet`] — the on-wire protocol (Connect/Accept/Disconnect/Ping/Pong/
+//!   UserData/Reliable/Ack/Snapshot/SnapshotDelta).
+//! - [`NetSocket`] — non-blocking UDP wrapper.
+//! - [`NetServer`] / [`NetClient`] — listen/connect endpoints with
+//!   client-id-bookkeeping and ping/timeout tracking.
+//! - [`ReliableChannel`] / [`OrderedChannel`] — sequence + ACK + retransmission
+//!   on top of UDP, with optional in-order delivery.
+//! - [`Snapshot`] — entity-state container + delta compression (`diff_snapshots`
+//!   / `apply_diff`).
+//! - [`InterpolationBuffer`] — client-side linear interpolation over
+//!   `Snapshot`s.
+//! - [`LagCompensation`] — server-side history rewind for hit registration.
+//! - [`PacketCipher`] / [`AuthToken`] — minimal symmetric crypto used for
+//!   authenticated packet framing.
+
+#![warn(missing_docs)]
+
 pub mod error;
 pub mod packet;
 pub mod socket;

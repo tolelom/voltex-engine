@@ -1,3 +1,6 @@
+//! Client-side snapshot interpolation buffer. Smooths server updates by
+//! interpolating between the two snapshots bracketing the render time.
+
 use std::collections::VecDeque;
 
 use crate::snapshot::{EntityState, Snapshot};

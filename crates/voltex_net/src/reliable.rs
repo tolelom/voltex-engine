@@ -1,3 +1,6 @@
+//! Reliable + ordered channels built on top of UDP packets. Adds sequence
+//! numbers, ACKs, retransmission and (optionally) in-order delivery.
+
 use std::collections::{HashMap, HashSet};
 use std::time::{Duration, Instant};
 
@@ -21,6 +24,7 @@ impl Default for ReliableChannel {
 }
 
 impl ReliableChannel {
+    /// Creates an empty channel with an initial RTT estimate of 100ms.
     pub fn new() -> Self {
         ReliableChannel {
             next_sequence: 0,
@@ -119,6 +123,7 @@ impl Default for OrderedChannel {
 }
 
 impl OrderedChannel {
+    /// Creates an empty ordered channel (next deliver = 0).
     pub fn new() -> Self {
         OrderedChannel {
             reliable: ReliableChannel::new(),

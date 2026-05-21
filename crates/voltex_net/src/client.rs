@@ -1,3 +1,5 @@
+//! UDP client endpoint — wraps a [`NetSocket`] and tracks our assigned client id.
+
 use std::net::SocketAddr;
 
 use crate::packet::Packet;
@@ -5,9 +7,18 @@ use crate::socket::NetSocket;
 
 /// Events produced by the client during polling.
 pub enum ClientEvent {
-    Connected { client_id: u32 },
+    /// Server accepted our `Connect` and assigned us `client_id`.
+    Connected {
+        /// Server-assigned client id.
+        client_id: u32,
+    },
+    /// The connection has been lost (Disconnect packet received).
     Disconnected,
-    PacketReceived { packet: Packet },
+    /// A non-control packet arrived from the server.
+    PacketReceived {
+        /// Decoded packet payload.
+        packet: Packet,
+    },
 }
 
 /// A non-blocking UDP client.

@@ -1,20 +1,29 @@
+//! Server-side history buffer for lag compensation. Records past entity
+//! positions so the server can "rewind" the world to the client's view when
+//! validating hit registration.
+
 use std::collections::VecDeque;
 
 /// A timestamped snapshot of entity positions for lag compensation.
 #[derive(Debug, Clone)]
 pub struct HistoryEntry {
+    /// Server tick this snapshot was taken on.
     pub tick: u64,
-    pub timestamp: f32,   // seconds
-    pub positions: Vec<([f32; 3], u32)>,  // (position, entity_id)
+    /// Wall-clock timestamp in seconds (server local).
+    pub timestamp: f32,
+    /// `(position, entity_id)` pairs at this tick.
+    pub positions: Vec<([f32; 3], u32)>,
 }
 
 /// Stores recent world state history for server-side lag compensation.
 pub struct LagCompensation {
     history: VecDeque<HistoryEntry>,
-    pub max_history_ms: f32,  // max history duration (e.g., 200ms)
+    /// Maximum history duration in milliseconds (older entries are pruned).
+    pub max_history_ms: f32,
 }
 
 impl LagCompensation {
+    /// Creates an empty buffer with the given retention window in milliseconds.
     pub fn new(max_history_ms: f32) -> Self {
         LagCompensation { history: VecDeque::new(), max_history_ms }
     }
@@ -86,6 +95,7 @@ impl LagCompensation {
         }
     }
 
+    /// Number of history entries currently retained.
     pub fn history_len(&self) -> usize { self.history.len() }
 }
 
