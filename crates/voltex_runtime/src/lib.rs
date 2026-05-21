@@ -20,6 +20,7 @@ pub mod config;
 pub mod crash;
 pub mod error;
 pub(crate) mod handler;
+pub mod log;
 
 pub use app::RuntimeApp;
 pub use config::RuntimeConfig;

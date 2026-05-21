@@ -173,6 +173,40 @@
 
 v1.0.9 부터는 **서비스 배포 완성도** 로드맵 (`docs/superpowers/specs/2026-05-21-service-readiness-roadmap.md`) 기준으로 진행.
 
+### v1.0.17 (2026-05-21) — 외부 dep 0 structured logger (`voltex_runtime::log`)
+
+배포된 게임의 디버그 visibility. 이전엔 `eprintln!` 산발 사용 → level 필터 / 파일 미러 / 일관 포맷 없었음.
+
+**신규 모듈** `crates/voltex_runtime/src/log.rs`:
+- `Level` enum 5단계 (Error < Warn < Info < Debug < Trace). `parse(&str)` (case-insensitive, "warning" alias).
+- `init(level, Option<PathBuf>)` + `init_from_env()` (`VOLTEX_LOG=debug` 등) — `OnceLock` 가드로 idempotent.
+- `enabled(level)` — caller-side early-out (인자 포맷 비싼 경우).
+- `log(level, target, &fmt::Arguments)` — 본체. stderr + optional file (Mutex<File>) 둘 다, best-effort (panic 없음).
+- `format_record(unix_seconds, level, target, msg)` — pure, 테스트 가능. 출력 형식: `2026-05-21T12:00:00Z [INFO ] target: message`.
+- 매크로 `log_error!` / `log_warn!` / `log_info!` / `log_debug!` / `log_trace!` — `enabled()` 게이트 후 `format_args!`. zero-alloc when filtered out.
+
+**Integration** (RuntimeApp::run):
+- `crate::log::init_from_env()` 자동 호출 (panic hook 직후).
+- 시작 시 `log_info!("voltex_runtime starting: title=..., size=AxB")`.
+- 종료 시 `log_info!("...exited normally")` 또는 `log_error!("...exited with error: ...")`.
+
+**crash.rs 와의 공유**: time 변환 helpers (`unix_seconds_now`, `unix_to_ymd_hms`) 를 `pub(crate)` 래퍼 (`_for_log`) 로 노출. 외부 API 표면 변경 없음 (Howard Hinnant 알고리즘 중복 회피).
+
+**테스트**: voltex_runtime 27 → 34 (+7):
+- Level::parse 정상/거부 / Level 순서 / Level label 길이
+- format_record ISO8601 timestamp + level + target / 모든 level label 보존
+- open_log_file parent dir 생성
+
+**셀프 피드백**:
+- 단계 1 logger 작성: 빌드 통과.
+- 단계 2 RuntimeApp 통합 + crash.rs helpers pub(crate): 워크스페이스 clippy 0 워닝, 0 회귀.
+- 외부 dep 0 (env 변수 + Mutex + std::sync::OnceLock 만).
+
+**한계 (v1.1+)**:
+- 매크로 호출 시 `module_path!()` 만 target 으로 사용. per-call `target: "..."` 명시 syntax 미지원.
+- VOLTEX_LOG 가 단일 level — `log` crate 처럼 per-module 필터 (e.g. `voltex_audio=debug,voltex_renderer=warn`) v1.1+.
+- 색상 없음 (ANSI escape) — Windows 호환 위해 의도적 plain text. v1.1+ opt-in.
+
 ### v1.0.16 (2026-05-21) — `docs/voltex-toml-reference.md` — 매니페스트 schema 완전 reference
 
 v1.0.11 가 manifest 의 unknown key/section 을 strict-reject 한 이후, 사용자가 "어떤 키가 valid 한지" 확인할 단일 문서가 부재. 이 cycle 이 그 갭을 메움.
@@ -722,7 +756,7 @@ crates/
 └── voltex_cli         — bin "voltex" (new/build/run), voltex.toml 매니페스트, .vpkg packing (B1+B2)
 ```
 
-## 테스트: ~1036개 통과 (Windows host, `cargo test --workspace`). `--lib` 기준은 982 (voltex_cli 는 bin-only 라 lib count 에서 빠지나 `cargo test -p voltex_cli` 로 54 개 실행됨). macOS host 에서는 +2 (CoreAudio 모듈) = 1038 예상. v1.0.1 +5 (input_system 순서/참조 ×2, Bounds default ×2, ScriptComponent default ×1). v1.0.3 +4 (canonicalize_friendly Windows verbatim strip ×3 + cross-OS integration ×1). v1.0.8 +21 (parser panic-resistance fuzz: PNG ×4 + JPG ×4 + GLTF ×5 + OBJ ×4 + WAV ×4). v1.0.9 +30 (OGG +11 + Vorbis +17 + decode_ogg_vorbis_bytes +2 — 모두 wire 직전까지 dead, 이제 실 컴파일). v1.0.10 +14 (voltex_runtime crash module ×11 + config crash log ×3). v1.0.11 +13 (voltex_cli schema/path validation + Levenshtein helper + error Display). v1.0.12 +4 (voltex_cli copy_license_files).
+## 테스트: ~1044개 통과 (Windows host, `cargo test --workspace`). `--lib` 기준은 989 (voltex_cli 는 bin-only 라 lib count 에서 빠지나 `cargo test -p voltex_cli` 로 55 개 실행됨). macOS host 에서는 +2 (CoreAudio 모듈) = 1038 예상. v1.0.1 +5 (input_system 순서/참조 ×2, Bounds default ×2, ScriptComponent default ×1). v1.0.3 +4 (canonicalize_friendly Windows verbatim strip ×3 + cross-OS integration ×1). v1.0.8 +21 (parser panic-resistance fuzz: PNG ×4 + JPG ×4 + GLTF ×5 + OBJ ×4 + WAV ×4). v1.0.9 +30 (OGG +11 + Vorbis +17 + decode_ogg_vorbis_bytes +2 — 모두 wire 직전까지 dead, 이제 실 컴파일). v1.0.10 +14 (voltex_runtime crash module ×11 + config crash log ×3). v1.0.11 +13 (voltex_cli schema/path validation + Levenshtein helper + error Display). v1.0.12 +4 (voltex_cli copy_license_files).
 
 - voltex: 2 (M6: prelude/module 경로 컴파일 검증)
 - voltex_math: 39 (8-7 +2: inverse roundtrip × VP+translation)
@@ -737,7 +771,7 @@ crates/
 - voltex_net: 47
 - voltex_script: 42 (S1 +12: pool ×6 [get_or_create same/load/reload/unknown/poll_reload/clear], system ×4 [start/update/5-cubes/missing-callbacks], engine_api ×2 [iter_entities/iter_by_tag])
 - voltex_editor: 169 (E3 +11: command ×5 add/remove/unknown/dead-entity + session ×4 add_undo/remove_undo/despawn_restores/despawn_history/slot_reused + inspector ×2 - 1 obsolete despawn_clears test)
-- voltex_runtime: 27 (v1.0.10 +14: crash module ×11 + config crash log ×3; was 13)
+- voltex_runtime: 34 (v1.0.17 +7: log module ×7; v1.0.10 +14; was 13)
 - voltex_cli: 55 (v1.0.16 +1 manifest reference doc gating; v1.0.13 +7; v1.0.12 +4; v1.0.11 +13; was 30)
 
 ## Examples (14개) + Games (1개) + 기존 survivor_game (archived)

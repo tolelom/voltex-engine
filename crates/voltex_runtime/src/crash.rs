@@ -134,6 +134,18 @@ fn unix_seconds_now() -> i64 {
         .unwrap_or(0)
 }
 
+/// Internal-only helper for the `log` module — re-exports
+/// [`unix_seconds_now`] without making it part of the public crash API.
+pub(crate) fn unix_seconds_now_for_log() -> i64 {
+    unix_seconds_now()
+}
+
+/// Internal-only helper for the `log` module — re-exports
+/// [`unix_to_ymd_hms`] without making it part of the public crash API.
+pub(crate) fn unix_to_ymd_hms_for_log(secs: i64) -> (i32, u32, u32, u32, u32, u32) {
+    unix_to_ymd_hms(secs)
+}
+
 /// Howard Hinnant's `days_from_civil` reversed — convert UNIX seconds
 /// (UTC) to `(year, month, day, hour, min, sec)`.
 /// Reference: <https://howardhinnant.github.io/date_algorithms.html>

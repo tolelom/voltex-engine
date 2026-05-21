@@ -10,6 +10,54 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## [v1.0.17] — 2026-05-21 — `voltex_runtime::log` — minimal structured logger
+
+Gives shipped games visibility for debugging. Previously only scattered
+`eprintln!` calls, with no level filter, file mirror, or consistent
+format.
+
+### Added
+
+- `crates/voltex_runtime/src/log.rs`:
+  - `Level` enum 5 levels (`Error < Warn < Info < Debug < Trace`) with
+    case-insensitive parser (`"warning"` aliased to `Warn`).
+  - `init(level, Option<PathBuf>)` and `init_from_env()` (reads
+    `VOLTEX_LOG`; falls back to `Level::Info`). Idempotent via
+    `OnceLock`.
+  - `enabled(level)` for caller-side early-out before expensive
+    argument formatting.
+  - `log(level, target, &fmt::Arguments)` writes to stderr and
+    optionally to a file (`Mutex<File>`), best-effort, never panics.
+  - `format_record(...)` pure formatter — ISO-8601-style timestamp,
+    `[LEVEL]`, target, message.
+  - Macros: `log_error!`, `log_warn!`, `log_info!`, `log_debug!`,
+    `log_trace!`. Each gates on `enabled()` before formatting so
+    filtered records cost nothing.
+- `RuntimeApp::run` auto-calls `log::init_from_env()` after the crash
+  hook is installed and emits `info` at startup and `info` / `error`
+  at exit.
+- `crash.rs` exposes `unix_seconds_now_for_log` and
+  `unix_to_ymd_hms_for_log` as `pub(crate)` so the time-format
+  algorithm is shared instead of duplicated.
+
+### Tests
+
+- `voltex_runtime`: 27 → **34** (+7). Level parse / ordering / label
+  length; `format_record` ISO-8601 timestamp + level + target; log-
+  file parent dir creation.
+- Workspace lib: 982 → **~989**.
+
+### Known limits
+
+- `VOLTEX_LOG` is a single level — no per-module filter
+  (`voltex_audio=debug,voltex_renderer=warn`).
+- No ANSI colour output (deliberate for Windows console compat).
+  Opt-in colour is deferred.
+- Existing `eprintln!` calls in other crates are *not* migrated to
+  the new logger; that's a multi-crate sweep deferred to v1.1+.
+
+---
+
 ## [v1.0.16] — 2026-05-21 — Complete `voltex.toml` schema reference
 
 v1.0.11 made the engine strict-reject unknown manifest keys, but

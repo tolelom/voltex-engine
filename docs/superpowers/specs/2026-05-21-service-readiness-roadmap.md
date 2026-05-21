@@ -76,8 +76,8 @@
 | 5b | E2E new/build/run test | `[ ]` | — | re-numbered (heavy: ~60s cargo build per run, #[ignore]'d) |
 | 6 | v1.0.14 CONTRIBUTING + pre-commit hook | `[✅]` | (inline STATUS § v1.0.14) | 5e7b9de |
 | 7 | v1.0.15 examples catalog + flagship README | `[✅]` | (inline STATUS § v1.0.15) | e0abe66 |
-| 8 | v1.0.16 voltex-toml-reference.md | `[✅]` | (inline STATUS § v1.0.16) | (pending commit) |
-| 9 | structured logging | `[ ]` | — | re-numbered |
+| 8 | v1.0.16 voltex-toml-reference.md | `[✅]` | (inline STATUS § v1.0.16) | a5b5ec8 |
+| 9 | v1.0.17 structured logger | `[✅]` | (inline STATUS § v1.0.17) | (pending commit) |
 | 7 | v1.0.15 cargo-deny | `[ ]` | — | — |
 | 8 | v1.0.16 CHANGELOG enforcement | `[ ]` | — | — |
 | 9 | v1.0.17 SemVer check | `[ ]` | — | — |

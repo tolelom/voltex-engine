@@ -170,13 +170,26 @@ impl RuntimeApp {
                 self.config.crash_log_dir.clone(),
             );
         }
+        // Auto-init logger from VOLTEX_LOG env var. Idempotent — safe even if
+        // the user already called `voltex_runtime::log::init` explicitly.
+        crate::log::init_from_env();
+        crate::log_info!(
+            "voltex_runtime starting: title={:?} size={}x{}",
+            self.config.window.title,
+            self.config.window.width,
+            self.config.window.height
+        );
         let event_loop = winit::event_loop::EventLoop::new()
             .map_err(|e| RuntimeError::WindowInit(e.to_string()))?;
         let mut handler = crate::handler::RuntimeHandler { app: Some(self) };
-        event_loop
+        let result = event_loop
             .run_app(&mut handler)
-            .map_err(|e| RuntimeError::WindowInit(e.to_string()))?;
-        Ok(())
+            .map_err(|e| RuntimeError::WindowInit(e.to_string()));
+        match &result {
+            Ok(()) => crate::log_info!("voltex_runtime exited normally"),
+            Err(e) => crate::log_error!("voltex_runtime exited with error: {}", e),
+        }
+        result
     }
 }
 
