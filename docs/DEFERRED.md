@@ -205,3 +205,5 @@
 - **voltex CLI `--version` + per-subcommand `--help`** ✅ v1.0.13 — help.rs 모듈 (TOP/NEW/BUILD/RUN), top-level `-V`/`--version`, `voltex <cmd> --help` 동작. +7 gating tests. 한계: --version 이 Cargo.toml package version (0.1.0) 출력 — workspace package version 일괄 bump 는 별 cycle.
 - **워크스페이스 31 crate Cargo.toml `version` v1.0.x 일괄 sync** — 현재 모두 0.1.0. workspace.package version 채택 + `voltex --version` / cargo semver 동기화 결정 필요. v1.0.x or v1.1+.
 - **CONTRIBUTING.md + git pre-commit hook** ✅ v1.0.14 — 4 파일 (.githooks/pre-commit, install.sh, install.ps1, CONTRIBUTING.md). bash syntax 검증. 한계: install.ps1 실 실행 검증 미실시 (개발 호스트 pwsh 부재), pre-commit fast (fmt) / pre-push slow (clippy+test) 분리 — v1.1+.
+- **NaN-safe sort comparators (6 callsites)** ✅ v1.0.40 — physics BVH/raycast/mesh_collider, editor rasterizer, renderer light_probes 의 `partial_cmp(...).unwrap()` 을 `unwrap_or(Ordering::Equal)` 로 교체. +5 회귀 테스트.
+- **Image parser size hardening (BMP/PNG/JPG)** ✅ v1.0.40 — zero-dim 거부 + 16384 max-dim cap + `checked_mul` 통일. +5 회귀 테스트. 한계: fuzz-driven coverage 는 v1.1+.

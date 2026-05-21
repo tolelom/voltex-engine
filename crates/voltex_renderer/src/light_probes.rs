@@ -40,7 +40,7 @@ impl LightProbeGrid {
         self.probes.iter().min_by(|a, b| {
             let da = dist_sq(a.position, pos);
             let db = dist_sq(b.position, pos);
-            da.partial_cmp(&db).unwrap()
+            da.partial_cmp(&db).unwrap_or(std::cmp::Ordering::Equal)
         })
     }
     pub fn len(&self) -> usize { self.probes.len() }
@@ -68,5 +68,17 @@ mod tests {
         grid.add(LightProbe::new([10.0, 0.0, 0.0]));
         let nearest = grid.nearest([1.0, 0.0, 0.0]).unwrap();
         assert!((nearest.position[0] - 0.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn nearest_with_nan_query_does_not_panic() {
+        // Querying with a NaN component (e.g. when the camera matrix degenerates)
+        // produces NaN dist_sq. The min_by comparator must not panic.
+        let mut grid = LightProbeGrid::new();
+        grid.add(LightProbe::new([0.0, 0.0, 0.0]));
+        grid.add(LightProbe::new([10.0, 0.0, 0.0]));
+        let nan = f32::NAN;
+        // Should not panic; result may be any probe.
+        let _ = grid.nearest([nan, 0.0, 0.0]);
     }
 }

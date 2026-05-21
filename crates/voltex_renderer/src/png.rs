@@ -4,6 +4,12 @@
 
 use crate::deflate;
 
+/// Hard cap on either PNG dimension we'll decode. Matches the typical GPU
+/// texture limit (`max_texture_dimension_2d = 16384`) and prevents adversarial
+/// headers from triggering huge allocations or arithmetic overflow on the size
+/// computation.
+const PNG_MAX_DIMENSION: u32 = 16_384;
+
 pub fn parse_png(data: &[u8]) -> crate::Result<(Vec<u8>, u32, u32)> {
     // 1. Verify PNG signature
     let signature: [u8; 8] = [137, 80, 78, 71, 13, 10, 26, 10];
@@ -82,6 +88,15 @@ pub fn parse_png(data: &[u8]) -> crate::Result<(Vec<u8>, u32, u32)> {
     if !got_ihdr {
         return Err("Missing IHDR chunk".into());
     }
+    if width == 0 || height == 0 {
+        return Err(format!("PNG zero dimension: {}x{}", width, height).into());
+    }
+    if width > PNG_MAX_DIMENSION || height > PNG_MAX_DIMENSION {
+        return Err(format!(
+            "PNG exceeds max dimension {}: {}x{}",
+            PNG_MAX_DIMENSION, width, height
+        ).into());
+    }
     if idat_data.is_empty() {
         return Err("No IDAT chunks found".into());
     }
@@ -96,8 +111,12 @@ pub fn parse_png(data: &[u8]) -> crate::Result<(Vec<u8>, u32, u32)> {
         _ => unreachable!(),
     };
     let bpp = channels; // bytes per pixel (bit_depth=8)
-    let stride = width as usize * channels;
-    let expected_size = height as usize * (1 + stride); // 1 filter byte per row
+    let stride = (width as usize)
+        .checked_mul(channels)
+        .ok_or("PNG stride overflow")?;
+    let expected_size = (height as usize)
+        .checked_mul(1usize.checked_add(stride).ok_or("PNG row width overflow")?)
+        .ok_or("PNG expected size overflow")?;
 
     if decompressed.len() < expected_size {
         return Err(format!(
@@ -107,7 +126,10 @@ pub fn parse_png(data: &[u8]) -> crate::Result<(Vec<u8>, u32, u32)> {
         ).into());
     }
 
-    let mut image_data = vec![0u8; height as usize * stride];
+    let image_size = (height as usize)
+        .checked_mul(stride)
+        .ok_or("PNG image size overflow")?;
+    let mut image_data = vec![0u8; image_size];
     let mut prev_row = vec![0u8; stride];
 
     for y in 0..height as usize {
@@ -133,7 +155,11 @@ pub fn parse_png(data: &[u8]) -> crate::Result<(Vec<u8>, u32, u32)> {
     // 5. Convert to RGBA if needed
     let rgba = if color_type == 2 {
         // RGB -> RGBA
-        let mut rgba = Vec::with_capacity(width as usize * height as usize * 4);
+        let rgba_size = (width as usize)
+            .checked_mul(height as usize)
+            .and_then(|v| v.checked_mul(4))
+            .ok_or("PNG RGBA output size overflow")?;
+        let mut rgba = Vec::with_capacity(rgba_size);
         for pixel in image_data.chunks_exact(3) {
             rgba.push(pixel[0]);
             rgba.push(pixel[1]);
@@ -502,5 +528,40 @@ mod tests {
                 let _ = parse_png(&data);
             }
         }
+    }
+
+    fn make_png_with_dims(width: u32, height: u32) -> Vec<u8> {
+        let mut png = Vec::new();
+        png.extend_from_slice(&[137, 80, 78, 71, 13, 10, 26, 10]);
+        let mut ihdr = Vec::new();
+        ihdr.extend_from_slice(&width.to_be_bytes());
+        ihdr.extend_from_slice(&height.to_be_bytes());
+        ihdr.push(8); // bit depth
+        ihdr.push(6); // color type RGBA
+        ihdr.push(0);
+        ihdr.push(0);
+        ihdr.push(0);
+        write_chunk(&mut png, b"IHDR", &ihdr);
+        // Minimal IDAT (one byte) — parse will reject before reading it.
+        write_chunk(&mut png, b"IDAT", &[0]);
+        write_chunk(&mut png, b"IEND", &[]);
+        png
+    }
+
+    #[test]
+    fn parse_png_rejects_zero_dimensions() {
+        // Zero dimensions used to silently allocate an empty vec and then
+        // attempt to slice into a non-existent row.
+        assert!(parse_png(&make_png_with_dims(0, 4)).is_err());
+        assert!(parse_png(&make_png_with_dims(4, 0)).is_err());
+    }
+
+    #[test]
+    fn parse_png_rejects_huge_dimensions() {
+        // Adversarial IHDR with extreme dims used to overflow `width * height * 4`
+        // before the size cap was added.
+        assert!(parse_png(&make_png_with_dims(50_000, 50_000)).is_err());
+        assert!(parse_png(&make_png_with_dims(u32::MAX, 1)).is_err());
+        assert!(parse_png(&make_png_with_dims(1, u32::MAX)).is_err());
     }
 }

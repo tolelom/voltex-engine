@@ -121,7 +121,7 @@ pub fn rasterize(outline: &GlyphOutline, scale: f32) -> RasterResult {
             }
         }
 
-        intersections.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
+        intersections.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
 
         // Fill using non-zero winding rule
         let mut winding = 0i32;

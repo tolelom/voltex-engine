@@ -59,7 +59,7 @@ impl BvhTree {
             let cb = b.1.center();
             let va = match axis { 0 => ca.x, 1 => ca.y, _ => ca.z };
             let vb = match axis { 0 => cb.x, 1 => cb.y, _ => cb.z };
-            va.partial_cmp(&vb).unwrap()
+            va.partial_cmp(&vb).unwrap_or(std::cmp::Ordering::Equal)
         });
 
         let mid = entries.len() / 2;
@@ -147,7 +147,7 @@ impl BvhTree {
         }
         let root = self.nodes.len() - 1;
         self.query_ray_recursive(root, ray, max_t, &mut hits);
-        hits.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap());
+        hits.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
         hits
     }
 
@@ -375,5 +375,37 @@ mod tests {
         tree.refit(&[(make_entity(1), AABB::new(Vec3::new(100.0, 100.0, 100.0), Vec3::new(101.0, 101.0, 101.0)))]);
 
         assert!(tree.query_pairs().is_empty(), "after refit, separated entities should not overlap");
+    }
+
+    // --- NaN safety regression tests ---
+
+    #[test]
+    fn build_with_nan_center_does_not_panic() {
+        // AABB with NaN min/max: any user pushing an entity with NaN Transform or
+        // a bogus mesh AABB ends up here. Pre-fix this panicked inside the sort comparator.
+        let nan = f32::NAN;
+        let entries = vec![
+            (make_entity(0), AABB::new(Vec3::new(nan, 0.0, 0.0), Vec3::new(1.0, 1.0, 1.0))),
+            (make_entity(1), AABB::new(Vec3::ZERO, Vec3::ONE)),
+            (make_entity(2), AABB::new(Vec3::new(5.0, 5.0, 5.0), Vec3::new(6.0, 6.0, 6.0))),
+        ];
+        // Should not panic.
+        let _tree = BvhTree::build(&entries);
+    }
+
+    #[test]
+    fn query_ray_with_nan_hit_distance_does_not_panic() {
+        // ray_vs_aabb on a NaN-bounded AABB can return NaN t. The sort by t must
+        // not panic.
+        let nan = f32::NAN;
+        let entries = vec![
+            (make_entity(0), AABB::new(Vec3::new(2.0, -1.0, -1.0), Vec3::new(4.0, 1.0, 1.0))),
+            (make_entity(1), AABB::new(Vec3::new(nan, -1.0, -1.0), Vec3::new(nan, 1.0, 1.0))),
+            (make_entity(2), AABB::new(Vec3::new(6.0, -1.0, -1.0), Vec3::new(8.0, 1.0, 1.0))),
+        ];
+        let tree = BvhTree::build(&entries);
+        let ray = Ray::new(Vec3::ZERO, Vec3::X);
+        // Should not panic regardless of NaN intermediate hits.
+        let _hits = tree.query_ray(&ray, 100.0);
     }
 }

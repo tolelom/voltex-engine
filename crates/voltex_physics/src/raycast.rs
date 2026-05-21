@@ -139,7 +139,7 @@ pub fn raycast_all(world: &World, ray: &Ray, max_dist: f32) -> Vec<RayHit> {
         }
     }
 
-    hits.sort_by(|a, b| a.t.partial_cmp(&b.t).unwrap());
+    hits.sort_by(|a, b| a.t.partial_cmp(&b.t).unwrap_or(std::cmp::Ordering::Equal));
     hits
 }
 
@@ -294,5 +294,25 @@ mod tests {
 
         assert_eq!(hit.entity, box_e);
         assert!(approx(hit.t, 2.0));
+    }
+
+    #[test]
+    fn raycast_all_with_nan_position_does_not_panic() {
+        // A Transform with NaN position propagates NaN into the collider AABB,
+        // which can produce NaN ray-hit `t`. The sort must not panic on NaN.
+        let mut world = World::new();
+        let nan = f32::NAN;
+
+        let good = world.spawn();
+        world.add(good, Transform::from_position(Vec3::new(3.0, 0.0, 0.0)));
+        world.add(good, Collider::Sphere { radius: 0.5 });
+
+        let bad = world.spawn();
+        world.add(bad, Transform::from_position(Vec3::new(nan, 0.0, 0.0)));
+        world.add(bad, Collider::Sphere { radius: 0.5 });
+
+        let ray = Ray::new(Vec3::ZERO, Vec3::X);
+        // Should not panic.
+        let _ = raycast_all(&world, &ray, 100.0);
     }
 }

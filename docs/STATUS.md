@@ -173,6 +173,35 @@
 
 v1.0.9 부터는 **서비스 배포 완성도** 로드맵 (`docs/superpowers/specs/2026-05-21-service-readiness-roadmap.md`) 기준으로 진행.
 
+### v1.0.40 (2026-05-22) — NaN-safe sort comparators + parser size hardening
+
+P0 robustness. 정적 코드 감사에서 발견한 두 종류의 패닉 가능 경로 제거.
+
+**1. NaN-safe sort comparators (6곳)** — `partial_cmp(...).unwrap()` 은 비교 한쪽이 NaN 이면 panic. 게임 입력에 NaN 이 한 컴포넌트라도 섞이면 (Transform 의 위치, mesh AABB 좌표, ray 거리 등) 정렬 단계에서 즉시 크래시:
+
+- `voltex_physics/src/bvh.rs:62` — BVH 빌드 시 AABB center 정렬 (NaN-position entity → 패닉)
+- `voltex_physics/src/bvh.rs:150` — `query_ray` 결과 거리 정렬
+- `voltex_physics/src/raycast.rs:142` — `raycast_all` 거리 정렬
+- `voltex_physics/src/mesh_collider.rs:75` — `ray_vs_mesh_all` 거리 정렬 (degenerate triangle → NaN t)
+- `voltex_editor/src/rasterizer.rs:124` — TTF 글리프 scanline 교차점 x 정렬
+- `voltex_renderer/src/light_probes.rs:43` — 가장 가까운 라이트 프로브 검색 (NaN 카메라 위치 → 패닉)
+
+모두 `.partial_cmp(...).unwrap_or(std::cmp::Ordering::Equal)` 로 교체 — NaN 입력시 자기 자신과 동일 순서로 취급 (defensive ordering). 회귀 테스트 4개 신규 추가 (`bvh::build_with_nan_center_does_not_panic`, `bvh::query_ray_with_nan_hit_distance_does_not_panic`, `raycast::raycast_all_with_nan_position_does_not_panic`, `mesh_collider::ray_vs_mesh_all_with_degenerate_triangle_does_not_panic`, `light_probes::nearest_with_nan_query_does_not_panic`).
+
+**2. Parser size overflow guards (BMP/PNG/JPG)** — 적대적 헤더가 선언한 width/height 가 산술 오버플로 또는 거대 할당을 유발하던 경로 차단. 세 파서 공통:
+- 0 차원 거부 (이전엔 빈 vec 할당 후 슬라이스 패닉)
+- 최대 차원 `16_384` (`max_texture_dimension_2d` 와 동일) 캡
+- `width * height * 4` 계산을 `checked_mul` 으로 통일 — 오버플로 시 친화적 에러 반환
+
+회귀 테스트 5개 추가 (`texture::parse_bmp_rejects_zero_dimensions`, `texture::parse_bmp_rejects_huge_dimensions`, `texture::parse_bmp_accepts_max_allowed_dimension_header`, `png::parse_png_rejects_zero_dimensions`, `png::parse_png_rejects_huge_dimensions`).
+
+**검증**:
+- `cargo build --workspace` 클린
+- `cargo clippy --workspace --all-targets -- -D warnings` 0 워닝
+- `cargo test --workspace --lib`: 모든 crate green. voltex_physics 106→110 (+4), voltex_renderer 217→223 (+6). 총 워크스페이스 ~1050 테스트, NaN/overflow 시나리오 9개 신규 보장.
+
+**한계**: 이 라운드는 정적 감사 기반. 적대적 입력으로부터의 fuzz coverage 확장은 별 사이클 (v1.0.x P3).
+
 ### v1.0.39 (2026-05-21) — README polish + service-readiness summary
 
 P2. README status badge 가 v1.0.20 에 멈춰 있고 v1.0.29~34 의 운영 tooling 이 Features 에 미반영.

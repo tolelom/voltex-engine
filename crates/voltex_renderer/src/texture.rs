@@ -12,6 +12,12 @@ pub struct BmpImage {
     pub pixels: Vec<u8>,
 }
 
+/// Hard cap on either dimension we'll decode. Matches the typical GPU texture
+/// limit (`max_texture_dimension_2d = 16384`) on desktop adapters and prevents
+/// adversarial BMP headers from triggering huge allocations or arithmetic
+/// overflow on the size computation below.
+const BMP_MAX_DIMENSION: u32 = 16_384;
+
 pub fn parse_bmp(data: &[u8]) -> crate::Result<BmpImage> {
     if data.len() < 54 {
         return Err(format!("BMP too small: {} bytes", data.len()).into());
@@ -37,9 +43,29 @@ pub fn parse_bmp(data: &[u8]) -> crate::Result<BmpImage> {
     let height = height_raw.unsigned_abs();
     let bottom_up = height_raw > 0;
 
+    if width == 0 || height == 0 {
+        return Err(format!("BMP zero dimension: {}x{}", width, height).into());
+    }
+    if width > BMP_MAX_DIMENSION || height > BMP_MAX_DIMENSION {
+        return Err(format!(
+            "BMP exceeds max dimension {}: {}x{}",
+            BMP_MAX_DIMENSION, width, height
+        ).into());
+    }
+
     let bytes_per_pixel = (bpp as usize) / 8;
-    let row_size = (bpp as usize * width as usize).div_ceil(32) * 4;
-    let required_data_size = pixel_offset + row_size * height as usize;
+    let row_size = (bpp as usize)
+        .checked_mul(width as usize)
+        .ok_or("BMP row size overflow")?
+        .div_ceil(32)
+        .checked_mul(4)
+        .ok_or("BMP row size overflow")?;
+    let row_bytes = row_size
+        .checked_mul(height as usize)
+        .ok_or("BMP pixel block size overflow")?;
+    let required_data_size = pixel_offset
+        .checked_add(row_bytes)
+        .ok_or("BMP data offset overflow")?;
 
     if data.len() < required_data_size {
         return Err(format!(
@@ -49,7 +75,11 @@ pub fn parse_bmp(data: &[u8]) -> crate::Result<BmpImage> {
         ).into());
     }
 
-    let mut pixels = vec![0u8; (width * height * 4) as usize];
+    let dst_size = (width as usize)
+        .checked_mul(height as usize)
+        .and_then(|v| v.checked_mul(4))
+        .ok_or("BMP output size overflow")?;
+    let mut pixels = vec![0u8; dst_size];
 
     for row in 0..height as usize {
         let src_row = if bottom_up { height as usize - 1 - row } else { row };
@@ -519,5 +549,48 @@ mod tests {
     fn test_parse_bmp_too_small() {
         let data = vec![0u8; 10];
         assert!(parse_bmp(&data).is_err());
+    }
+
+    fn make_bmp_header_only(width: i32, height: i32, bpp: u16) -> Vec<u8> {
+        let mut data = vec![0u8; 54];
+        data[0] = b'B';
+        data[1] = b'M';
+        data[10..14].copy_from_slice(&54u32.to_le_bytes());
+        data[18..22].copy_from_slice(&width.to_le_bytes());
+        data[22..26].copy_from_slice(&height.to_le_bytes());
+        data[28..30].copy_from_slice(&bpp.to_le_bytes());
+        // compression = 0 (default), planes = 1 not strictly required
+        data
+    }
+
+    #[test]
+    fn parse_bmp_rejects_zero_dimensions() {
+        // Zero width or height is degenerate; we error rather than vec![0; 0].
+        let bmp = make_bmp_header_only(0, 4, 24);
+        assert!(parse_bmp(&bmp).is_err());
+        let bmp = make_bmp_header_only(4, 0, 24);
+        assert!(parse_bmp(&bmp).is_err());
+    }
+
+    #[test]
+    fn parse_bmp_rejects_huge_dimensions() {
+        // Adversarial header with extreme dims used to overflow the size math
+        // (`width * height * 4` as u32) or trigger a multi-GB allocation.
+        // Now bounded to 16384 with an early error.
+        let bmp = make_bmp_header_only(50_000, 50_000, 24);
+        assert!(parse_bmp(&bmp).is_err());
+        // i32::MAX is also far past the cap.
+        let bmp = make_bmp_header_only(i32::MAX, 1, 24);
+        assert!(parse_bmp(&bmp).is_err());
+    }
+
+    #[test]
+    fn parse_bmp_accepts_max_allowed_dimension_header() {
+        // Header at exactly the cap (16384x1) parses headers OK, then bails
+        // out on data-too-small because no pixel data is present. The point of
+        // the test is that we hit *that* error, not an overflow or alloc panic.
+        let bmp = make_bmp_header_only(16_384, 1, 24);
+        let err = parse_bmp(&bmp).err().expect("expected error").to_string();
+        assert!(err.contains("data too small"), "unexpected error: {err}");
     }
 }

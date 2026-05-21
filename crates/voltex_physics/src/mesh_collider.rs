@@ -72,7 +72,7 @@ pub fn ray_vs_mesh_all(ray: &Ray, mesh: &MeshCollider) -> Vec<MeshHit> {
         }
     }
 
-    hits.sort_by(|a, b| a.distance.partial_cmp(&b.distance).unwrap());
+    hits.sort_by(|a, b| a.distance.partial_cmp(&b.distance).unwrap_or(std::cmp::Ordering::Equal));
     hits
 }
 
@@ -148,5 +148,27 @@ mod tests {
         let hits = ray_vs_mesh_all(&ray, &mesh);
         assert_eq!(hits.len(), 2);
         assert!(hits[0].distance < hits[1].distance); // sorted
+    }
+
+    #[test]
+    fn ray_vs_mesh_all_with_degenerate_triangle_does_not_panic() {
+        // Degenerate (zero-area) triangles can produce NaN t from Möller–Trumbore;
+        // mixing valid + degenerate triangles must not panic during sort.
+        let nan = f32::NAN;
+        let mesh = MeshCollider {
+            vertices: vec![
+                Vec3::new(-1.0, 0.0, -1.0),
+                Vec3::new(1.0, 0.0, -1.0),
+                Vec3::new(0.0, 0.0, 1.0),
+                // Triangle with NaN vertex — `ray_vs_triangle` may still return Some
+                Vec3::new(nan, nan, nan),
+                Vec3::new(1.0, 2.0, -1.0),
+                Vec3::new(0.0, 2.0, 1.0),
+            ],
+            indices: vec![[0, 1, 2], [3, 4, 5]],
+        };
+        let ray = Ray::new(Vec3::new(0.0, 5.0, 0.0), Vec3::new(0.0, -1.0, 0.0));
+        // Should not panic regardless of NaN intermediate hit distances.
+        let _ = ray_vs_mesh_all(&ray, &mesh);
     }
 }

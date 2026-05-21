@@ -13,6 +13,11 @@ mod mcu;
 use headers::{HuffTable, JpegComponent, parse_dqt, parse_sof, parse_dht};
 use decoder::decode_scan;
 
+/// Hard cap on either JPEG dimension we'll decode. Matches the typical GPU
+/// texture limit (`max_texture_dimension_2d = 16384`) and prevents adversarial
+/// SOF segments from triggering huge allocations.
+const JPG_MAX_DIMENSION: u32 = 16_384;
+
 pub fn parse_jpg(data: &[u8]) -> crate::Result<(Vec<u8>, u32, u32)> {
     if data.len() < 2 || data[0] != 0xFF || data[1] != 0xD8 {
         return Err("Invalid JPEG: missing SOI marker".into());
@@ -60,7 +65,14 @@ pub fn parse_jpg(data: &[u8]) -> crate::Result<(Vec<u8>, u32, u32)> {
                 // Convert RGB to RGBA
                 let w = width as u32;
                 let h = height as u32;
-                let mut rgba = Vec::with_capacity((w * h * 4) as usize);
+                // SOF0 path enforces the cap above, but if we ever decode
+                // without going through the cap (e.g. progressive path), be
+                // defensive on the capacity computation.
+                let cap = (w as usize)
+                    .checked_mul(h as usize)
+                    .and_then(|v| v.checked_mul(4))
+                    .ok_or("JPEG RGBA output size overflow")?;
+                let mut rgba = Vec::with_capacity(cap);
                 for pixel in rgb.chunks_exact(3) {
                     rgba.push(pixel[0]);
                     rgba.push(pixel[1]);
@@ -74,6 +86,15 @@ pub fn parse_jpg(data: &[u8]) -> crate::Result<(Vec<u8>, u32, u32)> {
                 let (sof, len) = parse_sof(data, pos)?;
                 width = sof.width;
                 height = sof.height;
+                if width == 0 || height == 0 {
+                    return Err(format!("JPEG zero dimension: {}x{}", width, height).into());
+                }
+                if width as u32 > JPG_MAX_DIMENSION || height as u32 > JPG_MAX_DIMENSION {
+                    return Err(format!(
+                        "JPEG exceeds max dimension {}: {}x{}",
+                        JPG_MAX_DIMENSION, width, height
+                    ).into());
+                }
                 num_components = sof.num_components;
                 components = sof.components;
                 found_sof = true;

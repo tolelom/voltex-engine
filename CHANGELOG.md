@@ -10,6 +10,52 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## [v1.0.40] — 2026-05-22 — NaN-safe sort comparators + parser size hardening
+
+**Fix**. P0 robustness pass surfaced via static audit of `partial_cmp(...).unwrap()` callsites and arithmetic-overflow paths in the image parsers. Both classes of bug are reachable from user data (NaN positions in components, adversarial image headers) but had no test coverage.
+
+### Fixed
+
+- **NaN-safe sort comparators in 6 production callsites.** `partial_cmp(...).unwrap()` panics when one side is `NaN`. Replaced with `.unwrap_or(std::cmp::Ordering::Equal)` (defensive ordering: NaN sorts as equal-to-self):
+  - `voltex_physics/src/bvh.rs:62` — BVH build sorts entries by AABB center on the longest axis. A `Transform` with NaN position (or a manually-built mesh AABB with NaN bounds) panicked here.
+  - `voltex_physics/src/bvh.rs:150` — `BvhTree::query_ray` sorts hits by ray-distance. NaN-bounded AABBs could yield NaN intermediate t.
+  - `voltex_physics/src/raycast.rs:142` — `raycast_all` sorts hits by distance.
+  - `voltex_physics/src/mesh_collider.rs:75` — `ray_vs_mesh_all` sorts hits by distance. Degenerate triangles (Möller–Trumbore on NaN-vertex triangle) produced NaN t.
+  - `voltex_editor/src/rasterizer.rs:124` — TTF glyph scanline-fill sorts edge intersections by x.
+  - `voltex_renderer/src/light_probes.rs:43` — `LightProbeGrid::nearest` minimum search by squared distance.
+
+- **Parser size-overflow / huge-allocation guards (BMP, PNG, JPG).** Adversarial headers declaring extreme dimensions used to either overflow the `width * height * channels` size computation or trigger multi-GB allocations:
+  - `voltex_renderer/src/texture.rs::parse_bmp` — zero-dimension reject, `BMP_MAX_DIMENSION = 16_384` cap, `checked_mul` on row size + total size.
+  - `voltex_renderer/src/png.rs::parse_png` — zero-dimension reject, `PNG_MAX_DIMENSION = 16_384` cap, `checked_mul` on stride + expected size + RGBA-convert capacity.
+  - `voltex_renderer/src/jpg/mod.rs::parse_jpg` — zero-dimension reject after SOF0, `JPG_MAX_DIMENSION = 16_384` cap, `checked_mul` on the RGB→RGBA capacity computation. (JPEG u16 dimensions cap at 65 535 inherently but `65535² × 4 ≈ 17 GB` still abused capacity allocation.)
+
+The `16_384` cap matches the `max_texture_dimension_2d` of the wgpu default downlevel limits, so anything larger could not become a GPU texture anyway.
+
+### Added (regression tests)
+
+- `voltex_physics::bvh::tests::build_with_nan_center_does_not_panic`
+- `voltex_physics::bvh::tests::query_ray_with_nan_hit_distance_does_not_panic`
+- `voltex_physics::raycast::tests::raycast_all_with_nan_position_does_not_panic`
+- `voltex_physics::mesh_collider::tests::ray_vs_mesh_all_with_degenerate_triangle_does_not_panic`
+- `voltex_renderer::light_probes::tests::nearest_with_nan_query_does_not_panic`
+- `voltex_renderer::texture::tests::parse_bmp_rejects_zero_dimensions`
+- `voltex_renderer::texture::tests::parse_bmp_rejects_huge_dimensions`
+- `voltex_renderer::texture::tests::parse_bmp_accepts_max_allowed_dimension_header`
+- `voltex_renderer::png::tests::parse_png_rejects_zero_dimensions`
+- `voltex_renderer::png::tests::parse_png_rejects_huge_dimensions`
+
+### Verification
+
+- `cargo build --workspace` — clean.
+- `cargo clippy --workspace --all-targets -- -D warnings` — 0 warnings.
+- `cargo test --workspace --lib` — every crate green. `voltex_physics` 106 → 110 (+4), `voltex_renderer` 217 → 223 (+6).
+
+### Notes
+
+This batch is static-audit-driven. Fuzz-based coverage expansion (libfuzzer / cargo-fuzz across all parsers + ECS query paths) remains v1.0.x P3 / v1.1.
+
+---
+
 ## [v1.0.39] — 2026-05-21 — README polish (status badge + service-readiness bullets)
 
 P2. README's status badge was frozen at v1.0.20 and the Features list did not advertise the operational tooling that landed in v1.0.29–v1.0.34.
