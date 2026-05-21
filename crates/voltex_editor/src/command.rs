@@ -27,6 +27,12 @@ pub enum EditorCommand {
     /// Detach `child` from `parent` (clears Parent on child, removes from
     /// parent's Children). No-op (still Ok) if not currently a child.
     RemoveChild { parent: Entity, child: Entity },
+    /// Attach a registered component to `entity` by name + raw bytes (E3).
+    /// `name` must match a `ComponentRegistry::register::<T>()` entry.
+    AddComponent { entity: Entity, name: String, data: Vec<u8> },
+    /// Detach a registered component from `entity` by name (E3). No-op
+    /// (still Ok) if the component is absent.
+    RemoveComponent { entity: Entity, name: String },
     SaveScene { path: String },
     LoadScene { path: String },
 }
@@ -99,6 +105,27 @@ pub fn apply_command(
             }
             voltex_ecs::hierarchy::remove_child(world, *parent, *child);
             Ok(*child)
+        }
+        EditorCommand::AddComponent { entity, name, data } => {
+            if !world.is_alive(*entity) {
+                return Err(EditorError::EntityNotAlive(*entity));
+            }
+            let entry = registry.find(name).ok_or_else(|| EditorError::Generic(
+                format!("AddComponent: unknown component name `{}`", name)
+            ))?;
+            (entry.deserialize)(world, *entity, data)
+                .map_err(|e| EditorError::Parse(e.to_string()))?;
+            Ok(*entity)
+        }
+        EditorCommand::RemoveComponent { entity, name } => {
+            if !world.is_alive(*entity) {
+                return Err(EditorError::EntityNotAlive(*entity));
+            }
+            let entry = registry.find(name).ok_or_else(|| EditorError::Generic(
+                format!("RemoveComponent: unknown component name `{}`", name)
+            ))?;
+            (entry.remove)(world, *entity);
+            Ok(*entity)
         }
         EditorCommand::SaveScene { path } => {
             let json = voltex_ecs::serialize_scene_json(world, registry);
@@ -331,6 +358,88 @@ mod tests {
         assert_eq!(tagged.len(), 1);
 
         std::fs::remove_file(&tmp).ok();
+    }
+
+    #[test]
+    fn add_component_attaches_with_default_bytes() {
+        let mut world = World::new();
+        let mut registry = ComponentRegistry::new();
+        registry.register_defaults();
+        let e = world.spawn();
+        // Use Transform default_bytes — should produce identity scale.
+        let bytes = <Transform as voltex_ecs::Component>::default_bytes();
+        let cmd = EditorCommand::AddComponent {
+            entity: e,
+            name: "transform".into(),
+            data: bytes,
+        };
+        apply_command(&mut world, &registry, &cmd).unwrap();
+        let t = world.get::<Transform>(e).expect("Transform attached");
+        assert_eq!(t.scale, voltex_math::Vec3::new(1.0, 1.0, 1.0));
+    }
+
+    #[test]
+    fn add_component_unknown_name_returns_generic_err() {
+        let mut world = World::new();
+        let mut registry = ComponentRegistry::new();
+        registry.register_defaults();
+        let e = world.spawn();
+        let cmd = EditorCommand::AddComponent {
+            entity: e,
+            name: "does_not_exist".into(),
+            data: vec![],
+        };
+        match apply_command(&mut world, &registry, &cmd) {
+            Err(EditorError::Generic(msg)) => assert!(msg.contains("does_not_exist")),
+            other => panic!("expected Generic err, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn remove_component_clears_existing() {
+        let mut world = World::new();
+        let mut registry = ComponentRegistry::new();
+        registry.register_defaults();
+        let e = world.spawn();
+        world.add(e, voltex_ecs::scene::Tag("Player".into()));
+        apply_command(&mut world, &registry, &EditorCommand::RemoveComponent {
+            entity: e,
+            name: "tag".into(),
+        }).unwrap();
+        assert!(world.get::<voltex_ecs::scene::Tag>(e).is_none());
+    }
+
+    #[test]
+    fn remove_component_absent_is_ok() {
+        // No-op semantics: removing a component the entity doesn't have is
+        // not an error — same as the existing AddChild/RemoveChild policy.
+        let mut world = World::new();
+        let mut registry = ComponentRegistry::new();
+        registry.register_defaults();
+        let e = world.spawn();
+        let result = apply_command(&mut world, &registry, &EditorCommand::RemoveComponent {
+            entity: e,
+            name: "tag".into(),
+        });
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn add_component_fails_when_entity_dead() {
+        let mut world = World::new();
+        let mut registry = ComponentRegistry::new();
+        registry.register_defaults();
+        let e = world.spawn();
+        world.despawn(e);
+        let cmd = EditorCommand::AddComponent {
+            entity: e,
+            name: "tag".into(),
+            data: vec![],
+        };
+        assert!(matches!(
+            apply_command(&mut world, &registry, &cmd),
+            Err(EditorError::EntityNotAlive(_))
+        ));
     }
 
     #[test]

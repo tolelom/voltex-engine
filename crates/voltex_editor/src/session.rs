@@ -25,8 +25,8 @@ pub enum EditorMode {
 }
 
 /// The inverse of a dispatched command. The undo stack stores one of these per
-/// undoable command. Commands that don't have a tractable inverse (Despawn,
-/// SaveScene, LoadScene) clear the undo/redo history when they run.
+/// undoable command. Only SaveScene/LoadScene clear the history (no tractable
+/// inverse). Despawn became undoable in E3 via the `RestoreEntity` variant.
 #[derive(Debug, Clone)]
 enum Inverse {
     /// Undo Spawn: despawn the entity that was just created.
@@ -47,6 +47,14 @@ enum Inverse {
     RemoveChild { parent: Entity, child: Entity },
     /// Undo RemoveChild: re-attach the child to the parent.
     AddChild { parent: Entity, child: Entity },
+    /// Undo AddComponent: remove the just-added component by name (E3).
+    RemoveComponentByName { entity: Entity, name: String },
+    /// Undo RemoveComponent: re-add with prior bytes (E3). `data = None`
+    /// when the component was absent before — undo leaves it absent.
+    AddComponentByBytes { entity: Entity, name: String, data: Option<Vec<u8>> },
+    /// Undo Despawn: restore the entity slot at its original generation and
+    /// re-attach every registered component captured pre-despawn (E3).
+    RestoreEntity { entity: Entity, components: Vec<(String, Vec<u8>)> },
 }
 
 pub struct EditorSession {
@@ -168,17 +176,18 @@ impl EditorSession {
                 EditorCommand::SetTransform { .. }
                 | EditorCommand::SetTag { .. }
                 | EditorCommand::AddChild { .. }
-                | EditorCommand::RemoveChild { .. } => {
+                | EditorCommand::RemoveChild { .. }
+                | EditorCommand::AddComponent { .. }
+                | EditorCommand::RemoveComponent { .. }
+                | EditorCommand::Despawn { .. } => {
                     if let Some(inv) = pre_inverse {
                         self.undo_stack.push((cmd.clone(), inv));
                         self.redo_stack.clear();
                     }
                 }
-                EditorCommand::Despawn { .. }
-                | EditorCommand::SaveScene { .. }
-                | EditorCommand::LoadScene { .. } => {
-                    // No tractable inverse in v1 — drop history rather than
-                    // produce stale, broken undo paths.
+                EditorCommand::SaveScene { .. } | EditorCommand::LoadScene { .. } => {
+                    // Scene-level commands cross persistence boundaries —
+                    // dropping the inverse history is the safe path.
                     self.undo_stack.clear();
                     self.redo_stack.clear();
                 }
@@ -276,9 +285,45 @@ impl EditorSession {
                     None
                 }
             }
-            EditorCommand::Despawn { .. }
-            | EditorCommand::SaveScene { .. }
-            | EditorCommand::LoadScene { .. } => None,
+            EditorCommand::AddComponent { entity, name, .. } => {
+                // Inverse is RemoveComponent — we don't capture pre-bytes
+                // because AddComponent semantics overwrite any prior value.
+                Some(Inverse::RemoveComponentByName {
+                    entity: *entity,
+                    name: name.clone(),
+                })
+            }
+            EditorCommand::RemoveComponent { entity, name } => {
+                // Capture prior bytes so undo can re-attach the exact value.
+                let prior = self
+                    .registry
+                    .find(name)
+                    .and_then(|entry| (entry.serialize)(&self.world, *entity));
+                Some(Inverse::AddComponentByBytes {
+                    entity: *entity,
+                    name: name.clone(),
+                    data: prior,
+                })
+            }
+            EditorCommand::Despawn { entity } => {
+                // Snapshot every registered component on the entity before
+                // it disappears. Unregistered components are silently lost —
+                // same policy as Play→Stop in E2.
+                let components: Vec<(String, Vec<u8>)> = self
+                    .registry
+                    .entries()
+                    .iter()
+                    .filter_map(|entry| {
+                        (entry.serialize)(&self.world, *entity)
+                            .map(|data| (entry.name.clone(), data))
+                    })
+                    .collect();
+                Some(Inverse::RestoreEntity {
+                    entity: *entity,
+                    components,
+                })
+            }
+            EditorCommand::SaveScene { .. } | EditorCommand::LoadScene { .. } => None,
         }
     }
 
@@ -319,6 +364,37 @@ impl EditorSession {
                 if self.world.is_alive(*parent) && self.world.is_alive(*child) {
                     voltex_ecs::hierarchy::remove_child(&mut self.world, *parent, *child);
                 }
+            }
+            Inverse::RemoveComponentByName { entity, name } => {
+                if let Some(entry) = self.registry.find(name) {
+                    (entry.remove)(&mut self.world, *entity);
+                }
+            }
+            Inverse::AddComponentByBytes { entity, name, data } => {
+                if let (Some(entry), Some(bytes)) =
+                    (self.registry.find(name), data.as_ref())
+                {
+                    let _ = (entry.deserialize)(&mut self.world, *entity, bytes);
+                }
+                // data == None means the component was absent before; undo
+                // leaves it absent.
+            }
+            Inverse::RestoreEntity { entity, components } => {
+                let restored = self
+                    .world
+                    .restore_at_generation(entity.id, entity.generation);
+                if restored {
+                    for (name, bytes) in components {
+                        if let Some(entry) = self.registry.find(name) {
+                            let _ = (entry.deserialize)(&mut self.world, *entity, bytes);
+                        }
+                    }
+                }
+                // If restore failed (slot was reused by another spawn that
+                // hasn't yet been despawned, etc.) we silently no-op. The
+                // undo() caller still pops the stack, so the UI's redo
+                // affordance becomes available — visible "nothing happened"
+                // is the intended behaviour for this edge case.
             }
         }
     }
@@ -478,22 +554,8 @@ mod tests {
         cleanup(&scene);
     }
 
-    #[test]
-    fn despawn_clears_undo_history_v1() {
-        let scene = temp_path("voltex_despawn_clears.vscn");
-        cleanup(&scene);
-        let mut session = EditorSession::new(scene.clone());
-        let e = session.dispatch(EditorCommand::Spawn).unwrap();
-        session
-            .dispatch(EditorCommand::SetTag { entity: e, tag: "Doomed".into() })
-            .unwrap();
-        assert_eq!(session.undo_depth(), 2);
-
-        session.dispatch(EditorCommand::Despawn { entity: e }).unwrap();
-        assert_eq!(session.undo_depth(), 0);
-        assert_eq!(session.redo_depth(), 0);
-        cleanup(&scene);
-    }
+    // (E3 obsoletes the prior `despawn_clears_undo_history_v1` test — see
+    // `despawn_no_longer_clears_undo_history` below for the new behaviour.)
 
     #[test]
     fn undo_add_child_detaches() {
@@ -836,6 +898,141 @@ mod tests {
         assert_eq!(session.world.get::<Transform>(e).unwrap().position.x, 1.0);
         session.redo();
         assert_eq!(session.world.get::<Transform>(e).unwrap().position.x, 2.0);
+        cleanup(&scene);
+    }
+
+    // ── E3: AddComponent / RemoveComponent / Despawn full undo ──────────
+
+    #[test]
+    fn add_component_undo_removes_it() {
+        let scene = temp_path("voltex_e3_add_undo.vscn");
+        cleanup(&scene);
+        let mut session = EditorSession::new(scene.clone());
+        let e = session.dispatch(EditorCommand::Spawn).unwrap();
+
+        // Initial Tag-less state.
+        assert!(session.world.get::<voltex_ecs::scene::Tag>(e).is_none());
+
+        let tag_bytes = b"Hero".to_vec();
+        session
+            .dispatch(EditorCommand::AddComponent {
+                entity: e,
+                name: "tag".into(),
+                data: tag_bytes,
+            })
+            .unwrap();
+        assert_eq!(session.world.get::<voltex_ecs::scene::Tag>(e).unwrap().0, "Hero");
+
+        assert!(session.undo());
+        assert!(session.world.get::<voltex_ecs::scene::Tag>(e).is_none());
+        cleanup(&scene);
+    }
+
+    #[test]
+    fn remove_component_undo_restores_prior_bytes() {
+        let scene = temp_path("voltex_e3_remove_undo.vscn");
+        cleanup(&scene);
+        let mut session = EditorSession::new(scene.clone());
+        let e = session.dispatch(EditorCommand::Spawn).unwrap();
+        session.dispatch(EditorCommand::SetTag { entity: e, tag: "Original".into() }).unwrap();
+
+        session
+            .dispatch(EditorCommand::RemoveComponent {
+                entity: e,
+                name: "tag".into(),
+            })
+            .unwrap();
+        assert!(session.world.get::<voltex_ecs::scene::Tag>(e).is_none());
+
+        assert!(session.undo());
+        assert_eq!(session.world.get::<voltex_ecs::scene::Tag>(e).unwrap().0, "Original");
+        cleanup(&scene);
+    }
+
+    #[test]
+    fn despawn_undo_restores_entity_and_components() {
+        let scene = temp_path("voltex_e3_despawn_undo.vscn");
+        cleanup(&scene);
+        let mut session = EditorSession::new(scene.clone());
+
+        let e = session.dispatch(EditorCommand::Spawn).unwrap();
+        session
+            .dispatch(EditorCommand::SetTransform {
+                entity: e,
+                position: Vec3::new(5.0, 6.0, 7.0),
+                rotation: Vec3::ZERO,
+                scale: Vec3::new(2.0, 2.0, 2.0),
+            })
+            .unwrap();
+        session.dispatch(EditorCommand::SetTag { entity: e, tag: "Hero".into() }).unwrap();
+
+        // Despawn it.
+        session.dispatch(EditorCommand::Despawn { entity: e }).unwrap();
+        assert!(!session.world.is_alive(e));
+
+        // Undo despawn — entity comes back with the same handle.
+        assert!(session.undo());
+        assert!(session.world.is_alive(e), "entity must be alive again at original (id, gen)");
+        let t = session.world.get::<Transform>(e).expect("Transform restored");
+        assert_eq!(t.position, Vec3::new(5.0, 6.0, 7.0));
+        assert_eq!(t.scale, Vec3::new(2.0, 2.0, 2.0));
+        let tag = session.world.get::<voltex_ecs::scene::Tag>(e).expect("Tag restored");
+        assert_eq!(tag.0, "Hero");
+        cleanup(&scene);
+    }
+
+    #[test]
+    fn despawn_no_longer_clears_undo_history() {
+        // Pre-E3 behaviour: Despawn cleared all undo history.
+        // Post-E3: Despawn is itself undoable + earlier history survives.
+        let scene = temp_path("voltex_e3_despawn_history.vscn");
+        cleanup(&scene);
+        let mut session = EditorSession::new(scene.clone());
+
+        let a = session.dispatch(EditorCommand::Spawn).unwrap();
+        let b = session.dispatch(EditorCommand::Spawn).unwrap();
+        assert_eq!(session.undo_depth(), 2);
+
+        session.dispatch(EditorCommand::Despawn { entity: b }).unwrap();
+        // History: Spawn(a), Spawn(b), Despawn(b) — 3 undoable actions.
+        assert_eq!(session.undo_depth(), 3);
+
+        // Undo despawn → Spawn(b) re-lives.
+        assert!(session.undo());
+        assert!(session.world.is_alive(b));
+        assert!(session.world.is_alive(a));
+        assert_eq!(session.undo_depth(), 2);
+        cleanup(&scene);
+    }
+
+    #[test]
+    fn despawn_undo_silently_fails_when_slot_reused() {
+        // Despawn, then spawn (steals the slot), then undo despawn — restore
+        // can't recover the original handle. Expect silent skip (undo returns
+        // true because the stack popped, but world is unchanged for the
+        // original entity).
+        let scene = temp_path("voltex_e3_despawn_reused.vscn");
+        cleanup(&scene);
+        let mut session = EditorSession::new(scene.clone());
+
+        let e = session.dispatch(EditorCommand::Spawn).unwrap();
+        session.dispatch(EditorCommand::Despawn { entity: e }).unwrap();
+        // World gives us a new entity in the same slot.
+        let reused = session.dispatch(EditorCommand::Spawn).unwrap();
+        assert_eq!(reused.id, e.id);
+        assert_ne!(reused.generation, e.generation);
+
+        // The Despawn entry is *not* on top — Spawn(reused) is. Undo Spawn first.
+        assert!(session.undo());
+        assert!(!session.world.is_alive(reused));
+
+        // Now top of undo stack is Despawn(e). Undoing it should silently fail
+        // because entry.generation has advanced beyond e.generation + 1.
+        let depth_before = session.undo_depth();
+        assert!(session.undo()); // pop succeeds
+        assert_eq!(session.undo_depth(), depth_before - 1);
+        // e never gets restored — generation moved past it.
+        assert!(!session.world.is_alive(e));
         cleanup(&scene);
     }
 }

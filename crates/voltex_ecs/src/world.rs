@@ -44,6 +44,17 @@ impl World {
         self.allocator.live_entities()
     }
 
+    /// Re-activate a previously despawned entity at its original generation.
+    /// Returns false if the slot is alive, out of range, or has moved past
+    /// `target_generation` (see `EntityAllocator::restore_at_generation`).
+    ///
+    /// Component storages remain untouched — despawn already removed them.
+    /// Callers (e.g. `EditorSession` Despawn-undo) re-add components after
+    /// a successful restore.
+    pub fn restore_at_generation(&mut self, id: u32, target_generation: u32) -> bool {
+        self.allocator.restore_at_generation(id, target_generation)
+    }
+
     /// Drop every entity, every component storage, and the entity allocator.
     /// Any externally-held `Entity` handles become invalid (their `is_alive`
     /// returns false). Use before loading a scene from disk to enforce

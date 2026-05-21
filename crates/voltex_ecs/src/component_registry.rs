@@ -10,11 +10,13 @@ use crate::world::World;
 
 pub type SerializeFn = fn(&World, Entity) -> Option<Vec<u8>>;
 pub type DeserializeFn = fn(&mut World, Entity, &[u8]) -> crate::Result<()>;
+pub type RemoveFn = fn(&mut World, Entity) -> bool;
+pub type DefaultBytesFn = fn() -> Vec<u8>;
 
 /// 직렬화 가능한 컴포넌트가 구현하는 trait.
 ///
-/// 이름과 ser/deser 함수를 컴포넌트 타입 자체에 묶어 단일 정의 위치를 만든다.
-/// `ComponentRegistry::register::<T>()` 로 한 줄에 등록할 수 있다.
+/// 이름과 ser/deser/remove/default_bytes 함수를 컴포넌트 타입 자체에 묶어
+/// 단일 정의 위치를 만든다. `ComponentRegistry::register::<T>()` 로 한 줄에 등록할 수 있다.
 ///
 /// 변경 시 주의: `NAME` 변경은 기존 .vscn / 바이너리 씬 파일 호환을 깨뜨린다.
 pub trait Component: 'static + Sized {
@@ -26,12 +28,27 @@ pub trait Component: 'static + Sized {
 
     /// 바이트를 디시리얼라이즈해 entity에 add.
     fn deserialize(world: &mut World, entity: Entity, data: &[u8]) -> crate::Result<()>;
+
+    /// Default impl: TypeId 기반으로 `Self` 컴포넌트를 entity 에서 제거. 있었으면 true.
+    /// 특수한 cleanup 이 필요한 컴포넌트만 오버라이드 (E3).
+    fn remove(world: &mut World, entity: Entity) -> bool {
+        world.remove::<Self>(entity).is_some()
+    }
+
+    /// "Sensible default" 바이트 — `deserialize` 에 넣었을 때 의미 있는 default
+    /// 값으로 복원되어야 한다. Editor 의 "Add Component" UI 가 사용 (E3).
+    /// Default impl 은 빈 Vec — 의미 있는 default 가 필요한 타입은 오버라이드.
+    fn default_bytes() -> Vec<u8> {
+        Vec::new()
+    }
 }
 
 pub struct ComponentEntry {
     pub name: String,
     pub serialize: SerializeFn,
     pub deserialize: DeserializeFn,
+    pub remove: RemoveFn,
+    pub default_bytes: DefaultBytesFn,
 }
 
 pub struct ComponentRegistry {
@@ -49,15 +66,21 @@ impl ComponentRegistry {
             name: T::NAME.to_string(),
             serialize: T::serialize,
             deserialize: T::deserialize,
+            remove: T::remove,
+            default_bytes: T::default_bytes,
         });
     }
 
     /// Escape hatch: `Component` 구현이 불가능한 외부 타입을 위해 보존.
+    /// `remove` 와 `default_bytes` 는 no-op stub 으로 채워지므로 Editor 의
+    /// AddComponent UI 에는 노출되지 않는다.
     pub fn register_raw(&mut self, name: &str, ser: SerializeFn, deser: DeserializeFn) {
         self.entries.push(ComponentEntry {
             name: name.to_string(),
             serialize: ser,
             deserialize: deser,
+            remove: |_, _| false,
+            default_bytes: Vec::new,
         });
     }
 
@@ -117,6 +140,20 @@ impl Component for crate::Transform {
         world.add(entity, t);
         Ok(())
     }
+
+    /// Default Transform = identity (pos/rot zero, scale = 1).
+    fn default_bytes() -> Vec<u8> {
+        let mut out = Vec::with_capacity(36);
+        // position (3 × f32 = 0)
+        out.extend_from_slice(&[0u8; 12]);
+        // rotation (3 × f32 = 0)
+        out.extend_from_slice(&[0u8; 12]);
+        // scale (3 × f32 = 1)
+        for _ in 0..3 {
+            out.extend_from_slice(&1.0f32.to_le_bytes());
+        }
+        out
+    }
 }
 
 // ── Tag: UTF-8 string bytes ─────────────────────────────────────────
@@ -133,6 +170,11 @@ impl Component for crate::scene::Tag {
         let s = std::str::from_utf8(data).map_err(|_| crate::EcsError::from("Invalid UTF-8 in tag"))?;
         world.add(entity, crate::scene::Tag(s.to_string()));
         Ok(())
+    }
+
+    /// Default Tag = empty string (deserialize handles 0-byte input).
+    fn default_bytes() -> Vec<u8> {
+        Vec::new()
     }
 }
 
@@ -304,6 +346,72 @@ mod tests {
         (entry.deserialize)(&mut world2, e2, &data).unwrap();
 
         assert_eq!(world2.get::<Health>(e2), Some(&Health(42)));
+    }
+
+    #[test]
+    fn default_bytes_roundtrip_transform() {
+        let bytes = <crate::Transform as Component>::default_bytes();
+        assert_eq!(bytes.len(), 36);
+        let mut world = World::new();
+        let e = world.spawn();
+        <crate::Transform as Component>::deserialize(&mut world, e, &bytes).unwrap();
+        let t = world.get::<crate::Transform>(e).unwrap();
+        // default scale = (1, 1, 1) — must be deserialised faithfully so AddComponent
+        // produces a usable identity transform, not a degenerate (scale = 0) one.
+        assert_eq!(t.scale, Vec3::new(1.0, 1.0, 1.0));
+        assert_eq!(t.position, Vec3::ZERO);
+        assert_eq!(t.rotation, Vec3::ZERO);
+    }
+
+    #[test]
+    fn default_bytes_roundtrip_tag() {
+        let bytes = <crate::scene::Tag as Component>::default_bytes();
+        let mut world = World::new();
+        let e = world.spawn();
+        <crate::scene::Tag as Component>::deserialize(&mut world, e, &bytes).unwrap();
+        let tag = world.get::<crate::scene::Tag>(e).unwrap();
+        assert_eq!(tag.0, "");
+    }
+
+    #[test]
+    fn registry_remove_function_drops_component() {
+        let mut registry = ComponentRegistry::new();
+        registry.register_defaults();
+        let mut world = World::new();
+        let e = world.spawn();
+        world.add(e, Transform::new());
+        assert!(world.get::<Transform>(e).is_some());
+
+        let entry = registry.find("transform").unwrap();
+        let removed = (entry.remove)(&mut world, e);
+        assert!(removed);
+        assert!(world.get::<Transform>(e).is_none(), "Transform must be gone after remove fn");
+
+        // Second remove is a no-op (returns false).
+        let removed_again = (entry.remove)(&mut world, e);
+        assert!(!removed_again);
+    }
+
+    #[test]
+    fn registry_default_bytes_function_invokable() {
+        let mut registry = ComponentRegistry::new();
+        registry.register_defaults();
+        let entry = registry.find("transform").unwrap();
+        let bytes = (entry.default_bytes)();
+        assert_eq!(bytes.len(), 36);
+    }
+
+    #[test]
+    fn register_raw_default_bytes_is_empty_and_remove_is_noop() {
+        fn dummy_ser(_: &World, _: Entity) -> Option<Vec<u8>> { Some(vec![]) }
+        fn dummy_deser(_: &mut World, _: Entity, _: &[u8]) -> crate::Result<()> { Ok(()) }
+        let mut registry = ComponentRegistry::new();
+        registry.register_raw("custom", dummy_ser, dummy_deser);
+        let entry = registry.find("custom").unwrap();
+        assert!((entry.default_bytes)().is_empty());
+        let mut world = World::new();
+        let e = world.spawn();
+        assert!(!(entry.remove)(&mut world, e));
     }
 
     #[test]

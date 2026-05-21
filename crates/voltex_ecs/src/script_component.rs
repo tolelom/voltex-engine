@@ -53,6 +53,12 @@ impl Component for ScriptComponent {
         world.add(entity, ScriptComponent { script_path, instance_id });
         Ok(())
     }
+
+    /// Default ScriptComponent = UNBOUND instance, empty path. User sets the
+    /// real .lua path via Inspector text input after AddComponent.
+    fn default_bytes() -> Vec<u8> {
+        Self::UNBOUND.to_le_bytes().to_vec()
+    }
 }
 
 #[cfg(test)]

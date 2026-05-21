@@ -49,6 +49,13 @@ impl Component for MeshHandle {
         world.add(entity, MeshHandle(Handle::from_raw_parts(id, gen)));
         Ok(())
     }
+
+    /// Default MeshHandle = sentinel (id=0, gen=0). Renderer treats stale
+    /// handles as "skip this entity" so AddComponent without a real mesh
+    /// is non-fatal — user fills it in via Inspector later.
+    fn default_bytes() -> Vec<u8> {
+        vec![0u8; 8]
+    }
 }
 
 impl Component for MaterialHandle {
@@ -70,6 +77,11 @@ impl Component for MaterialHandle {
         let gen = u32::from_le_bytes([data[4], data[5], data[6], data[7]]);
         world.add(entity, MaterialHandle(Handle::from_raw_parts(id, gen)));
         Ok(())
+    }
+
+    /// Default MaterialHandle = sentinel (id=0, gen=0). Same rationale as MeshHandle.
+    fn default_bytes() -> Vec<u8> {
+        vec![0u8; 8]
     }
 }
 
@@ -101,6 +113,12 @@ impl Component for Bounds {
         );
         world.add(entity, Bounds(aabb));
         Ok(())
+    }
+
+    /// Default Bounds = AABB { min: zero, max: zero } (degenerate). Inspector
+    /// users set real bounds explicitly via mesh import / dedicated commands.
+    fn default_bytes() -> Vec<u8> {
+        vec![0u8; 24]
     }
 }
 
