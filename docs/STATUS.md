@@ -173,6 +173,20 @@
 
 v1.0.9 부터는 **서비스 배포 완성도** 로드맵 (`docs/superpowers/specs/2026-05-21-service-readiness-roadmap.md`) 기준으로 진행.
 
+### v1.0.30 (2026-05-21) — CHANGELOG entry enforcement
+
+P1. autonomous-push workflow 에 PR 리뷰가 없어서 release-note 빠짐을 memory 에 의존하던 문제 해결.
+
+**신규**:
+- `scripts/check_changelog.sh` — reusable. `<base_ref> <head_ref>` 받아서 crates/examples/games 변경 시 CHANGELOG.md 동시 수정 강제. `*.md` / `CODEMAP.md` 는 docs-only 로 면제.
+- `.githooks/pre-push` — git pre-push 프로토콜 stdin 읽어 각 ref 마다 script 호출. 신규 브랜치 첫 push 는 origin/master 기준.
+- `.github/workflows/ci.yml`: `changelog-check` job (PR-only, blocking) — hook 미설치 contributor 보호.
+- `install.sh` / `install.ps1` 갱신 (chmod + 안내문).
+
+**검증**: throwaway repo 에서 3가지 case (code-only 위반 / docs-only / code+CHANGELOG) end-to-end 동작 확인.
+
+**한계**: `--no-verify` 로 bypass 가능 (기존 pre-commit 와 동일). PR 의 base_ref 가 master 가 아닌 경우도 동작.
+
 ### v1.0.29 (2026-05-21) — cargo-deny 통합
 
 P1 운영 인프라. 기존 cargo-about(license listing only) 보완 — RUSTSEC advisory + duplicate version + unknown source 추가 스캔.

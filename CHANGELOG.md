@@ -10,6 +10,30 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## [v1.0.30] — 2026-05-21 — CHANGELOG entry enforcement
+
+P1 service-readiness item. Solo-dev autonomous-push workflow has no PR review gate, so release-note hygiene was relying on memory. Now enforced by hook + CI.
+
+### Added
+
+- `scripts/check_changelog.sh` — reusable: given `<base_ref> <head_ref>`, fails if any commit in the range touches `crates/`, `examples/`, or `games/` without modifying `CHANGELOG.md`. `*.md` and `*/CODEMAP.md` inside code dirs are treated as docs-only and exempt.
+- `.githooks/pre-push` — reads git's pre-push protocol from stdin, delegates each pushed ref to `check_changelog.sh`. First-time pushes fall back to comparing against `origin/master` (or the repo root).
+- `.github/workflows/ci.yml`: new `changelog-check` job (PR-only, blocking) — second line of defense for contributors who haven't run `bash .githooks/install.sh`.
+- `install.sh` + `install.ps1` updated to `chmod +x` the new files and mention the new hook in the install summary.
+
+### Verified
+
+- `scripts/check_changelog.sh` syntax-checks with `bash -n`. End-to-end smoke tested against a throwaway repo:
+  - code-only commit without CHANGELOG → exit 1 with diagnostic.
+  - docs-only commit → exit 0 (`docs-only or non-code change`).
+  - code + CHANGELOG → exit 0.
+
+### Notes
+
+`--no-verify` still bypasses both hooks (consistent with existing pre-commit). The CI job uses `origin/${{ github.base_ref }}` so it works for any base branch, not just master.
+
+---
+
 ## [v1.0.29] — 2026-05-21 — `cargo-deny` integration
 
 P1 service-readiness item. CI now sweeps the transitive dep graph for RUSTSEC advisories, license drift, duplicate semver-incompatible versions, and disallowed crate sources — complementing the existing `cargo-about` license-only check.

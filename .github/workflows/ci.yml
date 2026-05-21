@@ -111,6 +111,24 @@ jobs:
       - name: cargo about generate (verify no license drift)
         run: cargo about generate about.hbs -o /tmp/THIRD-PARTY-LICENSES.md
 
+  # CHANGELOG entry gate. Mirrors the local pre-push hook
+  # (.githooks/pre-push -> scripts/check_changelog.sh) as a second line of
+  # defense for PRs that arrive without the hooks installed. Only runs on
+  # pull_request events — direct pushes are gated by the pre-push hook.
+  changelog-check:
+    name: changelog entry (pull_request)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (full history for diff)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Run check_changelog.sh against PR base
+        run: |
+          chmod +x scripts/check_changelog.sh
+          ./scripts/check_changelog.sh "origin/${{ github.base_ref }}" "HEAD"
+
   # Non-blocking cargo-deny job — sweeps RUSTSEC advisories, license drift,
   # duplicate semver-incompatible versions, and disallowed crate sources.
   # Complements license-check (cargo-about) by catching the categories

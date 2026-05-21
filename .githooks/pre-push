@@ -1,0 +1,55 @@
+#!/usr/bin/env bash
+# voltex pre-push hook — enforce CHANGELOG entry for every push that touches code.
+#
+# Install: bash .githooks/install.sh   (or .githooks/install.ps1 on Windows)
+# Bypass:  git push --no-verify
+#
+# Reads commit ranges from stdin (git's pre-push protocol). For each pushed ref,
+# delegates to scripts/check_changelog.sh which inspects the diff and fails the
+# push if code paths (crates/, examples/, games/) changed without a matching
+# CHANGELOG.md edit.
+
+set -e
+
+GREEN='\033[0;32m'
+RED='\033[0;31m'
+NC='\033[0m'
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+SCRIPT="$REPO_ROOT/scripts/check_changelog.sh"
+
+if [[ ! -x "$SCRIPT" ]]; then
+    echo -e "${RED}✗ pre-push: $SCRIPT missing or not executable${NC}"
+    echo "  run: chmod +x scripts/check_changelog.sh"
+    exit 1
+fi
+
+# git's pre-push protocol: one line per ref of the form
+#   <local_ref> <local_sha> <remote_ref> <remote_sha>
+# Branch deletes get local_sha = 0…0; first-time pushes get remote_sha = 0…0.
+zero="0000000000000000000000000000000000000000"
+
+while read -r local_ref local_sha remote_ref remote_sha; do
+    # Deleting a remote branch — nothing to check.
+    if [[ "$local_sha" == "$zero" ]]; then
+        continue
+    fi
+
+    if [[ "$remote_sha" == "$zero" ]]; then
+        # First push of this branch — compare against the local default base.
+        if git rev-parse --verify origin/master >/dev/null 2>&1; then
+            base="origin/master"
+        else
+            base="$(git rev-list --max-parents=0 HEAD | tail -n 1)"
+        fi
+    else
+        base="$remote_sha"
+    fi
+
+    if ! "$SCRIPT" "$base" "$local_sha"; then
+        echo -e "${RED}✗ pre-push: CHANGELOG enforcement failed for $local_ref${NC}"
+        exit 1
+    fi
+done
+
+echo -e "${GREEN}✓ pre-push: CHANGELOG check passed${NC}"

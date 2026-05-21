@@ -15,6 +15,7 @@ git config core.hooksPath .githooks
 
 Write-Host "✓ git hooks installed." -ForegroundColor Green
 Write-Host "  core.hooksPath = $(git config --get core.hooksPath)"
+Write-Host "  hooks: pre-commit (clippy + lib test), pre-push (CHANGELOG enforcement)"
 Write-Host ""
-Write-Host "  Disable temporarily: git commit --no-verify"
+Write-Host "  Disable temporarily: git commit --no-verify  /  git push --no-verify"
 Write-Host "  Disable permanently: git config --unset core.hooksPath"

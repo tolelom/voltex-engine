@@ -13,10 +13,12 @@ fi
 cd "$REPO_ROOT"
 
 git config core.hooksPath .githooks
-chmod +x .githooks/pre-commit
+chmod +x .githooks/pre-commit .githooks/pre-push
+chmod +x scripts/check_changelog.sh 2>/dev/null || true
 
 echo "✓ git hooks installed."
 echo "  core.hooksPath = $(git config --get core.hooksPath)"
+echo "  hooks: pre-commit (clippy + lib test), pre-push (CHANGELOG enforcement)"
 echo
-echo "  Disable temporarily: git commit --no-verify"
+echo "  Disable temporarily: git commit --no-verify  /  git push --no-verify"
 echo "  Disable permanently: git config --unset core.hooksPath"
