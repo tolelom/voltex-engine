@@ -5,7 +5,9 @@
 > 스크립팅, 멀티 OS 빌드 파이프라인까지 제공한다. 자세한 카운트와 정책은
 > 아래 "의존성 정책" 섹션 참고.
 
-![status: v1.0.4](https://img.shields.io/badge/status-v1.0.4-brightgreen)
+![status: v1.0.5](https://img.shields.io/badge/status-v1.0.5-brightgreen)
+![clippy: 0 warnings](https://img.shields.io/badge/clippy-0%20warnings-brightgreen)
+![audit: 0 vulnerabilities](https://img.shields.io/badge/cargo--audit-0%20vulnerabilities-brightgreen)
 ![runtime: Windows verified](https://img.shields.io/badge/runtime-Windows%20verified-green)
 ![runtime: Linux/macOS unverified](https://img.shields.io/badge/runtime-Linux%2FmacOS%20unverified-orange)
 ![rust: stable](https://img.shields.io/badge/rust-stable-orange)
@@ -189,6 +191,20 @@ PR 환영. 작업 흐름은 spec → plan → implementation → verify 의 4 �
 각 단계의 산출물은 `docs/superpowers/specs/` 와 `docs/superpowers/plans/`
 에 보존된다. 더 자세한 워크플로 + 컨벤션은 [CLAUDE.md](CLAUDE.md) 의 "변경
 워크플로 (AI 작업 기준)" 섹션 참고.
+
+PR 제출 전 로컬 검증 (CI 와 동일한 게이트):
+
+```bash
+cargo build --workspace
+cargo clippy --workspace --all-targets -- -D warnings
+cargo test --workspace --lib
+cargo test -p voltex_cli
+```
+
+CI (`.github/workflows/ci.yml`) 는 위 4 명령을 Ubuntu + Windows 매트릭스에서
+실행하고, macOS 는 advisory (non-blocking) 잡으로 돌린다. 모두 통과해야
+merge 가능. Linux 빌드는 ALSA 헤더 (`sudo apt-get install -y libasound2-dev`)
+필요 — CI 가 자동 설치한다.
 
 빠른 이슈 / 제안은 git repo 의 issue tracker 에 — Korean / English 둘 다 환영.
 

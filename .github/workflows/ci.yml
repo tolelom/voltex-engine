@@ -1,0 +1,91 @@
+name: ci
+
+# Voltex engine continuous integration.
+#
+# This workflow exists to catch the kind of regressions that v1.0.3 (`voltex
+# build` Windows P0) and v1.0.4 (clippy approx_constant) slipped past:
+# things that a `cargo build` + `cargo test --lib` sweep on a single host
+# does not notice. It enforces:
+#   - build clean on Windows + Linux (+ macOS as a non-blocking job)
+#   - clippy with -D warnings as a hard gate
+#   - the full --workspace --lib + voltex_cli bin test suite
+#
+# Linux needs libasound2-dev for voltex_audio's ALSA backend FFI link.
+# macOS uses the CoreAudio system framework (no extra install).
+#
+# This file targets GitHub Actions syntax; self-hosted Gitea/Forgejo runners
+# also accept it. On non-GitHub remotes the file is simply inert.
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: "-D warnings"
+
+jobs:
+  build-and-test:
+    name: build + clippy + test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      - name: Cache cargo registry + target
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Install Linux audio dev headers (ALSA)
+        if: matrix.os == 'ubuntu-latest'
+        run: sudo apt-get update && sudo apt-get install -y libasound2-dev
+
+      - name: cargo build --workspace
+        run: cargo build --workspace
+
+      - name: cargo clippy --workspace --all-targets
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: cargo test --workspace --lib
+        run: cargo test --workspace --lib
+
+      - name: cargo test -p voltex_cli (bin tests)
+        run: cargo test -p voltex_cli
+
+  # Non-blocking macOS job — provides early signal that CoreAudio + native
+  # build still link, without making the whole matrix fail when a macOS
+  # runner is queued / unavailable.
+  macos:
+    name: build + test (macos-latest, advisory)
+    runs-on: macos-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - name: cargo build --workspace
+        run: cargo build --workspace
+      - name: cargo clippy --workspace --all-targets
+        run: cargo clippy --workspace --all-targets -- -D warnings
+      - name: cargo test --workspace --lib
+        run: cargo test --workspace --lib
