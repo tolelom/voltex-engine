@@ -5,7 +5,9 @@ use std::process::Command;
 
 use crate::error::{CliError, Result};
 use crate::manifest::{host_triple, Manifest};
-use crate::util::{copy_optional_dir, copy_optional_file, escape_for_rust_string};
+use crate::util::{
+    canonicalize_friendly, copy_optional_dir, copy_optional_file, escape_for_rust_string,
+};
 
 const VOLTEX_REPO_ENV: &str = "VOLTEX_REPO";
 
@@ -93,8 +95,8 @@ pub fn build_target(
     manifest: &Manifest,
     target: &str,
 ) -> Result<()> {
-    let manifest_dir = manifest_dir.canonicalize()?;
-    let engine_path = engine_path.canonicalize()?;
+    let manifest_dir = canonicalize_friendly(manifest_dir)?;
+    let engine_path = canonicalize_friendly(engine_path)?;
     eprintln!(
         "voltex build: project={} target={}",
         manifest_dir.display(),

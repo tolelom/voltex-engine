@@ -6,6 +6,7 @@ use std::process::Command;
 use crate::build;
 use crate::error::{CliError, Result};
 use crate::manifest::Manifest;
+use crate::util::canonicalize_friendly;
 
 pub fn cmd(args: &[String]) -> Result<()> {
     // Re-use build's argument parsing by delegating.
@@ -17,7 +18,7 @@ pub fn cmd(args: &[String]) -> Result<()> {
     } else {
         std::env::current_dir()?
     };
-    let manifest_dir = manifest_dir.canonicalize()?;
+    let manifest_dir = canonicalize_friendly(&manifest_dir)?;
     let manifest = Manifest::load_from_dir(&manifest_dir)?;
     let exe = manifest_dir.join("dist").join(if cfg!(windows) {
         format!("{}.exe", manifest.project.name)

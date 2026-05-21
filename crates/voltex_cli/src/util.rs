@@ -1,12 +1,44 @@
 //! Cross-cutting helpers shared by subcommands.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use crate::error::{CliError, Result};
 
 /// Escape `s` so it can be embedded inside a Rust `"..."` literal.
 pub fn escape_for_rust_string(s: &str) -> String {
     s.replace('\\', "\\\\").replace('"', "\\\"")
+}
+
+/// Canonicalize `p`, then strip the Windows `\\?\` verbatim prefix for
+/// drive-letter paths so Cargo's `path = "..."` dependency parser can
+/// consume the result.
+///
+/// `std::fs::canonicalize` on Windows always returns paths in the
+/// extended-length `\\?\C:\...` form, which Cargo rejects as
+/// `invalid path url '//?/C:\...'`. UNC paths (`\\?\UNC\server\share\...`)
+/// are left untouched because rewriting them changes their meaning.
+pub fn canonicalize_friendly(p: &Path) -> Result<PathBuf> {
+    let canon = p.canonicalize().map_err(CliError::from)?;
+    Ok(strip_verbatim_prefix(canon))
+}
+
+#[cfg(windows)]
+fn strip_verbatim_prefix(p: PathBuf) -> PathBuf {
+    let Some(s) = p.to_str() else { return p };
+    let Some(rest) = s.strip_prefix(r"\\?\") else { return p };
+    if rest.starts_with("UNC\\") {
+        return p;
+    }
+    // Drive-letter form: "C:\..." — second byte is ':'.
+    if rest.len() >= 2 && rest.as_bytes()[1] == b':' {
+        return PathBuf::from(rest);
+    }
+    p
+}
+
+#[cfg(not(windows))]
+fn strip_verbatim_prefix(p: PathBuf) -> PathBuf {
+    p
 }
 
 pub fn copy_optional_file(src: &Path, dst: &Path) -> Result<()> {
@@ -67,6 +99,48 @@ mod tests {
         let _ = std::fs::remove_file(&dst);
         assert!(copy_optional_file(&src, &dst).is_ok());
         assert!(!dst.exists());
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn strip_verbatim_prefix_strips_drive_letter() {
+        let input = PathBuf::from(r"\\?\C:\foo\bar");
+        assert_eq!(strip_verbatim_prefix(input), PathBuf::from(r"C:\foo\bar"));
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn strip_verbatim_prefix_leaves_unc_alone() {
+        let input = PathBuf::from(r"\\?\UNC\server\share\foo");
+        assert_eq!(strip_verbatim_prefix(input.clone()), input);
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn strip_verbatim_prefix_leaves_non_verbatim_alone() {
+        let input = PathBuf::from(r"C:\foo");
+        assert_eq!(strip_verbatim_prefix(input.clone()), input);
+    }
+
+    #[cfg(not(windows))]
+    #[test]
+    fn strip_verbatim_prefix_is_noop_on_unix() {
+        let input = PathBuf::from("/foo/bar");
+        assert_eq!(strip_verbatim_prefix(input.clone()), input);
+    }
+
+    #[test]
+    fn canonicalize_friendly_returns_non_verbatim_path() {
+        // Pre-create a real directory so canonicalize succeeds on every host.
+        let dir = std::env::temp_dir().join("voltex_cli_canon_friendly");
+        std::fs::create_dir_all(&dir).unwrap();
+        let canon = canonicalize_friendly(&dir).unwrap();
+        let s = canon.to_string_lossy();
+        assert!(
+            !s.starts_with(r"\\?\"),
+            "canonicalize_friendly still returned verbatim path: {s}"
+        );
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]
