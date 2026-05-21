@@ -173,6 +173,24 @@
 
 v1.0.9 부터는 **서비스 배포 완성도** 로드맵 (`docs/superpowers/specs/2026-05-21-service-readiness-roadmap.md`) 기준으로 진행.
 
+### v1.0.44 (2026-05-22) — Navmesh deserializer 적대적 입력 방어
+
+P0 robustness round 5. v1.0.43 의 scene loader 패턴을 navmesh (VNAV) 에 적용. 두 진입점 (`NavMesh::deserialize` + free fn `deserialize_navmesh`) 모두 동일한 가드.
+
+**보강**:
+- `MAX_NAVMESH_VERTICES = 1_000_000`, `MAX_NAVMESH_TRIANGLES = 1_000_000` cap
+- Triangle vertex index (i0, i1, i2) ≥ vc 면 친화적 에러 — 이전엔 `self.vertices[oob]` 가 다운스트림 (`shared_edge`, `point_in_triangle_xz`) 에서 panic
+- Neighbour triangle index (≥0 이면서 ≥ tc) 면 친화적 에러 — 이전엔 `self.triangles[oob]` 가 pathfinding 도중 panic
+
+**검증**:
+- `cargo build --workspace` 클린, clippy 0 워닝
+- voltex_ai 34 → 37 (+3). 회귀 테스트:
+  - `navmesh::tests::deserialize_navmesh_rejects_huge_vertex_count`
+  - `navmesh::tests::deserialize_navmesh_rejects_triangle_vertex_index_oob`
+  - `navmesh::tests::deserialize_navmesh_rejects_neighbour_index_oob`
+
+**누적 (v1.0.40~44)**: 5 cycle, 34 회귀 테스트 신규. 총 워크스페이스 테스트 ~1056 → ~1090.
+
 ### v1.0.43 (2026-05-22) — Scene deserializer 적대적 입력 방어
 
 P0 robustness round 4. v1.0.42 에서 `add_child` cycle guard 추가했지만 scene loader 가 가지고 있는 자체 위험을 따로 잡아야 함:

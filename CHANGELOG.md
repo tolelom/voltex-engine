@@ -10,6 +10,39 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## [v1.0.44] — 2026-05-22 — Navmesh deserializer adversarial input hardening
+
+**Fix**. Same pattern as v1.0.43 applied to the VNAV navmesh format. Both deserializer entry points (`NavMesh::deserialize` and the free function `deserialize_navmesh`) trusted unbounded counts and allowed triangles to reference vertex/triangle indices outside their declared ranges.
+
+### Fixed
+
+- **`voltex_ai::navmesh::deserialize_navmesh` and `NavMesh::deserialize`**:
+  - Vertex count and triangle count are now capped at `1_000_000` each (`MAX_NAVMESH_VERTICES` / `MAX_NAVMESH_TRIANGLES`). An adversarial header with `count = u32::MAX` used to drive `Vec::with_capacity` allocations of 12 GB (vertex slot) + 48 GB (triangle slot).
+  - Triangle vertex indices (`i0 / i1 / i2`) are validated to be inside the vertex array. Pre-fix, a malformed file declaring 1 vertex + a triangle with index `5` could be deserialised; the panic surfaced later inside `NavMesh::shared_edge` or `point_in_triangle_xz` when downstream code did `self.vertices[5]`.
+  - Neighbour triangle indices (when non-negative) are validated to be inside the triangle array. Same panic class but inside pathfinding code paths.
+
+The validations are done at deserialise time, so downstream consumers can use indices without re-checking.
+
+### Tests
+
+`voltex_ai` 34 → 37 (+3):
+
+- `voltex_ai::navmesh::tests::deserialize_navmesh_rejects_huge_vertex_count`
+- `voltex_ai::navmesh::tests::deserialize_navmesh_rejects_triangle_vertex_index_oob`
+- `voltex_ai::navmesh::tests::deserialize_navmesh_rejects_neighbour_index_oob`
+
+### Verification
+
+- `cargo build --workspace` — clean.
+- `cargo clippy --workspace --all-targets -- -D warnings` — 0 warnings.
+- `cargo test --workspace --lib` — every crate green.
+
+### Notes
+
+Cumulative for the v1.0.40 – v1.0.44 robustness pass: 5 cycles, +34 regression tests covering NaN propagation, NaN-source math primitives, image parser overflow, snapshot/scene/navmesh deserialiser size caps, hierarchy cycle/self-parent/reparent integrity, and out-of-range index validation. Workspace tests went from ~1056 to ~1090.
+
+---
+
 ## [v1.0.43] — 2026-05-22 — Scene deserializer adversarial input hardening
 
 **Fix**. Two scene deserializers (text `.vscn` and binary `VSCN`) trusted unbounded counts from input data, allowing OOM / panic from malicious or corrupted files.

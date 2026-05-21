@@ -169,6 +169,12 @@ impl NavMesh {
         };
 
         let vc = read_u32(&mut offset)? as usize;
+        if vc > MAX_NAVMESH_VERTICES {
+            return Err(format!(
+                "navmesh vertex count {} exceeds limit {}",
+                vc, MAX_NAVMESH_VERTICES
+            ).into());
+        }
         let mut vertices = Vec::with_capacity(vc);
         for _ in 0..vc {
             let x = read_f32(&mut offset)?;
@@ -178,20 +184,44 @@ impl NavMesh {
         }
 
         let tc = read_u32(&mut offset)? as usize;
+        if tc > MAX_NAVMESH_TRIANGLES {
+            return Err(format!(
+                "navmesh triangle count {} exceeds limit {}",
+                tc, MAX_NAVMESH_TRIANGLES
+            ).into());
+        }
         let mut triangles = Vec::with_capacity(tc);
         for _ in 0..tc {
             let i0 = read_u32(&mut offset)? as usize;
             let i1 = read_u32(&mut offset)? as usize;
             let i2 = read_u32(&mut offset)? as usize;
+            if i0 >= vc || i1 >= vc || i2 >= vc {
+                return Err(format!(
+                    "navmesh triangle vertex index out of range (vertices={})",
+                    vc
+                ).into());
+            }
             let n0 = read_i32(&mut offset)?;
             let n1 = read_i32(&mut offset)?;
             let n2 = read_i32(&mut offset)?;
-            let to_opt = |v: i32| -> Option<usize> {
-                if v < 0 { None } else { Some(v as usize) }
+            let to_opt = |v: i32, tc: usize| -> crate::Result<Option<usize>> {
+                if v < 0 {
+                    Ok(None)
+                } else {
+                    let idx = v as usize;
+                    if idx >= tc {
+                        Err(format!(
+                            "navmesh neighbour triangle index {} out of range (triangles={})",
+                            idx, tc
+                        ).into())
+                    } else {
+                        Ok(Some(idx))
+                    }
+                }
             };
             triangles.push(NavTriangle {
                 indices: [i0, i1, i2],
-                neighbors: [to_opt(n0), to_opt(n1), to_opt(n2)],
+                neighbors: [to_opt(n0, tc)?, to_opt(n1, tc)?, to_opt(n2, tc)?],
             });
         }
 
@@ -276,7 +306,20 @@ pub fn serialize_navmesh(navmesh: &NavMesh) -> Vec<u8> {
     data
 }
 
+/// Maximum vertex / triangle count we accept in a single VNAV file. Real
+/// navmeshes have at most a few hundred thousand polygons; this limit
+/// catches adversarial headers without restricting realistic use.
+const MAX_NAVMESH_VERTICES: usize = 1_000_000;
+const MAX_NAVMESH_TRIANGLES: usize = 1_000_000;
+
 /// Deserialize a NavMesh from binary data.
+///
+/// Validation: vertex/triangle counts are capped at 1M each. Triangle
+/// vertex indices are validated to be inside the vertex array, and
+/// neighbour indices (when present) are validated to be inside the
+/// triangle array. This means downstream consumers
+/// (`NavMesh::shared_edge`, `point_in_triangle_xz`) can use these
+/// indices without re-checking.
 pub fn deserialize_navmesh(data: &[u8]) -> crate::Result<NavMesh> {
     let mut offset = 0;
 
@@ -308,6 +351,12 @@ pub fn deserialize_navmesh(data: &[u8]) -> crate::Result<NavMesh> {
     };
 
     let vc = read_u32(&mut offset)? as usize;
+    if vc > MAX_NAVMESH_VERTICES {
+        return Err(format!(
+            "navmesh vertex count {} exceeds limit {}",
+            vc, MAX_NAVMESH_VERTICES
+        ).into());
+    }
     let mut vertices = Vec::with_capacity(vc);
     for _ in 0..vc {
         let x = read_f32(&mut offset)?;
@@ -317,20 +366,44 @@ pub fn deserialize_navmesh(data: &[u8]) -> crate::Result<NavMesh> {
     }
 
     let tc = read_u32(&mut offset)? as usize;
+    if tc > MAX_NAVMESH_TRIANGLES {
+        return Err(format!(
+            "navmesh triangle count {} exceeds limit {}",
+            tc, MAX_NAVMESH_TRIANGLES
+        ).into());
+    }
     let mut triangles = Vec::with_capacity(tc);
     for _ in 0..tc {
         let i0 = read_u32(&mut offset)? as usize;
         let i1 = read_u32(&mut offset)? as usize;
         let i2 = read_u32(&mut offset)? as usize;
+        if i0 >= vc || i1 >= vc || i2 >= vc {
+            return Err(format!(
+                "navmesh triangle vertex index out of range (vertices={})",
+                vc
+            ).into());
+        }
         let n0 = read_i32(&mut offset)?;
         let n1 = read_i32(&mut offset)?;
         let n2 = read_i32(&mut offset)?;
-        let to_opt = |v: i32| -> Option<usize> {
-            if v < 0 { None } else { Some(v as usize) }
+        let to_opt = |v: i32, tc: usize| -> crate::Result<Option<usize>> {
+            if v < 0 {
+                Ok(None)
+            } else {
+                let idx = v as usize;
+                if idx >= tc {
+                    Err(format!(
+                        "navmesh neighbour triangle index {} out of range (triangles={})",
+                        idx, tc
+                    ).into())
+                } else {
+                    Ok(Some(idx))
+                }
+            }
         };
         triangles.push(NavTriangle {
             indices: [i0, i1, i2],
-            neighbors: [to_opt(n0), to_opt(n1), to_opt(n2)],
+            neighbors: [to_opt(n0, tc)?, to_opt(n1, tc)?, to_opt(n2, tc)?],
         });
     }
 
@@ -501,5 +574,60 @@ mod tests {
         data.extend_from_slice(&0u32.to_le_bytes());
         data.extend_from_slice(&0u32.to_le_bytes());
         assert!(NavMesh::deserialize(&data).is_err());
+    }
+
+    #[test]
+    fn deserialize_navmesh_rejects_huge_vertex_count() {
+        // Adversarial vertex count u32::MAX. Without the cap this drove a
+        // multi-GB `Vec::with_capacity` allocation.
+        let mut data = Vec::new();
+        data.extend_from_slice(&u32::MAX.to_le_bytes());
+        let err = deserialize_navmesh(&data).err().expect("expected error").to_string();
+        assert!(err.contains("vertex count"), "unexpected error: {err}");
+    }
+
+    #[test]
+    fn deserialize_navmesh_rejects_triangle_vertex_index_oob() {
+        // One vertex declared, triangle references vertex 5 → out of range.
+        // Without the check this allowed building a NavMesh whose
+        // `shared_edge` / `point_in_triangle_xz` would panic on
+        // `self.vertices[5]`.
+        let mut data = Vec::new();
+        // vertex_count = 1, one vertex at (0,0,0)
+        data.extend_from_slice(&1u32.to_le_bytes());
+        data.extend_from_slice(&0.0f32.to_le_bytes());
+        data.extend_from_slice(&0.0f32.to_le_bytes());
+        data.extend_from_slice(&0.0f32.to_le_bytes());
+        // triangle_count = 1, triangle (5,5,5) with no neighbours
+        data.extend_from_slice(&1u32.to_le_bytes());
+        data.extend_from_slice(&5u32.to_le_bytes());
+        data.extend_from_slice(&5u32.to_le_bytes());
+        data.extend_from_slice(&5u32.to_le_bytes());
+        data.extend_from_slice(&(-1i32).to_le_bytes());
+        data.extend_from_slice(&(-1i32).to_le_bytes());
+        data.extend_from_slice(&(-1i32).to_le_bytes());
+        let err = deserialize_navmesh(&data).err().expect("expected error").to_string();
+        assert!(err.contains("vertex index out of range"), "unexpected error: {err}");
+    }
+
+    #[test]
+    fn deserialize_navmesh_rejects_neighbour_index_oob() {
+        // One valid triangle but neighbour index = 5 (only 1 triangle exists).
+        let mut data = Vec::new();
+        // vertex_count = 3, simple triangle vertices
+        data.extend_from_slice(&3u32.to_le_bytes());
+        for _ in 0..9 {
+            data.extend_from_slice(&0.0f32.to_le_bytes());
+        }
+        // triangle_count = 1, valid indices but neighbour = 5
+        data.extend_from_slice(&1u32.to_le_bytes());
+        data.extend_from_slice(&0u32.to_le_bytes());
+        data.extend_from_slice(&1u32.to_le_bytes());
+        data.extend_from_slice(&2u32.to_le_bytes());
+        data.extend_from_slice(&5i32.to_le_bytes());
+        data.extend_from_slice(&(-1i32).to_le_bytes());
+        data.extend_from_slice(&(-1i32).to_le_bytes());
+        let err = deserialize_navmesh(&data).err().expect("expected error").to_string();
+        assert!(err.contains("neighbour triangle index"), "unexpected error: {err}");
     }
 }
