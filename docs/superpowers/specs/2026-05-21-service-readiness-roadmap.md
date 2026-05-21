@@ -70,9 +70,9 @@
 |---|---|---|---|---|
 | 1 | v1.0.9 OGG/Vorbis wire | `[✅]` | `plans/2026-05-21-v1.0.9-ogg-vorbis-wire.md` | c9b75ab |
 | 2 | v1.0.10 panic hook + crash log | `[✅]` | (inline plan in this doc § v1.0.10) | c98ef6f |
-| 3 | v1.0.11 voltex.toml schema | `[✅]` | (inline in STATUS § v1.0.11) | (pending commit) |
-| 4 | v1.0.12 license bundle in build | `[~]` | — | — |
-| 5 | v1.0.13 E2E new/build/run test | `[ ]` | — | — |
+| 3 | v1.0.11 voltex.toml schema | `[✅]` | (inline in STATUS § v1.0.11) | da33040 |
+| 4 | v1.0.12 license bundle in build | `[✅]` | (inline STATUS § v1.0.12) | (pending commit) |
+| 5 | v1.0.13 E2E new/build/run test | `[~]` | — | — |
 | 6 | v1.0.14 structured logging | `[ ]` | — | — |
 | 7 | v1.0.15 cargo-deny | `[ ]` | — | — |
 | 8 | v1.0.16 CHANGELOG enforcement | `[ ]` | — | — |

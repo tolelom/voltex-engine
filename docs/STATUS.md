@@ -173,6 +173,32 @@
 
 v1.0.9 부터는 **서비스 배포 완성도** 로드맵 (`docs/superpowers/specs/2026-05-21-service-readiness-roadmap.md`) 기준으로 진행.
 
+### v1.0.12 (2026-05-21) — LICENSE 파일 누락 fix + `voltex build` 가 라이선스 번들
+
+**발견된 컴플라이언스 갭**: repo 루트의 `Cargo.toml` 워크스페이스가 `license = "MIT OR Apache-2.0"` 명시하고 README 에 명시되어 있으나, **실제 `LICENSE-MIT` / `LICENSE-APACHE` 파일이 부재**. dual-license 약속이 텍스트 없이 떠 있던 상태.
+
+**fix**:
+- `LICENSE-MIT` (표준 MIT, Copyright 2026 tolelom) 신규 작성
+- `LICENSE-APACHE` (표준 Apache-2.0 boilerplate + APPENDIX) 신규 작성
+
+**번들링** (`voltex_cli::build::copy_license_files`):
+- `voltex build` 가 cargo build 완료 후 engine_path 의 `THIRD-PARTY-LICENSES.md` + `LICENSE-MIT` + `LICENSE-APACHE` 를 `dist/` 에 복사.
+- 누락된 파일은 silent skip (eprintln note) — 옛 engine checkout 호환.
+- Returns `Vec<PathBuf>` of copied files for caller logging.
+
+**테스트**: voltex_cli 43 → 47 (+4):
+- copy_license_files ×4: 전부 present / 전부 missing silent / partial only / **실 repo (CARGO_MANIFEST_DIR 부모 경로) 에서 실제로 THIRD-PARTY-LICENSES.md 찾기 검증** — 후자가 핵심으로, 이 cycle 이 작성한 LICENSE 파일 3종이 실 build flow 에 노출됨을 보증.
+
+**셀프 피드백**:
+- 단계 1 helper + build_target 통합: 컴파일 통과.
+- 단계 2 처음 작성한 테스트 4건: 3 통과 + 1 fail — "resolves_against_actual_repo" 가 LICENSE-MIT/APACHE 실제 부재 노출. **이게 v1.0.12 본질**: 테스트 가 컴플라이언스 갭 자체를 잡음.
+- 단계 3 LICENSE 파일 2개 작성 + 재실행: 4/4 통과.
+- 단계 4 워크스페이스 회귀: 0 워닝, 0 회귀.
+
+**알려진 한계 (v1.1+)**:
+- `THIRD-PARTY-LICENSES.md` 재생성은 수동 (`cargo about generate about.hbs -o ...`). CI 가 의존성 변화 시 자동 재생성 PR 만드는 건 별 cycle.
+- 번들된 라이선스 파일 무결성 검증 (해시 비교 등) 없음.
+
 ### v1.0.11 (2026-05-21) — voltex.toml 스키마 강화 (unknown key + section 거부 + path validation)
 
 배포 워크플로 진입 마찰 줄이기. `voltex build` 가 매니페스트의 오타나 누락된 자원을 빌드 *전* 에 친화 에러로 잡아냄 (이전엔 cargo 의 cryptic 에러로 나오거나 그냥 default 가 silent 적용).
@@ -620,7 +646,7 @@ crates/
 └── voltex_cli         — bin "voltex" (new/build/run), voltex.toml 매니페스트, .vpkg packing (B1+B2)
 ```
 
-## 테스트: ~1025개 통과 (Windows host, `cargo test --workspace`). `--lib` 기준은 982 (voltex_cli 는 bin-only 라 lib count 에서 빠지나 `cargo test -p voltex_cli` 로 43 개 실행됨). macOS host 에서는 +2 (CoreAudio 모듈) = 1027 예상. v1.0.1 +5 (input_system 순서/참조 ×2, Bounds default ×2, ScriptComponent default ×1). v1.0.3 +4 (canonicalize_friendly Windows verbatim strip ×3 + cross-OS integration ×1). v1.0.8 +21 (parser panic-resistance fuzz: PNG ×4 + JPG ×4 + GLTF ×5 + OBJ ×4 + WAV ×4). v1.0.9 +30 (OGG +11 + Vorbis +17 + decode_ogg_vorbis_bytes +2 — 모두 wire 직전까지 dead, 이제 실 컴파일). v1.0.10 +14 (voltex_runtime crash module ×11 + config crash log ×3). v1.0.11 +13 (voltex_cli schema/path validation + Levenshtein helper + error Display).
+## 테스트: ~1029개 통과 (Windows host, `cargo test --workspace`). `--lib` 기준은 982 (voltex_cli 는 bin-only 라 lib count 에서 빠지나 `cargo test -p voltex_cli` 로 47 개 실행됨). macOS host 에서는 +2 (CoreAudio 모듈) = 1031 예상. v1.0.1 +5 (input_system 순서/참조 ×2, Bounds default ×2, ScriptComponent default ×1). v1.0.3 +4 (canonicalize_friendly Windows verbatim strip ×3 + cross-OS integration ×1). v1.0.8 +21 (parser panic-resistance fuzz: PNG ×4 + JPG ×4 + GLTF ×5 + OBJ ×4 + WAV ×4). v1.0.9 +30 (OGG +11 + Vorbis +17 + decode_ogg_vorbis_bytes +2 — 모두 wire 직전까지 dead, 이제 실 컴파일). v1.0.10 +14 (voltex_runtime crash module ×11 + config crash log ×3). v1.0.11 +13 (voltex_cli schema/path validation + Levenshtein helper + error Display). v1.0.12 +4 (voltex_cli copy_license_files).
 
 - voltex: 2 (M6: prelude/module 경로 컴파일 검증)
 - voltex_math: 39 (8-7 +2: inverse roundtrip × VP+translation)
@@ -636,7 +662,7 @@ crates/
 - voltex_script: 42 (S1 +12: pool ×6 [get_or_create same/load/reload/unknown/poll_reload/clear], system ×4 [start/update/5-cubes/missing-callbacks], engine_api ×2 [iter_entities/iter_by_tag])
 - voltex_editor: 169 (E3 +11: command ×5 add/remove/unknown/dead-entity + session ×4 add_undo/remove_undo/despawn_restores/despawn_history/slot_reused + inspector ×2 - 1 obsolete despawn_clears test)
 - voltex_runtime: 27 (v1.0.10 +14: crash module ×11 + config crash log ×3; was 13)
-- voltex_cli: 43 (v1.0.11 +13: schema validation 5 + path validation 3 + helpers 2 + error Display 3; was 30)
+- voltex_cli: 47 (v1.0.12 +4: copy_license_files; v1.0.11 +13; was 30)
 
 ## Examples (14개) + Games (1개) + 기존 survivor_game (archived)
 

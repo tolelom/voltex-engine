@@ -150,6 +150,14 @@ pub fn build_target(
 
     copy_assets(&manifest_dir, &dist_dir, manifest)?;
 
+    let licenses = copy_license_files(&engine_path, &dist_dir)?;
+    if !licenses.is_empty() {
+        eprintln!(
+            "voltex build: bundled {} license file(s)",
+            licenses.len()
+        );
+    }
+
     Ok(())
 }
 
@@ -179,6 +187,34 @@ fn copy_assets(manifest_dir: &Path, dist_dir: &Path, manifest: &Manifest) -> Res
         copy_optional_dir(&dir, &dst)?;
     }
     Ok(())
+}
+
+/// v1.0.12: copy `THIRD-PARTY-LICENSES.md` and `LICENSE-*` files from the
+/// engine repo into `dist_dir` so the shipped artifact carries its own
+/// dependency-license attribution. Missing files are logged but never
+/// fail the build (older engine checkouts predate the inventory).
+///
+/// Returns the list of license files actually copied (relative to
+/// `dist_dir`) for caller-side logging / testing.
+pub fn copy_license_files(engine_path: &Path, dist_dir: &Path) -> Result<Vec<PathBuf>> {
+    let candidates = ["THIRD-PARTY-LICENSES.md", "LICENSE-MIT", "LICENSE-APACHE"];
+    std::fs::create_dir_all(dist_dir)?;
+    let mut copied = Vec::new();
+    for name in candidates {
+        let src = engine_path.join(name);
+        if src.is_file() {
+            let dst = dist_dir.join(name);
+            std::fs::copy(&src, &dst)?;
+            copied.push(PathBuf::from(name));
+        } else {
+            eprintln!(
+                "voltex build: note — license file {} not found at {}",
+                name,
+                src.display()
+            );
+        }
+    }
+    Ok(copied)
 }
 
 fn write_wrapper_manifest(wrapper_dir: &Path, engine_path: &Path) -> Result<()> {
@@ -362,6 +398,98 @@ mod tests {
         assert!(paths.contains(&"scripts/a.lua".to_string()));
         assert!(paths.contains(&"assets/sub/b.png".to_string()));
         let _ = std::fs::remove_dir_all(&root);
+    }
+
+    // ── v1.0.12: license bundle ────────────────────────────────────────────
+
+    fn make_engine_with_licenses(third_party: bool, mit: bool, apache: bool) -> PathBuf {
+        let stamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_nanos())
+            .unwrap_or(0);
+        let root = std::env::temp_dir().join(format!(
+            "voltex_cli_license_engine_{}_{}_{}",
+            third_party as u8, mit as u8, stamp
+        ));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        if third_party {
+            std::fs::write(root.join("THIRD-PARTY-LICENSES.md"), "third-party body").unwrap();
+        }
+        if mit {
+            std::fs::write(root.join("LICENSE-MIT"), "MIT body").unwrap();
+        }
+        if apache {
+            std::fs::write(root.join("LICENSE-APACHE"), "Apache body").unwrap();
+        }
+        root
+    }
+
+    #[test]
+    fn copy_license_files_copies_all_present() {
+        let engine = make_engine_with_licenses(true, true, true);
+        let dist = engine.join("dist");
+        let copied = copy_license_files(&engine, &dist).unwrap();
+        assert_eq!(copied.len(), 3);
+        assert!(dist.join("THIRD-PARTY-LICENSES.md").is_file());
+        assert!(dist.join("LICENSE-MIT").is_file());
+        assert!(dist.join("LICENSE-APACHE").is_file());
+        // Body preserved.
+        let body = std::fs::read_to_string(dist.join("THIRD-PARTY-LICENSES.md")).unwrap();
+        assert_eq!(body, "third-party body");
+        let _ = std::fs::remove_dir_all(&engine);
+    }
+
+    #[test]
+    fn copy_license_files_skips_silently_when_missing() {
+        // No license files at all → empty copied list, no error, no panic.
+        let engine = make_engine_with_licenses(false, false, false);
+        let dist = engine.join("dist");
+        let copied = copy_license_files(&engine, &dist).unwrap();
+        assert_eq!(copied.len(), 0);
+        // dist dir still created (caller may want to write other artifacts).
+        assert!(dist.is_dir());
+        let _ = std::fs::remove_dir_all(&engine);
+    }
+
+    #[test]
+    fn copy_license_files_partial_only_copies_present() {
+        // Only LICENSE-MIT present — the other two should be skipped.
+        let engine = make_engine_with_licenses(false, true, false);
+        let dist = engine.join("dist");
+        let copied = copy_license_files(&engine, &dist).unwrap();
+        assert_eq!(copied.len(), 1);
+        assert!(dist.join("LICENSE-MIT").is_file());
+        assert!(!dist.join("THIRD-PARTY-LICENSES.md").exists());
+        assert!(!dist.join("LICENSE-APACHE").exists());
+        let _ = std::fs::remove_dir_all(&engine);
+    }
+
+    #[test]
+    fn copy_license_files_resolves_against_actual_repo() {
+        // The repo this test runs in IS the engine. THIRD-PARTY-LICENSES.md
+        // was created in v1.0.7 — assert that helper finds it when given the
+        // workspace root, so the build flow we just wired into build_target
+        // works end-to-end (without invoking cargo).
+        let workspace_root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .unwrap()
+            .parent()
+            .unwrap()
+            .to_path_buf();
+        let dist = std::env::temp_dir().join(format!(
+            "voltex_cli_license_real_{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&dist);
+        let copied = copy_license_files(&workspace_root, &dist).unwrap();
+        assert!(
+            copied.iter().any(|p| p.to_str() == Some("THIRD-PARTY-LICENSES.md")),
+            "expected THIRD-PARTY-LICENSES.md to be bundled from {} — got {:?}",
+            workspace_root.display(),
+            copied,
+        );
+        let _ = std::fs::remove_dir_all(&dist);
     }
 
     #[test]

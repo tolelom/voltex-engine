@@ -10,6 +10,43 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## [v1.0.12] — 2026-05-21 — Missing LICENSE files added + `voltex build` bundles them
+
+A compliance gap discovered while writing the v1.0.12 tests: the
+workspace `Cargo.toml` advertises `license = "MIT OR Apache-2.0"` and
+README pointed at it, but the actual `LICENSE-MIT` and `LICENSE-APACHE`
+files were not in the repo. Shipped exes also did not carry license
+attribution.
+
+### Added
+
+- `LICENSE-MIT` (standard MIT, Copyright 2026 tolelom)
+- `LICENSE-APACHE` (standard Apache-2.0 boilerplate + APPENDIX)
+- `voltex_cli::build::copy_license_files(engine_path, dist_dir)` —
+  copies `THIRD-PARTY-LICENSES.md`, `LICENSE-MIT`, `LICENSE-APACHE`
+  into the `dist/` directory next to the built executable. Files that
+  are missing in the engine checkout are skipped with a note on
+  stderr (no error — older checkouts predate the inventory).
+- `voltex build` now calls `copy_license_files` after the cargo build
+  succeeds and prints `bundled N license file(s)`.
+
+### Tests
+
+- `voltex_cli`: 43 → **47** (+4). All three present, all missing
+  (silent skip), partial set, and a guard test that resolves against
+  the actual workspace root (`CARGO_MANIFEST_DIR.parent().parent()`)
+  to assert the bundle includes `THIRD-PARTY-LICENSES.md` — this is
+  the test that originally surfaced the missing LICENSE files.
+
+### Known limits
+
+- `THIRD-PARTY-LICENSES.md` regeneration is still manual via
+  `cargo about generate about.hbs -o THIRD-PARTY-LICENSES.md`. Auto-
+  regen PR on dependency change is deferred.
+- No integrity check on bundled files (hash etc.) — deferred.
+
+---
+
 ## [v1.0.11] — 2026-05-21 — `voltex.toml` strict schema + path validation
 
 Deployment workflow friction reduction: `voltex build` now rejects
