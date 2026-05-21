@@ -83,8 +83,14 @@ fn resolve_engine_path(args: &[String]) -> Result<PathBuf> {
         return Ok(PathBuf::from(value));
     }
     let env = std::env::var(VOLTEX_REPO_ENV).map_err(|_| CliError::Io(format!(
-        "engine path unknown — set `{}` or pass `--engine-path <repo-root>`",
-        VOLTEX_REPO_ENV
+        "engine path unknown — set `{env}` or pass `--engine-path <repo-root>`.\n\
+         \n\
+         Typical fix in a scaffolded project (`voltex new my_game && cd my_game`):\n  \
+           voltex build --engine-path /path/to/voltex\n\
+         or persist for the shell session:\n  \
+           export {env}=/path/to/voltex   # bash/zsh\n  \
+           $env:{env}='C:/path/to/voltex' # PowerShell",
+        env = VOLTEX_REPO_ENV
     )))?;
     Ok(PathBuf::from(env))
 }
