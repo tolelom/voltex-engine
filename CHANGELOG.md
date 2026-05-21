@@ -10,6 +10,43 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## [v1.0.2] — 2026-05-21 — 600-line rule re-enforcement + full example runtime sweep
+
+### Changed (refactor only — no behavior change)
+- `voltex_editor::session` (1060 lines) → `session/{mod.rs 445, tests.rs
+  483, e3_tests.rs 152}`. E3 tests carry their own `temp_path` / `cleanup`
+  helpers so each file compiles independently.
+- `voltex_script::engine_api` (713) → `engine_api/{mod.rs 356, tests.rs
+  357}`.
+- `voltex_ecs::world` (665) → `world/{mod.rs 351, tests.rs 314}`.
+- `voltex_cli::manifest` (612) → `manifest/{mod.rs 450, tests.rs 162}`.
+- After splits, the largest source file is `voltex_physics::solver` at
+  574 lines (under the project's 600-line guideline).
+
+### Verified
+- Runtime smoke-test on the 8 previously-unverified examples
+  (model_viewer / many_cubes / asset_demo / multi_light_demo /
+  shadow_demo / ibl_demo / deferred_demo / editor_demo) — all 8 exit 124
+  (timeout-clean, no panic). With v1.0.1's voltex_survivor +
+  tutorial_minigame + runtime_demo + audio_demo + triangle + pbr_demo +
+  hierarchy_demo, **all 15 examples + 1 game are Windows-host runtime
+  verified**.
+
+### Documentation sync
+- STATUS.md M3 row corrected (was 'no violations' — became 4 violations
+  during Cycles 4-13 before re-split).
+- STATUS.md voltex_ecs test count fixed (was 131, actual 134).
+- DEFERRED.md: gizmo / Despawn-undo / mesh AABB picking marked ✅ (done
+  in Cycles 3 and 12 but never reflected in DEFERRED).
+- DEFERRED.md: new 'v1.0.x 추가 한계' section enumerates every deferral
+  introduced in v1.0 / v1.0.1 / v1.0.2 with its source cycle.
+- CLAUDE.md 600-line rule references v1.0.2 re-split.
+
+### Tests
+- 0 new tests (pure refactor). 921 --lib tests still pass.
+
+---
+
 ## [v1.0.1] — 2026-05-21 — Runtime verification + P0/P1 regression patch
 
 ### Fixed

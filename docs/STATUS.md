@@ -166,10 +166,31 @@
 - examples/editor_demo: 시드 엔티티 (ground + 3 cube + Cube1↔Cube2 hierarchy)를 `EditorSession::dispatch` 경로로 옮김 → jsonl 로그 + Save/Load round-trip 일관성
 - v1 한계 (문서화): picking은 sphere 근사 (메시 AABB는 미구현). gizmo translate/rotate/scale 핸들은 미구현
 
-## 🎉 v1.0 release — 2026-05-21 (tag `v1.0.0`) → **v1.0.1 verification patch** (tag `v1.0.1`)
+## 🎉 v1.0 release — 2026-05-21 (tag `v1.0.0`) → **v1.0.1** + **v1.0.2** patches
 
 15 cycle / 37 세션 / 약 4 일에 걸쳐 진행된 v1.0 로드맵 완료. 회고는
 [docs/v1.0-retrospective.md](v1.0-retrospective.md). 미뤄진 항목은 v1.1+ 후속.
+
+### v1.0.2 (2026-05-21) — 600 줄 한도 회복 + 전체 examples smoke-test + stale docs 동기화
+**600 줄 한도 재분리** (M3 시점 0건 → v1.0.1 시점 위반 4건):
+- `voltex_editor::session` (1060) → `session/{mod.rs 445, tests.rs 483, e3_tests.rs 152}`. E3 테스트는 helper 자체 포함으로 분리.
+- `voltex_script::engine_api` (713) → `engine_api/{mod.rs 356, tests.rs 357}`. 17 Lua FFI 함수 body 는 mod.rs 유지.
+- `voltex_ecs::world` (665) → `world/{mod.rs 351, tests.rs 314}`.
+- `voltex_cli::manifest` (612) → `manifest/{mod.rs 450, tests.rs 162}`. Mini-TOML 파서 본체는 mod.rs.
+- 분리 후 가장 큰 파일은 `voltex_physics::solver` 574 줄.
+
+**전체 examples runtime smoke-test** (5-초 timeout × 8 미검증 → exit 124 = 정상):
+- model_viewer / many_cubes / asset_demo / multi_light_demo / shadow_demo / ibl_demo / deferred_demo / editor_demo 모두 무패닉.
+- 15 examples + 1 game (voltex_survivor) **Windows 호스트 100% runtime 검증**.
+
+**Stale docs 동기화**:
+- STATUS.md M3 행 + voltex_ecs 테스트 카운트.
+- DEFERRED.md Phase 8-7 의 gizmo / Despawn full undo / 메시 AABB picking ✅ 표시 (Cycle 3/12 에 이미 완료된 것을 반영 못 했음).
+- DEFERRED.md macOS/Linux 백엔드 ✅ (Cycle 10/11).
+- DEFERRED.md 신규 "v1.0.x 추가 한계" 섹션: 7 항목 (3 OS 검증 / Lua input / CLI editor / HUD / 1573 missing docs / pub(crate) / 멀티 OS audio runtime).
+- CLAUDE.md 600 줄 한도 라인 — v1.0.2 재분리 노트.
+
+테스트 +0 (동작 변경 없음, 분리만). 921 lib tests 유지.
 
 ### v1.0.1 (2026-05-21) — runtime 동작 검증 + P0/P1 회귀 패치
 v1.0 release 후 실 머신 (Windows) 검증에서 4개 회귀 발견, 즉시 fix:
