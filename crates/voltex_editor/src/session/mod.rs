@@ -262,11 +262,22 @@ impl EditorSession {
         };
         let result = apply_command(&mut self.world, &self.registry, &forward);
         self.append_log(&forward, &result);
-        if result.is_ok() {
-            self.undo_stack.push((forward, inverse));
+        if let Ok(applied_entity) = result {
+            // Re-applying `Spawn` allocates a fresh entity. The stored
+            // `DespawnSpawned(old_entity)` inverse refers to the *previous*
+            // entity (now dead) — applying it later would silent-no-op and
+            // leak the newly-redo'd entity. Patch the inverse so the next
+            // undo targets the right slot.
+            let patched_inverse = match (&forward, inverse) {
+                (EditorCommand::Spawn, _) => Inverse::DespawnSpawned(applied_entity),
+                (_, inv) => inv,
+            };
+            self.undo_stack.push((forward, patched_inverse));
             self.persist_scene_silent();
+            true
+        } else {
+            false
         }
-        result.is_ok()
     }
 
     fn capture_inverse(&self, cmd: &EditorCommand) -> Option<Inverse> {

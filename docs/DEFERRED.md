@@ -213,3 +213,5 @@
 - **Scene deserializer 적대적 entity count / index** ✅ v1.0.43 — `.vscn` text + `VSCN` binary 양쪽에 `MAX_SCENE_ENTITIES = 1_000_000` cap. Out-of-range parent index 도 silently 무시. +5 회귀 테스트. JSON deserializer 의 추가 cap 은 v1.1+.
 - **Navmesh deserializer 적대적 입력** ✅ v1.0.44 — VNAV 두 진입점에 `MAX_NAVMESH_VERTICES/TRIANGLES = 1_000_000` cap + triangle vertex index / neighbour index 범위 검사. +3 회귀 테스트.
 - **glTF accessor count + attribute mismatch** ✅ v1.0.45 — 7개 read_accessor_* 가 공통 `validate_count` (MAX=4M) + POSITION/NORMAL/UV/TANGENT 길이 일치 강제. +2 회귀 테스트.
+- **Editor redo-Spawn entity leak** ✅ v1.0.46 — `Spawn→Undo→Redo→Undo` 시 두 번째 undo 가 stale entity 를 가리켜 새로 생성된 entity 가 영구 생존하던 버그. redo 후 inverse 패치. +1 회귀.
+- **Audio mixer clip_index OOB** ✅ v1.0.46 — `clips.get()` 으로 안전 접근. +1 회귀.

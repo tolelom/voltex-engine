@@ -173,6 +173,25 @@
 
 v1.0.9 부터는 **서비스 배포 완성도** 로드맵 (`docs/superpowers/specs/2026-05-21-service-readiness-roadmap.md`) 기준으로 진행.
 
+### v1.0.46 (2026-05-22) — Editor redo Spawn 누수 fix + audio mixer OOB defence + runtime resize cleanup
+
+P0 robustness round 7. 세 곳의 작은 버그를 정리:
+
+**1. EditorSession::redo() 가 Spawn 재실행 시 entity 누수** — `Spawn → Undo → Redo → Undo` 시퀀스에서 inverse 가 *옛* entity (이미 죽은 슬롯) 를 가리켜 두 번째 undo 가 silently no-op. 새로 생성된 entity 는 영원히 살아남음.
+- Fix: redo() 가 `Spawn` 명령 재실행 후 `DespawnSpawned(applied_entity)` 로 inverse 패치.
+
+**2. 오디오 mixer 가 잘못된 clip_index 에서 OOB panic** — `PlayingSound` 의 `clip_index` 가 clips 슬라이스 길이를 초과하면 `clips[clip_index]` 가 panic. 에셋 reload / 슬라이스 축소 후 발생 가능.
+- Fix: `clips.get(sound.clip_index)` 사용. 잘못된 인덱스는 finished 리스트에 추가되어 다음 패스에서 제거.
+
+**3. RuntimeApp resize 핸들러 0×0 (창 최소화) 정리** — `WindowEvent::Resized(0, 0)` 시 카메라 aspect 만 가드되고 GPU resize 는 무조건 호출 (gpu 자체 가드로 no-op). 일관성을 위해 양쪽 가드 통합.
+- 변경 자체는 functional impact 0 (gpu.resize 가 이미 zero-dim 차단).
+
+**검증**:
+- `cargo build --workspace` 클린, clippy 0 워닝
+- voltex_audio 119 → 120 (+1), voltex_editor 169 → 170 (+1). 회귀 테스트 2개:
+  - `mixing::tests::out_of_range_clip_index_does_not_panic`
+  - `session::tests::redo_spawn_then_undo_cleans_up_the_new_entity`
+
 ### v1.0.45 (2026-05-22) — glTF accessor count cap + attribute length consistency
 
 P0 robustness round 6. glTF 파서의 모든 `read_accessor_*` 함수가 JSON 의 `count` 필드를 그대로 신뢰 → `Vec::with_capacity(u32::MAX)` 가능. 또한 mesh primitive 의 attribute (POSITION/NORMAL/UV/TANGENT) 가 서로 다른 count 를 주장하면 vertex assembly 루프가 OOB 패닉.

@@ -10,6 +10,31 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## [v1.0.46] — 2026-05-22 — Editor redo-Spawn leak + audio mixer OOB defence + runtime resize cleanup
+
+**Fix**. Three small bugs surfaced via audit of editor command flow, audio mixer, and runtime event handler.
+
+### Fixed
+
+- **`EditorSession::redo()` leaked entities on the `Spawn → Undo → Redo → Undo` sequence.** The undo stack stored `DespawnSpawned(old_entity)` as the inverse of the original `Spawn`. After the first undo killed `old_entity` and redo allocated a fresh entity (same id, bumped generation), the inverse still pointed at the dead slot. The second undo's `world.despawn(old_entity)` was a silent no-op because the generation no longer matched, and the freshly-redo'd entity stayed alive forever. Fixed by patching the inverse to `DespawnSpawned(applied_entity)` immediately after redo applies a `Spawn` command.
+- **`voltex_audio::mixing::mix_sounds` OOB panic on stale `clip_index`.** A `PlayingSound` whose `clip_index` no longer indexes the `clips` slice (asset reload, list shrunk) used to crash with index-out-of-bounds on `clips[sound.clip_index]`. The mixer now skips invalid sounds via `clips.get(_)` and queues them for removal so the next pass drops them cleanly.
+- **`voltex_runtime` `WindowEvent::Resized` cleanup.** Window minimisation produces a 0×0 resize event on most platforms. `state.gpu.resize` already no-ops for zero dimensions, but the caller was invoking it unconditionally; tightened the guard so both `gpu.resize` and the camera aspect update happen behind the same `> 0` check. Functional behaviour unchanged.
+
+### Tests
+
+`voltex_audio` 119 → 120 (+1), `voltex_editor` 169 → 170 (+1):
+
+- `voltex_audio::mixing::tests::out_of_range_clip_index_does_not_panic`
+- `voltex_editor::session::tests::redo_spawn_then_undo_cleans_up_the_new_entity`
+
+### Verification
+
+- `cargo build --workspace` — clean.
+- `cargo clippy --workspace --all-targets -- -D warnings` — 0 warnings.
+- `cargo test --workspace --lib` — every crate green.
+
+---
+
 ## [v1.0.45] — 2026-05-22 — glTF accessor count cap + attribute length consistency
 
 **Fix**. Two classes of bug in `voltex_renderer/src/gltf/accessor.rs`:

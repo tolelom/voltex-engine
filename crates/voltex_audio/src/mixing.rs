@@ -70,7 +70,14 @@ pub fn mix_sounds(
     let mut finished = Vec::new();
 
     for (sound_idx, sound) in playing.iter_mut().enumerate() {
-        let clip = &clips[sound.clip_index];
+        // A `PlayingSound` may outlive the clip slice it was created against
+        // (e.g. assets reloaded, list shrunk). Skip rather than panic on an
+        // out-of-range `clip_index`, and treat the sound as finished so the
+        // mixer drops it on the next pass.
+        let Some(clip) = clips.get(sound.clip_index) else {
+            finished.push(sound_idx);
+            continue;
+        };
 
         // Apply group and master volume multiplier.
         let group_vol = mixer.effective_volume(sound.group);
@@ -366,5 +373,24 @@ mod tests {
         for &s in &output {
             assert!(s.abs() < 1e-6, "expected silence with master=0, got {}", s);
         }
+    }
+
+    #[test]
+    fn out_of_range_clip_index_does_not_panic() {
+        // A PlayingSound whose clip_index is past the end of `clips` used to
+        // panic with index-out-of-bounds on the very first iteration. The
+        // mixer now drops the sound silently.
+        let clips = vec![make_mono_clip(1.0, 100, 44100)];
+        let mut playing = vec![
+            PlayingSound::new(0, 1.0, false),
+            PlayingSound::new(99, 1.0, false), // out of range
+        ];
+        let mut output = Vec::new();
+
+        mix_sounds(&mut output, &mut playing, &clips, 44100, 1, 10, &Listener::default(), &MixerState::new());
+
+        // The invalid sound was dropped, the valid one is still playing.
+        assert_eq!(playing.len(), 1);
+        assert_eq!(playing[0].clip_index, 0);
     }
 }

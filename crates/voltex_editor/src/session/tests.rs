@@ -481,3 +481,39 @@ fn multi_step_undo_redo_walks_both_ways() {
     cleanup(&scene);
 }
 
+
+#[test]
+fn redo_spawn_then_undo_cleans_up_the_new_entity() {
+    // Regression: Spawn -> Undo -> Redo -> Undo used to leak the
+    // entity created by Redo because the stored DespawnSpawned
+    // inverse referenced the original (now dead) entity. Redo
+    // must patch the inverse to point at the freshly-allocated
+    // entity slot before pushing back onto undo_stack.
+    let scene = temp_path("voltex_redo_spawn.vscn");
+    cleanup(&scene);
+    let mut session = EditorSession::new(scene.clone());
+
+    // 1. Initial spawn.
+    let e1 = session.dispatch(EditorCommand::Spawn).unwrap();
+    assert!(session.world.is_alive(e1));
+    assert_eq!(session.world.entity_count(), 1);
+
+    // 2. Undo.
+    assert!(session.undo());
+    assert!(!session.world.is_alive(e1));
+    assert_eq!(session.world.entity_count(), 0);
+
+    // 3. Redo — allocates a fresh slot (same id, bumped generation).
+    assert!(session.redo());
+    assert_eq!(session.world.entity_count(), 1);
+    // Whichever entity is now live, it is not e1.
+    assert!(!session.world.is_alive(e1));
+
+    // 4. Undo again — pre-fix this silent-no-op'd because the inverse
+    //    targeted e1. The new entity leaked. Now the inverse is
+    //    patched at redo time, so this undo cleans up properly.
+    assert!(session.undo());
+    assert_eq!(session.world.entity_count(), 0);
+    cleanup(&scene);
+}
+

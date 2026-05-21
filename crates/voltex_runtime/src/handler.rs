@@ -83,8 +83,12 @@ impl ApplicationHandler for RuntimeHandler {
                 }
             }
             WindowEvent::Resized(size) => {
-                state.gpu.resize(size.width, size.height);
+                // Window minimisation produces a 0x0 resize event on most
+                // platforms. wgpu's `configure_surface` panics on a zero-sized
+                // surface, so we skip both the GPU resize and the aspect
+                // update until the user restores the window.
                 if size.width > 0 && size.height > 0 {
+                    state.gpu.resize(size.width, size.height);
                     state.camera.aspect = size.width as f32 / size.height as f32;
                 }
             }
