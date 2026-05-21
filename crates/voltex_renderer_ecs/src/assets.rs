@@ -8,11 +8,15 @@ use voltex_asset::{Assets, Handle};
 use voltex_ecs::{MaterialHandle, MeshHandle};
 use voltex_renderer::{MaterialUniform, Mesh};
 
+/// GPU-resident mesh + material storage. Hands out the phantom-typed
+/// [`MeshHandle`] / [`MaterialHandle`] ECS components while keeping the
+/// underlying `Handle<Mesh>` / `Handle<MaterialUniform>` ids in lockstep.
 pub struct RenderAssets {
     assets: Assets,
 }
 
 impl RenderAssets {
+    /// Creates an empty asset store. `add_mesh` / `add_material` populate it.
     pub fn new() -> Self {
         Self { assets: Assets::new() }
     }
@@ -24,6 +28,7 @@ impl RenderAssets {
         MeshHandle(Handle::from_raw_parts(h.id(), h.generation()))
     }
 
+    /// Borrows the underlying `voltex_renderer::Mesh` for `h`, or `None` if stale.
     pub fn mesh(&self, h: MeshHandle) -> Option<&Mesh> {
         let raw: Handle<Mesh> = Handle::from_raw_parts(h.0.id(), h.0.generation());
         self.assets.get(raw)
@@ -35,6 +40,7 @@ impl RenderAssets {
         MaterialHandle(Handle::from_raw_parts(h.id(), h.generation()))
     }
 
+    /// Borrows the underlying `MaterialUniform` for `h`, or `None` if stale.
     pub fn material(&self, h: MaterialHandle) -> Option<&MaterialUniform> {
         let raw: Handle<MaterialUniform> = Handle::from_raw_parts(h.0.id(), h.0.generation());
         self.assets.get(raw)

@@ -10,6 +10,26 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## [v1.0.35] — 2026-05-21 — `voltex_renderer_ecs` 100% documented (→ 0 `missing_docs`)
+
+Eleventh crate in the workspace `missing_docs` sweep. Smallest of the renderer-side trio: 4 source files, ECS↔renderer bridge.
+
+### Added
+
+- Crate-level `#![warn(missing_docs)]` guard (crate-level `//!` already existed).
+- Public docs:
+  - `RendererEcsError` 2 variants (Generic/Io) + `Result` alias.
+  - `RenderAssets` (new/mesh/material constructors and accessors).
+  - `RenderItem` 4 fields (entity/model/mesh/material).
+  - `BasicRenderer` struct-level doc.
+
+### Verified
+
+- `cargo build -p voltex_renderer_ecs` — zero `missing_docs` warnings.
+- `cargo test -p voltex_renderer_ecs --lib` — 7 passed (no regression).
+
+---
+
 ## [v1.0.34] — 2026-05-21 — Release artifact automation
 
 P1 service-readiness item. Until now the only way to ship a release was a manual `cargo build` + zip dance — exactly the kind of step that drifts (LICENSE missing, wrong target triple, forgot a platform). Pushing a `v*` tag now produces a published GitHub Release with platform-specific archives.

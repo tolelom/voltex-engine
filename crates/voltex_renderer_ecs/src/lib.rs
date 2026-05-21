@@ -7,6 +7,8 @@
 //! - [`BasicRenderer`] : mesh_shader.wgsl 기반 pipeline + per-entity dynamic UBO 를 소유.
 //!   `render(...)` 한 메서드로 World 를 그린다.
 
+#![warn(missing_docs)]
+
 pub mod error;
 pub mod assets;
 pub mod items;

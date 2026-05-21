@@ -94,7 +94,8 @@
 | 23 | v1.0.31 E2E new+build test | `[✅]` | (inline STATUS § v1.0.31) | 4a92f12 |
 | 24 | v1.0.32 HUD primitive | `[✅]` | (inline STATUS § v1.0.32) | 3617834 |
 | 25 | v1.0.33 SemVer-checks CI | `[✅]` | (inline STATUS § v1.0.33) | d4d6e0c |
-| 26 | v1.0.34 release artifact automation | `[✅]` | (inline STATUS § v1.0.34) | (pending commit) |
+| 26 | v1.0.34 release artifact automation | `[✅]` | (inline STATUS § v1.0.34) | 6b60589 |
+| 27 | v1.0.35 voltex_renderer_ecs missing_docs →0 | `[✅]` | (inline STATUS § v1.0.35) | (pending commit) |
 | 7 | v1.0.15 cargo-deny | `[ ]` | — | — |
 | 8 | v1.0.16 CHANGELOG enforcement | `[ ]` | — | — |
 | 9 | v1.0.17 SemVer check | `[ ]` | — | — |

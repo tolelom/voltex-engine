@@ -10,9 +10,13 @@ use crate::assets::RenderAssets;
 
 /// 한 엔티티의 한 프레임 렌더 데이터.
 pub struct RenderItem {
+    /// Source entity for this draw.
     pub entity: Entity,
+    /// World-space model matrix (`WorldTransform` snapshot).
     pub model: Mat4,
+    /// Phantom-typed handle into [`RenderAssets`](crate::RenderAssets).
     pub mesh: MeshHandle,
+    /// Per-entity material uniform (already resolved from `MaterialHandle`).
     pub material: MaterialUniform,
 }
 

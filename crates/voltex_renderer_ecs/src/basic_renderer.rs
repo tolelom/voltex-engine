@@ -12,6 +12,8 @@ use voltex_renderer::{
 use crate::assets::RenderAssets;
 use crate::items::collect_render_items;
 
+/// World-driven mesh renderer — Blinn-Phong shader, per-entity dynamic UBO,
+/// camera + light shared bind group. Owns the wgpu pipeline objects.
 pub struct BasicRenderer {
     pipeline: wgpu::RenderPipeline,
     camera_buffer: wgpu::Buffer,

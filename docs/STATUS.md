@@ -173,6 +173,22 @@
 
 v1.0.9 부터는 **서비스 배포 완성도** 로드맵 (`docs/superpowers/specs/2026-05-21-service-readiness-roadmap.md`) 기준으로 진행.
 
+### v1.0.35 (2026-05-21) — voltex_renderer_ecs 100% missing_docs + `#![warn(missing_docs)]`
+
+열한 번째 crate. 4 파일 (lib/error/assets/items/basic_renderer).
+
+**작업**:
+- `#![warn(missing_docs)]` 추가 (crate-level //! 는 이미 존재)
+- Public API:
+  - `RendererEcsError` 2 variant + `Result` alias
+  - `RenderAssets::{new, mesh, material}` (add_mesh/add_material 는 이미 doc 있음)
+  - `RenderItem` 4 field
+  - `BasicRenderer` struct-level doc
+
+**검증**:
+- `cargo build -p voltex_renderer_ecs` 0 missing_docs
+- `cargo test -p voltex_renderer_ecs --lib` 7 통과
+
 ### v1.0.34 (2026-05-21) — Release artifact automation
 
 P1. tag push 만으로 3-OS exe + 라이선스 번들이 GitHub Release 로 발행되는 파이프라인.
