@@ -168,7 +168,7 @@ use voltex::physics::{Collider, RigidBody};
 
 1. **위치 파악**: 수정할 기능이 어느 crate에 있는지 `CLAUDE.md` 의존성 그래프 → 해당 `CODEMAP.md` → 모듈 구조에서 찾기
 2. **변경 영향 점검**: `CODEMAP.md`의 "변경 시 주의점" 확인
-3. **수정**: 단일 책임 원칙, 600줄 한도, 일관된 패턴
+3. **수정**: 단일 책임 원칙, 600줄 한도 (v1.0.2 에서 4 파일 재분리 완료, 회귀 발생 시 분리)
 4. **빌드 확인**: `cargo build -p <crate>` (해당 crate만) 후 `cargo build --workspace`
 5. **테스트 확인**: `cargo test -p <crate> --lib` 후 `cargo test --workspace --lib`
 6. **CODEMAP 갱신**: 공개 API/모듈 구조가 바뀌었으면 해당 `CODEMAP.md` 갱신

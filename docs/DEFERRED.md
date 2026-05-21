@@ -69,7 +69,7 @@
 
 ## Phase 6-1
 
-- **macOS/Linux 백엔드** — WASAPI(Windows)만 구현.
+- ~~**macOS/Linux 백엔드**~~ ✅ Cycle 10 (ALSA) + Cycle 11 (CoreAudio) 코드 완료. 실 머신 runtime 검증 v1.1.
 - ~~**OGG/Vorbis 디코더**~~ ✅ OGG 컨테이너 + Vorbis 디코더 완료.
 - ~~**24-bit/32-bit WAV**~~ ✅ 완료.
 - ~~**ECS 통합**~~ ✅ AudioSource 컴포넌트 완료. audio_sync_system 미구현.
@@ -165,6 +165,17 @@
 - ~~**viewport raycast picking**~~ ✅ sphere 기반 (`picking::pick_entity`). 좌클릭 → `session.selected`.
 - ~~**Lua hierarchy API**~~ ✅ add_child / remove_child / find_all_by_tag 추가.
 - ~~**editor_demo 시드의 command 경로 통합**~~ ✅ Save/Load round-trip 일관성 확보.
-- **메시 AABB picking** — 현재 sphere 근사 (반경 = default × max(scale)). ECS에 mesh bounds 컴포넌트가 들어오면 OBB/AABB 교차로 업그레이드.
-- **gizmo (translate/rotate/scale)** — viewport 안에서 3축 핸들 드래그. 렌더러 작업 동반 → 다음 chunk 후보.
-- **Despawn 정확한 undo** — v1은 history 클리어. 풀 undo 위해 EntityAllocator의 generation 복원 + 컴포넌트 스냅샷 필요.
+- ~~**메시 AABB picking**~~ ✅ Cycle 3 (E1) — `Bounds` 컴포넌트 있는 entity 는 8-corner AABB world transform 후 ray vs AABB. 없으면 sphere fallback.
+- ~~**gizmo (translate/rotate/scale)**~~ ✅ Cycle 3 (E1) — translate/rotate/scale 3축 핸들 + LINE wgpu 파이프라인. End-drag 시 SetTransform 단일 undo 엔트리.
+- ~~**Despawn 정확한 undo**~~ ✅ Cycle 12 (E3) — `EntityAllocator::restore_at_generation` + 등록된 모든 컴포넌트 snapshot/restore. 슬롯 재사용 시 silent skip.
+
+## v1.0 / v1.0.1 / v1.0.2 추가 한계
+
+- **3 OS exe artifact 검증** — Windows host 빌드 + runtime 검증만. Linux + macOS 실 머신 검증 v1.1 사용자 PR.
+- **Lua input API** — 입력은 Rust `add_input_system` 만. Lua 측 `input.is_key_pressed(...)` v1.1 후속.
+- **voltex_cli editor 모드** — `voltex new/build/run` 만. `voltex editor` 서브커맨드 v1.1.
+- **HUD 통합** — 런타임 UiContext 정식 API 없음. 점수 등 표시는 콘솔 print 만.
+- **1573 missing_docs** — facade prelude + tier-1 API 만 보장. crate 별 점진 작성 v1.1.
+- **`pub(crate)` 다운그레이드** — 후보 노트 (`docs/v1.0-pub-audit.md`) 만 작성. 실 변경 v1.1.
+- **600줄 한도 위반 4건** ✅ v1.0.2 에서 재분리.
+- **macOS/Linux 백엔드 runtime** — Cycle 10 (P1) ALSA + Cycle 11 (B3) CoreAudio 코드 작성 완료. 실 머신 audio 출력 v1.1.

@@ -8,7 +8,7 @@
 |---|---|---|
 | M1 | 11개 crate × CODEMAP.md + CLAUDE.md 보강 | 12 CODEMAP (sub 11 + facade) |
 | M2 | 800줄+ 파일 4개 분리 (vorbis/gltf/jpg/deferred_pipeline) | 0건 잔존 |
-| M3 | 500-800줄 파일 11개 분리 | 0건 잔존 (전체 .rs 600줄 이하) |
+| M3 | 500-800줄 파일 11개 분리 | M3 시점 0건. v1.0.2 에서 누적 위반 4건 재분리 |
 | M4 | 에러 표준화 (thiserror 기반 `<Crate>Error` + `Result<T>` alias) | 8 crate 적용, `Result<T, String>` 0건 |
 | M5 | ECS 패턴 표준화 (Component trait + `register::<T>()`) | Transform/Tag 마이그레이션, +3 테스트 |
 | M6 | voltex facade crate + prelude | L4 facade, triangle 마이그레이션 |
@@ -344,7 +344,7 @@ crates/
 - voltex: 2 (M6: prelude/module 경로 컴파일 검증)
 - voltex_math: 39 (8-7 +2: inverse roundtrip × VP+translation)
 - voltex_platform: 3
-- voltex_ecs: 131 (E3 +10: restore_at_generation ×5 + default_bytes/remove ×5)
+- voltex_ecs: 134 (E3 +10, v1.0.1 +3 Bounds/ScriptComponent default round-trip)
 - voltex_asset: 36 (B2 +12: vpkg ×6 + vfs ×6; C0a +2: Handle accessors)
 - voltex_renderer: 200
 - voltex_renderer_ecs: 7 (C0b 신규: RenderAssets material roundtrip ×2, missing handle ×2, items empty/skip-no-mesh/stale/hierarchy)
