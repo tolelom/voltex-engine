@@ -54,10 +54,23 @@ impl Component for ScriptComponent {
         Ok(())
     }
 
-    /// Default ScriptComponent = UNBOUND instance, empty path. User sets the
-    /// real .lua path via Inspector text input after AddComponent.
+    /// Default ScriptComponent = UNBOUND instance + path
+    /// `"scripts/spinner.lua"`. The Inspector's "+ script" button needs a
+    /// runnable placeholder so the user can verify the script system is
+    /// wired up correctly — every `voltex new` scaffold ships a
+    /// `scripts/spinner.lua` that just rotates the entity (v1.0.1 fix; was
+    /// 4 bytes of UNBOUND-only with no path, which made the button a no-op).
+    ///
+    /// Users replace the path via the Inspector's path text input (v1.1) or
+    /// by editing the scene file. The script system silently skips missing
+    /// files, so the default is safe even if the user's project lacks
+    /// `scripts/spinner.lua`.
     fn default_bytes() -> Vec<u8> {
-        Self::UNBOUND.to_le_bytes().to_vec()
+        let path = b"scripts/spinner.lua";
+        let mut out = Vec::with_capacity(4 + path.len());
+        out.extend_from_slice(&Self::UNBOUND.to_le_bytes());
+        out.extend_from_slice(path);
+        out
     }
 }
 
@@ -117,5 +130,23 @@ mod tests {
         let data = [0u8, 0, 0, 0, 0xFF, 0xFE];
         let result = <ScriptComponent as Component>::deserialize(&mut world, e, &data);
         assert!(result.is_err());
+    }
+
+    // ── v1.0.1: default_bytes regression ─────────────────────────────────
+
+    #[test]
+    fn default_bytes_round_trips_to_unbound_with_placeholder_path() {
+        // Prior to v1.0.1 default_bytes was just 4 UNBOUND bytes with no
+        // path — Inspector's "+ script" produced a script component that
+        // pointed at "" and was therefore a no-op. The fix encodes a
+        // placeholder path so the user can verify the script system is wired.
+        let bytes = <ScriptComponent as Component>::default_bytes();
+        assert!(bytes.len() > 4, "default_bytes must carry a path payload");
+        let mut world = World::new();
+        let e = world.spawn();
+        <ScriptComponent as Component>::deserialize(&mut world, e, &bytes).unwrap();
+        let s = world.get::<ScriptComponent>(e).expect("ScriptComponent attached");
+        assert_eq!(s.instance_id, ScriptComponent::UNBOUND);
+        assert_eq!(s.script_path, "scripts/spinner.lua");
     }
 }

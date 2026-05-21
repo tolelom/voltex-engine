@@ -122,11 +122,13 @@ fn register_systems(app: &mut RuntimeApp) {
         }
     });
 
-    // 2. Lua-spawned entities (enemy / projectile / kill_marker /
-    //    damage_marker) come into the world without mesh / material handles.
-    //    Attach the shared cube + material so they render. Markers stay
-    //    invisible because they have no Transform; Lua creates them with a
-    //    default Transform via spawn_entity, but we mask them by Tag.
+    // 2. Lua-spawned entities (enemy / projectile) come into the world
+    //    without mesh / material handles AND without a ScriptComponent —
+    //    `spawn_entity()` only creates a bare entity with Transform. This
+    //    system attaches the right ScriptComponent + render handles based
+    //    on the tag the Lua script set. Markers (kill_marker /
+    //    damage_marker) are intentionally skipped — they stay invisible
+    //    and have no script to run.
     app.add_system(|world, _dt| {
         // Find a shared mesh/material handle by sampling the player's.
         let sample = world
@@ -139,17 +141,29 @@ fn register_systems(app: &mut RuntimeApp) {
         let (Some(mesh), Some(mat)) = (mesh, mat) else { return };
         let bounds = Bounds(AABB::new(Vec3::new(-0.5, -0.5, -0.5), Vec3::new(0.5, 0.5, 0.5)));
 
-        let needy: Vec<Entity> = world
+        // Collect (entity, tag_name) pairs needing attachment so we can
+        // borrow the world mutably afterwards.
+        let needy: Vec<(Entity, String)> = world
             .query::<Tag>()
             .filter(|(e, t)| {
-                (t.0 == "enemy" || t.0 == "projectile") && world.get::<MeshHandle>(*e).is_none()
+                (t.0 == "enemy" || t.0 == "projectile")
+                    && world.get::<MeshHandle>(*e).is_none()
             })
-            .map(|(e, _)| e)
+            .map(|(e, t)| (e, t.0.clone()))
             .collect();
-        for e in needy {
+        for (e, tag) in needy {
             world.add(e, mesh);
             world.add(e, mat);
             world.add(e, bounds);
+            // Tag-driven script attachment (the engine_api has no
+            // set_script(...) helper — v1.1 work). Marker entities don't
+            // get scripts; game.lua handles them via iter_by_tag.
+            let path = match tag.as_str() {
+                "enemy" => "scripts/enemy.lua",
+                "projectile" => "scripts/projectile.lua",
+                _ => continue,
+            };
+            world.add(e, ScriptComponent::new(path));
         }
     });
 }

@@ -115,10 +115,22 @@ impl Component for Bounds {
         Ok(())
     }
 
-    /// Default Bounds = AABB { min: zero, max: zero } (degenerate). Inspector
-    /// users set real bounds explicitly via mesh import / dedicated commands.
+    /// Default Bounds = unit cube AABB `min: (-0.5, -0.5, -0.5)`, `max:
+    /// (0.5, 0.5, 0.5)`. A zero-volume AABB would be frustum-culled by every
+    /// renderer pass — the unit cube matches the engine's default mesh size
+    /// so Inspector's "+ bounds" click produces a visible entity (v1.0.1
+    /// fix; default_bytes used to be 24 zero bytes).
     fn default_bytes() -> Vec<u8> {
-        vec![0u8; 24]
+        let mut out = Vec::with_capacity(24);
+        // min = (-0.5, -0.5, -0.5)
+        for _ in 0..3 {
+            out.extend_from_slice(&(-0.5f32).to_le_bytes());
+        }
+        // max = (0.5, 0.5, 0.5)
+        for _ in 0..3 {
+            out.extend_from_slice(&(0.5f32).to_le_bytes());
+        }
+        out
     }
 }
 
@@ -211,5 +223,41 @@ mod tests {
         let e = world.spawn();
         let result = <Bounds as Component>::deserialize(&mut world, e, &[0u8; 23]);
         assert!(result.is_err());
+    }
+
+    // ── v1.0.1: default_bytes regression ─────────────────────────────────
+
+    #[test]
+    fn bounds_default_bytes_round_trips_to_unit_cube() {
+        // Prior to v1.0.1 default_bytes was 24 zero bytes — a degenerate
+        // zero-volume AABB that every frustum-cull pass would discard,
+        // making Inspector's "+ bounds" button produce an invisible entity.
+        // The fix encodes a unit cube AABB instead.
+        let bytes = <Bounds as Component>::default_bytes();
+        assert_eq!(bytes.len(), 24);
+        let mut world = World::new();
+        let e = world.spawn();
+        <Bounds as Component>::deserialize(&mut world, e, &bytes).unwrap();
+        let b = world.get::<Bounds>(e).expect("Bounds attached");
+        assert!((b.0.min.x - (-0.5)).abs() < 1e-6);
+        assert!((b.0.min.y - (-0.5)).abs() < 1e-6);
+        assert!((b.0.min.z - (-0.5)).abs() < 1e-6);
+        assert!((b.0.max.x - 0.5).abs() < 1e-6);
+        assert!((b.0.max.y - 0.5).abs() < 1e-6);
+        assert!((b.0.max.z - 0.5).abs() < 1e-6);
+    }
+
+    #[test]
+    fn bounds_default_bytes_is_not_zero_volume() {
+        // Regression test for v1.0.1: explicit guard that the default
+        // produces non-degenerate volume (max > min on every axis).
+        let bytes = <Bounds as Component>::default_bytes();
+        let mut world = World::new();
+        let e = world.spawn();
+        <Bounds as Component>::deserialize(&mut world, e, &bytes).unwrap();
+        let b = world.get::<Bounds>(e).unwrap();
+        assert!(b.0.max.x > b.0.min.x);
+        assert!(b.0.max.y > b.0.min.y);
+        assert!(b.0.max.z > b.0.min.z);
     }
 }

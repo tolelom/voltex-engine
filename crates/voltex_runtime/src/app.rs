@@ -284,4 +284,66 @@ mod tests {
         let app = RuntimeApp::new(cfg).expect("RuntimeApp::new should not fail on missing scene");
         assert_eq!(app.world.entity_count(), 0);
     }
+
+    // ── v1.0.1: add_input_system regression coverage ─────────────────────
+
+    #[test]
+    fn add_input_system_runs_after_regular_systems() {
+        // Verifies the ordering invariant `tick_systems_only` documents:
+        // input_systems fire *after* user_systems each frame.
+        let log = Rc::new(Cell::new(Vec::<&'static str>::new()));
+        let l_user = log.clone();
+        let l_input = log.clone();
+        let cfg = RuntimeConfig::new()
+            .disable_physics()
+            .disable_scripts()
+            .with_system_setup(move |app| {
+                let lu = l_user.clone();
+                app.add_system(move |_w, _dt| {
+                    let mut v = lu.take();
+                    v.push("user");
+                    lu.set(v);
+                });
+                let li = l_input.clone();
+                app.add_input_system(move |_w, _input, _dt| {
+                    let mut v = li.take();
+                    v.push("input");
+                    li.set(v);
+                });
+            });
+        let mut app = RuntimeApp::new(cfg).unwrap();
+        assert_eq!(app.user_system_count(), 1);
+        assert_eq!(app.input_system_count(), 1);
+        app.tick_systems_only(0.016);
+        assert_eq!(log.take(), vec!["user", "input"]);
+    }
+
+    #[test]
+    fn input_system_receives_app_input_reference() {
+        // The input system must observe the runtime's `app.input` field
+        // (same reference, same state) so user code can read keyboard /
+        // mouse state captured by the winit handler.
+        let captured_pressed = Rc::new(Cell::new(false));
+        let cap = captured_pressed.clone();
+        let cfg = RuntimeConfig::new()
+            .disable_physics()
+            .disable_scripts()
+            .with_system_setup(move |app| {
+                // Pre-set a key in the app's input so the system sees it.
+                app.input.process_key(
+                    winit::keyboard::KeyCode::KeyW,
+                    true,
+                );
+                let cc = cap.clone();
+                app.add_input_system(move |_w, input, _dt| {
+                    cc.set(input.is_key_pressed(winit::keyboard::KeyCode::KeyW));
+                });
+            });
+        let mut app = RuntimeApp::new(cfg).unwrap();
+        app.tick_systems_only(0.016);
+        assert!(
+            captured_pressed.get(),
+            "input system did not see the pre-set KeyW press"
+        );
+    }
 }

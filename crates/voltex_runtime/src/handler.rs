@@ -124,26 +124,32 @@ fn redraw(app: &mut RuntimeApp, event_loop: &ActiveEventLoop) {
         .fixed_dt
         .unwrap_or_else(|| app.timer.frame_dt());
 
-    // Camera update (RMB-held mouse look + WASD/Space/Shift movement). We do
-    // this before the user systems so script logic sees a fresh camera too.
+    // Camera update — both mouse look AND WASD/Space/Shift movement are gated
+    // on RMB-held, matching the established scene-view convention (Bevy /
+    // Unity / Godot). With WASD released, games' `add_input_system` user
+    // systems are free to use WASD for player movement without conflict.
     let state = app.runtime_state.as_mut().expect("redraw needs runtime_state");
     if app.input.is_mouse_button_pressed(MouseButton::Right) {
         let (dx, dy) = app.input.mouse_delta();
         state.fps_controller.process_mouse(&mut state.camera, dx, dy);
+        let mut fwd = 0.0;
+        let mut right = 0.0;
+        let mut up = 0.0;
+        if app.input.is_key_pressed(KeyCode::KeyW) { fwd += 1.0; }
+        if app.input.is_key_pressed(KeyCode::KeyS) { fwd -= 1.0; }
+        if app.input.is_key_pressed(KeyCode::KeyD) { right += 1.0; }
+        if app.input.is_key_pressed(KeyCode::KeyA) { right -= 1.0; }
+        if app.input.is_key_pressed(KeyCode::Space) { up += 1.0; }
+        if app.input.is_key_pressed(KeyCode::ShiftLeft) { up -= 1.0; }
+        state.fps_controller.process_movement(&mut state.camera, fwd, right, up, dt);
     }
-    let mut fwd = 0.0;
-    let mut right = 0.0;
-    let mut up = 0.0;
-    if app.input.is_key_pressed(KeyCode::KeyW) { fwd += 1.0; }
-    if app.input.is_key_pressed(KeyCode::KeyS) { fwd -= 1.0; }
-    if app.input.is_key_pressed(KeyCode::KeyD) { right += 1.0; }
-    if app.input.is_key_pressed(KeyCode::KeyA) { right -= 1.0; }
-    if app.input.is_key_pressed(KeyCode::Space) { up += 1.0; }
-    if app.input.is_key_pressed(KeyCode::ShiftLeft) { up -= 1.0; }
-    state.fps_controller.process_movement(&mut state.camera, fwd, right, up, dt);
-    app.input.begin_frame();
 
     app.tick_systems_only(dt);
+    // End-of-frame: clear just_pressed / just_released / mouse_delta AFTER
+    // user systems have observed them. Previously this ran before
+    // tick_systems_only, so `is_key_just_pressed` was always false in user
+    // systems — fixed in v1.0.1.
+    app.input.begin_frame();
 
     // Acquire swapchain texture (graceful resize/recover).
     let state = app.runtime_state.as_mut().unwrap();
