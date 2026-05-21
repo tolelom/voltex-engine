@@ -10,6 +10,38 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## [v1.0.20] — 2026-05-21 — `voltex_platform` 100% documented (38 → 0 `missing_docs`)
+
+Second crate in the workspace `missing_docs` sweep (after v1.0.19).
+~250 lines across `lib.rs` + `window.rs` + `input.rs` +
+`game_loop.rs`.
+
+### Added
+
+- Crate-level docstring naming the three core types ([`VoltexWindow`],
+  [`InputState`], [`GameTimer`]) and the one config struct
+  ([`WindowConfig`]). `#![warn(missing_docs)]` to lock the count.
+- `WindowConfig` field docs + `VoltexWindow` method docs.
+- `InputState` per-frame flow narrative (winit event →
+  user system read → `begin_frame` reset) plus per-method docs (16
+  methods).
+- `GameTimer` cites Glenn Fiedler's "Fix your timestep!" pattern.
+  `tick`'s 250 ms clamp (death-spiral avoidance) is now spelled out.
+
+### Side effect
+
+- clippy auto-applied `collapsible_else_if` cleanup in
+  `InputState::process_key` and `process_mouse_button` (`if let { if
+  X {} }` → `if let { } else if X { }`).
+
+### Verified
+
+- `cargo build -p voltex_platform`: 0 `missing_docs` (was 38).
+- Workspace clippy `-D warnings`: clean.
+- `cargo test -p voltex_platform --lib`: 3 pass (unchanged).
+
+---
+
 ## [v1.0.19] — 2026-05-21 — `voltex_math` 100% documented (59 → 0 `missing_docs`)
 
 First chunk of the 1573-warning workspace-wide `missing_docs` sweep.

@@ -1,7 +1,18 @@
+//! Per-frame input snapshot — keyboard + mouse + scroll.
+//!
+//! Owned by [`crate::VoltexWindow`]'s caller (typically
+//! `voltex_runtime::RuntimeApp`). Each frame:
+//!
+//! 1. winit events feed [`InputState::process_key`] / `process_mouse_*`.
+//! 2. User systems read state via the `is_*` / `mouse_*` accessors.
+//! 3. The runtime calls [`InputState::begin_frame`] at frame end to
+//!    clear the `just_*` sets and delta accumulators.
+
 use winit::keyboard::KeyCode;
 use std::collections::HashSet;
 use winit::event::MouseButton;
 
+/// Snapshot of all input state for the current frame.
 pub struct InputState {
     pressed: HashSet<KeyCode>,
     just_pressed: HashSet<KeyCode>,
@@ -21,6 +32,8 @@ impl Default for InputState {
 }
 
 impl InputState {
+    /// Construct an empty input state — no keys / buttons pressed,
+    /// mouse at `(0, 0)`.
     pub fn new() -> Self {
         Self {
             pressed: HashSet::new(),
@@ -35,38 +48,51 @@ impl InputState {
         }
     }
 
+    /// `true` while `key` is held down.
     pub fn is_key_pressed(&self, key: KeyCode) -> bool {
         self.pressed.contains(&key)
     }
 
+    /// `true` for one frame on the press edge of `key`.
     pub fn is_key_just_pressed(&self, key: KeyCode) -> bool {
         self.just_pressed.contains(&key)
     }
 
+    /// `true` for one frame on the release edge of `key`.
     pub fn is_key_just_released(&self, key: KeyCode) -> bool {
         self.just_released.contains(&key)
     }
 
+    /// Mouse cursor position in physical pixels, `(x, y)` from the
+    /// top-left of the window's client area.
     pub fn mouse_position(&self) -> (f64, f64) {
         self.mouse_position
     }
 
+    /// Mouse motion `(dx, dy)` accumulated since the last
+    /// [`begin_frame`](Self::begin_frame).
     pub fn mouse_delta(&self) -> (f64, f64) {
         self.mouse_delta
     }
 
+    /// `true` while `button` is held down.
     pub fn is_mouse_button_pressed(&self, button: MouseButton) -> bool {
         self.mouse_buttons.contains(&button)
     }
 
+    /// `true` for one frame on the press edge of `button`.
     pub fn is_mouse_button_just_pressed(&self, button: MouseButton) -> bool {
         self.mouse_buttons_just_pressed.contains(&button)
     }
 
+    /// Mouse scroll-wheel delta accumulated since the last
+    /// [`begin_frame`](Self::begin_frame). Sign: positive = up / away.
     pub fn mouse_scroll(&self) -> f32 {
         self.mouse_scroll_delta
     }
 
+    /// Clear the `just_*` sets and reset mouse / scroll deltas to zero.
+    /// Called by the runtime at the end of each frame.
     pub fn begin_frame(&mut self) {
         self.just_pressed.clear();
         self.just_released.clear();
@@ -76,36 +102,39 @@ impl InputState {
         self.mouse_scroll_delta = 0.0;
     }
 
+    /// Apply a key event from winit. `pressed` is the new state.
     pub fn process_key(&mut self, key: KeyCode, pressed: bool) {
         if pressed {
             if self.pressed.insert(key) {
                 self.just_pressed.insert(key);
             }
-        } else {
-            if self.pressed.remove(&key) {
-                self.just_released.insert(key);
-            }
+        } else if self.pressed.remove(&key) {
+            self.just_released.insert(key);
         }
     }
 
+    /// Apply a `CursorMoved` event from winit. Adds the delta to the
+    /// accumulator and replaces the stored cursor position.
     pub fn process_mouse_move(&mut self, x: f64, y: f64) {
         self.mouse_delta.0 += x - self.mouse_position.0;
         self.mouse_delta.1 += y - self.mouse_position.1;
         self.mouse_position = (x, y);
     }
 
+    /// Apply a mouse-button event from winit. `pressed` is the new
+    /// state.
     pub fn process_mouse_button(&mut self, button: MouseButton, pressed: bool) {
         if pressed {
             if self.mouse_buttons.insert(button) {
                 self.mouse_buttons_just_pressed.insert(button);
             }
-        } else {
-            if self.mouse_buttons.remove(&button) {
-                self.mouse_buttons_just_released.insert(button);
-            }
+        } else if self.mouse_buttons.remove(&button) {
+            self.mouse_buttons_just_released.insert(button);
         }
     }
 
+    /// Apply a `MouseWheel` event from winit. Delta is added to the
+    /// per-frame accumulator.
     pub fn process_scroll(&mut self, delta: f32) {
         self.mouse_scroll_delta += delta;
     }

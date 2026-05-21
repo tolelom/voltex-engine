@@ -1,12 +1,23 @@
+//! winit window wrapper.
+
 use std::sync::Arc;
 use winit::event_loop::ActiveEventLoop;
 use winit::window::{Window as WinitWindow, WindowAttributes};
 
+/// Window creation parameters. Used by [`VoltexWindow::new`] and stored
+/// on `RuntimeConfig` (in `voltex_runtime`) for the lazy window creation
+/// that happens on winit's first `resumed` event.
 pub struct WindowConfig {
+    /// OS window title bar text.
     pub title: String,
+    /// Initial inner width in logical pixels.
     pub width: u32,
+    /// Initial inner height in logical pixels.
     pub height: u32,
+    /// Open as borderless fullscreen on the primary monitor.
     pub fullscreen: bool,
+    /// Enable vsync on the swapchain (set on the wgpu present mode by
+    /// the renderer).
     pub vsync: bool,
 }
 
@@ -22,12 +33,19 @@ impl Default for WindowConfig {
     }
 }
 
+/// Thin owning wrapper around a `winit::window::Window`. Held in an
+/// `Arc` so the renderer can grab a copy for its surface bind.
 pub struct VoltexWindow {
+    /// Underlying winit window handle.
     pub handle: Arc<WinitWindow>,
+    /// `vsync` flag copied from the [`WindowConfig`] used at construction.
     pub vsync: bool,
 }
 
 impl VoltexWindow {
+    /// Construct using winit's `ActiveEventLoop` (only valid inside
+    /// an event callback — typically `ApplicationHandler::resumed`).
+    /// Panics if window creation fails.
     pub fn new(event_loop: &ActiveEventLoop, config: &WindowConfig) -> Self {
         let mut attrs = WindowAttributes::default()
             .with_title(&config.title)
@@ -44,11 +62,14 @@ impl VoltexWindow {
         }
     }
 
+    /// Current inner (client-area) size in physical pixels, as
+    /// `(width, height)`.
     pub fn inner_size(&self) -> (u32, u32) {
         let size = self.handle.inner_size();
         (size.width, size.height)
     }
 
+    /// Ask winit to dispatch a `RedrawRequested` event next iteration.
     pub fn request_redraw(&self) {
         self.handle.request_redraw();
     }

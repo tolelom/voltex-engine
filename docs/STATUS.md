@@ -173,6 +173,20 @@
 
 v1.0.9 부터는 **서비스 배포 완성도** 로드맵 (`docs/superpowers/specs/2026-05-21-service-readiness-roadmap.md`) 기준으로 진행.
 
+### v1.0.20 (2026-05-21) — voltex_platform 100% missing_docs (38 → 0) + `#![warn(missing_docs)]`
+
+v1.0.19 의 패턴을 두 번째 crate 에 적용. voltex_platform 은 ~250 라인 4 파일 (lib/window/input/game_loop).
+
+**작업**:
+- crate-level docstring (3 core type [VoltexWindow / InputState / GameTimer] + 1 config 명시) + `#![warn(missing_docs)]`.
+- window.rs module + WindowConfig (title/width/height/fullscreen/vsync 필드) + VoltexWindow (handle/vsync 필드, new/inner_size/request_redraw 메서드).
+- input.rs module + 3-step per-frame 흐름 설명 (winit event → user system read → begin_frame 리셋). InputState 의 11 public 메서드 (is_key_pressed / is_key_just_pressed / is_key_just_released / mouse_position / mouse_delta / is_mouse_button_pressed / is_mouse_button_just_pressed / mouse_scroll / begin_frame / process_key / process_mouse_move / process_mouse_button / process_scroll).
+- game_loop.rs module + Glenn Fiedler "Fix your timestep" 인용 + GameTimer 메서드 (new/tick/should_fixed_update/fixed_dt/frame_dt/alpha). tick 의 250ms clamp (death-spiral 방지) 명시.
+
+**부산물**: input::process_key + process_mouse_button 에서 clippy `collapsible_else_if` 자동 정리 (nested-if → `else if`).
+
+**검증**: 0 missing_docs (38→0), 워크스페이스 clippy 0 워닝, voltex_platform 3 tests 통과.
+
 ### v1.0.19 (2026-05-21) — voltex_math 100% missing_docs (59 → 0) + `#![warn(missing_docs)]`
 
 1573 workspace-wide missing_docs 의 첫 chunk 해소. 가장 작고 stable한 voltex_math 부터 — 이후 crate 들의 sweep 패턴 확립.
