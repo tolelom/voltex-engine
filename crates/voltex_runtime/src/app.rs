@@ -158,7 +158,18 @@ impl RuntimeApp {
     /// Take over the calling thread with a winit event loop until the window
     /// is closed. GPU resources are constructed lazily on the first `resumed`
     /// callback, so `tick_systems_only` may be called before this.
+    ///
+    /// Side-effect: when the config's `enable_crash_log` is true (default),
+    /// installs a `std::panic::set_hook` that writes
+    /// `<window_title>-crash-<UTC>.txt` alongside the default stderr panic.
+    /// Idempotent across multiple `run` calls in the same process.
     pub fn run(self) -> RuntimeResult<()> {
+        if self.config.enable_crash_log {
+            crate::crash::install_panic_hook(
+                self.config.window.title.clone(),
+                self.config.crash_log_dir.clone(),
+            );
+        }
         let event_loop = winit::event_loop::EventLoop::new()
             .map_err(|e| RuntimeError::WindowInit(e.to_string()))?;
         let mut handler = crate::handler::RuntimeHandler { app: Some(self) };

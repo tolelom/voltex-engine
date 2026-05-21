@@ -173,6 +173,36 @@
 
 v1.0.9 부터는 **서비스 배포 완성도** 로드맵 (`docs/superpowers/specs/2026-05-21-service-readiness-roadmap.md`) 기준으로 진행.
 
+### v1.0.10 (2026-05-21) — 크래시 로그 panic hook (`voltex_runtime::crash`)
+
+배포된 exe 가 죽었을 때 stderr 는 사용자에게 안 보임 → 사용자가 버그 리포트에 첨부할 단일 파일 (`<app>-crash-YYYYMMDD-HHMMSS.txt`) 자동 생성.
+
+**신규 모듈** `crates/voltex_runtime/src/crash.rs` (266 라인):
+- `install_panic_hook(app, dir)` — `std::panic::set_hook` 으로 기본 hook 호출 후 크래시 파일 작성. `Once` 가드로 idempotent.
+- `format_crash_report(...)` — pure 함수. 헤더 (app/UTC/os/arch/voltex_runtime version) + panic message + location (`file:line:col`) + 풀 backtrace (`std::backtrace::Backtrace::force_capture`).
+- `crash_filename(app, ts)` — `<sanitized_app>-crash-<UTC>.txt`. 비-ASCII / 슬래시 등은 `_` 로 치환.
+- `unix_to_ymd_hms` — Howard Hinnant 의 days-from-civil 역변환 inline (외부 dep 0 정책 — chrono/time 도입 회피). leap year (2000-02-29) + 음수 (pre-1970) 모두 검증.
+
+**RuntimeConfig 확장**:
+- `enable_crash_log: bool` (default true)
+- `crash_log_dir: Option<PathBuf>` (default None = current working dir)
+- builder: `.with_crash_log_dir(p)`, `.disable_crash_log()` (헤드리스/fuzz 용 opt-out)
+
+**RuntimeApp::run** 진입 시 `enable_crash_log == true` 면 window title 을 app name 으로 hook 설치.
+
+**테스트**: voltex_runtime 13 → 27 (+14):
+- crash ×11 (epoch 0, 2026-05-21 noon, 2000-02-29 leap, pre-epoch, filename well-formed/sanitised, report all sections / missing location / trailing newline, write_crash_file dir creation, idempotent install)
+- config ×3 (default enables, disable, with_dir)
+
+**셀프 피드백**:
+- 단계 1 모듈 작성 + 첫 테스트: 27 통과, 3 실패 — 내가 timestamp 산술 (2026-05-21 noon 의 unix seconds) 을 1일 빗나가게 계산. 알고리즘은 정확. 실측 값으로 정정.
+- 단계 2 wire 후 워크스페이스 clippy/test: 0 워닝, 0 회귀.
+- 단계 3 docs: STATUS/CHANGELOG/DEFERRED/roadmap 갱신.
+
+**알려진 한계 (v1.1+)**:
+- 패닉 hook 의 실제 fire 검증은 단위 테스트에서 catch_unwind 보장 + global hook state 격리가 까다로워 미실시. 통합 테스트 (별도 프로세스 fork) 는 별 cycle.
+- 사용자 정보 (예: GPU 어댑터 이름, FPS, 마지막 씬) 미수집 — 첫 컨택트 후 추가.
+
 ### v1.0.9 (2026-05-21) — OGG/Vorbis lib.rs wire + clippy 27→0 + AudioClip 진입점
 
 v1.0.8 에서 발견된 dead-module 회귀 해소. STATUS Phase 6-1 의 "OGG/Vorbis 자체 구현 완료" 주장을 사실로 만듦.
@@ -552,7 +582,7 @@ crates/
 └── voltex_cli         — bin "voltex" (new/build/run), voltex.toml 매니페스트, .vpkg packing (B1+B2)
 ```
 
-## 테스트: ~998개 통과 (Windows host, `cargo test --workspace`). `--lib` 기준은 968 (voltex_cli 는 bin-only 라 lib count 에서 빠지나 `cargo test -p voltex_cli` 로 30 개 실행됨). macOS host 에서는 +2 (CoreAudio 모듈) = 1000 예상. v1.0.1 +5 (input_system 순서/참조 ×2, Bounds default ×2, ScriptComponent default ×1). v1.0.3 +4 (canonicalize_friendly Windows verbatim strip ×3 + cross-OS integration ×1). v1.0.8 +21 (parser panic-resistance fuzz: PNG ×4 + JPG ×4 + GLTF ×5 + OBJ ×4 + WAV ×4). v1.0.9 +30 (OGG +11 + Vorbis +17 + decode_ogg_vorbis_bytes +2 — 모두 wire 직전까지 dead, 이제 실 컴파일).
+## 테스트: ~1012개 통과 (Windows host, `cargo test --workspace`). `--lib` 기준은 982 (voltex_cli 는 bin-only 라 lib count 에서 빠지나 `cargo test -p voltex_cli` 로 30 개 실행됨). macOS host 에서는 +2 (CoreAudio 모듈) = 1014 예상. v1.0.1 +5 (input_system 순서/참조 ×2, Bounds default ×2, ScriptComponent default ×1). v1.0.3 +4 (canonicalize_friendly Windows verbatim strip ×3 + cross-OS integration ×1). v1.0.8 +21 (parser panic-resistance fuzz: PNG ×4 + JPG ×4 + GLTF ×5 + OBJ ×4 + WAV ×4). v1.0.9 +30 (OGG +11 + Vorbis +17 + decode_ogg_vorbis_bytes +2 — 모두 wire 직전까지 dead, 이제 실 컴파일). v1.0.10 +14 (voltex_runtime crash module ×11 + config crash log ×3).
 
 - voltex: 2 (M6: prelude/module 경로 컴파일 검증)
 - voltex_math: 39 (8-7 +2: inverse roundtrip × VP+translation)
@@ -567,7 +597,7 @@ crates/
 - voltex_net: 47
 - voltex_script: 42 (S1 +12: pool ×6 [get_or_create same/load/reload/unknown/poll_reload/clear], system ×4 [start/update/5-cubes/missing-callbacks], engine_api ×2 [iter_entities/iter_by_tag])
 - voltex_editor: 169 (E3 +11: command ×5 add/remove/unknown/dead-entity + session ×4 add_undo/remove_undo/despawn_restores/despawn_history/slot_reused + inspector ×2 - 1 obsolete despawn_clears test)
-- voltex_runtime: 11 (B0 신규: config ×5, error ×2, app ×4 [registry/scene order, system order, transform propagation, missing-scene graceful])
+- voltex_runtime: 27 (v1.0.10 +14: crash module ×11 + config crash log ×3; was 13)
 - voltex_cli: 30 (B1-spike +3, B1 +16, B2 +1, B3 +6, v1.0.3 +4: canonicalize_friendly ×4 covering Windows verbatim strip, UNC passthrough, non-verbatim passthrough, cross-OS integration)
 
 ## Examples (14개) + Games (1개) + 기존 survivor_game (archived)

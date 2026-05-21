@@ -199,3 +199,4 @@
 - **OGG/Vorbis lib.rs 등록** ✅ v1.0.9 — `pub mod ogg; pub mod vorbis;` 등록 + clippy 27→0 (자동 5 + #![allow] 6 파일 + 진짜 fix 4) + `decode_ogg_vorbis_bytes` 진입점. 숨겨진 테스트 회귀 2건 (ogg invalid_capture_pattern, vorbis bitreader_basics) fix. voltex_audio 89→119 tests.
 - **coverage-guided fuzzing (cargo-fuzz / honggfuzz)** — 현재 deterministic xorshift32 만. nightly toolchain + libfuzzer 인프라는 v1.1+.
 - **실제 `.ogg` 파일 디코드 검증** — v1.0.9 는 unit test (≤100 byte 합성 입력) 만. Vorbis decoder 자체가 simplified (scalar codebook only, no coupled channels). 실 파일 + audio_demo 통합은 v1.0.x+.
+- **crash-log panic hook** ✅ v1.0.10 — `voltex_runtime::crash` 모듈 + `RuntimeConfig::{enable_crash_log, crash_log_dir}` + 자동 `<app>-crash-UTC.txt` 작성. 외부 dep 0 (Howard Hinnant 알고리즘 inline). +14 tests. 한계: live panic 통합 테스트 미실시 (global hook state 격리 까다로움), 크래시 리포트에 GPU 어댑터/FPS/마지막 씬 정보 없음 — v1.1+.

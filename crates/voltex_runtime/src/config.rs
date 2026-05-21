@@ -2,6 +2,8 @@
 //! runtime should do in builder chain form; `RuntimeApp::new` consumes it and
 //! runs the registered callbacks during boot.
 
+use std::path::PathBuf;
+
 use voltex_ecs::{ComponentRegistry, World};
 use voltex_platform::WindowConfig;
 
@@ -32,6 +34,14 @@ pub struct RuntimeConfig {
     /// Optional virtual filesystem to consult first when loading scenes /
     /// scripts. When `None`, paths are read directly from disk.
     pub vfs: Option<voltex_asset::Vfs>,
+    /// When `true` (default), [`crate::RuntimeApp::run`] installs a
+    /// `std::panic::set_hook` that writes a crash log file alongside the
+    /// default stderr behaviour. Set to `false` for headless tests or when
+    /// the host application installs its own panic hook.
+    pub enable_crash_log: bool,
+    /// Directory the crash log is written to. When `None`, the current
+    /// working directory at hook-fire time is used.
+    pub crash_log_dir: Option<PathBuf>,
 }
 
 impl Default for RuntimeConfig {
@@ -47,6 +57,8 @@ impl Default for RuntimeConfig {
             enable_physics: true,
             enable_scripts: true,
             vfs: None,
+            enable_crash_log: true,
+            crash_log_dir: None,
         }
     }
 }
@@ -129,6 +141,21 @@ impl RuntimeConfig {
         self.vfs = Some(vfs);
         self
     }
+
+    /// Override the directory the crash log is written to. Pass `None` (or
+    /// don't call this method) to use the current working directory.
+    pub fn with_crash_log_dir(mut self, dir: impl Into<PathBuf>) -> Self {
+        self.crash_log_dir = Some(dir.into());
+        self
+    }
+
+    /// Opt out of the crash-log panic hook. Use when the host application
+    /// installs its own hook or runs in a context where file writes are
+    /// not desired (e.g. fuzzing / headless test harnesses).
+    pub fn disable_crash_log(mut self) -> Self {
+        self.enable_crash_log = false;
+        self
+    }
 }
 
 #[cfg(test)]
@@ -173,5 +200,25 @@ mod tests {
         let c = RuntimeConfig::new().disable_scripts();
         assert!(c.enable_physics);
         assert!(!c.enable_scripts);
+    }
+
+    #[test]
+    fn default_enables_crash_log() {
+        let c = RuntimeConfig::default();
+        assert!(c.enable_crash_log);
+        assert!(c.crash_log_dir.is_none());
+    }
+
+    #[test]
+    fn builder_disable_crash_log() {
+        let c = RuntimeConfig::new().disable_crash_log();
+        assert!(!c.enable_crash_log);
+    }
+
+    #[test]
+    fn builder_with_crash_log_dir() {
+        let p = std::path::PathBuf::from("/tmp/crashes");
+        let c = RuntimeConfig::new().with_crash_log_dir(p.clone());
+        assert_eq!(c.crash_log_dir.as_deref(), Some(p.as_path()));
     }
 }

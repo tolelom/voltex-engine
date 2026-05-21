@@ -17,10 +17,12 @@
 
 pub mod app;
 pub mod config;
+pub mod crash;
 pub mod error;
 pub(crate) mod handler;
 
 pub use app::RuntimeApp;
 pub use config::RuntimeConfig;
+pub use crash::{crash_filename, format_crash_report, install_panic_hook};
 pub use error::{RuntimeError, RuntimeResult};
 pub use voltex_asset::Vfs;

@@ -10,6 +10,58 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## [v1.0.10] — 2026-05-21 — Crash-log panic hook in `voltex_runtime`
+
+Deployed game executables hide stderr from the end user, so a panic in
+production used to leave the user with nothing to attach to a bug
+report. v1.0.10 closes that gap.
+
+### Added
+
+- New module `crates/voltex_runtime/src/crash.rs`:
+  - `install_panic_hook(app_name, dir)` wraps the existing
+    `std::panic::set_hook` so the default stderr behaviour still runs
+    *and* a `<app>-crash-YYYYMMDD-HHMMSS.txt` file is written
+    alongside. `std::sync::Once` makes it idempotent within a process.
+  - `format_crash_report(...)` — pure function (no side effects) so
+    the format is unit-testable. Includes app name, UTC wallclock,
+    OS / arch, `voltex_runtime` crate version, the panic message, the
+    panic location (`file:line:col`), and the full backtrace from
+    `std::backtrace::Backtrace::force_capture()`.
+  - `crash_filename(app, ts)` — sanitises the app name (whitespace,
+    slashes, non-ASCII → `_`) so the filename is always valid on
+    Windows + Linux + macOS.
+  - Inline Howard-Hinnant `days_from_civil` algorithm for UNIX-seconds
+    → calendar conversion (no `chrono` / `time` dep, in keeping with
+    the runtime crate's external-dep policy).
+- `RuntimeConfig` extensions:
+  - `enable_crash_log: bool` (defaults to `true`)
+  - `crash_log_dir: Option<PathBuf>` (defaults to `None` = current
+    working directory at hook-fire time)
+  - Builder methods `.with_crash_log_dir(p)` and
+    `.disable_crash_log()` — the latter for headless / fuzz harnesses.
+- `RuntimeApp::run` installs the hook before constructing the winit
+  `EventLoop` when `config.enable_crash_log` is true.
+
+### Tests
+
+- `voltex_runtime`: 13 → **27** (+14). Crash module 11 (epoch,
+  2026-05-21 noon UTC, 2000-02-29 leap, pre-epoch negative seconds,
+  filename well-formed / sanitised, report content with / without
+  location / trailing newline, file write + dir creation, idempotent
+  install). Config 3 (default enables, disable toggle, with_dir).
+- Workspace lib: 968 → **~982**.
+
+### Known limits
+
+- The hook itself is not exercised via a live `panic!` in tests —
+  global panic-hook state is messy to isolate per-test. A separate-
+  process integration test is deferred.
+- Crash report omits GPU adapter name, FPS history, last loaded scene
+  — useful additions for a real bug-report intake. Deferred.
+
+---
+
 ## [v1.0.9] — 2026-05-21 — OGG/Vorbis lib.rs wire + clippy 27→0 + AudioClip entry point
 
 First cycle of the **service-readiness roadmap**
