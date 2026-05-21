@@ -1,3 +1,6 @@
+//! WAV file parser and writer — PCM 16/24/32-bit, mono and stereo, RIFF
+//! containers. See [`parse_wav`] / [`generate_wav_bytes`].
+
 use crate::AudioClip;
 
 // ---------------------------------------------------------------------------

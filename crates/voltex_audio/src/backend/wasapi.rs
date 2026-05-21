@@ -6,11 +6,14 @@
 use super::{AudioBackend, BackendError};
 use crate::wasapi::WasapiDevice;
 
+/// `AudioBackend` adapter over the WASAPI FFI wrapper.
 pub struct WasapiBackend {
     device: WasapiDevice,
 }
 
 impl WasapiBackend {
+    /// Initialises a WASAPI device; returns `BackendError::InitFailed` if the
+    /// underlying device handle could not be obtained.
     pub fn new() -> Result<Self, BackendError> {
         WasapiDevice::new()
             .map(|device| WasapiBackend { device })

@@ -1,12 +1,19 @@
+//! Generic audio bus — sums several gain-weighted inputs into a single output.
+
 /// Audio bus: mixes multiple input signals.
 pub struct AudioBus {
+    /// Input list (id + per-input gain).
     pub inputs: Vec<BusInput>,
+    /// Final gain applied to the summed inputs.
     pub output_gain: f32,
 }
 
+/// Per-input entry on an [`AudioBus`].
 #[derive(Debug, Clone)]
 pub struct BusInput {
+    /// Identifier of the source signal (matched against the sample list).
     pub source_id: u32,
+    /// Linear gain applied to this input before summing.
     pub gain: f32,
 }
 
@@ -17,14 +24,17 @@ impl Default for AudioBus {
 }
 
 impl AudioBus {
+    /// Empty bus with unity output gain.
     pub fn new() -> Self {
         AudioBus { inputs: Vec::new(), output_gain: 1.0 }
     }
 
+    /// Adds a new input with the given gain.
     pub fn add_input(&mut self, source_id: u32, gain: f32) {
         self.inputs.push(BusInput { source_id, gain });
     }
 
+    /// Removes all inputs matching `source_id`.
     pub fn remove_input(&mut self, source_id: u32) {
         self.inputs.retain(|i| i.source_id != source_id);
     }

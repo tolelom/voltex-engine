@@ -15,33 +15,63 @@ use crate::mix_group::{MixGroup, MixerState};
 pub enum AudioCommand {
     /// Start playing a clip.
     Play {
+        /// Clip index into the system's clip list.
         clip_index: usize,
+        /// Linear volume `[0.0, 1.0]`.
         volume: f32,
+        /// Whether the clip restarts when it ends.
         looping: bool,
     },
     /// Start playing a clip with 3D spatial parameters.
     Play3d {
+        /// Clip index into the system's clip list.
         clip_index: usize,
+        /// Linear volume `[0.0, 1.0]`.
         volume: f32,
+        /// Whether the clip restarts when it ends.
         looping: bool,
+        /// 3D emitter parameters (position + min/max distance).
         spatial: SpatialParams,
     },
     /// Update the listener position and orientation.
     SetListener {
+        /// Listener world position.
         position: voltex_math::Vec3,
+        /// Listener forward direction (unit).
         forward: voltex_math::Vec3,
+        /// Listener right direction (unit).
         right: voltex_math::Vec3,
     },
     /// Stop all instances of a clip.
-    Stop { clip_index: usize },
+    Stop {
+        /// Clip index whose instances should stop.
+        clip_index: usize,
+    },
     /// Change volume of all playing instances of a clip.
-    SetVolume { clip_index: usize, volume: f32 },
+    SetVolume {
+        /// Clip index whose instances are affected.
+        clip_index: usize,
+        /// New linear volume `[0.0, 1.0]`.
+        volume: f32,
+    },
     /// Stop all currently playing sounds.
     StopAll,
     /// Set volume for a mix group immediately.
-    SetGroupVolume { group: MixGroup, volume: f32 },
+    SetGroupVolume {
+        /// Target mix group.
+        group: MixGroup,
+        /// New volume.
+        volume: f32,
+    },
     /// Fade a mix group to a target volume over a duration (seconds).
-    FadeGroup { group: MixGroup, target: f32, duration: f32 },
+    FadeGroup {
+        /// Target mix group.
+        group: MixGroup,
+        /// End-of-fade volume.
+        target: f32,
+        /// Fade length in seconds.
+        duration: f32,
+    },
     /// Shut down the audio thread.
     Shutdown,
 }

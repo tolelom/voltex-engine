@@ -1,3 +1,5 @@
+//! Schroeder-style reverb + single-tap echo + raw [`DelayLine`].
+
 /// Simple delay line for echo effect.
 pub struct DelayLine {
     pub(crate) buffer: Vec<f32>,
@@ -6,10 +8,13 @@ pub struct DelayLine {
 }
 
 impl DelayLine {
+    /// Creates a delay line of `delay_samples` samples (min 1).
     pub fn new(delay_samples: usize) -> Self {
         DelayLine { buffer: vec![0.0; delay_samples.max(1)], write_pos: 0, delay_samples }
     }
 
+    /// Pushes `input` and returns the sample delayed by `delay_samples`. The
+    /// `feedback` scalar is added back into the buffer for recirculation.
     pub fn process(&mut self, input: f32, feedback: f32) -> f32 {
         let read_pos = (self.write_pos + self.buffer.len() - self.delay_samples) % self.buffer.len();
         let delayed = self.buffer[read_pos];
@@ -23,8 +28,10 @@ impl DelayLine {
 pub struct Reverb {
     comb_filters: Vec<CombFilter>,
     allpass_filters: Vec<AllpassFilter>,
-    pub wet: f32,    // 0.0-1.0
-    pub dry: f32,    // 0.0-1.0
+    /// Wet (reverbed) signal mix `[0.0, 1.0]`.
+    pub wet: f32,
+    /// Dry (original) signal mix `[0.0, 1.0]`.
+    pub dry: f32,
 }
 
 struct CombFilter {
@@ -61,6 +68,8 @@ impl AllpassFilter {
 }
 
 impl Reverb {
+    /// Builds a reverb with prime-number delay lengths tuned for the given
+    /// device sample rate.
     pub fn new(sample_rate: u32) -> Self {
         // Schroeder reverb with prime-number delay lengths
         let sr = sample_rate as f32;
@@ -80,6 +89,8 @@ impl Reverb {
         }
     }
 
+    /// Processes one sample through the reverb chain. Returns the mixed
+    /// `dry * input + wet * reverb` output.
     pub fn process(&mut self, input: f32) -> f32 {
         // Sum comb filter outputs
         let mut comb_sum = 0.0;
@@ -101,17 +112,22 @@ impl Reverb {
 /// Simple echo (single delay + feedback).
 pub struct Echo {
     delay: DelayLine,
+    /// Feedback amount fed back into the delay (0.0 = single tap, 1.0 = self-oscillating).
     pub feedback: f32,
+    /// Wet (delayed) signal mix.
     pub wet: f32,
+    /// Dry (original) signal mix.
     pub dry: f32,
 }
 
 impl Echo {
+    /// Creates an echo with `delay_ms` of single-tap delay at the given sample rate.
     pub fn new(delay_ms: f32, sample_rate: u32) -> Self {
         let samples = (delay_ms * sample_rate as f32 / 1000.0) as usize;
         Echo { delay: DelayLine::new(samples), feedback: 0.5, wet: 0.3, dry: 0.7 }
     }
 
+    /// Processes one sample. Returns the mixed `dry * input + wet * delayed` output.
     pub fn process(&mut self, input: f32) -> f32 {
         let delayed = self.delay.process(input, self.feedback);
         input * self.dry + delayed * self.wet

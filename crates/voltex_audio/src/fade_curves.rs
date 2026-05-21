@@ -1,9 +1,15 @@
+//! Reusable fade curve shapes. Apply via [`apply_fade`].
+
 /// Fade curve types.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum FadeCurve {
+    /// `f(t) = t` — uniform rate.
     Linear,
+    /// `f(t) = t²` — slow start, fast finish.
     Exponential,
+    /// `f(t) = √t` — fast start, slow finish.
     Logarithmic,
+    /// Smoothstep `3t² − 2t³` — smooth at both ends.
     SCurve,
 }
 

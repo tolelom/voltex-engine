@@ -3,6 +3,7 @@
 
 use super::{AudioBackend, BackendError};
 
+/// Silent backend that advertises a sane sample rate but discards samples.
 pub struct NullBackend {
     sample_rate: u32,
     channels: u16,
@@ -16,6 +17,7 @@ impl Default for NullBackend {
 }
 
 impl NullBackend {
+    /// Creates a Null backend advertising 48 kHz stereo, 1024-frame buffers.
     pub fn new() -> Self {
         Self {
             sample_rate: 48_000,

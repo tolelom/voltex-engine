@@ -7,10 +7,14 @@
 
 use std::fmt;
 
+/// Errors a backend may return from init / write.
 #[derive(Debug)]
 pub enum BackendError {
+    /// Device handle could not be acquired; carries a human-readable reason.
     InitFailed(String),
+    /// `write()` failed mid-stream; carries the OS-level error string.
     WriteFailed(String),
+    /// Backend isn't supported on the current OS or feature build.
     NotSupported,
 }
 
@@ -29,10 +33,15 @@ impl std::error::Error for BackendError {}
 /// Per-platform PCM output. Implementations are owned by the audio worker
 /// thread, so `Send` is required but `Sync` is not.
 pub trait AudioBackend: Send {
+    /// Output sample rate in Hz that the backend is currently feeding.
     fn sample_rate(&self) -> u32;
+    /// Output channel count (1 = mono, 2 = stereo).
     fn channels(&self) -> u16;
+    /// Per-call buffer size in frames (samples per channel).
     fn buffer_frames(&self) -> u32;
+    /// Pushes interleaved PCM samples to the device; returns the number written.
     fn write(&mut self, samples: &[f32]) -> Result<usize, BackendError>;
+    /// Releases the device handle. Safe to call multiple times.
     fn shutdown(&mut self);
 }
 

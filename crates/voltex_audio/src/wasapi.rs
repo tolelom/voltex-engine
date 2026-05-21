@@ -1,4 +1,6 @@
 #![allow(non_snake_case, non_camel_case_types, non_upper_case_globals, dead_code)]
+#![allow(missing_docs)] // 1:1 Win32 FFI bindings — Microsoft's MSDN is the canonical reference.
+
 //! WASAPI FFI bindings for Windows audio output.
 //!
 //! This module is only compiled on Windows (`#[cfg(target_os = "windows")]`).

@@ -1,8 +1,13 @@
+//! Audio occlusion model — derives a volume scaler + low-pass cutoff from an
+//! `occlusion_factor` in `[0.0, 1.0]`.
+
 /// Audio occlusion parameters.
 #[derive(Debug, Clone, Copy)]
 pub struct OcclusionResult {
-    pub volume_multiplier: f32,    // 0.0-1.0, reduced by occlusion
-    pub lowpass_cutoff: f32,       // Hz, lower = more muffled
+    /// Volume scaler in `[0.3, 1.0]` (capped at 70% reduction).
+    pub volume_multiplier: f32,
+    /// Low-pass cutoff frequency in Hz — lower = more muffled.
+    pub lowpass_cutoff: f32,
 }
 
 /// Simple ray-based occlusion check.
@@ -22,6 +27,7 @@ pub struct LowPassFilter {
 }
 
 impl LowPassFilter {
+    /// Creates a one-pole low-pass filter with the given cutoff frequency.
     pub fn new(cutoff_hz: f32, sample_rate: u32) -> Self {
         let rc = 1.0 / (2.0 * std::f32::consts::PI * cutoff_hz);
         let dt = 1.0 / sample_rate as f32;
@@ -29,17 +35,20 @@ impl LowPassFilter {
         LowPassFilter { prev_output: 0.0, alpha }
     }
 
+    /// Recomputes the filter coefficient for a new cutoff frequency.
     pub fn set_cutoff(&mut self, cutoff_hz: f32, sample_rate: u32) {
         let rc = 1.0 / (2.0 * std::f32::consts::PI * cutoff_hz);
         let dt = 1.0 / sample_rate as f32;
         self.alpha = dt / (rc + dt);
     }
 
+    /// Pushes one sample through the filter; returns the smoothed output.
     pub fn process(&mut self, input: f32) -> f32 {
         self.prev_output = self.prev_output + self.alpha * (input - self.prev_output);
         self.prev_output
     }
 
+    /// Clears the filter's internal state (returns it to silence).
     pub fn reset(&mut self) {
         self.prev_output = 0.0;
     }

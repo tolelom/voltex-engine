@@ -1,11 +1,17 @@
+//! 3D spatialisation primitives: [`Listener`] + [`SpatialParams`] +
+//! distance attenuation + equal-power panning.
+
 use voltex_math::Vec3;
 use std::f32::consts::PI;
 
 /// Represents the listener in 3D space.
 #[derive(Debug, Clone)]
 pub struct Listener {
+    /// World position of the listener (typically the camera/avatar).
     pub position: Vec3,
+    /// Forward facing direction (unit vector).
     pub forward: Vec3,
+    /// Right direction (unit vector, perpendicular to `forward`).
     pub right: Vec3,
 }
 
@@ -22,8 +28,11 @@ impl Default for Listener {
 /// Parameters for a 3D audio emitter.
 #[derive(Debug, Clone)]
 pub struct SpatialParams {
+    /// World position of the emitter.
     pub position: Vec3,
+    /// Distance below which attenuation = 1.0 (no falloff).
     pub min_distance: f32,
+    /// Distance beyond which attenuation = 0.0 (silent).
     pub max_distance: f32,
 }
 

@@ -1,3 +1,6 @@
+//! Per-frame mixer that combines a list of [`PlayingSound`]s into an output
+//! buffer using [`MixerState`] and a [`Listener`] for spatial gains.
+
 use crate::AudioClip;
 use crate::spatial::{Listener, SpatialParams, compute_spatial_gains};
 use crate::mix_group::{MixGroup, MixerState};
@@ -19,6 +22,7 @@ pub struct PlayingSound {
 }
 
 impl PlayingSound {
+    /// Creates a 2D sound on the [`MixGroup::Sfx`] group.
     pub fn new(clip_index: usize, volume: f32, looping: bool) -> Self {
         Self {
             clip_index,
@@ -30,6 +34,7 @@ impl PlayingSound {
         }
     }
 
+    /// Creates a 3D-spatialised sound on the [`MixGroup::Sfx`] group.
     pub fn new_3d(clip_index: usize, volume: f32, looping: bool, spatial: SpatialParams) -> Self {
         Self { clip_index, position: 0, volume, looping, spatial: Some(spatial), group: MixGroup::Sfx }
     }

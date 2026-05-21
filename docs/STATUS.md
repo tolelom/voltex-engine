@@ -173,6 +173,26 @@
 
 v1.0.9 부터는 **서비스 배포 완성도** 로드맵 (`docs/superpowers/specs/2026-05-21-service-readiness-roadmap.md`) 기준으로 진행.
 
+### v1.0.24 (2026-05-21) — voltex_audio 100% missing_docs + `#![warn(missing_docs)]`
+
+여섯 번째 crate. 21 파일 (in-house audio 스택 전체).
+
+**작업**:
+- Crate-level docstring + `#![warn(missing_docs)]`.
+- 모듈 헤더 17개 (audio_clip/audio_source/audio_bus/async_loader/wav/mixing/spatial/hrtf/mix_group/reverb/occlusion/fade_curves/dynamic_groups/effect_chain/backend mod/null/wasapi/error).
+- Public API:
+  - `AudioCommand` 8 variant + 21 field doc
+  - `LoadState` 4 variant, `BackendError` 3 variant
+  - `OcclusionResult` 2 field, `Listener` 3 field, `SpatialParams` 3 field
+  - `HrtfResult` 4 ITD/ILD field, `MixGroup` 4 variant, `GroupState` 3 field
+  - `AudioEffect` / `AudioBackend` trait methods
+  - `Reverb`/`Echo` wet/dry/feedback fields
+- `wasapi.rs` (75 FFI items) 은 `#![allow(missing_docs)]` + MSDN 참조 코멘트.
+
+**검증**:
+- `cargo build -p voltex_audio` — 0 missing_docs warning.
+- `cargo test -p voltex_audio --lib` — 119 통과.
+
 ### v1.0.23 (2026-05-21) — voltex_ai 100% missing_docs + `#![warn(missing_docs)]`
 
 다섯 번째 crate. 5 모듈 (error/nav_agent/navmesh/pathfinding/steering).

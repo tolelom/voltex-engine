@@ -1,3 +1,5 @@
+//! In-memory representation of decoded audio samples.
+
 /// A loaded audio clip stored as normalized f32 PCM samples.
 #[derive(Debug)]
 pub struct AudioClip {

@@ -10,6 +10,24 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## [v1.0.24] — 2026-05-21 — `voltex_audio` 100% documented (→ 0 `missing_docs`)
+
+Sixth crate in the workspace `missing_docs` sweep. Covers the in-house audio stack — clips/sources/system/spatial/HRTF/mixer/effects/backend — across 21 source files.
+
+### Added
+
+- Crate-level docstring + `#![warn(missing_docs)]` guard.
+- Module headers for every audio sub-module: `audio_clip`, `audio_source`, `audio_bus`, `async_loader`, `wav`, `mixing`, `spatial`, `hrtf`, `mix_group`, `reverb`, `occlusion`, `fade_curves`, `dynamic_groups`, `effect_chain`, `backend/mod`, `backend/null`, `backend/wasapi`, plus error.
+- Public field / variant / method docs across all of the above. Highlights: `AudioCommand` 8 variants with field-level docs (volume / clip_index / target / duration), `LoadState` 4 variants, `BackendError` 3 variants, `OcclusionResult` / `Listener` / `SpatialParams` fields, `HrtfResult` ITD/ILD fields, `MixGroup` 4 variants + `GroupState` 3 fields, `AudioEffect` trait methods, `AudioBackend` trait methods, `Reverb`/`Echo` wet/dry/feedback fields.
+- `wasapi.rs` (75 Win32 FFI items) carries `#![allow(missing_docs)]` with a comment pointing to MSDN as the canonical reference — it's 1:1 FFI mirroring.
+
+### Verified
+
+- `cargo build -p voltex_audio` — zero `missing_docs` warnings.
+- `cargo test -p voltex_audio --lib` — 119 passed (no regression).
+
+---
+
 ## [v1.0.23] — 2026-05-21 — `voltex_ai` 100% documented (→ 0 `missing_docs`)
 
 Fifth crate in the workspace `missing_docs` sweep. Covers NavMesh / NavTriangle / NavAgent / find_path / SteeringAgent + 5 steering behaviours across 5 source files.

@@ -1,3 +1,6 @@
+//! Approximate Head-Related Transfer Function (HRTF) — Woodworth ITD model
+//! plus a cosine ILD shadow factor. Cheap stand-in for full HRIR convolution.
+
 /// Head radius in meters (average human).
 const HEAD_RADIUS: f32 = 0.0875;
 /// Speed of sound in m/s.
@@ -6,10 +9,14 @@ const SPEED_OF_SOUND: f32 = 343.0;
 /// HRTF filter result for a sound at a given azimuth angle.
 #[derive(Debug, Clone, Copy)]
 pub struct HrtfResult {
-    pub left_delay_samples: f32,   // ITD: delay for left ear in samples
-    pub right_delay_samples: f32,  // ITD: delay for right ear in samples
-    pub left_gain: f32,            // ILD: gain for left ear (0.0-1.0)
-    pub right_gain: f32,           // ILD: gain for right ear (0.0-1.0)
+    /// ITD: delay for the left ear in samples.
+    pub left_delay_samples: f32,
+    /// ITD: delay for the right ear in samples.
+    pub right_delay_samples: f32,
+    /// ILD: gain for the left ear in `[0.0, 1.0]`.
+    pub left_gain: f32,
+    /// ILD: gain for the right ear in `[0.0, 1.0]`.
+    pub right_gain: f32,
 }
 
 /// Calculate HRTF parameters from azimuth angle.

@@ -1,3 +1,23 @@
+//! # voltex_audio
+//!
+//! In-house audio stack:
+//!
+//! - Decoders: [`wav::parse_wav`] (PCM 16/24/32-bit), [`ogg::parse_ogg`] +
+//!   [`vorbis::decode_vorbis`] (simplified Vorbis I), bundled into
+//!   [`decode_ogg_vorbis_bytes`] for convenience.
+//! - Playback model: [`AudioClip`] holds samples, [`AudioSource`] is the per
+//!   ECS instance, [`mixing::PlayingSound`] + [`mix_sounds`] do per-frame mix.
+//! - Spatialisation: [`Listener`] + [`SpatialParams`] +
+//!   [`compute_spatial_gains`], 3D distance/pan/HRTF helpers.
+//! - Mixer: [`MixGroup`] / [`MixerState`] + dynamic [`MixGroupManager`] +
+//!   [`AudioBus`] routing.
+//! - Effects: [`Reverb`] / [`Echo`] / [`DelayLine`] / [`EffectChain`] /
+//!   [`LowPassFilter`] occlusion / fade curves.
+//! - Backends: [`AudioBackend`] trait with [`NullBackend`] always available;
+//!   WASAPI on Windows.
+
+#![warn(missing_docs)]
+
 pub mod error;
 pub mod audio_clip;
 pub mod wav;

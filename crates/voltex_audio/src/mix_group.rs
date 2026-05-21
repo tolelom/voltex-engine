@@ -1,21 +1,32 @@
+//! Static four-group mixer (Master / Bgm / Sfx / Voice) with per-group volume
+//! and linear fade. See [`MixGroup`], [`GroupState`], [`MixerState`].
+
 /// Mixer group identifiers.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum MixGroup {
+    /// Master group — multiplies every other group's effective volume.
     Master = 0,
+    /// Background music.
     Bgm = 1,
+    /// Sound effects (one-shots, ambient loops).
     Sfx = 2,
+    /// Voice / dialogue.
     Voice = 3,
 }
 
 /// Per-group volume state with optional fade.
 #[derive(Debug, Clone)]
 pub struct GroupState {
+    /// Current effective volume `[0.0, 1.0]`.
     pub volume: f32,
+    /// Volume that an active fade is heading toward.
     pub fade_target: f32,
+    /// Fade rate in volume-units per second (`0.0` = no fade active).
     pub fade_speed: f32,
 }
 
 impl GroupState {
+    /// New group at 100% volume, no fade in progress.
     pub fn new() -> Self {
         Self {
             volume: 1.0,
@@ -50,10 +61,12 @@ impl Default for GroupState {
 
 /// Global mixer state holding one `GroupState` per `MixGroup`.
 pub struct MixerState {
+    /// Per-`MixGroup` state, indexed by the enum's discriminant.
     pub groups: [GroupState; 4],
 }
 
 impl MixerState {
+    /// New mixer with every group at 100% volume.
     pub fn new() -> Self {
         Self {
             groups: [

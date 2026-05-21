@@ -1,15 +1,25 @@
+//! `AudioSource` ECS component — per-entity playback handle.
+
 /// ECS component that attaches audio playback to an entity.
 #[derive(Debug, Clone)]
 pub struct AudioSource {
+    /// Clip identifier (key into the asset table holding the [`AudioClip`](crate::AudioClip)).
     pub clip_id: u32,
+    /// Linear volume multiplier (0.0 = silent, 1.0 = unattenuated).
     pub volume: f32,
+    /// If `true`, the mixer applies 3D spatialisation using the entity transform.
     pub spatial: bool,
+    /// If `true`, the clip restarts from the beginning when it ends.
     pub looping: bool,
+    /// Active playback flag — set to `true` to start, `false` to stop.
     pub playing: bool,
+    /// Internal flag: set by the mixer once the clip has finished once
+    /// (relevant for non-looping one-shot detection).
     pub played_once: bool,
 }
 
 impl AudioSource {
+    /// Creates a stopped, 100%-volume, non-spatial, non-looping source.
     pub fn new(clip_id: u32) -> Self {
         AudioSource {
             clip_id,
@@ -21,14 +31,18 @@ impl AudioSource {
         }
     }
 
+    /// Builder helper: marks this source as spatialised.
     pub fn spatial(mut self) -> Self { self.spatial = true; self }
+    /// Builder helper: marks this source as looping.
     pub fn looping(mut self) -> Self { self.looping = true; self }
 
+    /// Starts playback (resets the `played_once` latch).
     pub fn play(&mut self) {
         self.playing = true;
         self.played_once = false;
     }
 
+    /// Stops playback (does not reset `played_once`).
     pub fn stop(&mut self) {
         self.playing = false;
     }
