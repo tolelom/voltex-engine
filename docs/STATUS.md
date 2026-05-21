@@ -173,6 +173,29 @@
 
 v1.0.9 부터는 **서비스 배포 완성도** 로드맵 (`docs/superpowers/specs/2026-05-21-service-readiness-roadmap.md`) 기준으로 진행.
 
+### v1.0.43 (2026-05-22) — Scene deserializer 적대적 입력 방어
+
+P0 robustness round 4. v1.0.42 에서 `add_child` cycle guard 추가했지만 scene loader 가 가지고 있는 자체 위험을 따로 잡아야 함:
+
+**1. .vscn (텍스트) deserialize_scene** — `entity 4294967295` 같은 적대적 line 이 placeholder Vec 을 수십억 개 push → OOM.
+- `MAX_SCENE_ENTITIES = 1_000_000` 도입. 초과 entity index 는 silently skip
+- Out-of-range parent index 는 silently 무시 (이전엔 panic, index out of bounds)
+- self-parent 는 v1.0.42 의 add_child 가드로 자동 거부
+
+**2. VSCN (바이너리) deserialize_scene_binary** — 헤더의 entity_count u32 그대로 신뢰. `count = u32::MAX` 면 `Vec::with_capacity(4_294_967_295)` 가 다중-GB 할당 시도.
+- 동일한 `MAX_SCENE_ENTITIES = 1_000_000` cap 추가
+
+**검증**:
+- `cargo build --workspace` 클린, clippy 0 워닝
+- voltex_ecs 139 → 144 (+5). 회귀 테스트 5개:
+  - `scene::tests::deserialize_scene_caps_huge_entity_index`
+  - `scene::tests::deserialize_scene_ignores_out_of_range_parent_index`
+  - `scene::tests::deserialize_scene_self_parent_is_silently_refused`
+  - `scene::tests::deserialize_scene_at_cap_boundary_works`
+  - `binary_scene::tests::deserialize_binary_scene_rejects_huge_entity_count`
+
+**한계**: JSON deserialize_scene_json 의 `entities_arr.len()` 는 JSON parser 가 미리 정렬한 것이라 cap 안 두어도 OK (parser 가 1차 방어선). v1.1+ 에서 JSON parser 자체에도 한계 도입 검토.
+
 ### v1.0.42 (2026-05-22) — Hierarchy cycle / self-parent / reparent integrity
 
 P0 robustness round 3. `add_child` 가 세 가지 무결성 위반을 silently 허용:

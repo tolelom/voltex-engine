@@ -86,7 +86,19 @@ pub fn serialize_scene(world: &World) -> String {
     output
 }
 
+/// Maximum entity index we'll honour while parsing a `.vscn` text scene.
+/// A malicious or corrupted file declaring `entity 4294967295` would
+/// otherwise force the loader to push billions of placeholder slots
+/// (OOM). This cap is far above any realistic hand-authored scene.
+const MAX_SCENE_ENTITIES: usize = 1_000_000;
+
 /// Parse a .vscn string, create entities in the world, and return the created entities.
+///
+/// Robustness: entity indices and parent indices that exceed
+/// [`MAX_SCENE_ENTITIES`] are silently skipped; out-of-range parent
+/// indices that reference an entity outside the created set are
+/// silently ignored. The resulting world is therefore always
+/// consistent, even on adversarial input.
 pub fn deserialize_scene(world: &mut World, source: &str) -> Vec<Entity> {
     // Intermediate storage: local_index -> (transform, tag, parent_local_index)
     let mut local_transforms: Vec<Option<Transform>> = Vec::new();
@@ -105,6 +117,13 @@ pub fn deserialize_scene(world: &mut World, source: &str) -> Vec<Entity> {
 
         if let Some(rest) = trimmed.strip_prefix("entity ") {
             let idx: usize = rest.trim().parse().unwrap_or(local_transforms.len());
+            // Reject indices that would expand storage beyond the cap.
+            // Without this, an adversarial `entity 4294967295` line forced a
+            // multi-GB Vec allocation.
+            if idx >= MAX_SCENE_ENTITIES {
+                current_index = None;
+                continue;
+            }
             // Ensure vectors are large enough
             while local_transforms.len() <= idx {
                 local_transforms.push(None);
@@ -145,11 +164,17 @@ pub fn deserialize_scene(world: &mut World, source: &str) -> Vec<Entity> {
         created.push(entity);
     }
 
-    // Apply parent relationships
+    // Apply parent relationships. A `parent N` line whose N is outside
+    // the created entity set is silently ignored — the file referenced
+    // an entity that does not exist (corrupted or out-of-order).
     for (child_local_idx, parent_local_opt) in local_parents.iter().enumerate() {
         if let Some(parent_local_idx) = parent_local_opt {
+            if *parent_local_idx >= created.len() {
+                continue;
+            }
             let child_entity = created[child_local_idx];
             let parent_entity = created[*parent_local_idx];
+            // add_child silently refuses self-parent and cycles (v1.0.42).
             add_child(world, parent_entity, child_entity);
         }
     }
@@ -495,5 +520,61 @@ entity 2
         let mut world2 = World::new();
         let entities = deserialize_scene_json(&mut world2, &json, &registry).unwrap();
         assert_eq!(entities.len(), 5);
+    }
+
+    // ── adversarial / robustness tests ───────────────────────────────
+
+    #[test]
+    fn deserialize_scene_caps_huge_entity_index() {
+        // `entity 4294967295` used to push billions of placeholder slots
+        // into the intermediate Vec. Now silently ignored above the cap.
+        let source = "entity 4294967295\n  transform 0 0 0 | 0 0 0 | 1 1 1\n";
+        let mut world = World::new();
+        let created = deserialize_scene(&mut world, source);
+        // Nothing got created — the entity declaration was above the cap.
+        assert!(created.is_empty());
+    }
+
+    #[test]
+    fn deserialize_scene_ignores_out_of_range_parent_index() {
+        // `parent 99` references an entity that does not exist. Before the
+        // bounds check, this panicked with index-out-of-bounds inside the
+        // parent-application loop.
+        let source = r#"
+entity 0
+  transform 0 0 0 | 0 0 0 | 1 1 1
+  parent 99
+"#;
+        let mut world = World::new();
+        let created = deserialize_scene(&mut world, source);
+        assert_eq!(created.len(), 1);
+        // No Parent component was attached because the index was out of range.
+        assert!(world.get::<Parent>(created[0]).is_none());
+    }
+
+    #[test]
+    fn deserialize_scene_self_parent_is_silently_refused() {
+        // Hierarchy guard from v1.0.42: even if the scene file declares
+        // a self-parent edge, `add_child` refuses it. The entity is
+        // created without a Parent component.
+        let source = r#"
+entity 0
+  transform 0 0 0 | 0 0 0 | 1 1 1
+  parent 0
+"#;
+        let mut world = World::new();
+        let created = deserialize_scene(&mut world, source);
+        assert_eq!(created.len(), 1);
+        assert!(world.get::<Parent>(created[0]).is_none());
+    }
+
+    #[test]
+    fn deserialize_scene_at_cap_boundary_works() {
+        // Index exactly equal to the cap is rejected; one below succeeds
+        // but would allocate ~1M Vec entries, which is acceptable.
+        let source = format!("entity {}\n  transform 0 0 0 | 0 0 0 | 1 1 1\n", MAX_SCENE_ENTITIES);
+        let mut world = World::new();
+        let created = deserialize_scene(&mut world, &source);
+        assert!(created.is_empty(), "entity at MAX_SCENE_ENTITIES must be rejected");
     }
 }

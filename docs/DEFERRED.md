@@ -210,3 +210,4 @@
 - **Vec/Ray/Mat4 normalize 문서 거짓 + safe variant** ✅ v1.0.41 — `normalize_or_zero` (Vec2/Vec3), `Ray::try_new`. 기존 docstring 의 panic 주장 제거. 한계: 기존 30+ `.normalize()` 호출자 일괄 audit/교체는 v1.1+.
 - **Snapshot deserialiser 적대적 count 거부** ✅ v1.0.41 — `MAX_SNAPSHOT_ENTITIES = 1_000_000` + `checked_mul`/`checked_add`. +2 회귀 테스트.
 - **Hierarchy cycle / self-parent / stale reparent** ✅ v1.0.42 — `add_child` 가 self-parent, cycle 생성, re-parent stale entry 3종을 silently 허용. 모두 silently 거부 + 옛 parent 의 Children 정리. +5 회귀 테스트. 한계: 직렬화된 씬 파일의 pre-existing 사이클은 `validate_hierarchy` 별 pass 필요 — v1.1+.
+- **Scene deserializer 적대적 entity count / index** ✅ v1.0.43 — `.vscn` text + `VSCN` binary 양쪽에 `MAX_SCENE_ENTITIES = 1_000_000` cap. Out-of-range parent index 도 silently 무시. +5 회귀 테스트. JSON deserializer 의 추가 cap 은 v1.1+.

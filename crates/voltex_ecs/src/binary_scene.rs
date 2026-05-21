@@ -19,6 +19,12 @@ use crate::component_registry::ComponentRegistry;
 const MAGIC: &[u8; 4] = b"VSCN";
 const VERSION: u32 = 1;
 
+/// Maximum entity count we accept in a single binary scene file. A header
+/// declaring billions of entities used to drive a multi-GB
+/// `Vec::with_capacity` allocation even when the body was tiny.
+/// Mirrors `MAX_SCENE_ENTITIES` in `scene.rs`.
+const MAX_SCENE_ENTITIES: usize = 1_000_000;
+
 /// Serialize all entities with a Transform to the binary scene format.
 pub fn serialize_scene_binary(world: &World, registry: &ComponentRegistry) -> Vec<u8> {
     let entities_with_transform: Vec<(Entity, Transform)> = world
@@ -96,6 +102,12 @@ pub fn deserialize_scene_binary(
     }
 
     let entity_count = u32::from_le_bytes([data[8], data[9], data[10], data[11]]) as usize;
+    if entity_count > MAX_SCENE_ENTITIES {
+        return Err(format!(
+            "Binary scene entity count {} exceeds limit {}",
+            entity_count, MAX_SCENE_ENTITIES
+        ).into());
+    }
     let mut pos = 12;
 
     let mut created: Vec<Entity> = Vec::with_capacity(entity_count);
@@ -259,5 +271,22 @@ mod tests {
             let tag = world2.get::<Tag>(e).unwrap();
             assert_eq!(tag.0, format!("e{}", i));
         }
+    }
+
+    #[test]
+    fn deserialize_binary_scene_rejects_huge_entity_count() {
+        // Header claims u32::MAX entities. Without the cap this drove a
+        // multi-GB `Vec::with_capacity` allocation even though the file body
+        // was tiny.
+        let mut data = Vec::new();
+        data.extend_from_slice(MAGIC);
+        data.extend_from_slice(&VERSION.to_le_bytes());
+        data.extend_from_slice(&u32::MAX.to_le_bytes());
+        let mut world = World::new();
+        let registry = ComponentRegistry::new();
+        let err = deserialize_scene_binary(&mut world, &data, &registry)
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("exceeds limit"), "unexpected error: {err}");
     }
 }

@@ -10,6 +10,41 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## [v1.0.43] — 2026-05-22 — Scene deserializer adversarial input hardening
+
+**Fix**. Two scene deserializers (text `.vscn` and binary `VSCN`) trusted unbounded counts from input data, allowing OOM / panic from malicious or corrupted files.
+
+### Fixed
+
+- **`voltex_ecs::scene::deserialize_scene` (.vscn text)**:
+  - Lines like `entity 4294967295` previously forced the loader to push billions of placeholder `Option<Transform>` entries into the intermediate vectors before any error could be reported. Now silently ignored above `MAX_SCENE_ENTITIES = 1_000_000`.
+  - Out-of-range parent indices (e.g. `parent 99` when only 1 entity was declared) used to panic with index-out-of-bounds inside the parent-application loop. Now silently ignored.
+  - Cycles and self-parents that survive the parse are caught by the v1.0.42 `add_child` guard. This entry just documents that the guarantee composes correctly through scene load.
+
+- **`voltex_ecs::binary_scene::deserialize_scene_binary` (.vscn binary)**: header field `entity_count: u32` was used directly in `Vec::with_capacity(entity_count)`. An adversarial header with `count = u32::MAX` could allocate 32 GB+ (entity slot vec) before reading any body bytes. Same `MAX_SCENE_ENTITIES = 1_000_000` cap applied with a friendly error message.
+
+### Tests
+
+`voltex_ecs` 139 → 144 (+5):
+
+- `voltex_ecs::scene::tests::deserialize_scene_caps_huge_entity_index`
+- `voltex_ecs::scene::tests::deserialize_scene_ignores_out_of_range_parent_index`
+- `voltex_ecs::scene::tests::deserialize_scene_self_parent_is_silently_refused`
+- `voltex_ecs::scene::tests::deserialize_scene_at_cap_boundary_works`
+- `voltex_ecs::binary_scene::tests::deserialize_binary_scene_rejects_huge_entity_count`
+
+### Verification
+
+- `cargo build --workspace` — clean.
+- `cargo clippy --workspace --all-targets -- -D warnings` — 0 warnings.
+- `cargo test --workspace --lib` — every crate green.
+
+### Notes
+
+The JSON deserializer (`deserialize_scene_json`) does not need a separate cap because `entities_arr.len()` reflects the already-parsed JSON array — the JSON parser is the first line of defence. Adding a limit to the JSON parser itself is queued for v1.1.
+
+---
+
 ## [v1.0.42] — 2026-05-22 — Hierarchy cycle / self-parent / reparent integrity
 
 **Fix**. `voltex_ecs::hierarchy::add_child` silently allowed three classes of integrity violation that caused unbounded-recursion stack overflow inside `despawn_recursive`:
