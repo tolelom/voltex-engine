@@ -216,3 +216,4 @@
 - **Editor redo-Spawn entity leak** ✅ v1.0.46 — `Spawn→Undo→Redo→Undo` 시 두 번째 undo 가 stale entity 를 가리켜 새로 생성된 entity 가 영구 생존하던 버그. redo 후 inverse 패치. +1 회귀.
 - **Audio mixer clip_index OOB** ✅ v1.0.46 — `clips.get()` 으로 안전 접근. +1 회귀.
 - **Lua FFI null-deref + type confusion** ✅ v1.0.47 — `get_world` 가 Option 반환, 비숫자 handle/좌표 arg silent no-op 으로 거부. +3 회귀 테스트.
+- **Animation zero-duration / extract_keyframe OOB / quat slerp NaN** ✅ v1.0.48 — `AnimationPlayer::update` duration=0 early-out, `extract_keyframe` start>=values.len() 기본값 반환, `Quat::slerp` dot clamp(-1,1). +3 회귀 테스트.

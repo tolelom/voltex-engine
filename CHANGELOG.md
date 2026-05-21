@@ -10,6 +10,32 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## [v1.0.48] — 2026-05-22 — Animation system zero-duration / OOB keyframe / quat slerp NaN
+
+**Fix**. Three latent NaN / panic paths in `voltex_renderer/src/animation.rs`:
+
+### Fixed
+
+- **`AnimationPlayer::update` zero-duration NaN.** A zero-duration animation in `looping=true` mode hit `current_time %= 0.0`. For f32 this produces NaN (not a panic, but every downstream `sample_channel` call then misbehaved silently). Now: `duration <= 0` clamps `current_time` to 0 and stops the player.
+- **`extract_keyframe` slice OOB panic.** A malformed glTF where `values.len() < times.len() * stride` panicked at `values[start..end]` whenever `start > values.len()`. The previous `end.min(values.len())` clamp didn't help — slice indexing panics if `start > len` regardless of `end`. `start >= values.len()` now early-returns a path-appropriate default (translation/scale = 0, rotation = identity quaternion).
+- **`Quat::slerp` `acos(> 1.0)` NaN.** Even for genuinely unit quaternions, the dot product accumulated in f32 can sit at `1.0000001` etc. `theta = dot.acos()` then returned NaN, contaminating the whole interpolation. Added `dot = dot.clamp(-1.0, 1.0)` before branching. The existing `dot > 0.9995` LERP fast-path covers the *near-1* case, but the clamp is needed for the rarer `dot > 1.0` (overshoot) and `dot < -1.0` (after the sign-flip branch) edges.
+
+### Tests
+
+`voltex_renderer` 225 → 228 (+3):
+
+- `voltex_renderer::animation::tests::animation_player_zero_duration_does_not_div_by_zero`
+- `voltex_renderer::animation::tests::extract_keyframe_with_truncated_values_returns_default`
+- `voltex_renderer::animation::tests::quat_slerp_with_floating_point_dot_overshoot_does_not_nan`
+
+### Verification
+
+- `cargo build --workspace` — clean.
+- `cargo clippy --workspace --all-targets -- -D warnings` — 0 warnings.
+- `cargo test --workspace --lib` — every crate green.
+
+---
+
 ## [v1.0.47] — 2026-05-22 — Lua FFI null-deref + type-confusion guards
 
 **Fix**. The Lua engine_api FFI surface had three latent safety bugs reachable from arbitrary script code:

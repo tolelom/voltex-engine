@@ -15,6 +15,11 @@ impl Quat {
         let mut dot = a.x*b.x + a.y*b.y + a.z*b.z + a.w*b.w;
         let mut b = b;
         if dot < 0.0 { b = Quat { x: -b.x, y: -b.y, z: -b.z, w: -b.w }; dot = -dot; }
+        // `acos` returns NaN for inputs outside [-1, 1]. Floating-point
+        // accumulation in the dot product above can push the result just past
+        // 1.0 even for unit quaternions, which used to silently produce
+        // NaN-filled rotations downstream.
+        dot = dot.clamp(-1.0, 1.0);
         if dot > 0.9995 {
             // Linear interpolation for nearly identical quaternions
             let r = Quat {
@@ -99,6 +104,17 @@ fn extract_keyframe(values: &[f32], index: usize, path: &AnimationPath) -> Vec<f
         AnimationPath::Rotation => 4,
     };
     let start = index * stride;
+    // Clamp both ends — a malformed glTF where values.len() < times.len() *
+    // stride used to panic on `values[start..end]` when `start > values.len()`.
+    if start >= values.len() {
+        // Return a sensible default per path so the caller can still
+        // interpolate (translation/scale = 0, rotation = identity).
+        return match path {
+            AnimationPath::Translation => vec![0.0, 0.0, 0.0],
+            AnimationPath::Scale => vec![1.0, 1.0, 1.0],
+            AnimationPath::Rotation => vec![0.0, 0.0, 0.0, 1.0],
+        };
+    }
     let end = (start + stride).min(values.len());
     values[start..end].to_vec()
 }
@@ -121,8 +137,21 @@ impl AnimationPlayer {
         if !self.playing { return; }
         self.current_time += dt * self.speed;
         if self.current_time > self.duration {
-            if self.looping { self.current_time %= self.duration; }
-            else { self.current_time = self.duration; self.playing = false; }
+            // A zero-duration animation has no meaningful state — clamp to
+            // 0 and stop. Pre-fix, `current_time %= 0.0` was integer-modulo's
+            // f32 cousin and produced NaN (not a panic on f32, but every
+            // downstream `sample_channel` call then took the
+            // `times.is_empty()` shortcut on NaN-compared times — silent
+            // bad).
+            if self.duration <= 0.0 {
+                self.current_time = 0.0;
+                self.playing = false;
+            } else if self.looping {
+                self.current_time %= self.duration;
+            } else {
+                self.current_time = self.duration;
+                self.playing = false;
+            }
         }
     }
 
@@ -241,5 +270,45 @@ mod tests {
         let id = [[1.0,0.0,0.0,0.0],[0.0,1.0,0.0,0.0],[0.0,0.0,1.0,0.0],[0.0,0.0,0.0,1.0]];
         let r = mat4_mul(&id, &id);
         assert!((r[0][0] - 1.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn animation_player_zero_duration_does_not_div_by_zero() {
+        // Pre-fix `current_time %= 0.0` produced NaN for f32 (not a panic
+        // but every downstream channel sample then misbehaved). The player
+        // now clamps to 0 and stops.
+        let mut player = AnimationPlayer::new(0.0);
+        player.update(1.0);
+        assert_eq!(player.current_time, 0.0);
+        assert!(!player.playing);
+        assert!(!player.current_time.is_nan());
+    }
+
+    #[test]
+    fn extract_keyframe_with_truncated_values_returns_default() {
+        // Malformed glTF: times has 5 entries but values has only 6 floats
+        // (room for 2 translations of stride=3). Pre-fix, indexing
+        // values[12..15] for keyframe 4 panicked with slice OOB.
+        let truncated_values: Vec<f32> = vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0];
+        // Index 0 and 1 exist.
+        assert_eq!(extract_keyframe(&truncated_values, 0, &AnimationPath::Translation), vec![1.0, 2.0, 3.0]);
+        assert_eq!(extract_keyframe(&truncated_values, 1, &AnimationPath::Translation), vec![4.0, 5.0, 6.0]);
+        // Index 4 is out of range — pre-fix this panicked, now returns default.
+        assert_eq!(extract_keyframe(&truncated_values, 4, &AnimationPath::Translation), vec![0.0, 0.0, 0.0]);
+        // Same for scale (default 1) and rotation (identity quat).
+        assert_eq!(extract_keyframe(&[], 0, &AnimationPath::Scale), vec![1.0, 1.0, 1.0]);
+        assert_eq!(extract_keyframe(&[], 0, &AnimationPath::Rotation), vec![0.0, 0.0, 0.0, 1.0]);
+    }
+
+    #[test]
+    fn quat_slerp_with_floating_point_dot_overshoot_does_not_nan() {
+        // Two near-identical unit quaternions whose dot accumulates just past
+        // 1.0 in f32 used to feed acos a > 1.0 input → NaN result. The clamp
+        // added in this fix keeps the result finite.
+        let a = Quat { x: 0.3, y: 0.4, z: 0.5, w: std::f32::consts::FRAC_1_SQRT_2 }.normalize();
+        // Construct b as exactly a + tiny noise.
+        let b = Quat { x: a.x + 1e-9, y: a.y, z: a.z, w: a.w }.normalize();
+        let r = Quat::slerp(a, b, 0.5);
+        assert!(!r.x.is_nan() && !r.y.is_nan() && !r.z.is_nan() && !r.w.is_nan());
     }
 }

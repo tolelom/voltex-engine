@@ -173,6 +173,26 @@
 
 v1.0.9 부터는 **서비스 배포 완성도** 로드맵 (`docs/superpowers/specs/2026-05-21-service-readiness-roadmap.md`) 기준으로 진행.
 
+### v1.0.48 (2026-05-22) — Animation system: zero-duration / OOB keyframe / quat slerp NaN
+
+P0 robustness round 9. animation.rs 의 세 가지 잠재 NaN/panic 경로 정리:
+
+**1. `AnimationPlayer::update` zero-duration `%` → NaN** — duration=0 인 빈 애니메이션이 looping 모드에 들어가면 `current_time %= 0.0` 가 NaN 생성 (f32 modulo by zero). 그 후 sample_channel 호출이 silently 잘못된 결과.
+- Fix: duration <= 0 시 current_time=0, playing=false. Early termination.
+
+**2. `extract_keyframe` 슬라이스 OOB panic** — 적대적 / 손상된 glTF 에서 `values.len() < times.len() * stride` 일 때 `values[start..end]` 가 `start > values.len()` 으로 panic. 이전 시점 `end = (start+stride).min(values.len())` 만으로는 start 미가드.
+- Fix: `start >= values.len()` 검사 + path 별 기본값 (translation/scale=0, rotation=identity quat) 반환.
+
+**3. `Quat::slerp` 의 dot >1.0 floating-point overshoot → acos NaN** — unit quaternion 사이의 dot 도 f32 누적 오차로 1.0000001 이 가능. acos(>1) = NaN 으로 회전 전체가 NaN.
+- Fix: `dot = dot.clamp(-1.0, 1.0)` 추가. 두 0.9995 보다 큰 경우는 이미 LERP 처리하지만 정확히 그 사이도 안전.
+
+**검증**:
+- `cargo build --workspace` 클린, clippy 0 워닝
+- voltex_renderer 225 → 228 (+3). 회귀 테스트:
+  - `animation::tests::animation_player_zero_duration_does_not_div_by_zero`
+  - `animation::tests::extract_keyframe_with_truncated_values_returns_default`
+  - `animation::tests::quat_slerp_with_floating_point_dot_overshoot_does_not_nan`
+
 ### v1.0.47 (2026-05-22) — Lua FFI null-deref 차단 + type-confusion 가드
 
 P0 critical safety. voltex_script 의 engine_api 가 unsafe FFI 표면이라 세 종류의 잠재 UB / silent corruption:
