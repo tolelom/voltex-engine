@@ -5,7 +5,7 @@
 > 스크립팅, 멀티 OS 빌드 파이프라인까지 제공한다. 자세한 카운트와 정책은
 > 아래 "의존성 정책" 섹션 참고.
 
-![status: v1.0.13](https://img.shields.io/badge/status-v1.0.13-brightgreen)
+![status: v1.0.14](https://img.shields.io/badge/status-v1.0.14-brightgreen)
 ![clippy: 0 warnings](https://img.shields.io/badge/clippy-0%20warnings-brightgreen)
 ![audit: 0 vulnerabilities](https://img.shields.io/badge/cargo--audit-0%20vulnerabilities-brightgreen)
 ![coverage: 82%](https://img.shields.io/badge/coverage-82%25%20lib-brightgreen)
@@ -225,10 +225,13 @@ CI 가 동일 명령으로 license drift 검출 (`license-check` advisory job).
 
 ## Contributing
 
-PR 환영. 작업 흐름은 spec → plan → implementation → verify 의 4 단계로,
-각 단계의 산출물은 `docs/superpowers/specs/` 와 `docs/superpowers/plans/`
-에 보존된다. 더 자세한 워크플로 + 컨벤션은 [CLAUDE.md](CLAUDE.md) 의 "변경
-워크플로 (AI 작업 기준)" 섹션 참고.
+PR 환영. 외부 contributor 용 전체 가이드는 [CONTRIBUTING.md](CONTRIBUTING.md)
+에 정리 (의존성 정책, 600줄 한도, 에러 표준, 컴포넌트 등록, 테스트 스타일,
+커밋 컨벤션, 첫 PR 체크리스트). 자동 진행 로드맵 + 자동 루프 정책도 동봉.
+
+작업 흐름은 spec → plan → implementation → verify 의 4 단계로, 각 단계의
+산출물은 `docs/superpowers/specs/` 와 `docs/superpowers/plans/` 에 보존된다.
+AI 작업 시점의 워크플로 (CODEMAP 우선 탐색 등) 는 [CLAUDE.md](CLAUDE.md) 참고.
 
 PR 제출 전 로컬 검증 (CI 와 동일한 게이트):
 
@@ -237,6 +240,14 @@ cargo build --workspace
 cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace --lib
 cargo test -p voltex_cli
+```
+
+위 4개를 매 커밋 자동으로 돌리려면 git hook 설치:
+
+```bash
+bash .githooks/install.sh                  # Linux / macOS
+# 또는
+.\.githooks\install.ps1                    # Windows PowerShell
 ```
 
 CI (`.github/workflows/ci.yml`) 는 위 4 명령을 Ubuntu + Windows 매트릭스에서

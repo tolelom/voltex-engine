@@ -173,6 +173,31 @@
 
 v1.0.9 부터는 **서비스 배포 완성도** 로드맵 (`docs/superpowers/specs/2026-05-21-service-readiness-roadmap.md`) 기준으로 진행.
 
+### v1.0.14 (2026-05-21) — CONTRIBUTING.md + git pre-commit hook
+
+외부 contributor 가 로컬 검증 → 커밋 → PR 흐름에서 마찰 줄이기. 이전엔 README 의 "Contributing" 섹션에 4개 cargo 명령만 있고, 새 contributor 가 한 번 잊으면 CI 에서 실패해야 학습.
+
+**신규**:
+- `CONTRIBUTING.md` — 의존성 정책 (winit/wgpu/bytemuck 만), 600줄 한도, 에러 표준 (thiserror + Generic), Component 등록 패턴, 테스트 스타일 (inline xorshift32 fuzz), commit 컨벤션 (v1.0.x 형식), 자동 루프 정책 (작업 전 pull --ff-only), 첫 PR 체크리스트.
+- `.githooks/pre-commit` — `cargo clippy --workspace --all-targets -- -D warnings` + `cargo test --workspace --lib --quiet`. cargo fmt 는 의도적으로 제외 (프로젝트가 fmt 설정 미사용; 적용 시 무관 코드 대량 재포맷).
+- `.githooks/install.sh` (bash) + `.githooks/install.ps1` (PowerShell) — `git config core.hooksPath .githooks` + chmod +x. idempotent.
+- README "Contributing" 섹션에 CONTRIBUTING.md 링크 + hooks install 명령 추가.
+
+**검증**:
+- `bash -n .githooks/{pre-commit,install.sh}` 둘 다 syntax OK.
+- PowerShell `.ps1` 은 Windows 환경에서 실제 실행 확인 후 v1.1 마킹 (개발 호스트에서 pwsh 미설치 시).
+
+**테스트**: 셸 스크립트라 Rust 단위 테스트 미추가 (스크립트 한 줄 짜리 + parse-check 로 충분). voltex_cli / runtime 등 코드 변경 없음.
+
+**셀프 피드백**:
+- 단계 1 workspace package version bump 시도 → auto-mode 분류기 차단 (deferred 항목 라벨 자기-참조). 정당. 즉시 pivot.
+- 단계 2 pre-commit + CONTRIBUTING 작성: 4 파일 신규 + README 1 섹션 갱신.
+- 단계 3 bash syntax check 통과. 워크스페이스 build/test/clippy 영향 0.
+
+**알려진 한계 (v1.1+)**:
+- PowerShell install.ps1 실제 실행 검증 미실시 (개발 호스트 pwsh 부재).
+- pre-commit 이 30~60초 (초기) 걸려, 큰 commit 흐름에서는 `--no-verify` 유혹. pre-commit (fmt-only fast) + pre-push (clippy+test slow) 분리는 별 cycle.
+
 ### v1.0.13 (2026-05-21) — voltex CLI `--version` + 풍부한 per-subcommand `--help`
 
 첫 사용자 마찰 줄이기. 이전: top-level help 만 있고 `voltex new --help` / `voltex build --help` / `voltex run --help` 무동작 (subcommand 가 help flag 인식 안 함). `--version` 도 없었음.

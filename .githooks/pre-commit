@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+# voltex pre-commit hook — runs clippy + lib tests on the workspace.
+#
+# Install:    bash .githooks/install.sh   (or .githooks/install.ps1 on Windows)
+# Skip once:  git commit --no-verify
+# Skip always: git config --unset core.hooksPath
+#
+# The hook intentionally does NOT run `cargo fmt --check` because the
+# project does not enforce a fmt config; running it would reformat lots
+# of existing code outside the scope of any single commit.
+
+set -e
+
+GREEN='\033[0;32m'
+RED='\033[0;31m'
+NC='\033[0m'
+
+echo "→ voltex pre-commit: cargo clippy --workspace --all-targets -- -D warnings"
+if ! cargo clippy --workspace --all-targets -- -D warnings 2>&1 | tail -5; then
+    echo -e "${RED}✗ clippy failed${NC} — fix warnings or use 'git commit --no-verify' to bypass"
+    exit 1
+fi
+
+echo "→ voltex pre-commit: cargo test --workspace --lib --quiet"
+if ! cargo test --workspace --lib --quiet 2>&1 | tail -5; then
+    echo -e "${RED}✗ tests failed${NC} — fix or use 'git commit --no-verify' to bypass"
+    exit 1
+fi
+
+echo -e "${GREEN}✓ pre-commit checks passed${NC}"

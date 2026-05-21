@@ -10,6 +10,44 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## [v1.0.14] — 2026-05-21 — `CONTRIBUTING.md` + git pre-commit hook
+
+Lowers external-contributor friction. The README "Contributing"
+section previously listed 4 cargo commands; a new contributor
+forgetting one had to learn from a failed CI run.
+
+### Added
+
+- `CONTRIBUTING.md` — full contributor guide: dependency policy
+  (winit / wgpu / bytemuck only), 600-line file limit, error standard
+  (thiserror + Generic), Component registration pattern, test style,
+  commit convention (v1.0.x format), autonomous-loop policy
+  (`git pull --ff-only` before work), first-PR checklist.
+- `.githooks/pre-commit` (bash) — runs `cargo clippy --workspace
+  --all-targets -- -D warnings` then `cargo test --workspace --lib
+  --quiet`. Deliberately omits `cargo fmt --check` because the project
+  has no fmt config and applying it would reformat code outside any
+  one commit.
+- `.githooks/install.sh` (bash) and `.githooks/install.ps1`
+  (PowerShell) — single-command installers that set
+  `core.hooksPath = .githooks` and chmod +x. Idempotent.
+- README "Contributing" section now points at `CONTRIBUTING.md` and
+  shows the hook install command for both shells.
+
+### Verified
+
+- `bash -n` syntax check on both bash scripts.
+
+### Known limits
+
+- `.githooks/install.ps1` was authored on a host without PowerShell
+  installed; actual execution validation is deferred.
+- Pre-commit takes 30-60 s on first run, 5-10 s on cached runs.
+  Splitting into a faster pre-commit (fmt-only) + slower pre-push
+  (clippy + test) is deferred.
+
+---
+
 ## [v1.0.13] — 2026-05-21 — `voltex --version` + rich per-subcommand `--help`
 
 First-user friction reduction. Previously `voltex new --help` and

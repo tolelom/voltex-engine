@@ -204,3 +204,4 @@
 - **LICENSE-MIT/APACHE 파일 추가 + `voltex build` 라이선스 번들** ✅ v1.0.12 — repo 의 dual license 약속을 실 파일로 backing + 모든 `voltex build` 산출물의 `dist/` 에 THIRD-PARTY-LICENSES.md + LICENSE-MIT + LICENSE-APACHE 자동 복사. +4 tests. 한계: THIRD-PARTY-LICENSES.md 자동 재생성 (현재 수동 cargo about) — v1.1+.
 - **voltex CLI `--version` + per-subcommand `--help`** ✅ v1.0.13 — help.rs 모듈 (TOP/NEW/BUILD/RUN), top-level `-V`/`--version`, `voltex <cmd> --help` 동작. +7 gating tests. 한계: --version 이 Cargo.toml package version (0.1.0) 출력 — workspace package version 일괄 bump 는 별 cycle.
 - **워크스페이스 31 crate Cargo.toml `version` v1.0.x 일괄 sync** — 현재 모두 0.1.0. workspace.package version 채택 + `voltex --version` / cargo semver 동기화 결정 필요. v1.0.x or v1.1+.
+- **CONTRIBUTING.md + git pre-commit hook** ✅ v1.0.14 — 4 파일 (.githooks/pre-commit, install.sh, install.ps1, CONTRIBUTING.md). bash syntax 검증. 한계: install.ps1 실 실행 검증 미실시 (개발 호스트 pwsh 부재), pre-commit fast (fmt) / pre-push slow (clippy+test) 분리 — v1.1+.
