@@ -173,6 +173,18 @@
 
 v1.0.9 부터는 **서비스 배포 완성도** 로드맵 (`docs/superpowers/specs/2026-05-21-service-readiness-roadmap.md`) 기준으로 진행.
 
+### v1.0.53 (2026-05-22) — Camera::right NaN at pitch ±90°
+
+P1 robustness. `Camera::right()` 가 forward × Vec3::Y 를 정규화 — pitch 가 ±π/2 이면 forward 가 Y 와 평행 → cross product 0 → normalize NaN. `FpsController::process_mouse` 가 pitch 를 ±89° 로 clamp 하지만 `Camera.pitch` 는 public 필드라 user code 가 직접 설정 가능.
+
+**Fix (`voltex_renderer/src/camera.rs`)**:
+- `right()` 가 `normalize_or_zero()` (v1.0.41) 사용 + zero 시 `Vec3::X` fallback
+
+**검증**:
+- voltex_renderer 228 → 230 (+2). 회귀 테스트:
+  - `camera::tests::camera_right_at_straight_up_does_not_nan`
+  - `camera::tests::camera_right_at_straight_down_does_not_nan`
+
 ### v1.0.52 (2026-05-22) — GameTimer hz=0 panic + alpha div-by-zero
 
 P1 robustness. `GameTimer::new(0)` 가 `Duration::from_secs_f64(1.0 / 0.0 = inf)` 호출 → "non-finite value" 패닉. 또한 `u32::MAX` Hz 면 fixed_dt 가 0 ns 로 라운드 → `should_fixed_update` 무한 루프.

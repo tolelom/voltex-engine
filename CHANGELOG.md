@@ -10,6 +10,31 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## [v1.0.53] — 2026-05-22 — `Camera::right` NaN at pitch ±90°
+
+**Fix**. `voltex_renderer::Camera::right()` computed `forward × Vec3::Y` and called `.normalize()`. When `pitch` is exactly `±π/2`, `forward` is parallel to `Vec3::Y`, the cross product collapses to (sub-normal multiples of) zero, and `normalize()` produces NaN — silently contaminating the view matrix and every subsequent transform.
+
+`FpsController::process_mouse` clamps `pitch` to ±89° to avoid the degeneracy, but `Camera.pitch` is a public field. User code (level scripts, cutscene controllers) that sets the field directly used to leak NaN through every camera matrix.
+
+### Fixed
+
+- `Camera::right` now uses `normalize_or_zero` (added in v1.0.41) and falls back to `Vec3::X` for the degenerate case.
+
+### Tests
+
+`voltex_renderer` 228 → 230 (+2):
+
+- `voltex_renderer::camera::tests::camera_right_at_straight_up_does_not_nan`
+- `voltex_renderer::camera::tests::camera_right_at_straight_down_does_not_nan`
+
+### Verification
+
+- `cargo build --workspace` — clean.
+- `cargo clippy --workspace --all-targets -- -D warnings` — 0 warnings.
+- `cargo test --workspace --lib` — every crate green.
+
+---
+
 ## [v1.0.52] — 2026-05-22 — GameTimer hz=0 panic + alpha div-by-zero
 
 **Fix**. Two `voltex_platform::GameTimer` footguns:

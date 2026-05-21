@@ -44,8 +44,17 @@ impl Camera {
     }
 
     /// Unit-length right direction (forward × Y axis).
+    ///
+    /// At pitch ±90° the forward vector is parallel to `Vec3::Y`, so the
+    /// cross product is zero and `.normalize()` would produce NaN.
+    /// `FpsController::process_mouse` clamps pitch to ±89° to avoid this,
+    /// but `pitch` is a public field — user code that sets it directly
+    /// would otherwise leak NaN into every transform built from `right()`.
+    /// Falls back to `Vec3::X` for the degenerate case.
     pub fn right(&self) -> Vec3 {
-        self.forward().cross(Vec3::Y).normalize()
+        let r = self.forward().cross(Vec3::Y);
+        let n = r.normalize_or_zero();
+        if n == Vec3::ZERO { Vec3::X } else { n }
     }
 
     /// View matrix from eye looking along [`forward`](Self::forward).
@@ -146,6 +155,35 @@ mod tests {
             "Expected (1, 0, 0), got ({}, {}, {})",
             fwd.x, fwd.y, fwd.z
         );
+    }
+
+    #[test]
+    fn camera_right_at_straight_up_does_not_nan() {
+        // Pre-fix: pitch = +90° made forward ≈ (0,1,0); the cross product
+        // with Vec3::Y collapsed to a sub-normal vector whose normalize()
+        // produced NaN. In f32, cos(π/2) doesn't return exactly 0, so the
+        // cross product is a tiny vector along ±X — small enough to push
+        // through `normalize_or_zero` and into NaN before the fallback was
+        // added.
+        let mut cam = Camera::new(Vec3::ZERO, 1.0);
+        cam.pitch = std::f32::consts::FRAC_PI_2; // exactly +90°
+        let r = cam.right();
+        // No NaN anywhere.
+        assert!(!r.x.is_nan() && !r.y.is_nan() && !r.z.is_nan());
+        // Result is unit-length along the X axis (sign depends on f32 noise).
+        assert!((r.length() - 1.0).abs() < 1e-4, "right() must be unit length, got {:?}", r);
+        assert!(r.y.abs() < 1e-4);
+        assert!(r.z.abs() < 1e-4);
+        assert!(r.x.abs() > 0.99);
+    }
+
+    #[test]
+    fn camera_right_at_straight_down_does_not_nan() {
+        let mut cam = Camera::new(Vec3::ZERO, 1.0);
+        cam.pitch = -std::f32::consts::FRAC_PI_2;
+        let r = cam.right();
+        assert!(!r.x.is_nan() && !r.y.is_nan() && !r.z.is_nan());
+        assert!((r.length() - 1.0).abs() < 1e-4);
     }
 
     #[test]
