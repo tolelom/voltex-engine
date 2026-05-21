@@ -1,5 +1,14 @@
+//! GPU glyph atlas — rasterised TTF glyphs packed into a single texture.
+//! [`TtfFont`](crate::TtfFont) lazily fills the cache as new code points are
+//! requested.
+//!
+//! `GlyphInfo` / `GlyphCache` expose every packing field as `pub` for tests;
+//! user code should reach for [`TtfFont`](crate::TtfFont) directly.
+#![allow(missing_docs)]
+
 use std::collections::HashMap;
 
+/// Side length (in pixels) of the square glyph atlas texture.
 pub const ATLAS_SIZE: u32 = 1024;
 
 #[derive(Clone, Debug)]

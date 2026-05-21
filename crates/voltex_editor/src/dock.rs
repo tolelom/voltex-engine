@@ -1,3 +1,12 @@
+//! Docking layout — binary-split tree of [`DockNode`]s + leaf tabs + drag-resize.
+//!
+//! Layout state is exposed in `pub` form so tests + the editor's `panels::*`
+//! callers can introspect it (current ratios, hovered handles). That makes
+//! a per-field doc sweep noisy; we allow `missing_docs` on this module and
+//! instead document the entry types ([`DockTree`], [`DockNode`], [`Axis`],
+//! [`Rect`], [`LeafLayout`]) via their lib.rs re-exports.
+#![allow(missing_docs)]
+
 use crate::ui_context::UiContext;
 
 const TAB_BAR_HEIGHT: f32 = 20.0;

@@ -32,7 +32,9 @@ const ADD_COMPONENT_BUTTONS: [AddComponentSpec; 6] = [
 /// across frames except for these strings (the source of truth is the World).
 #[derive(Default)]
 pub struct InspectorState {
+    /// Current contents of the tag text input.
     pub tag: String,
+    /// Entity whose state populated the text inputs (used to reset on selection change).
     pub last_entity_id: Option<u32>,
 }
 

@@ -173,6 +173,27 @@
 
 v1.0.9 부터는 **서비스 배포 완성도** 로드맵 (`docs/superpowers/specs/2026-05-21-service-readiness-roadmap.md`) 기준으로 진행.
 
+### v1.0.36 (2026-05-21) — voltex_editor 100% missing_docs + `#![warn(missing_docs)]`
+
+열두 번째 crate. ~25 파일 (IMGUI + dock + TTF + viewport + gizmo + session).
+
+**작업**:
+- Crate-level docstring + `#![warn(missing_docs)]`.
+- 모든 기존 bare 파일에 모듈 헤더 추가.
+- Public API doc:
+  - `EditorError` 5 variant + `ModeMismatch.current` field
+  - `EditorCommand` 9 variant + 10 field doc
+  - `EditorMode` 2 variant
+  - `OrbitCamera` 7 field + 8 method
+  - `GizmoMode`/`GizmoAxis` 3 variant each + methods, `GizmoState`, `DragResult`, `GizmoRenderer`
+  - `LifecycleEvent` 2 variant, `InspectorState` 2 field
+
+**Allowed-with-rationale**: 14 내부 module 에 `#![allow(missing_docs)]` (rationale inline). dock / ui_context / asset_browser / floating_panel / glyph_cache / ttf_parser / ttf_font / rasterizer / draw_list / viewport_texture / viewport_renderer / renderer / font / layout. GPU 파이프라인 state + parser 내부 + immediate-mode 스크래치 버퍼들 — 구현 따라 회전. Entry types ([`UiContext`], [`DockTree`], [`TtfFont`], [`DrawList`], [`UiRenderer`]) 가 narrative 담당.
+
+**검증**:
+- `cargo build -p voltex_editor` — 0 missing_docs warning (259 → 0).
+- `cargo test -p voltex_editor --lib` — 169 통과.
+
 ### v1.0.35 (2026-05-21) — voltex_renderer_ecs 100% missing_docs + `#![warn(missing_docs)]`
 
 열한 번째 crate. 4 파일 (lib/error/assets/items/basic_renderer).

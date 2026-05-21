@@ -1,3 +1,7 @@
+//! Immediate-mode cursor-based layout — tracks the next widget origin
+//! within a panel.
+#![allow(missing_docs)]
+
 /// Simple cursor-based layout state for immediate mode UI.
 pub struct LayoutState {
     pub cursor_x: f32,

@@ -1,3 +1,16 @@
+//! Minimal in-house TrueType (`.ttf`) parser.
+//!
+//! Extracts the tables we need to rasterise glyphs (`head`, `hhea`, `hmtx`,
+//! `cmap`, `glyf`/`loca`). Vendored implementation lets us keep the engine
+//! dependency-free; missing or unsupported tables fall back gracefully so the
+//! editor still loads with a bitmap font.
+//!
+//! Every table-record field is `pub` so tests can probe the parse, and the
+//! set rotates as the parser grows. Allowing `missing_docs` keeps the field
+//! churn cheap; user code should reach for [`TtfFont`](crate::TtfFont)
+//! instead of this module.
+#![allow(missing_docs)]
+
 use std::collections::HashMap;
 
 // --- Byte helpers (big-endian) ---

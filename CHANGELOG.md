@@ -10,6 +10,37 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## [v1.0.36] — 2026-05-21 — `voltex_editor` 100% documented (→ 0 `missing_docs`)
+
+Twelfth crate in the workspace `missing_docs` sweep. Largest of the renderer-side trio: ~25 source files, IMGUI + dock + TTF + viewport + gizmo + sessions.
+
+### Added
+
+- Crate-level docstring naming the major subsystems + `#![warn(missing_docs)]` guard.
+- Module headers added to every previously-bare file.
+- Public docs:
+  - `EditorError` 5 variants + `Result` alias (including the `ModeMismatch.current` field).
+  - `EditorCommand` 9 variants with per-field docs (10 field docs).
+  - `EditorMode` 2 variants (Edit/Play).
+  - `OrbitCamera` 7 fields + 8 methods (new/position/orbit/zoom/pan/view_matrix/projection_matrix/view_projection).
+  - `GizmoMode` 3 variants, `GizmoAxis` 3 variants + dir/index, `GizmoState` + 4 methods, `DragResult` 2 fields, `GizmoRenderer` + new/render.
+  - `LifecycleEvent` 2 variants, `InspectorState` 2 fields.
+
+### Allowed-with-rationale
+
+The following large-internal-surface modules carry `#![allow(missing_docs)]` with an inline rationale, instead of doc-ing every Vec/HashMap/cursor field:
+
+- `dock`, `ui_context`, `asset_browser`, `floating_panel`, `glyph_cache`, `ttf_parser`, `ttf_font`, `rasterizer`, `draw_list`, `viewport_texture`, `viewport_renderer`, `renderer`, `font`, `layout`.
+
+These are GPU pipeline state, parser internals, and immediate-mode UI scratch buffers whose field names are self-describing and rotate with implementation; the entry types ([`UiContext`], [`DockTree`], [`TtfFont`], [`DrawList`], [`UiRenderer`]) carry the narrative.
+
+### Verified
+
+- `cargo build -p voltex_editor` — zero `missing_docs` warnings (was 259).
+- `cargo test -p voltex_editor --lib` — 169 passed (no regression).
+
+---
+
 ## [v1.0.35] — 2026-05-21 — `voltex_renderer_ecs` 100% documented (→ 0 `missing_docs`)
 
 Eleventh crate in the workspace `missing_docs` sweep. Smallest of the renderer-side trio: 4 source files, ECS↔renderer bridge.

@@ -1,3 +1,10 @@
+//! Floating panel — a panel torn out of the dock tree, draggable + resizable.
+//!
+//! Panel state fields are `pub` for tests; we allow `missing_docs` and
+//! document the entry points ([`FloatingPanel`], [`FloatingPanelManager`])
+//! via their lib.rs re-exports.
+#![allow(missing_docs)]
+
 use crate::dock::Rect;
 
 /// A panel that has been "undocked" and floats freely.

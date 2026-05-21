@@ -1,3 +1,20 @@
+//! # voltex_editor
+//!
+//! Immediate-mode editor stack on top of `voltex_renderer`:
+//!
+//! - UI: [`UiContext`] + [`DrawList`] + [`UiRenderer`] (host-side commands,
+//!   wgpu pipeline). [`widgets`] provides text/button/slider/checkbox/panel
+//!   primitives.
+//! - Layout: [`DockTree`] binary-split layout + [`FloatingPanel`].
+//! - 3D scene: [`OrbitCamera`], [`ViewportRenderer`] + [`ViewportTexture`],
+//!   [`pick_entity`] sphere picking, [`gizmo`] translate/rotate/scale handles.
+//! - Fonts: [`FontAtlas`] (bitmap), [`TtfFont`] + [`ttf_parser`] + [`rasterizer`]
+//!   + [`glyph_cache`] for TrueType.
+//! - Editor sessions: [`EditorSession`] + [`EditorCommand`] + Undo/Redo +
+//!   jsonl autosave.
+
+#![warn(missing_docs)]
+
 pub mod error;
 pub mod font;
 pub mod draw_list;

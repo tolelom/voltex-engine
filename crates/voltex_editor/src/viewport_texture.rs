@@ -1,7 +1,15 @@
+//! Off-screen render target used by the editor's 3D scene viewport — color +
+//! depth attachments, sized to match the viewport panel.
+#![allow(missing_docs)]
+
+/// Color attachment format used by the viewport's offscreen target.
 pub const VIEWPORT_COLOR_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8Unorm;
+/// Depth attachment format used by the viewport's offscreen target.
 pub const VIEWPORT_DEPTH_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth32Float;
 
+/// Pair of color + depth offscreen textures plus a sampled view for compositing.
 pub struct ViewportTexture {
+    /// Color attachment (Rgba8Unorm).
     pub color_texture: wgpu::Texture,
     pub color_view: wgpu::TextureView,
     pub depth_texture: wgpu::Texture,

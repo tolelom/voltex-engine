@@ -1,3 +1,7 @@
+//! UI renderer — uploads a [`DrawList`] to wgpu buffers and emits per-frame
+//! draw calls behind the textured-quad UI pipeline.
+#![allow(missing_docs)]
+
 use wgpu::util::DeviceExt;
 
 use crate::draw_list::{DrawList, DrawVertex};

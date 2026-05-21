@@ -1,3 +1,7 @@
+//! TrueType glyph rasteriser — converts a parsed [`GlyphOutline`] into a
+//! grayscale coverage bitmap used by the glyph atlas.
+#![allow(missing_docs)]
+
 use crate::ttf_parser::GlyphOutline;
 
 /// Result of rasterizing a single glyph.

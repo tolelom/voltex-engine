@@ -1,5 +1,9 @@
+//! Crate-wide error type and `Result` alias for `voltex_editor`.
+
 use voltex_ecs::Entity;
 
+/// All errors produced by `voltex_editor` operations (command dispatch,
+/// scene IO, mode validation).
 #[derive(Debug, Clone, PartialEq, thiserror::Error)]
 pub enum EditorError {
     /// String 메시지를 그대로 보존하는 generic variant (마이그레이션 호환).
@@ -22,7 +26,10 @@ pub enum EditorError {
     /// Policy: Play mode is read-only from the user's command surface; only
     /// systems registered via lifecycle callbacks may mutate the World.
     #[error("dispatch rejected: current mode is {current:?}")]
-    ModeMismatch { current: crate::session::EditorMode },
+    ModeMismatch {
+        /// The editor mode that rejected the dispatch.
+        current: crate::session::EditorMode,
+    },
 }
 
 impl From<String> for EditorError {

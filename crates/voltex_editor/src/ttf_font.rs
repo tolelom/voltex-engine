@@ -1,3 +1,7 @@
+//! High-level TrueType font — parser + glyph rasteriser + glyph cache,
+//! wrapped behind a single `text_quads(...)` API.
+#![allow(missing_docs)]
+
 use crate::ttf_parser::TtfParser;
 use crate::rasterizer::rasterize;
 use crate::glyph_cache::{GlyphCache, GlyphInfo, ATLAS_SIZE};

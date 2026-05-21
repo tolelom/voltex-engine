@@ -1,3 +1,6 @@
+//! Bitmap font atlas — built-in 8x12 ASCII font used when no TTF is loaded.
+#![allow(missing_docs)]
+
 /// Bitmap font atlas for ASCII 32-126.
 /// 8x12 pixel glyphs arranged in 16 columns x 6 rows = 128x72 texture.
 pub struct FontAtlas {

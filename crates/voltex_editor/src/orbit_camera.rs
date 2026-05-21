@@ -1,3 +1,6 @@
+//! Orbit camera for the scene viewport — pitch/yaw + distance, mouse-drag
+//! orbit + middle-click pan + scroll zoom.
+
 use voltex_math::{Vec3, Mat4};
 use std::f32::consts::PI;
 
@@ -8,13 +11,21 @@ const ORBIT_SENSITIVITY: f32 = 0.005;
 const ZOOM_FACTOR: f32 = 0.1;
 const PAN_SENSITIVITY: f32 = 0.01;
 
+/// Orbit camera that pivots around a target point.
 pub struct OrbitCamera {
+    /// World-space point the camera orbits around.
     pub target: Vec3,
+    /// Distance from `target` to the eye, in world units.
     pub distance: f32,
+    /// Yaw in radians (rotation around the world Y axis).
     pub yaw: f32,
+    /// Pitch in radians (clamped near ±π/2 to avoid gimbal flip).
     pub pitch: f32,
+    /// Vertical field of view in radians.
     pub fov_y: f32,
+    /// Near clipping plane distance.
     pub near: f32,
+    /// Far clipping plane distance.
     pub far: f32,
 }
 
@@ -25,6 +36,7 @@ impl Default for OrbitCamera {
 }
 
 impl OrbitCamera {
+    /// New camera with sensible defaults (5-unit distance, slight downward pitch).
     pub fn new() -> Self {
         OrbitCamera {
             target: Vec3::ZERO,
@@ -37,6 +49,7 @@ impl OrbitCamera {
         }
     }
 
+    /// Eye position in world space, derived from yaw/pitch/distance/target.
     pub fn position(&self) -> Vec3 {
         let cp = self.pitch.cos();
         let sp = self.pitch.sin();
@@ -49,17 +62,21 @@ impl OrbitCamera {
         )
     }
 
+    /// Applies a mouse-drag orbit (`dx`/`dy` in pixels), clamping pitch.
     pub fn orbit(&mut self, dx: f32, dy: f32) {
         self.yaw += dx * ORBIT_SENSITIVITY;
         self.pitch += dy * ORBIT_SENSITIVITY;
         self.pitch = self.pitch.clamp(-PITCH_LIMIT, PITCH_LIMIT);
     }
 
+    /// Scroll-wheel zoom; positive `delta` zooms in, clamped to `[MIN,MAX]`.
     pub fn zoom(&mut self, delta: f32) {
         self.distance *= 1.0 - delta * ZOOM_FACTOR;
         self.distance = self.distance.clamp(MIN_DISTANCE, MAX_DISTANCE);
     }
 
+    /// Middle-drag pan — translates the target along the camera's
+    /// right/up axes by `(dx, dy)` scaled by distance.
     pub fn pan(&mut self, dx: f32, dy: f32) {
         let forward = (self.target - self.position()).normalize();
         let right = forward.cross(Vec3::Y);
@@ -70,14 +87,17 @@ impl OrbitCamera {
         self.target = self.target + offset_x + offset_y;
     }
 
+    /// View matrix from the current eye position looking at `target`.
     pub fn view_matrix(&self) -> Mat4 {
         Mat4::look_at(self.position(), self.target, Vec3::Y)
     }
 
+    /// Perspective projection matrix for the given viewport aspect.
     pub fn projection_matrix(&self, aspect: f32) -> Mat4 {
         Mat4::perspective(self.fov_y, aspect, self.near, self.far)
     }
 
+    /// Combined `proj * view`, ready to upload as a camera UBO.
     pub fn view_projection(&self, aspect: f32) -> Mat4 {
         self.projection_matrix(aspect).mul_mat4(&self.view_matrix())
     }

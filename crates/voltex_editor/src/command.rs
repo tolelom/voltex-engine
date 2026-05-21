@@ -18,34 +18,74 @@ pub enum EditorCommand {
     Spawn,
     /// Despawn `entity` and drop its components. Undoable since E3 —
     /// the session snapshots every registered component first.
-    Despawn { entity: Entity },
+    Despawn {
+        /// Entity to despawn.
+        entity: Entity,
+    },
     /// Replace `entity`'s Transform with the given values. If no Transform
     /// is currently attached, one is added.
     SetTransform {
+        /// Target entity.
         entity: Entity,
+        /// New world position.
         position: Vec3,
+        /// New Euler rotation (radians, XYZ).
         rotation: Vec3,
+        /// New scale.
         scale: Vec3,
     },
     /// Replace `entity`'s Tag with `tag`. Adds the component if missing.
-    SetTag { entity: Entity, tag: String },
+    SetTag {
+        /// Target entity.
+        entity: Entity,
+        /// New tag string.
+        tag: String,
+    },
     /// Attach `child` under `parent` (sets Parent on child, adds to Children).
     /// No-op (still Ok) if the relationship already exists. Fails if either
     /// entity is not alive.
-    AddChild { parent: Entity, child: Entity },
+    AddChild {
+        /// Parent entity.
+        parent: Entity,
+        /// Child entity to attach.
+        child: Entity,
+    },
     /// Detach `child` from `parent` (clears Parent on child, removes from
     /// parent's Children). No-op (still Ok) if not currently a child.
-    RemoveChild { parent: Entity, child: Entity },
+    RemoveChild {
+        /// Parent entity.
+        parent: Entity,
+        /// Child entity to detach.
+        child: Entity,
+    },
     /// Attach a registered component to `entity` by name + raw bytes (E3).
     /// `name` must match a `ComponentRegistry::register::<T>()` entry.
-    AddComponent { entity: Entity, name: String, data: Vec<u8> },
+    AddComponent {
+        /// Target entity.
+        entity: Entity,
+        /// Registered component name (`Component::NAME`).
+        name: String,
+        /// Serialized component payload.
+        data: Vec<u8>,
+    },
     /// Detach a registered component from `entity` by name (E3). No-op
     /// (still Ok) if the component is absent.
-    RemoveComponent { entity: Entity, name: String },
+    RemoveComponent {
+        /// Target entity.
+        entity: Entity,
+        /// Registered component name.
+        name: String,
+    },
     /// Serialize the world to `path` as JSON. Clears the undo history.
-    SaveScene { path: String },
+    SaveScene {
+        /// Destination path (resolved against the editor's working dir).
+        path: String,
+    },
     /// Read `path` as JSON and replace the world contents. Clears the undo history.
-    LoadScene { path: String },
+    LoadScene {
+        /// Source path (resolved against the editor's working dir).
+        path: String,
+    },
 }
 
 use voltex_ecs::{World, Transform};

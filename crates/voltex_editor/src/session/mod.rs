@@ -20,7 +20,9 @@ use voltex_math::Vec3;
 /// and lets systems (physics, scripts) drive the World instead.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EditorMode {
+    /// Edit mode — commands accepted, systems are paused.
     Edit,
+    /// Play mode — commands rejected (read-only surface); systems run.
     Play,
 }
 

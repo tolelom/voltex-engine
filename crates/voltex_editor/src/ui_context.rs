@@ -1,3 +1,11 @@
+//! Immediate-mode UI context — per-frame input + draw command building.
+//!
+//! Most fields on [`UiContext`] are `pub` because every widget mutates them;
+//! exhaustively documenting each is more noise than signal. We allow
+//! `missing_docs` at module scope; the entry type ([`crate::UiContext`])
+//! carries the narrative.
+#![allow(missing_docs)]
+
 use std::collections::HashMap;
 use crate::draw_list::DrawList;
 use crate::font::FontAtlas;

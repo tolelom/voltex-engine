@@ -13,21 +13,30 @@ use voltex_math::{Mat4, Vec3};
 
 pub use renderer::GizmoRenderer;
 
+/// Which kind of manipulation the gizmo performs.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum GizmoMode {
+    /// Translate (move) along an axis.
     Translate,
+    /// Rotate around an axis.
     Rotate,
+    /// Scale along an axis.
     Scale,
 }
 
+/// One of the three world-space axes the gizmo can act on.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum GizmoAxis {
+    /// X axis (red).
     X,
+    /// Y axis (green).
     Y,
+    /// Z axis (blue).
     Z,
 }
 
 impl GizmoAxis {
+    /// Unit-length world-space direction for this axis.
     pub fn dir(self) -> Vec3 {
         match self {
             GizmoAxis::X => Vec3::new(1.0, 0.0, 0.0),
@@ -35,6 +44,7 @@ impl GizmoAxis {
             GizmoAxis::Z => Vec3::new(0.0, 0.0, 1.0),
         }
     }
+    /// 0-based axis index (X=0, Y=1, Z=2).
     pub fn index(self) -> usize {
         match self {
             GizmoAxis::X => 0,
@@ -49,7 +59,9 @@ impl GizmoAxis {
 /// drag start (caller rolls World back to this so `dispatch` captures the
 /// correct inverse), `final_transform` is the value at drag end.
 pub struct DragResult {
+    /// Transform value at drag start (used to compute the inverse for undo).
     pub initial: Transform,
+    /// Transform value at drag end.
     pub final_transform: Transform,
 }
 
@@ -64,26 +76,32 @@ pub(crate) struct DragState {
     pub(crate) anchor: f32,
 }
 
+/// Persistent gizmo state — current mode + in-progress drag (if any).
 pub struct GizmoState {
+    /// Current gizmo mode (Translate / Rotate / Scale).
     pub mode: GizmoMode,
     pub(crate) drag: Option<DragState>,
 }
 
 impl GizmoState {
+    /// New gizmo state in [`GizmoMode::Translate`] with no active drag.
     pub fn new() -> Self {
         Self { mode: GizmoMode::Translate, drag: None }
     }
 
+    /// Switches mode if not currently mid-drag (drag-in-progress is preserved).
     pub fn set_mode(&mut self, mode: GizmoMode) {
         if self.drag.is_none() {
             self.mode = mode;
         }
     }
 
+    /// `true` if a drag is currently in progress.
     pub fn is_dragging(&self) -> bool {
         self.drag.is_some()
     }
 
+    /// Axis currently being dragged, or `None` if no drag is active.
     pub fn active_axis(&self) -> Option<GizmoAxis> {
         self.drag.as_ref().map(|d| d.axis)
     }

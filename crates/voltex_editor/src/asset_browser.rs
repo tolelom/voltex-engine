@@ -1,3 +1,10 @@
+//! Asset browser panel — filesystem tree view with click-to-navigate folders.
+//!
+//! State fields (current path, selection, expanded entries) are `pub` so
+//! tests can introspect; we allow `missing_docs` and keep the narrative in
+//! the [`asset_browser_panel`] entry point.
+#![allow(missing_docs)]
+
 use std::path::PathBuf;
 use crate::ui_context::UiContext;
 use crate::dock::Rect;

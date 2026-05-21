@@ -43,6 +43,7 @@ struct CameraUniform {
 
 const MAX_VERTS: usize = 2048;
 
+/// wgpu pipeline that draws the translate/rotate/scale gizmo handles.
 pub struct GizmoRenderer {
     pipeline: wgpu::RenderPipeline,
     camera_buffer: wgpu::Buffer,
@@ -51,6 +52,7 @@ pub struct GizmoRenderer {
 }
 
 impl GizmoRenderer {
+    /// Creates the gizmo pipeline targeting the given color + depth formats.
     pub fn new(
         device: &wgpu::Device,
         target_format: wgpu::TextureFormat,
@@ -151,6 +153,7 @@ impl GizmoRenderer {
         Self { pipeline, camera_buffer, bind_group, vertex_buffer }
     }
 
+    /// Renders the gizmo handles into `target_view` for the given state.
     #[allow(clippy::too_many_arguments)]
     pub fn render(
         &self,

@@ -1,3 +1,7 @@
+//! Renders a [`ViewportTexture`](crate::ViewportTexture)'s color attachment
+//! as a textured quad inside the UI pipeline.
+#![allow(missing_docs)]
+
 use bytemuck::{Pod, Zeroable};
 
 #[repr(C)]

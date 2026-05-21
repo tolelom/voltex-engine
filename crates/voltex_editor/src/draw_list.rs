@@ -1,3 +1,11 @@
+//! Host-side draw command buffer. Records vertices + draw commands that
+//! [`UiRenderer`](crate::UiRenderer) flushes to wgpu each frame.
+//!
+//! Vertex / command field schemas are GPU-facing structs whose layout the
+//! wgpu pipeline depends on. We allow `missing_docs` here and keep the
+//! narrative on the entry types ([`DrawVertex`], [`DrawCommand`], [`DrawList`]).
+#![allow(missing_docs)]
+
 use bytemuck::{Pod, Zeroable};
 use crate::font::FontAtlas;
 

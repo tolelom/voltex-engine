@@ -4,6 +4,7 @@
 
 use voltex_ecs::World;
 
+/// Edit↔Play transition kinds passed to a [`LifecycleCallback`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LifecycleEvent {
     /// Fired right after the editor transitions Edit → Play, with the

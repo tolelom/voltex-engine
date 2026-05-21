@@ -1,3 +1,6 @@
+//! Immediate-mode widgets — text/button/slider/checkbox/panel/text_input/drag,
+//! implemented as methods on [`UiContext`](crate::UiContext).
+
 mod controls;
 mod containers;
 mod text_input;
