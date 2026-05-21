@@ -27,10 +27,15 @@ use std::sync::{Mutex, OnceLock};
 /// strictly *above* the configured level.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Level {
+    /// Errors — almost-fatal conditions you always want logged.
     Error = 0,
+    /// Warnings — recoverable misconfigurations.
     Warn = 1,
+    /// Informational — startup/shutdown, infrequent state changes.
     Info = 2,
+    /// Debug — verbose diagnostics, off by default.
     Debug = 3,
+    /// Trace — extremely verbose tracing, almost always off.
     Trace = 4,
 }
 
@@ -185,6 +190,7 @@ macro_rules! log_error {
     }};
 }
 
+/// Log at Warn level. Skips argument formatting when filtered out.
 #[macro_export]
 macro_rules! log_warn {
     ($($arg:tt)*) => {{
@@ -198,6 +204,7 @@ macro_rules! log_warn {
     }};
 }
 
+/// Log at Info level. Skips argument formatting when filtered out.
 #[macro_export]
 macro_rules! log_info {
     ($($arg:tt)*) => {{
@@ -211,6 +218,7 @@ macro_rules! log_info {
     }};
 }
 
+/// Log at Debug level. Skips argument formatting when filtered out.
 #[macro_export]
 macro_rules! log_debug {
     ($($arg:tt)*) => {{
@@ -224,6 +232,7 @@ macro_rules! log_debug {
     }};
 }
 
+/// Log at Trace level. Skips argument formatting when filtered out.
 #[macro_export]
 macro_rules! log_trace {
     ($($arg:tt)*) => {{

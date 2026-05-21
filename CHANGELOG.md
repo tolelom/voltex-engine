@@ -10,6 +10,27 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## [v1.0.28] — 2026-05-21 — `voltex_runtime` 100% documented (→ 0 `missing_docs`)
+
+Tenth crate in the workspace `missing_docs` sweep. Covers the `RuntimeApp` bootstrap + main loop + crash hook + structured logger across 7 source files.
+
+### Added
+
+- `#![warn(missing_docs)]` guard at the crate root (crate docstring already existed).
+- Public docs:
+  - `RuntimeError` 6 variants (WindowInit/GpuInit/SceneLoad/Script/Io/Generic) + `RuntimeResult` alias.
+  - `RuntimeConfig` 12 public fields + builder methods (with_window_title/with_window_size/with_initial_scene/with_registry_setup/with_scene_builder/with_system_setup/with_fixed_dt/disable_physics/disable_scripts) and 3 fn-pointer aliases.
+  - `RuntimeApp` 11 public fields + `user_system_count` / `input_system_count`.
+  - `Level` 5 variants (Error/Warn/Info/Debug/Trace).
+  - 4 missing log macro doc comments (log_warn/log_info/log_debug/log_trace).
+
+### Verified
+
+- `cargo build -p voltex_runtime` — zero `missing_docs` warnings.
+- `cargo test -p voltex_runtime --lib` — 36 passed (no regression).
+
+---
+
 ## [v1.0.27] — 2026-05-21 — `voltex_script` 100% documented (→ 0 `missing_docs`)
 
 Ninth crate in the workspace `missing_docs` sweep. Covers LuaState wrapper + script instance pool + system integration + engine API + Lua C FFI bindings across 11 source files.

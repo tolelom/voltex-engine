@@ -46,18 +46,29 @@ type UserSystem = Box<dyn FnMut(&mut World, f32) + 'static>;
 /// without requiring a full `InputState as ECS resource` abstraction (v1.1).
 type InputSystem = Box<dyn FnMut(&mut World, &InputState, f32) + 'static>;
 
+/// The runtime's top-level application object. Owns the ECS world, asset
+/// stores, schedulers, and the main loop integration with `winit`/`wgpu`.
 pub struct RuntimeApp {
     pub(crate) runtime_state: Option<RuntimeState>,
     user_systems: Vec<UserSystem>,
     input_systems: Vec<InputSystem>,
+    /// Polling file watcher used for script / scene hot reload.
     pub file_watcher: FileWatcher,
+    /// Fixed-step timer driving update / render dt.
     pub timer: GameTimer,
+    /// Aggregated input state (keyboard + mouse + scroll), refreshed each frame.
     pub input: InputState,
+    /// Physics tuning knobs (gravity, fixed_dt, solver iterations).
     pub physics_config: PhysicsConfig,
+    /// Pool of loaded Lua interpreters keyed by script path.
     pub script_pool: ScriptInstancePool,
+    /// GPU-resident mesh + material storage shared with the renderer.
     pub assets: RenderAssets,
+    /// Component registry used for scene (de)serialisation.
     pub registry: ComponentRegistry,
+    /// The ECS world the runtime ticks each frame.
     pub world: World,
+    /// The configuration passed to [`RuntimeApp::new`].
     pub config: RuntimeConfig,
 }
 
@@ -137,6 +148,7 @@ impl RuntimeApp {
         self.user_systems.push(Box::new(system));
     }
 
+    /// Number of registered user systems (excluding input systems).
     pub fn user_system_count(&self) -> usize {
         self.user_systems.len()
     }
@@ -151,6 +163,7 @@ impl RuntimeApp {
         self.input_systems.push(Box::new(system));
     }
 
+    /// Number of registered input systems.
     pub fn input_system_count(&self) -> usize {
         self.input_systems.len()
     }

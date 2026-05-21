@@ -1,3 +1,5 @@
+#![warn(missing_docs)]
+
 //! voltex_runtime — standard bootstrap + main loop + default system wiring.
 //!
 //! ```ignore

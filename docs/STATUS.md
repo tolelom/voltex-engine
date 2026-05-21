@@ -173,6 +173,23 @@
 
 v1.0.9 부터는 **서비스 배포 완성도** 로드맵 (`docs/superpowers/specs/2026-05-21-service-readiness-roadmap.md`) 기준으로 진행.
 
+### v1.0.28 (2026-05-21) — voltex_runtime 100% missing_docs + `#![warn(missing_docs)]`
+
+열 번째 crate. 7 파일 (app/config/crash/error/handler/log + lib).
+
+**작업**:
+- `#![warn(missing_docs)]` 추가 (crate-level //! 는 이미 존재).
+- Public API:
+  - `RuntimeError` 6 variant + `RuntimeResult` alias
+  - `RuntimeConfig` 12 field + 9 builder method + 3 fn-pointer alias
+  - `RuntimeApp` 11 field + user_system_count/input_system_count
+  - `Level` 5 variant
+  - log_warn/log_info/log_debug/log_trace macro 4개 doc
+
+**검증**:
+- `cargo build -p voltex_runtime` — 0 missing_docs warning.
+- `cargo test -p voltex_runtime --lib` — 36 통과.
+
 ### v1.0.27 (2026-05-21) — voltex_script 100% missing_docs + `#![warn(missing_docs)]`
 
 아홉 번째 crate. 11 파일 (LuaState/bindings/engine_api/instance/pool/system + ffi/sandbox/coroutine).

@@ -7,8 +7,11 @@ use std::path::PathBuf;
 use voltex_ecs::{ComponentRegistry, World};
 use voltex_platform::WindowConfig;
 
+/// Boxed closure that augments the [`ComponentRegistry`] during boot.
 pub type RegistrySetupFn = Box<dyn FnOnce(&mut ComponentRegistry)>;
+/// Boxed closure that populates the initial scene World.
 pub type SceneBuilderFn = Box<dyn FnOnce(&mut World, &mut ComponentRegistry)>;
+/// Boxed closure that runs after default systems are registered to add custom ones.
 pub type SystemSetupFn = Box<dyn FnOnce(&mut crate::app::RuntimeApp)>;
 /// Callback that runs once on first `resumed`, after `GpuContext` and
 /// `BasicRenderer` exist. Use this to upload meshes to `RenderAssets` and
@@ -19,17 +22,25 @@ pub type GpuInitFn =
 
 /// All knobs `RuntimeApp` exposes. Builder methods return `Self` for chaining.
 pub struct RuntimeConfig {
+    /// Window configuration (title, size, fullscreen, vsync).
     pub window: WindowConfig,
+    /// Path of a `.vscn` scene to load on boot, or `None`.
     pub initial_scene: Option<String>,
+    /// Optional callback to register custom components on the registry.
     pub register_components: Option<RegistrySetupFn>,
+    /// Optional callback to build the initial scene World.
     pub build_scene: Option<SceneBuilderFn>,
+    /// Optional callback to register custom systems after defaults.
     pub setup_systems: Option<SystemSetupFn>,
+    /// Optional callback that runs once after GPU init (uploads meshes etc.).
     pub gpu_init: Option<GpuInitFn>,
     /// When `Some(dt)`, every frame's update step is forced to that delta —
     /// useful for deterministic playback. When `None`, the wallclock-derived
     /// `GameTimer::frame_dt` is used.
     pub fixed_dt: Option<f32>,
+    /// Enable the physics solver step in the default schedule.
     pub enable_physics: bool,
+    /// Enable Lua script start/update systems in the default schedule.
     pub enable_scripts: bool,
     /// Optional virtual filesystem to consult first when loading scenes /
     /// scripts. When `None`, paths are read directly from disk.
@@ -64,26 +75,31 @@ impl Default for RuntimeConfig {
 }
 
 impl RuntimeConfig {
+    /// New config with engine defaults.
     pub fn new() -> Self {
         Self::default()
     }
 
+    /// Sets the window title.
     pub fn with_window_title(mut self, title: impl Into<String>) -> Self {
         self.window.title = title.into();
         self
     }
 
+    /// Sets the window pixel size.
     pub fn with_window_size(mut self, width: u32, height: u32) -> Self {
         self.window.width = width;
         self.window.height = height;
         self
     }
 
+    /// Loads the named `.vscn` file at boot.
     pub fn with_initial_scene(mut self, path: impl Into<String>) -> Self {
         self.initial_scene = Some(path.into());
         self
     }
 
+    /// Registers a callback to add custom components to the registry on boot.
     pub fn with_registry_setup<F>(mut self, f: F) -> Self
     where
         F: FnOnce(&mut ComponentRegistry) + 'static,
@@ -92,6 +108,7 @@ impl RuntimeConfig {
         self
     }
 
+    /// Registers a callback to populate the initial scene World.
     pub fn with_scene_builder<F>(mut self, f: F) -> Self
     where
         F: FnOnce(&mut World, &mut ComponentRegistry) + 'static,
@@ -100,6 +117,7 @@ impl RuntimeConfig {
         self
     }
 
+    /// Registers a callback that adds custom systems after defaults.
     pub fn with_system_setup<F>(mut self, f: F) -> Self
     where
         F: FnOnce(&mut crate::app::RuntimeApp) + 'static,
@@ -119,16 +137,19 @@ impl RuntimeConfig {
         self
     }
 
+    /// Forces a fixed timestep `dt` (seconds) — useful for deterministic playback.
     pub fn with_fixed_dt(mut self, dt: f32) -> Self {
         self.fixed_dt = Some(dt);
         self
     }
 
+    /// Removes physics_step from the default schedule.
     pub fn disable_physics(mut self) -> Self {
         self.enable_physics = false;
         self
     }
 
+    /// Removes Lua script systems from the default schedule.
     pub fn disable_scripts(mut self) -> Self {
         self.enable_scripts = false;
         self
