@@ -22,6 +22,9 @@ on:
   pull_request:
     branches: [master]
   workflow_dispatch:
+  schedule:
+    # Nightly E2E quickstart safety net (UTC 18:00 ≈ KST 03:00 ≈ low-traffic).
+    - cron: "0 18 * * *"
 
 env:
   CARGO_TERM_COLOR: always
@@ -128,6 +131,35 @@ jobs:
         run: |
           chmod +x scripts/check_changelog.sh
           ./scripts/check_changelog.sh "origin/${{ github.base_ref }}" "HEAD"
+
+  # E2E `voltex new → voltex build` smoke test. Heavy (~60s release build of
+  # the entire engine), so it does not run on every push — only on
+  # workflow_dispatch (manual) and on schedule (nightly safety net). Catches
+  # the kinds of regressions v1.0.3/v1.0.9 only surfaced after-the-fact, where
+  # the quickstart flow looked fine in unit tests but broke in production.
+  e2e-quickstart:
+    name: e2e new+build (ubuntu-latest, advisory)
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install Linux audio dev headers (ALSA)
+        run: sudo apt-get update && sudo apt-get install -y libasound2-dev
+      - name: Cache cargo registry + target
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-e2e-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-e2e-
+            ${{ runner.os }}-cargo-
+      - name: cargo test --test e2e_new_build -- --ignored
+        run: cargo test -p voltex_cli --test e2e_new_build -- --ignored --nocapture
 
   # Non-blocking cargo-deny job — sweeps RUSTSEC advisories, license drift,
   # duplicate semver-incompatible versions, and disallowed crate sources.

@@ -173,6 +173,22 @@
 
 v1.0.9 부터는 **서비스 배포 완성도** 로드맵 (`docs/superpowers/specs/2026-05-21-service-readiness-roadmap.md`) 기준으로 진행.
 
+### v1.0.31 (2026-05-21) — E2E `voltex new → build` 테스트 + nightly CI
+
+P0. quickstart 흐름이 v1.0.3 / v1.0.9 처럼 우연히 발견되던 패턴을 자동화로 전환.
+
+**신규**:
+- `crates/voltex_cli/tests/e2e_new_build.rs` — `env!("CARGO_BIN_EXE_voltex")` 로 binary 실행 → 임시 scratch dir 에 `voltex new` → `voltex build --engine-path <workspace_root>` → dist exe + v1.0.12 라이선스 번들 존재 확인. `#[ignore]` (engine 전체 release build 라 50~60s).
+- `.github/workflows/ci.yml`:
+  - `e2e-quickstart` job — `workflow_dispatch` (수동) + `schedule` (매일 18:00 UTC) 트리거. advisory (`continue-on-error`).
+  - top-level `on:` 에 `schedule: cron "0 18 * * *"` 추가.
+
+**검증**:
+- 기본 `cargo test`: `1 ignored` (skip 작동).
+- `cargo test ... -- --ignored --nocapture`: 1 passed in 52.17s. dist 의 exe + LICENSE-MIT/APACHE 둘 다 생성됨 확인.
+
+**한계**: CI 캐시 cold 상태에서 5분+ 가능. advisory 로 두고 GA / kid 패턴 관찰 후 blocking 승격.
+
 ### v1.0.30 (2026-05-21) — CHANGELOG entry enforcement
 
 P1. autonomous-push workflow 에 PR 리뷰가 없어서 release-note 빠짐을 memory 에 의존하던 문제 해결.

@@ -90,7 +90,8 @@
 | 19 | v1.0.27 voltex_script missing_docs →0 | `[✅]` | (inline STATUS § v1.0.27) | 5111bb1 |
 | 20 | v1.0.28 voltex_runtime missing_docs →0 | `[✅]` | (inline STATUS § v1.0.28) | e0fa667 |
 | 21 | v1.0.29 cargo-deny integration | `[✅]` | (inline STATUS § v1.0.29) | 0907618 |
-| 22 | v1.0.30 CHANGELOG enforcement | `[✅]` | (inline STATUS § v1.0.30) | (pending commit) |
+| 22 | v1.0.30 CHANGELOG enforcement | `[✅]` | (inline STATUS § v1.0.30) | 9086db1 |
+| 23 | v1.0.31 E2E new+build test | `[✅]` | (inline STATUS § v1.0.31) | (pending commit) |
 | 7 | v1.0.15 cargo-deny | `[ ]` | — | — |
 | 8 | v1.0.16 CHANGELOG enforcement | `[ ]` | — | — |
 | 9 | v1.0.17 SemVer check | `[ ]` | — | — |

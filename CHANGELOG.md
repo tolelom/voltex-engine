@@ -10,6 +10,30 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## [v1.0.31] — 2026-05-21 — E2E `voltex new → build` test + nightly CI
+
+P0 service-readiness item. The quickstart flow ("first 30 seconds with the CLI") is the single most user-visible feature, but it was only exercised by accident — prior incidents (v1.0.3 manifest validation, v1.0.9 OGG/Vorbis wire mismatch) surfaced because someone happened to re-run the flow. This cycle adds an automated regression detector.
+
+### Added
+
+- `crates/voltex_cli/tests/e2e_new_build.rs` — integration test that invokes the `voltex` binary (via `env!("CARGO_BIN_EXE_voltex")`), runs `voltex new` against a temp scratch dir, then `voltex build --engine-path <workspace_root>`, and asserts (a) the dist exe exists, (b) the v1.0.12 license bundle is intact. Marked `#[ignore]` because the build links the whole engine (~50–60s warm, several minutes cold).
+- `.github/workflows/ci.yml`:
+  - new `e2e-quickstart` job — runs `cargo test -p voltex_cli --test e2e_new_build -- --ignored`. Triggers on `workflow_dispatch` (manual) and `schedule` (nightly 18:00 UTC). Advisory (`continue-on-error: true`) while we tune cache behavior.
+  - top-level `on:` gained `schedule: - cron: "0 18 * * *"` (nightly).
+
+### Verified
+
+- `cargo test -p voltex_cli --test e2e_new_build` — 1 ignored, 0 failed (default skip works).
+- `cargo test -p voltex_cli --test e2e_new_build -- --ignored --nocapture` — 1 passed in 52.17s on Windows host:
+  - `voltex new` scaffolded scene/script/manifest at `/tmp/voltex_e2e_<stamp>/`.
+  - `voltex build --engine-path .` produced `dist/voltex_e2e_<stamp>.exe` and bundled 3 license files.
+
+### Notes
+
+The test uses the scratch dir's basename as the project name (since `voltex new` derives it from `file_name()`). The exe assertion reads the actual name from the generated `voltex.toml` for robustness against future scaffold-name changes.
+
+---
+
 ## [v1.0.30] — 2026-05-21 — CHANGELOG entry enforcement
 
 P1 service-readiness item. Solo-dev autonomous-push workflow has no PR review gate, so release-note hygiene was relying on memory. Now enforced by hook + CI.
