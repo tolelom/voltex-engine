@@ -14,12 +14,31 @@ pub struct Ray {
 
 impl Ray {
     /// Construct a ray. The direction is normalised before storage —
-    /// callers can pass an unnormalised vector. Panics if direction is
-    /// the zero vector.
+    /// callers can pass an unnormalised vector.
+    ///
+    /// **Beware**: passing [`Vec3::ZERO`] does *not* panic — it stores
+    /// a NaN direction (see [`Vec3::normalize`]). Downstream code that
+    /// branches on `direction` (raycasts, picking) will then behave
+    /// unpredictably. Validate or use [`Ray::try_new`] when the
+    /// direction is computed from external data.
     pub fn new(origin: Vec3, direction: Vec3) -> Self {
         Self {
             origin,
             direction: direction.normalize(),
+        }
+    }
+
+    /// Construct a ray, returning `None` if `direction` is the zero
+    /// vector or has subnormal length. Prefer this over [`Ray::new`]
+    /// when the direction comes from untrusted or computed data.
+    pub fn try_new(origin: Vec3, direction: Vec3) -> Option<Self> {
+        if direction.length_squared() < f32::MIN_POSITIVE {
+            None
+        } else {
+            Some(Self {
+                origin,
+                direction: direction.normalize(),
+            })
         }
     }
 
@@ -52,5 +71,16 @@ mod tests {
         let r = Ray::new(Vec3::new(1.0, 2.0, 3.0), Vec3::X);
         let p = r.at(5.0);
         assert!(approx_vec(p, Vec3::new(6.0, 2.0, 3.0)));
+    }
+
+    #[test]
+    fn try_new_rejects_zero_direction() {
+        assert!(Ray::try_new(Vec3::ZERO, Vec3::ZERO).is_none());
+    }
+
+    #[test]
+    fn try_new_accepts_nonzero_direction() {
+        let r = Ray::try_new(Vec3::ZERO, Vec3::new(2.0, 0.0, 0.0)).expect("should succeed");
+        assert!(approx_vec(r.direction, Vec3::X));
     }
 }

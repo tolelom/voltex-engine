@@ -80,6 +80,14 @@ pub fn serialize_snapshot(snapshot: &Snapshot) -> Vec<u8> {
     buf
 }
 
+/// Maximum entity count we will accept in a single snapshot. Snapshots
+/// arrive over the network from potentially untrusted peers; a header
+/// declaring billions of entities used to overflow `count * ENTITY_SIZE`
+/// on 32-bit `usize` and could trigger huge `Vec::with_capacity`
+/// allocations on 64-bit. UDP datagrams are capped well below this in
+/// practice, so a 1 M ceiling is generous.
+const MAX_SNAPSHOT_ENTITIES: usize = 1_000_000;
+
 /// Deserialize a snapshot from binary data.
 pub fn deserialize_snapshot(data: &[u8]) -> crate::Result<Snapshot> {
     if data.len() < 8 {
@@ -88,7 +96,19 @@ pub fn deserialize_snapshot(data: &[u8]) -> crate::Result<Snapshot> {
     let tick = u32::from_le_bytes([data[0], data[1], data[2], data[3]]);
     let count = u32::from_le_bytes([data[4], data[5], data[6], data[7]]) as usize;
 
-    let expected = 8 + count * ENTITY_SIZE;
+    if count > MAX_SNAPSHOT_ENTITIES {
+        return Err(format!(
+            "Snapshot entity count {} exceeds limit {}",
+            count, MAX_SNAPSHOT_ENTITIES
+        ).into());
+    }
+
+    let body_size = count
+        .checked_mul(ENTITY_SIZE)
+        .ok_or("Snapshot body size overflow")?;
+    let expected = body_size
+        .checked_add(8)
+        .ok_or("Snapshot expected size overflow")?;
     if data.len() < expected {
         return Err(format!(
             "Snapshot data too short: expected {} bytes, got {}",
@@ -385,5 +405,27 @@ mod tests {
             diff_bytes.len(),
             full_bytes.len()
         );
+    }
+
+    #[test]
+    fn deserialize_snapshot_rejects_huge_entity_count() {
+        // Adversarial header claiming u32::MAX entities. Before the cap,
+        // `count * ENTITY_SIZE` overflowed on 32-bit and `Vec::with_capacity`
+        // could attempt a multi-GB allocation on 64-bit.
+        let mut bytes = vec![0u8; 8];
+        bytes[0..4].copy_from_slice(&0u32.to_le_bytes());        // tick
+        bytes[4..8].copy_from_slice(&u32::MAX.to_le_bytes());    // count = u32::MAX
+        let err = deserialize_snapshot(&bytes).unwrap_err().to_string();
+        assert!(err.contains("exceeds limit"), "unexpected error: {err}");
+    }
+
+    #[test]
+    fn deserialize_snapshot_rejects_truncated_body() {
+        // Header claims 2 entities but body is short.
+        let mut bytes = vec![0u8; 8];
+        bytes[0..4].copy_from_slice(&0u32.to_le_bytes());
+        bytes[4..8].copy_from_slice(&2u32.to_le_bytes()); // claims 2 entities
+        let err = deserialize_snapshot(&bytes).unwrap_err().to_string();
+        assert!(err.contains("too short"), "unexpected error: {err}");
     }
 }

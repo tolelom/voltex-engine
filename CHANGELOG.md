@@ -10,6 +10,53 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## [v1.0.41] — 2026-05-22 — NaN-source hardening (math) + snapshot deserialiser cap
+
+**Fix + additive**. v1.0.40 protected sort comparators from incoming NaN. v1.0.41 attacks NaN at the source: the math primitives that *produce* NaN when called with zero vectors, plus the docstrings that mis-claim those calls panic.
+
+### Fixed
+
+- **`Vec3::normalize` / `Vec2::normalize` docstrings.** Old text claimed "Panics if the input is the zero vector (division by zero)". Rust `f32 / 0.0` does not panic — it produces NaN (when numerator is also 0) or `±inf`. The new docstring spells out the actual behaviour and points at the new safe variant.
+- **`Ray::new` docstring.** Same correction. `Ray::new(_, Vec3::ZERO)` did not panic — it stored a NaN direction.
+- **`Mat4::look_at` docstring.** Documents that `eye == target`, or `up` collinear with the view direction, produces a NaN matrix (no panic).
+- **`voltex_net::snapshot::deserialize_snapshot` entity-count handling.** Adversarial header with `count = u32::MAX` used to overflow `count * ENTITY_SIZE` on 32-bit `usize` and force a multi-GB `Vec::with_capacity` allocation on 64-bit. Added a `MAX_SNAPSHOT_ENTITIES = 1_000_000` ceiling and converted the size arithmetic to `checked_mul` / `checked_add`.
+
+### Added
+
+- `Vec3::normalize_or_zero(self) -> Vec3` — returns `Vec3::ZERO` when `length²` is below `f32::MIN_POSITIVE`, otherwise behaves like `normalize`.
+- `Vec2::normalize_or_zero(self) -> Vec2` — same pattern.
+- `Ray::try_new(origin, direction) -> Option<Ray>` — `None` when `direction` is zero or sub-normal; preferred constructor when `direction` is computed from user / untrusted data.
+
+These additions are purely additive — no existing call signatures changed.
+
+### Tests
+
+`voltex_math` 39 → 48 (+9), `voltex_net` 47 → 49 (+2):
+
+- `voltex_math::vec3::tests::normalize_zero_produces_nan` (regression-pin for the documented bad behaviour)
+- `voltex_math::vec3::tests::normalize_or_zero_returns_zero_for_zero_input`
+- `voltex_math::vec3::tests::normalize_or_zero_matches_normalize_for_nonzero_input`
+- `voltex_math::vec3::tests::normalize_or_zero_handles_subnormal_length`
+- `voltex_math::vec2::tests::normalize_zero_produces_nan`
+- `voltex_math::vec2::tests::normalize_or_zero_returns_zero_for_zero_input`
+- `voltex_math::vec2::tests::normalize_or_zero_matches_normalize_for_nonzero_input`
+- `voltex_math::ray::tests::try_new_rejects_zero_direction`
+- `voltex_math::ray::tests::try_new_accepts_nonzero_direction`
+- `voltex_net::snapshot::tests::deserialize_snapshot_rejects_huge_entity_count`
+- `voltex_net::snapshot::tests::deserialize_snapshot_rejects_truncated_body`
+
+### Verification
+
+- `cargo build --workspace` — clean.
+- `cargo clippy --workspace --all-targets -- -D warnings` — 0 warnings.
+- `cargo test --workspace --lib` — every crate green.
+
+### Notes
+
+The ~30 existing `.normalize()` callsites (steering, gizmo, picking, csm, frustum, …) were *not* mass-migrated to `normalize_or_zero`. Each site has either a manual length-guard or a calling convention that excludes zero inputs; a blanket rewrite would mask context-specific assumptions. A targeted audit cycle is queued for v1.1+.
+
+---
+
 ## [v1.0.40] — 2026-05-22 — NaN-safe sort comparators + parser size hardening
 
 **Fix**. P0 robustness pass surfaced via static audit of `partial_cmp(...).unwrap()` callsites and arithmetic-overflow paths in the image parsers. Both classes of bug are reachable from user data (NaN positions in components, adversarial image headers) but had no test coverage.

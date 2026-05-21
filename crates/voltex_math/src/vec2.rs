@@ -40,12 +40,37 @@ impl Vec2 {
     }
 
     /// Returns a unit-length vector pointing in the same direction.
-    /// Panics if the input is the zero vector (division by zero).
+    ///
+    /// **Beware**: dividing an `f32` by 0 does not panic — it produces
+    /// `NaN` (when the numerator is also 0) or `±inf`. Passing
+    /// [`Vec2::ZERO`] therefore returns a NaN-filled vector which then
+    /// silently corrupts downstream computations.
+    ///
+    /// Use [`normalize_or_zero`](Self::normalize_or_zero) for the
+    /// NaN-safe version. (Earlier docstrings claimed this method
+    /// panicked on zero input; it does not.)
     pub fn normalize(self) -> Self {
         let len = self.length();
         Self {
             x: self.x / len,
             y: self.y / len,
+        }
+    }
+
+    /// NaN-safe normalisation. Returns [`Vec2::ZERO`] if the input is
+    /// the zero vector (or any vector with length below
+    /// [`f32::MIN_POSITIVE`]). Otherwise behaves like
+    /// [`normalize`](Self::normalize).
+    pub fn normalize_or_zero(self) -> Self {
+        let len_sq = self.length_squared();
+        if len_sq < f32::MIN_POSITIVE {
+            Self::ZERO
+        } else {
+            let len = len_sq.sqrt();
+            Self {
+                x: self.x / len,
+                y: self.y / len,
+            }
         }
     }
 }
@@ -116,5 +141,27 @@ mod tests {
         let n = v.normalize();
         assert!((n.length() - 1.0).abs() < 1e-6);
         assert_eq!(n, Vec2::new(1.0, 0.0));
+    }
+
+    #[test]
+    fn normalize_zero_produces_nan() {
+        // Documents the known-bad behaviour explicitly.
+        let n = Vec2::ZERO.normalize();
+        assert!(n.x.is_nan() && n.y.is_nan());
+    }
+
+    #[test]
+    fn normalize_or_zero_returns_zero_for_zero_input() {
+        assert_eq!(Vec2::ZERO.normalize_or_zero(), Vec2::ZERO);
+    }
+
+    #[test]
+    fn normalize_or_zero_matches_normalize_for_nonzero_input() {
+        let v = Vec2::new(3.0, 4.0);
+        let a = v.normalize();
+        let b = v.normalize_or_zero();
+        assert!((a.x - b.x).abs() < 1e-6);
+        assert!((a.y - b.y).abs() < 1e-6);
+        assert!((b.length() - 1.0).abs() < 1e-6);
     }
 }

@@ -130,6 +130,13 @@ impl Mat4 {
     /// - `eye`    — camera position
     /// - `target` — point the camera is looking at
     /// - `up`     — world up vector (usually `Vec3::Y`)
+    ///
+    /// **Beware**: if `eye == target` the forward vector becomes zero
+    /// and the internal `.normalize()` produces NaN (it does not
+    /// panic). Similarly, an `up` collinear with the forward direction
+    /// produces a zero right vector and NaN propagation. Callers
+    /// observing NaN matrices should validate `eye != target` and that
+    /// `up` is not parallel to `target - eye`.
     pub fn look_at(eye: Vec3, target: Vec3, up: Vec3) -> Self {
         let f = (target - eye).normalize(); // forward
         let r = f.cross(up).normalize();    // right

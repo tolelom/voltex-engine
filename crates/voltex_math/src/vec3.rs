@@ -57,13 +57,39 @@ impl Vec3 {
     }
 
     /// Returns a unit-length vector pointing in the same direction.
-    /// Panics if the input is the zero vector (division by zero).
+    ///
+    /// **Beware**: dividing an `f32` by 0 does not panic — it produces
+    /// `NaN` (when the numerator is also 0) or `±inf`. Passing
+    /// [`Vec3::ZERO`] therefore returns a NaN-filled vector which then
+    /// silently corrupts downstream computations.
+    ///
+    /// Use [`normalize_or_zero`](Self::normalize_or_zero) for the
+    /// NaN-safe version. (Earlier docstrings claimed this method
+    /// panicked on zero input; it does not.)
     pub fn normalize(self) -> Self {
         let len = self.length();
         Self {
             x: self.x / len,
             y: self.y / len,
             z: self.z / len,
+        }
+    }
+
+    /// NaN-safe normalisation. Returns [`Vec3::ZERO`] if the input is
+    /// the zero vector (or any vector with length below
+    /// [`f32::MIN_POSITIVE`]). Otherwise behaves like
+    /// [`normalize`](Self::normalize).
+    pub fn normalize_or_zero(self) -> Self {
+        let len_sq = self.length_squared();
+        if len_sq < f32::MIN_POSITIVE {
+            Self::ZERO
+        } else {
+            let len = len_sq.sqrt();
+            Self {
+                x: self.x / len,
+                y: self.y / len,
+                z: self.z / len,
+            }
         }
     }
 }
@@ -166,6 +192,40 @@ mod tests {
         let n = v.normalize();
         assert!((n.length() - 1.0).abs() < 1e-6);
         assert_eq!(n, Vec3::new(1.0, 0.0, 0.0));
+    }
+
+    #[test]
+    fn normalize_zero_produces_nan() {
+        // Documenting the known-bad behaviour explicitly so a future change
+        // doesn't silently flip semantics. f32::NAN != f32::NAN, hence is_nan().
+        let n = Vec3::ZERO.normalize();
+        assert!(n.x.is_nan() && n.y.is_nan() && n.z.is_nan());
+    }
+
+    #[test]
+    fn normalize_or_zero_returns_zero_for_zero_input() {
+        assert_eq!(Vec3::ZERO.normalize_or_zero(), Vec3::ZERO);
+    }
+
+    #[test]
+    fn normalize_or_zero_matches_normalize_for_nonzero_input() {
+        let v = Vec3::new(3.0, 4.0, 0.0);
+        let a = v.normalize();
+        let b = v.normalize_or_zero();
+        assert!((a.x - b.x).abs() < 1e-6);
+        assert!((a.y - b.y).abs() < 1e-6);
+        assert!((a.z - b.z).abs() < 1e-6);
+        assert!((b.length() - 1.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn normalize_or_zero_handles_subnormal_length() {
+        // A vector whose squared length underflows to 0 still triggers the
+        // safe branch.
+        let v = Vec3::new(1e-30, 0.0, 0.0);
+        let n = v.normalize_or_zero();
+        // length² < f32::MIN_POSITIVE in this case, so we return ZERO.
+        assert_eq!(n, Vec3::ZERO);
     }
 
     #[test]

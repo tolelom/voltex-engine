@@ -207,3 +207,5 @@
 - **CONTRIBUTING.md + git pre-commit hook** ✅ v1.0.14 — 4 파일 (.githooks/pre-commit, install.sh, install.ps1, CONTRIBUTING.md). bash syntax 검증. 한계: install.ps1 실 실행 검증 미실시 (개발 호스트 pwsh 부재), pre-commit fast (fmt) / pre-push slow (clippy+test) 분리 — v1.1+.
 - **NaN-safe sort comparators (6 callsites)** ✅ v1.0.40 — physics BVH/raycast/mesh_collider, editor rasterizer, renderer light_probes 의 `partial_cmp(...).unwrap()` 을 `unwrap_or(Ordering::Equal)` 로 교체. +5 회귀 테스트.
 - **Image parser size hardening (BMP/PNG/JPG)** ✅ v1.0.40 — zero-dim 거부 + 16384 max-dim cap + `checked_mul` 통일. +5 회귀 테스트. 한계: fuzz-driven coverage 는 v1.1+.
+- **Vec/Ray/Mat4 normalize 문서 거짓 + safe variant** ✅ v1.0.41 — `normalize_or_zero` (Vec2/Vec3), `Ray::try_new`. 기존 docstring 의 panic 주장 제거. 한계: 기존 30+ `.normalize()` 호출자 일괄 audit/교체는 v1.1+.
+- **Snapshot deserialiser 적대적 count 거부** ✅ v1.0.41 — `MAX_SNAPSHOT_ENTITIES = 1_000_000` + `checked_mul`/`checked_add`. +2 회귀 테스트.

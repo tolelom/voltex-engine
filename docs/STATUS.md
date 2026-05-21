@@ -173,6 +173,44 @@
 
 v1.0.9 부터는 **서비스 배포 완성도** 로드맵 (`docs/superpowers/specs/2026-05-21-service-readiness-roadmap.md`) 기준으로 진행.
 
+### v1.0.41 (2026-05-22) — NaN-source hardening (math) + snapshot deserialiser cap
+
+P0 robustness round 2. v1.0.40 가 정렬 단계의 NaN 패닉을 막았다면, v1.0.41 은 NaN 이 *어디서 나오는지* 를 추적해서 원천 차단.
+
+**1. Truthful normalise docstrings + safe variant** — `Vec3::normalize()` / `Vec2::normalize()` 의 docstring 이 "Panics if the input is the zero vector (division by zero)" 라고 거짓말 (f32 의 0/0 은 패닉이 아니라 silently NaN). Ray/look_at 도 동일.
+
+- `Vec3::normalize_or_zero(self) -> Vec3` 추가 — 길이² < `f32::MIN_POSITIVE` 면 `Vec3::ZERO` 반환
+- `Vec2::normalize_or_zero(self) -> Vec2` 추가 — 동일 패턴
+- `Ray::try_new(origin, direction) -> Option<Ray>` 추가 — direction 이 zero/sub-normal 이면 `None`
+- `Vec3::normalize`, `Vec2::normalize`, `Ray::new`, `Mat4::look_at` 4 항목의 docstring 을 truthful 하게 교체 (panic 주장 제거, NaN 동작 명시, 안전 변형 안내)
+
+이번 변경은 추가 (additive) 만 — 기존 호출자 동작 변경 0. v1.0.40 의 `.unwrap_or(Equal)` 보강이 마지막 방어선이고, v1.0.41 의 `normalize_or_zero` 가 첫 번째 방어선 (호출자가 zero-input 의 가능성을 미리 알면 채택).
+
+**2. Snapshot deserialiser entity-count cap** — `voltex_net::snapshot::deserialize_snapshot` 이 헤더의 entity count u32 그대로 신뢰. 적대적 peer 가 `count = u32::MAX` 를 보내면 32-bit `usize` 에서 `count * 40` 오버플로, 64-bit 에서 `Vec::with_capacity(u32::MAX)` 의 다중-GB 할당. UDP datagram 의 실제 상한과 무관.
+
+- `MAX_SNAPSHOT_ENTITIES = 1_000_000` 도입 — 초과시 친화적 에러
+- `count * ENTITY_SIZE` 와 `+ 8` 모두 `checked_mul` / `checked_add` 로 통일
+
+**검증**:
+- `cargo build --workspace` 클린
+- `cargo clippy --workspace --all-targets -- -D warnings` 0 워닝
+- 회귀 테스트 9개 추가 — voltex_math 39→48 (+9), voltex_net 47→49 (+2). 워크스페이스 전체 그린.
+
+**Tests added**:
+- `voltex_math::vec3::tests::normalize_zero_produces_nan` (문서화 회귀)
+- `voltex_math::vec3::tests::normalize_or_zero_returns_zero_for_zero_input`
+- `voltex_math::vec3::tests::normalize_or_zero_matches_normalize_for_nonzero_input`
+- `voltex_math::vec3::tests::normalize_or_zero_handles_subnormal_length`
+- `voltex_math::vec2::tests::normalize_zero_produces_nan` (문서화 회귀)
+- `voltex_math::vec2::tests::normalize_or_zero_returns_zero_for_zero_input`
+- `voltex_math::vec2::tests::normalize_or_zero_matches_normalize_for_nonzero_input`
+- `voltex_math::ray::tests::try_new_rejects_zero_direction`
+- `voltex_math::ray::tests::try_new_accepts_nonzero_direction`
+- `voltex_net::snapshot::tests::deserialize_snapshot_rejects_huge_entity_count`
+- `voltex_net::snapshot::tests::deserialize_snapshot_rejects_truncated_body`
+
+**한계**: 기존 normalize() 호출자 약 30 곳 (steering, gizmo, picking, csm, frustum 등) 은 컨텍스트에 따라 length-check 가드를 직접 가지고 있거나 호출 conditions 가 zero-input 을 배제. 일괄 normalize_or_zero 교체는 미실시 (호출자별 의미 검토 필요, v1.1+ audit cycle).
+
 ### v1.0.40 (2026-05-22) — NaN-safe sort comparators + parser size hardening
 
 P0 robustness. 정적 코드 감사에서 발견한 두 종류의 패닉 가능 경로 제거.
