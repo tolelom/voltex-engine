@@ -240,7 +240,9 @@ mod tests {
             "c0.b = {} expected ~{}", coeffs[0][2], expected_c0
         );
 
-        // All higher-order coefficients should be ~0
+        // All higher-order coefficients should be ~0.
+        // Indices k and ch are used in both the lookup and the assert message.
+        #[allow(clippy::needless_range_loop)]
         for k in 1..9 {
             for ch in 0..3 {
                 assert!(
@@ -319,7 +321,9 @@ mod tests {
         assert!(coeffs[0][1] > 0.0, "L0 G should be positive");
         assert!(coeffs[0][2] > 0.0, "L0 B should be positive");
 
-        // Verify coefficients are finite
+        // Verify coefficients are finite.
+        // Indices k and ch are used in both the lookup and the assert message.
+        #[allow(clippy::needless_range_loop)]
         for k in 0..9 {
             for ch in 0..3 {
                 assert!(
@@ -333,6 +337,7 @@ mod tests {
     #[test]
     fn test_pack_sh_coefficients() {
         let mut coeffs = [[0.0f32; 3]; 9];
+        #[allow(clippy::needless_range_loop)] // k indexes coeffs and computes the value.
         for k in 0..9 {
             coeffs[k] = [(k * 3) as f32, (k * 3 + 1) as f32, (k * 3 + 2) as f32];
         }

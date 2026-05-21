@@ -288,7 +288,7 @@ mod tests {
         asset_browser_panel(&mut ui, &mut browser, &rect);
         ui.end_frame();
 
-        assert!(ui.draw_list.commands.len() > 0);
+        assert!(!ui.draw_list.commands.is_empty());
 
         let _ = fs::remove_dir_all(&dir);
     }

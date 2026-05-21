@@ -496,8 +496,7 @@ impl ApplicationHandler for EditorDemoApp {
                         && !state.gizmo_dragging
                         && state.left_down_pos.map(|p| (p.0 - mx).abs() + (p.1 - my).abs() < 8.0).unwrap_or(false)
                         && vr.contains(mx, my)
-                    {
-                        if state.gizmo_state.try_begin_drag(
+                        && state.gizmo_state.try_begin_drag(
                             &mut state.session.world,
                             sel,
                             &vp,
@@ -507,7 +506,6 @@ impl ApplicationHandler for EditorDemoApp {
                         ) {
                             state.gizmo_dragging = true;
                         }
-                    }
                     if state.gizmo_dragging && !in_play {
                         state.gizmo_state.update_drag(
                             &mut state.session.world,

@@ -6,9 +6,6 @@ struct Position { x: f32, y: f32 }
 #[derive(Debug, PartialEq)]
 struct Velocity { dx: f32, dy: f32 }
 
-#[derive(Debug, PartialEq)]
-struct Name(String);
-
 #[test]
 fn clear_drops_all_entities_and_components() {
     let mut world = World::new();

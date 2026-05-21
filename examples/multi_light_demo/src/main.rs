@@ -80,7 +80,7 @@ fn camera_light_bind_group_layout(device: &wgpu::Device) -> wgpu::BindGroupLayou
 }
 
 fn align_up(size: u32, alignment: u32) -> u32 {
-    ((size + alignment - 1) / alignment) * alignment
+    size.div_ceil(alignment) * alignment
 }
 
 impl ApplicationHandler for MultiLightApp {

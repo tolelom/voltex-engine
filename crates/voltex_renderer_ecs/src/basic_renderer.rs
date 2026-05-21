@@ -33,7 +33,7 @@ impl BasicRenderer {
     ) -> Self {
         let alignment = device.limits().min_uniform_buffer_offset_alignment;
         let cam_size = std::mem::size_of::<CameraUniform>() as u32;
-        let aligned_size = ((cam_size + alignment - 1) / alignment) * alignment;
+        let aligned_size = cam_size.div_ceil(alignment) * alignment;
 
         let cl_layout = camera_light_bind_group_layout(device);
         let tex_layout = GpuTexture::bind_group_layout(device);

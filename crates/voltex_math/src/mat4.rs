@@ -210,7 +210,7 @@ impl Mat4 {
                     ci += 1;
                 }
             }
-            let sign = if (r + c) % 2 == 0 { 1.0 } else { -1.0 };
+            let sign = if (r + c).is_multiple_of(2) { 1.0 } else { -1.0 };
             sign * det3(
                 e(rows[0], cols[0]), e(rows[0], cols[1]), e(rows[0], cols[2]),
                 e(rows[1], cols[0]), e(rows[1], cols[1]), e(rows[1], cols[2]),
@@ -227,7 +227,10 @@ impl Mat4 {
         let inv_det = 1.0 / det;
 
         // inv(r, c) = cofactor(c, r) / det  (adjugate is transposed cofactor).
+        // The (r, c) indices are needed on both sides — enumerate() would
+        // hide the intent without removing the lookup.
         let mut out = [[0.0f32; 4]; 4];
+        #[allow(clippy::needless_range_loop)]
         for r in 0..4 {
             for c in 0..4 {
                 out[c][r] = cof(c, r) * inv_det;

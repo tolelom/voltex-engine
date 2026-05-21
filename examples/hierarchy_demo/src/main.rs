@@ -90,7 +90,7 @@ impl ApplicationHandler for HierarchyDemoApp {
         let uniform_alignment = gpu.device.limits().min_uniform_buffer_offset_alignment;
         let uniform_size = std::mem::size_of::<CameraUniform>() as u32;
         let aligned_size =
-            ((uniform_size + uniform_alignment - 1) / uniform_alignment) * uniform_alignment;
+            uniform_size.div_ceil(uniform_alignment) * uniform_alignment;
 
         // Parse OBJ
         let obj_src = include_str!("../../../assets/cube.obj");

@@ -170,15 +170,6 @@ mod tests {
         AudioClip::new(vec![value; frames], sample_rate, 1)
     }
 
-    fn make_stereo_clip(left: f32, right: f32, frames: usize, sample_rate: u32) -> AudioClip {
-        let mut samples = Vec::with_capacity(frames * 2);
-        for _ in 0..frames {
-            samples.push(left);
-            samples.push(right);
-        }
-        AudioClip::new(samples, sample_rate, 2)
-    }
-
     #[test]
     fn single_sound_volume() {
         let clips = vec![make_mono_clip(1.0, 100, 44100)];

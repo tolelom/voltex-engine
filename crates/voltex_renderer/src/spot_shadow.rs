@@ -117,7 +117,7 @@ mod tests {
         let near_point = Vec4::new(0.0, 0.0, -0.1, 1.0);
         let clip_near = vp.mul_vec4(near_point);
         let ndc_z_near = clip_near.z / clip_near.w;
-        assert!(ndc_z_near >= -0.1 && ndc_z_near <= 0.2,
+        assert!((-0.1..=0.2).contains(&ndc_z_near),
             "Near point NDC z should be ~0, got {}", ndc_z_near);
 
         // A point at far distance should have NDC z ~ 1

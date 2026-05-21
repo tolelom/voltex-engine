@@ -70,7 +70,7 @@ mod tests {
         while timer.should_fixed_update() {
             count += 1;
         }
-        assert!(count >= 5 && count <= 7, "Expected ~6 fixed updates, got {count}");
+        assert!((5..=7).contains(&count), "Expected ~6 fixed updates, got {count}");
     }
 
     #[test]
@@ -80,6 +80,6 @@ mod tests {
         timer.tick();
         while timer.should_fixed_update() {}
         let alpha = timer.alpha();
-        assert!(alpha >= 0.0 && alpha <= 1.0, "Alpha should be 0..1, got {alpha}");
+        assert!((0.0..=1.0).contains(&alpha), "Alpha should be 0..1, got {alpha}");
     }
 }

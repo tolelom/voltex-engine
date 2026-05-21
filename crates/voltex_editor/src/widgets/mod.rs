@@ -179,7 +179,7 @@ mod tests {
 
         // max_scroll = 300 - 100 = 200; scroll should be clamped
         let scroll = ctx.scroll_offsets.get(&1).copied().unwrap_or(0.0);
-        assert!(scroll >= 0.0 && scroll <= 200.0, "scroll={}", scroll);
+        assert!((0.0..=200.0).contains(&scroll), "scroll={}", scroll);
     }
 
     #[test]

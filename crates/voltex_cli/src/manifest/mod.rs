@@ -71,8 +71,7 @@ impl Manifest {
             .to_string();
 
         let build_section = toml.get("build");
-        let (scene, scripts, assets, window_title, window_size, targets) =
-            extract_build(build_section, &name)?;
+        let build = extract_build(build_section, &name)?;
 
         let mut target_overrides = HashMap::new();
         for (k, v) in toml.sections() {
@@ -84,14 +83,7 @@ impl Manifest {
 
         Ok(Manifest {
             project: ProjectInfo { name, version },
-            build: BuildConfig {
-                scene,
-                scripts,
-                assets,
-                window_title,
-                window_size,
-                targets,
-            },
+            build,
             target_overrides,
         })
     }
@@ -119,14 +111,7 @@ fn strip_glob(pattern: &str) -> &str {
 fn extract_build(
     section: Option<&TomlSection>,
     project_name: &str,
-) -> Result<(
-    String,
-    Vec<String>,
-    Vec<String>,
-    String,
-    (u32, u32),
-    Vec<String>,
-)> {
+) -> Result<BuildConfig> {
     let default_scene = "scene.vscn".to_string();
     let default_scripts = vec!["scripts/**/*.lua".to_string()];
     let default_assets = vec!["assets/**/*".to_string()];
@@ -135,14 +120,14 @@ fn extract_build(
     let default_targets = vec![host_triple().to_string()];
 
     let Some(s) = section else {
-        return Ok((
-            default_scene,
-            default_scripts,
-            default_assets,
-            default_title,
-            default_size,
-            default_targets,
-        ));
+        return Ok(BuildConfig {
+            scene: default_scene,
+            scripts: default_scripts,
+            assets: default_assets,
+            window_title: default_title,
+            window_size: default_size,
+            targets: default_targets,
+        });
     };
 
     let scene = s.get_string("scene").map(|s| s.to_string()).unwrap_or(default_scene);
@@ -170,7 +155,14 @@ fn extract_build(
         .get_string_array("targets")?
         .unwrap_or(default_targets);
 
-    Ok((scene, scripts, assets, window_title, window_size, targets))
+    Ok(BuildConfig {
+        scene,
+        scripts,
+        assets,
+        window_title,
+        window_size,
+        targets,
+    })
 }
 
 pub fn host_triple() -> &'static str {

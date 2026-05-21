@@ -36,7 +36,7 @@ pub fn collect_render_items(world: &mut World, assets: &RenderAssets) -> Vec<Ren
         let material = world
             .get::<MaterialHandle>(entity)
             .and_then(|h| assets.material(*h).copied())
-            .unwrap_or_else(MaterialUniform::new);
+            .unwrap_or_default();
 
         items.push(RenderItem {
             entity,

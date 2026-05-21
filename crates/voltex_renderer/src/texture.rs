@@ -465,7 +465,7 @@ mod tests {
     use super::*;
 
     fn make_bmp_24bit(width: u32, height: u32, pixel_bgr: [u8; 3]) -> Vec<u8> {
-        let row_size = ((24 * width + 31) / 32 * 4) as usize;
+        let row_size = ((24 * width).div_ceil(32) * 4) as usize;
         let pixel_data_size = row_size * height as usize;
         let file_size = 54 + pixel_data_size;
         let mut data = vec![0u8; file_size];

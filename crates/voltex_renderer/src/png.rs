@@ -419,7 +419,7 @@ mod tests {
         // First pixel: avg(0, 0) = 0, so unchanged
         assert_eq!(row[0], 10);
         // Second pixel (i=4): avg(row[0]=10, prev[4]=0) = 5, so 5+5=10
-        assert_eq!(row[4], 5u8.wrapping_add(((10u16 + 0u16) / 2) as u8));
+        assert_eq!(row[4], 5u8.wrapping_add((10u16 / 2) as u8));
     }
 
     #[test]

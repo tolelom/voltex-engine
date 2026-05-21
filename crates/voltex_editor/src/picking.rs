@@ -146,6 +146,7 @@ pub fn world_aabb_from_local(local: &AABB, world: &Mat4) -> AABB {
 ///
 /// Returns `None` if the mouse is outside the viewport rect, the matrix is
 /// singular, or no entity is hit.
+#[allow(clippy::too_many_arguments)] // Viewport rect + mouse + camera args are intrinsic to picking.
 pub fn pick_entity(
     world: &mut World,
     view_proj: &Mat4,

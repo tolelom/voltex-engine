@@ -401,7 +401,7 @@ mod tests {
             ("active", LuaValue::Bool(true)),
         ];
         lua.push_table(&pairs);
-        unsafe { crate::ffi::lua_setglobal(lua.state, b"tbl\0".as_ptr() as *const _); }
+        unsafe { crate::ffi::lua_setglobal(lua.state, c"tbl".as_ptr()); }
         lua.exec("result_name = tbl.name; result_val = tbl.value").unwrap();
         assert_eq!(lua.get_global_string("result_name"), Some("test".to_string()));
         assert_eq!(lua.get_global_number("result_val"), Some(42.0));
@@ -455,11 +455,11 @@ mod tests {
     fn test_vec3_named_roundtrip() {
         let lua = LuaState::new();
         lua.push_vec3([1.0, 2.5, 3.0]);
-        unsafe { crate::ffi::lua_setglobal(lua.state, b"v\0".as_ptr() as *const _); }
+        unsafe { crate::ffi::lua_setglobal(lua.state, c"v".as_ptr()); }
 
         // Read it back
         unsafe {
-            crate::ffi::lua_getglobal(lua.state, b"v\0".as_ptr() as *const _);
+            crate::ffi::lua_getglobal(lua.state, c"v".as_ptr());
             let v = lua.read_vec3(-1).unwrap();
             crate::ffi::lua_pop(lua.state, 1);
             assert_eq!(v, [1.0, 2.5, 3.0]);
@@ -471,7 +471,7 @@ mod tests {
         let lua = LuaState::new();
         lua.exec("v = { x = 10, y = 20, z = 30 }").unwrap();
         unsafe {
-            crate::ffi::lua_getglobal(lua.state, b"v\0".as_ptr() as *const _);
+            crate::ffi::lua_getglobal(lua.state, c"v".as_ptr());
             let v = lua.read_vec3(-1).unwrap();
             crate::ffi::lua_pop(lua.state, 1);
             assert_eq!(v, [10.0, 20.0, 30.0]);
@@ -483,7 +483,7 @@ mod tests {
         let lua = LuaState::new();
         lua.exec("v = { 4, 5, 6 }").unwrap();
         unsafe {
-            crate::ffi::lua_getglobal(lua.state, b"v\0".as_ptr() as *const _);
+            crate::ffi::lua_getglobal(lua.state, c"v".as_ptr());
             let v = lua.read_vec3(-1).unwrap();
             crate::ffi::lua_pop(lua.state, 1);
             assert_eq!(v, [4.0, 5.0, 6.0]);

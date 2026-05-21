@@ -89,7 +89,7 @@ impl ApplicationHandler for AssetDemoApp {
         // Dynamic uniform buffer alignment
         let uniform_alignment = gpu.device.limits().min_uniform_buffer_offset_alignment;
         let uniform_size = std::mem::size_of::<CameraUniform>() as u32;
-        let aligned_size = ((uniform_size + uniform_alignment - 1) / uniform_alignment) * uniform_alignment;
+        let aligned_size = uniform_size.div_ceil(uniform_alignment) * uniform_alignment;
 
         // Parse OBJ and create Mesh
         let obj_src = include_str!("../../../assets/cube.obj");
@@ -276,8 +276,8 @@ impl ApplicationHandler for AssetDemoApp {
                         .map(|(e, _, _)| *e)
                         .collect();
                     let remove_count = entities.len().min(10);
-                    for i in 0..remove_count {
-                        state.world.despawn(entities[i]);
+                    for &entity in entities.iter().take(remove_count) {
+                        state.world.despawn(entity);
                     }
                     log::info!(
                         "Removed {} entities. Remaining: {}, Mesh assets: {}",

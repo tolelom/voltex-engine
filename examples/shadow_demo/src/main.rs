@@ -89,7 +89,7 @@ fn camera_light_bind_group_layout(device: &wgpu::Device) -> wgpu::BindGroupLayou
 }
 
 fn align_up(size: u32, alignment: u32) -> u32 {
-    ((size + alignment - 1) / alignment) * alignment
+    size.div_ceil(alignment) * alignment
 }
 
 /// Model matrices for the 6 scene objects.
@@ -436,6 +436,7 @@ impl ApplicationHandler for ShadowDemoApp {
                 // ----- Build shadow pass staging data -----
                 let sp_total = sp_aligned * NUM_OBJECTS;
                 let mut sp_staging = vec![0u8; sp_total];
+                #[allow(clippy::needless_range_loop)] // i indexes models and computes the staging offset.
                 for i in 0..NUM_OBJECTS {
                     let sp_uniform = ShadowPassUniform {
                         light_vp_model: (light_vp * models[i]).cols,

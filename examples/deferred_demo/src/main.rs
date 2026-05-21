@@ -44,7 +44,7 @@ struct CameraPositionUniform {
 }
 
 fn align_up(size: u32, alignment: u32) -> u32 {
-    ((size + alignment - 1) / alignment) * alignment
+    size.div_ceil(alignment) * alignment
 }
 
 struct DeferredDemoApp {
@@ -1063,8 +1063,8 @@ impl ApplicationHandler for DeferredDemoApp {
                     cpass.set_bind_group(0, &state.rt_shadow_gb_bg, &[]);
                     cpass.set_bind_group(1, &state.rt_shadow_data_bg, &[]);
                     cpass.dispatch_workgroups(
-                        (state.gpu.config.width + 7) / 8,
-                        (state.gpu.config.height + 7) / 8,
+                        state.gpu.config.width.div_ceil(8),
+                        state.gpu.config.height.div_ceil(8),
                         1,
                     );
                 }
@@ -1104,6 +1104,7 @@ impl ApplicationHandler for DeferredDemoApp {
                 // ---- Pass 5: Bloom downsample chain ----
                 {
                     let ms = mip_sizes(state.gpu.config.width, state.gpu.config.height);
+                    #[allow(clippy::needless_range_loop)] // i indexes ms, mip_views, mip_bind_groups together.
                     for i in 0..BLOOM_MIP_COUNT {
                         let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                             label: Some("Bloom Downsample"),
@@ -1267,6 +1268,7 @@ fn create_ssgi_gbuffer_bind_group(
 }
 
 /// Helper: create the shadow + IBL + SSGI + RT shadow bind group (9 entries).
+#[allow(clippy::too_many_arguments)] // 9 binding sources is intrinsic to this bind group layout.
 fn create_shadow_bind_group(
     device: &wgpu::Device,
     layout: &wgpu::BindGroupLayout,

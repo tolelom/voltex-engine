@@ -26,6 +26,7 @@ pub fn count_entity_nodes(world: &World, entity: Entity) -> usize {
     count
 }
 
+#[allow(clippy::too_many_arguments)] // Recursive draw — packing into a struct would only add noise.
 fn draw_entity_node(
     ui: &mut UiContext,
     world: &World,

@@ -173,9 +173,8 @@ mod tests {
         body.push(0x00); // class=0 (DC), id=0
         // counts: 1 symbol at length 1, 0 for lengths 2-16
         body.push(1);
-        for _ in 1..16 {
-            body.push(0);
-        }
+        // Zero counts for lengths 2-16 (JPEG DHT format requires 16 length entries).
+        body.extend_from_slice(&[0u8; 15]);
         body.push(0x05); // the symbol
 
         seg.extend_from_slice(&((body.len() + 2) as u16).to_be_bytes());
@@ -251,9 +250,8 @@ mod tests {
         let mut dqt = Vec::new();
         dqt.extend_from_slice(&0x0043u16.to_be_bytes()); // length = 67
         dqt.push(0x00); // 8-bit, table 0
-        for _ in 0..64 {
-            dqt.push(1);
-        }
+        // 64-entry quantization table, all values = 1.
+        dqt.extend_from_slice(&[1u8; 64]);
         out.extend_from_slice(&dqt);
 
         // SOF0 — 8x8, 1 component (grayscale)
@@ -272,9 +270,8 @@ mod tests {
         let mut dht_body = Vec::new();
         dht_body.push(0x00); // DC, id=0
         dht_body.push(1); // 1 symbol at length 1
-        for _ in 1..16 {
-            dht_body.push(0);
-        }
+        // Zero counts for lengths 2-16.
+        dht_body.extend_from_slice(&[0u8; 15]);
         dht_body.push(0x00); // symbol: category 0 (DC diff = 0)
         let dht_len = (dht_body.len() + 2) as u16;
         out.extend_from_slice(&dht_len.to_be_bytes());
@@ -285,9 +282,8 @@ mod tests {
         let mut dht_ac = Vec::new();
         dht_ac.push(0x10); // AC, id=0
         dht_ac.push(1); // 1 symbol at length 1
-        for _ in 1..16 {
-            dht_ac.push(0);
-        }
+        // Zero counts for lengths 2-16.
+        dht_ac.extend_from_slice(&[0u8; 15]);
         dht_ac.push(0x00); // symbol: 0x00 = EOB
         let dht_ac_len = (dht_ac.len() + 2) as u16;
         out.extend_from_slice(&dht_ac_len.to_be_bytes());

@@ -457,11 +457,11 @@ mod tests {
     #[test]
     fn accuracy_32bit_float() {
         // 32-bit float should preserve exact values
-        let samples = vec![0.123456789f32, -0.987654321f32];
+        let samples = vec![0.123_456_79_f32, -0.987_654_3_f32];
         let wav_bytes = generate_wav_bytes_f32(&samples, 44100);
         let clip = parse_wav(&wav_bytes).expect("parse failed");
-        assert_eq!(clip.samples[0], 0.123456789f32);
-        assert_eq!(clip.samples[1], -0.987654321f32);
+        assert_eq!(clip.samples[0], 0.123_456_79_f32);
+        assert_eq!(clip.samples[1], -0.987_654_3_f32);
     }
 
     #[test]
