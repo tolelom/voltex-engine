@@ -386,4 +386,94 @@ mod tests {
             let _ = parse_gltf(&valid[..n]);
         }
     }
+
+    #[test]
+    fn parse_gltf_rejects_huge_accessor_count() {
+        // Build a GLB whose POSITION accessor claims count = u32::MAX. Pre-fix,
+        // `Vec::with_capacity(u32::MAX)` for vec3 = ~48 GB attempted allocation.
+        let mut bin = vec![0u8; 36];
+        bin.push(0); bin.push(0); // padding
+        let json_str = format!(r#"{{
+            "asset": {{"version": "2.0"}},
+            "buffers": [{{"byteLength": {}}}],
+            "bufferViews": [
+                {{"buffer": 0, "byteOffset": 0, "byteLength": 36}}
+            ],
+            "accessors": [
+                {{"bufferView": 0, "componentType": 5126, "count": 4294967295, "type": "VEC3"}}
+            ],
+            "meshes": [{{
+                "primitives": [{{"attributes": {{"POSITION": 0}}}}]
+            }}]
+        }}"#, bin.len());
+        let glb = build_glb(&json_str, &bin);
+        let err = parse_gltf(&glb).err().expect("expected error").to_string();
+        assert!(err.contains("exceeds limit"), "unexpected error: {err}");
+    }
+
+    #[test]
+    fn parse_gltf_rejects_attribute_length_mismatch() {
+        // Build a GLB where POSITION has 3 elements but NORMAL has 5.
+        // Pre-fix, the vertex assembly loop indexed normals[3]/normals[4]
+        // out of bounds.
+        let mut bin = Vec::new();
+        // 3 positions (36 bytes)
+        for &v in &[0.0f32, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0] {
+            bin.extend_from_slice(&v.to_le_bytes());
+        }
+        // 5 normals (60 bytes)
+        for _ in 0..5 {
+            for &v in &[0.0f32, 1.0, 0.0] {
+                bin.extend_from_slice(&v.to_le_bytes());
+            }
+        }
+        let json_str = format!(r#"{{
+            "asset": {{"version": "2.0"}},
+            "buffers": [{{"byteLength": {}}}],
+            "bufferViews": [
+                {{"buffer": 0, "byteOffset": 0, "byteLength": 36}},
+                {{"buffer": 0, "byteOffset": 36, "byteLength": 60}}
+            ],
+            "accessors": [
+                {{"bufferView": 0, "componentType": 5126, "count": 3, "type": "VEC3"}},
+                {{"bufferView": 1, "componentType": 5126, "count": 5, "type": "VEC3"}}
+            ],
+            "meshes": [{{
+                "primitives": [{{
+                    "attributes": {{"POSITION": 0, "NORMAL": 1}}
+                }}]
+            }}]
+        }}"#, bin.len());
+        let glb = build_glb(&json_str, &bin);
+        let err = parse_gltf(&glb).err().expect("expected error").to_string();
+        assert!(err.contains("attribute length mismatch"), "unexpected error: {err}");
+    }
+
+    /// Helper to wrap arbitrary JSON + BIN payloads into a GLB container.
+    fn build_glb(json_str: &str, bin: &[u8]) -> Vec<u8> {
+        let json_bytes = json_str.as_bytes();
+        let json_padded_len = (json_bytes.len() + 3) & !3;
+        let mut json_padded = json_bytes.to_vec();
+        while json_padded.len() < json_padded_len {
+            json_padded.push(b' ');
+        }
+        // BIN chunk must be 4-byte aligned.
+        let bin_padded_len = (bin.len() + 3) & !3;
+        let mut bin_padded = bin.to_vec();
+        while bin_padded.len() < bin_padded_len {
+            bin_padded.push(0);
+        }
+        let total_len = 12 + 8 + json_padded.len() + 8 + bin_padded.len();
+        let mut glb = Vec::with_capacity(total_len);
+        glb.extend_from_slice(&0x46546C67u32.to_le_bytes()); // magic
+        glb.extend_from_slice(&2u32.to_le_bytes()); // version
+        glb.extend_from_slice(&(total_len as u32).to_le_bytes());
+        glb.extend_from_slice(&(json_padded.len() as u32).to_le_bytes());
+        glb.extend_from_slice(&0x4E4F534Au32.to_le_bytes()); // JSON
+        glb.extend_from_slice(&json_padded);
+        glb.extend_from_slice(&(bin_padded.len() as u32).to_le_bytes());
+        glb.extend_from_slice(&0x004E4942u32.to_le_bytes()); // BIN
+        glb.extend_from_slice(&bin_padded);
+        glb
+    }
 }

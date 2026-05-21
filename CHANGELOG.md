@@ -10,6 +10,35 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## [v1.0.45] — 2026-05-22 — glTF accessor count cap + attribute length consistency
+
+**Fix**. Two classes of bug in `voltex_renderer/src/gltf/accessor.rs`:
+
+### Fixed
+
+- **Accessor `count` is now capped at `MAX_ACCESSOR_COUNT = 4_000_000`.** Every `read_accessor_*` function (vec3/vec2/vec4/indices/joints/mat4/floats) trusted the JSON `count` field; an adversarial accessor with `count = u32::MAX` drove `Vec::with_capacity` allocations of 48 GB (vec4), 32 GB (vec3), etc., before any data was even read. A single `validate_count` helper now gates every accessor read.
+- **`read_accessor_floats`** computed `total = count * components` without overflow check. Switched to `checked_mul` (defends 32-bit `usize`).
+- **`extract_meshes` attribute length validation.** A glTF primitive whose `POSITION` accessor declared 3 elements while `NORMAL` declared 5 used to OOB-panic at `normals[3]` inside the vertex assembly loop. The mismatch is now caught up front with a friendly error message that lists every attribute's length.
+
+### Tests
+
+`voltex_renderer` 223 → 225 (+2):
+
+- `voltex_renderer::gltf::tests::parse_gltf_rejects_huge_accessor_count`
+- `voltex_renderer::gltf::tests::parse_gltf_rejects_attribute_length_mismatch`
+
+### Verification
+
+- `cargo build --workspace` — clean.
+- `cargo clippy --workspace --all-targets -- -D warnings` — 0 warnings.
+- `cargo test --workspace --lib` — every crate green.
+
+### Notes
+
+The OBJ parser is unaffected — it already uses `.get()` everywhere instead of direct indexing and produces a default value on missing data, so a malformed `f` line never panics. JSON-parser-level size limits remain v1.1.
+
+---
+
 ## [v1.0.44] — 2026-05-22 — Navmesh deserializer adversarial input hardening
 
 **Fix**. Same pattern as v1.0.43 applied to the VNAV navmesh format. Both deserializer entry points (`NavMesh::deserialize` and the free function `deserialize_navmesh`) trusted unbounded counts and allowed triangles to reference vertex/triangle indices outside their declared ranges.

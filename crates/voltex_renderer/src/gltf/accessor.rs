@@ -5,6 +5,25 @@ use super::types::{GltfData, GltfMesh};
 use super::node::{parse_nodes, parse_skins, parse_animations};
 use super::material::extract_material;
 
+/// Hard cap on the `count` field of any glTF accessor. A glTF file with a
+/// realistic mesh has at most a few hundred thousand vertices; this cap
+/// catches adversarial JSON that would otherwise force a multi-GB
+/// `Vec::with_capacity` allocation before any data is even read.
+const MAX_ACCESSOR_COUNT: usize = 4_000_000;
+
+/// Validates an accessor `count` field. Returns the cast `usize` value or
+/// an error if it exceeds the cap.
+fn validate_count(count: u32) -> crate::Result<usize> {
+    let count = count as usize;
+    if count > MAX_ACCESSOR_COUNT {
+        return Err(format!(
+            "glTF accessor count {} exceeds limit {}",
+            count, MAX_ACCESSOR_COUNT
+        ).into());
+    }
+    Ok(count)
+}
+
 pub(super) fn extract_meshes(json: &JsonValue, buffers: &[Vec<u8>]) -> crate::Result<GltfData> {
     let empty_arr: Vec<JsonValue> = Vec::new();
     let accessors = json.get("accessors").and_then(|v| v.as_array()).unwrap_or(&empty_arr);
@@ -59,6 +78,22 @@ pub(super) fn extract_meshes(json: &JsonValue, buffers: &[Vec<u8>]) -> crate::Re
                 // No indices — generate sequential
                 (0..positions.len() as u32).collect()
             };
+
+            // Defend against malformed glTF where attribute accessors disagree
+            // on count. Pre-fix, the loop below could panic with index-out-of-
+            // bounds when reading `normals[i]` / `uvs[i]` / `tangents[i]`.
+            if normals.len() != positions.len()
+                || uvs.len() != positions.len()
+                || tangents.as_ref().is_some_and(|t| t.len() != positions.len())
+            {
+                return Err(format!(
+                    "glTF primitive attribute length mismatch: positions={}, normals={}, uvs={}, tangents={:?}",
+                    positions.len(),
+                    normals.len(),
+                    uvs.len(),
+                    tangents.as_ref().map(|t| t.len()),
+                ).into());
+            }
 
             // Assemble vertices
             let mut vertices: Vec<MeshVertex> = Vec::with_capacity(positions.len());
@@ -127,7 +162,7 @@ fn read_accessor_vec3(
     accessors: &[JsonValue], buffer_views: &[JsonValue], buffers: &[Vec<u8>], idx: usize,
 ) -> crate::Result<Vec<[f32; 3]>> {
     let acc = accessors.get(idx).ok_or("Accessor index out of range")?;
-    let count = acc.get("count").and_then(|v| v.as_u32()).ok_or("Missing count")? as usize;
+    let count = validate_count(acc.get("count").and_then(|v| v.as_u32()).ok_or("Missing count")?)?;
     let (buffer, offset) = get_buffer_data(acc, buffer_views, buffers)?;
     let mut result = Vec::with_capacity(count);
     for i in 0..count {
@@ -145,7 +180,7 @@ fn read_accessor_vec2(
     accessors: &[JsonValue], buffer_views: &[JsonValue], buffers: &[Vec<u8>], idx: usize,
 ) -> crate::Result<Vec<[f32; 2]>> {
     let acc = accessors.get(idx).ok_or("Accessor index out of range")?;
-    let count = acc.get("count").and_then(|v| v.as_u32()).ok_or("Missing count")? as usize;
+    let count = validate_count(acc.get("count").and_then(|v| v.as_u32()).ok_or("Missing count")?)?;
     let (buffer, offset) = get_buffer_data(acc, buffer_views, buffers)?;
     let mut result = Vec::with_capacity(count);
     for i in 0..count {
@@ -162,7 +197,7 @@ fn read_accessor_vec4(
     accessors: &[JsonValue], buffer_views: &[JsonValue], buffers: &[Vec<u8>], idx: usize,
 ) -> crate::Result<Vec<[f32; 4]>> {
     let acc = accessors.get(idx).ok_or("Accessor index out of range")?;
-    let count = acc.get("count").and_then(|v| v.as_u32()).ok_or("Missing count")? as usize;
+    let count = validate_count(acc.get("count").and_then(|v| v.as_u32()).ok_or("Missing count")?)?;
     let (buffer, offset) = get_buffer_data(acc, buffer_views, buffers)?;
     let mut result = Vec::with_capacity(count);
     for i in 0..count {
@@ -181,7 +216,7 @@ fn read_accessor_indices(
     accessors: &[JsonValue], buffer_views: &[JsonValue], buffers: &[Vec<u8>], idx: usize,
 ) -> crate::Result<Vec<u32>> {
     let acc = accessors.get(idx).ok_or("Accessor index out of range")?;
-    let count = acc.get("count").and_then(|v| v.as_u32()).ok_or("Missing count")? as usize;
+    let count = validate_count(acc.get("count").and_then(|v| v.as_u32()).ok_or("Missing count")?)?;
     let comp_type = acc.get("componentType").and_then(|v| v.as_u32()).ok_or("Missing componentType")?;
     let (buffer, offset) = get_buffer_data(acc, buffer_views, buffers)?;
 
@@ -216,7 +251,7 @@ fn read_accessor_joints(
     accessors: &[JsonValue], buffer_views: &[JsonValue], buffers: &[Vec<u8>], idx: usize,
 ) -> crate::Result<Vec<[u16; 4]>> {
     let acc = accessors.get(idx).ok_or("Accessor index out of range")?;
-    let count = acc.get("count").and_then(|v| v.as_u32()).ok_or("Missing count")? as usize;
+    let count = validate_count(acc.get("count").and_then(|v| v.as_u32()).ok_or("Missing count")?)?;
     let comp_type = acc.get("componentType").and_then(|v| v.as_u32()).unwrap_or(5123);
     let (buffer, offset) = get_buffer_data(acc, buffer_views, buffers)?;
     let mut result = Vec::with_capacity(count);
@@ -252,7 +287,7 @@ pub(super) fn read_accessor_mat4(
     accessors: &[JsonValue], buffer_views: &[JsonValue], buffers: &[Vec<u8>], idx: usize,
 ) -> crate::Result<Vec<[[f32; 4]; 4]>> {
     let acc = accessors.get(idx).ok_or("Accessor index out of range")?;
-    let count = acc.get("count").and_then(|v| v.as_u32()).ok_or("Missing count")? as usize;
+    let count = validate_count(acc.get("count").and_then(|v| v.as_u32()).ok_or("Missing count")?)?;
     let (buffer, offset) = get_buffer_data(acc, buffer_views, buffers)?;
     let mut result = Vec::with_capacity(count);
     for i in 0..count {
@@ -274,7 +309,7 @@ pub(super) fn read_accessor_floats(
     accessors: &[JsonValue], buffer_views: &[JsonValue], buffers: &[Vec<u8>], idx: usize,
 ) -> crate::Result<Vec<f32>> {
     let acc = accessors.get(idx).ok_or("Accessor index out of range")?;
-    let count = acc.get("count").and_then(|v| v.as_u32()).ok_or("Missing count")? as usize;
+    let count = validate_count(acc.get("count").and_then(|v| v.as_u32()).ok_or("Missing count")?)?;
     let acc_type = acc.get("type").and_then(|v| v.as_str()).unwrap_or("SCALAR");
     let components = match acc_type {
         "SCALAR" => 1,
@@ -283,7 +318,9 @@ pub(super) fn read_accessor_floats(
         "VEC4" => 4,
         _ => 1,
     };
-    let total = count * components;
+    let total = count
+        .checked_mul(components)
+        .ok_or("glTF accessor count*components overflow")?;
     let (buffer, offset) = get_buffer_data(acc, buffer_views, buffers)?;
     let mut result = Vec::with_capacity(total);
     for i in 0..total {

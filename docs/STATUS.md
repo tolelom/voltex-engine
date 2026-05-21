@@ -173,6 +173,23 @@
 
 v1.0.9 부터는 **서비스 배포 완성도** 로드맵 (`docs/superpowers/specs/2026-05-21-service-readiness-roadmap.md`) 기준으로 진행.
 
+### v1.0.45 (2026-05-22) — glTF accessor count cap + attribute length consistency
+
+P0 robustness round 6. glTF 파서의 모든 `read_accessor_*` 함수가 JSON 의 `count` 필드를 그대로 신뢰 → `Vec::with_capacity(u32::MAX)` 가능. 또한 mesh primitive 의 attribute (POSITION/NORMAL/UV/TANGENT) 가 서로 다른 count 를 주장하면 vertex assembly 루프가 OOB 패닉.
+
+**보강 (`voltex_renderer/src/gltf/accessor.rs`)**:
+- `MAX_ACCESSOR_COUNT = 4_000_000` cap. 7개 read_accessor_* 함수 (vec3/vec2/vec4/indices/joints/mat4/floats) 가 공통 `validate_count` 통과
+- `read_accessor_floats`: `count * components` 곱셈을 `checked_mul` 로 교체 (overflow 방어)
+- `extract_meshes`: positions/normals/uvs/tangents 의 길이 불일치를 친화적 에러로 거부. 이전엔 `normals[i]` 가 OOB panic 했음
+
+**검증**:
+- `cargo build --workspace` 클린, clippy 0 워닝
+- voltex_renderer 223 → 225 (+2). 회귀 테스트:
+  - `gltf::tests::parse_gltf_rejects_huge_accessor_count`
+  - `gltf::tests::parse_gltf_rejects_attribute_length_mismatch`
+
+**한계**: glTF JSON parser 자체에 size limit 은 미적용 (1차 방어선이 GLB length header). OBJ parser 는 이미 .get() 패턴으로 OOB 방어됨 — 변경 없음.
+
 ### v1.0.44 (2026-05-22) — Navmesh deserializer 적대적 입력 방어
 
 P0 robustness round 5. v1.0.43 의 scene loader 패턴을 navmesh (VNAV) 에 적용. 두 진입점 (`NavMesh::deserialize` + free fn `deserialize_navmesh`) 모두 동일한 가드.
