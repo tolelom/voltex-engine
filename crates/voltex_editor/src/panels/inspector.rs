@@ -13,6 +13,21 @@ use voltex_math::Vec3;
 
 const EPSILON: f32 = 1e-4;
 
+/// Component types surfaced by the Inspector's "Add Component" button row.
+/// `name` must match the corresponding `Component::NAME` in voltex_ecs.
+struct AddComponentSpec {
+    name: &'static str,
+}
+
+const ADD_COMPONENT_BUTTONS: [AddComponentSpec; 6] = [
+    AddComponentSpec { name: "transform" },
+    AddComponentSpec { name: "tag" },
+    AddComponentSpec { name: "mesh_handle" },
+    AddComponentSpec { name: "material_handle" },
+    AddComponentSpec { name: "bounds" },
+    AddComponentSpec { name: "script" },
+];
+
 /// Persistent buffers for the inspector's text inputs. The inspector is stateless
 /// across frames except for these strings (the source of truth is the World).
 #[derive(Default)]
@@ -118,6 +133,25 @@ pub fn inspector_panel(
         ui.text(&parent_text);
     }
 
+    // ── Add Component buttons (E3) ────────────────────────────────────
+    // One button per built-in registered component. AddComponent dispatches
+    // with the component's default_bytes — deserialize handles overwriting
+    // any existing instance, so clicking is idempotent.
+    ui.text("-- Add Component --");
+    for spec in &ADD_COMPONENT_BUTTONS {
+        let label = format!("+ {}", spec.name);
+        if ui.button(&label) {
+            if let Some(entry) = session.registry.find(spec.name) {
+                let bytes = (entry.default_bytes)();
+                let _ = session.dispatch(EditorCommand::AddComponent {
+                    entity,
+                    name: spec.name.to_string(),
+                    data: bytes,
+                });
+            }
+        }
+    }
+
     if ui.button("Despawn") {
         let _ = session.dispatch(EditorCommand::Despawn { entity });
         session.selected = None;
@@ -190,6 +224,47 @@ mod tests {
         ui.end_frame();
         // 9 sliders + label rows + header → easily >10 draw commands
         assert!(ui.draw_list.commands.len() > 10);
+        cleanup(&scene);
+    }
+
+    #[test]
+    fn add_component_button_specs_match_registered_built_in_names() {
+        // Guard against drift between ADD_COMPONENT_BUTTONS and
+        // ComponentRegistry::register_defaults(). If a button references a
+        // name that isn't in the registry, the dispatch would silently fail.
+        let scene = temp_path("voltex_insp_add_specs.vscn");
+        cleanup(&scene);
+        let session = EditorSession::new(scene.clone());
+        for spec in super::ADD_COMPONENT_BUTTONS.iter() {
+            assert!(
+                session.registry.find(spec.name).is_some(),
+                "ADD_COMPONENT_BUTTONS references unknown name `{}`",
+                spec.name
+            );
+        }
+        cleanup(&scene);
+    }
+
+    #[test]
+    fn add_component_dispatch_with_default_bytes_attaches_transform() {
+        // The Inspector wiring calls `(entry.default_bytes)()` and dispatches
+        // AddComponent — exercise that exact path end-to-end without the GUI.
+        let scene = temp_path("voltex_insp_add_dispatch.vscn");
+        cleanup(&scene);
+        let mut session = EditorSession::new(scene.clone());
+        let e = session.dispatch(EditorCommand::Spawn).unwrap();
+
+        // Pretend the user clicks "+ transform" — we replicate the closure logic.
+        let entry = session.registry.find("transform").expect("transform registered");
+        let bytes = (entry.default_bytes)();
+        session.dispatch(EditorCommand::AddComponent {
+            entity: e,
+            name: "transform".into(),
+            data: bytes,
+        }).unwrap();
+
+        let t = session.world.get::<Transform>(e).expect("Transform attached");
+        assert_eq!(t.scale, voltex_math::Vec3::new(1.0, 1.0, 1.0));
         cleanup(&scene);
     }
 

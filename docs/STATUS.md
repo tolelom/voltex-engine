@@ -166,6 +166,19 @@
 - examples/editor_demo: 시드 엔티티 (ground + 3 cube + Cube1↔Cube2 hierarchy)를 `EditorSession::dispatch` 경로로 옮김 → jsonl 로그 + Save/Load round-trip 일관성
 - v1 한계 (문서화): picking은 sphere 근사 (메시 AABB는 미구현). gizmo translate/rotate/scale 핸들은 미구현
 
+### Cycle 12 (E3): AddComponent/RemoveComponent + Despawn full undo (2026-05-21)
+- voltex_ecs::Component trait: **+ `remove(world, entity) -> bool`** (default = `world.remove::<Self>(entity).is_some()`) + **`default_bytes() -> Vec<u8>`** (default = empty Vec). 6 built-in 모두 `default_bytes` 오버라이드 (Transform=identity, Tag=empty, MeshHandle/MaterialHandle/Bounds=zero, ScriptComponent=UNBOUND).
+- voltex_ecs::ComponentEntry: **`remove` + `default_bytes`** 함수 포인터 필드 2개 추가. `register_raw` 는 no-op stub 으로 채움 (Inspector AddComponent UI 에서 제외).
+- voltex_ecs::EntityAllocator: **`restore_at_generation(id, gen) -> bool`** — 죽은 슬롯을 원래 generation 으로 부활. 슬롯이 alloc/dealloc 사이클을 한 번이라도 더 거쳤다면 (entries[id].generation != gen+1) false. World 가 위임.
+- voltex_editor::EditorCommand: **`AddComponent { entity, name, data }`** + **`RemoveComponent { entity, name }`** 2 variants.
+- voltex_editor::session::Inverse: **`RemoveComponentByName` + `AddComponentByBytes` + `RestoreEntity`** 3 variants.
+- voltex_editor::session::dispatch: **Despawn 이 history 를 clear 하지 않음** — undoable group 으로 이동. SaveScene/LoadScene 만 history clear.
+- voltex_editor::session::capture_inverse: Despawn 시 ComponentRegistry.entries() 순회하여 모든 등록 컴포넌트를 snapshot. 미등록 컴포넌트는 silent loss (E2 와 동일 정책).
+- voltex_editor::session::apply_inverse: `RestoreEntity` 가 `World::restore_at_generation` 호출 후 컴포넌트 재첨부. 슬롯 재사용 시 silent skip.
+- voltex_editor::panels::inspector: **"Add Component" 버튼 6개** — `+ transform` / `+ tag` / `+ mesh_handle` / `+ material_handle` / `+ bounds` / `+ script`. 클릭 시 `(entry.default_bytes)()` + `AddComponent` dispatch. v1 한계: dropdown 아님, 컴포넌트별 [×] remove 버튼은 v1.1.
+- 테스트 +21: voltex_ecs +10 (entity ×5 + component_registry ×5), voltex_editor +11 (command ×5 + session ×4 [add_component_undo/remove_component_undo/despawn_undo_restores/despawn_no_longer_clears/despawn_undo_silently_fails_when_slot_reused, 5 - 1 obsolete 제거] + inspector ×2).
+- spec: docs/superpowers/specs/2026-05-21-e3-component-commands-design.md
+
 ### Cycle 11 (B3): CoreAudio + multi-OS native build (2026-05-21)
 - voltex_audio::backend::coreaudio (cfg(target_os = "macos") 신규): **`CoreAudioBackend`** — AudioToolbox.framework 의 AudioQueue API 를 raw FFI 로 호출. `#[link(name = "AudioToolbox", kind = "framework")]`. f32 LE stereo @48kHz 고정. 4 buffer × 1024 frame.
 - AudioQueue 콜백 모델을 push-style trait 에 wrap: `FreeQueue { Mutex<VecDeque<AudioQueueBufferRef>> + Condvar }` 로 동기화. write() 가 free 버퍼 pop 후 enqueue, output_callback 이 빈 버퍼를 free 큐에 push + notify. 100ms timeout 으로 deadlock 방지. `std::panic::catch_unwind` 로 FFI 콜백 panic 차폐.
@@ -279,12 +292,12 @@ crates/
 └── voltex_cli         — bin "voltex" (new/build/run), voltex.toml 매니페스트, .vpkg packing (B1+B2)
 ```
 
-## 테스트: 921개 통과 (Windows host, `cargo test --workspace`). `--lib` 기준은 895 (voltex_cli 는 bin-only 라 lib count 에서 빠지나 `cargo test -p voltex_cli` 로 26 개 실행됨). macOS host 에서는 +2 (CoreAudio 모듈) = 923 예상.
+## 테스트: 940개 통과 (Windows host, `cargo test --workspace`). `--lib` 기준은 914 (voltex_cli 는 bin-only 라 lib count 에서 빠지나 `cargo test -p voltex_cli` 로 26 개 실행됨). macOS host 에서는 +2 (CoreAudio 모듈) = 942 예상.
 
 - voltex: 2 (M6: prelude/module 경로 컴파일 검증)
 - voltex_math: 39 (8-7 +2: inverse roundtrip × VP+translation)
 - voltex_platform: 3
-- voltex_ecs: 121 (S1 +5: ScriptComponent roundtrip/unbound/too-short/utf8 ×4 + register_defaults_includes_script ×1)
+- voltex_ecs: 131 (E3 +10: restore_at_generation ×5 + default_bytes/remove ×5)
 - voltex_asset: 36 (B2 +12: vpkg ×6 + vfs ×6; C0a +2: Handle accessors)
 - voltex_renderer: 200
 - voltex_renderer_ecs: 7 (C0b 신규: RenderAssets material roundtrip ×2, missing handle ×2, items empty/skip-no-mesh/stale/hierarchy)
@@ -293,7 +306,7 @@ crates/
 - voltex_ai: 34
 - voltex_net: 47
 - voltex_script: 42 (S1 +12: pool ×6 [get_or_create same/load/reload/unknown/poll_reload/clear], system ×4 [start/update/5-cubes/missing-callbacks], engine_api ×2 [iter_entities/iter_by_tag])
-- voltex_editor: 158 (E2 +12: session::* mode/snapshot/dispatch ×7, lifecycle/callbacks ×4, undo/redo non-Health-snapshot inner test ×1)
+- voltex_editor: 169 (E3 +11: command ×5 add/remove/unknown/dead-entity + session ×4 add_undo/remove_undo/despawn_restores/despawn_history/slot_reused + inspector ×2 - 1 obsolete despawn_clears test)
 - voltex_runtime: 11 (B0 신규: config ×5, error ×2, app ×4 [registry/scene order, system order, transform propagation, missing-scene graceful])
 - voltex_cli: 26 (B1-spike +3, B1 +16, B2 +1, B3 +6: validate_target ×5 + cross_compile_error_message)
 
