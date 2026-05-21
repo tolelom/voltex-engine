@@ -1,4 +1,9 @@
 #![allow(non_camel_case_types, non_snake_case)]
+#![allow(missing_docs)] // 1:1 Lua C API bindings — lua.org's reference is canonical.
+
+//! Raw Lua C API FFI bindings (`lua_*`/`luaL_*`/constants). See
+//! <https://www.lua.org/manual/5.4/manual.html> for the upstream reference.
+
 use std::os::raw::{c_char, c_int, c_void};
 
 pub enum lua_State {}

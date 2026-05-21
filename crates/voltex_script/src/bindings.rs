@@ -1,3 +1,5 @@
+//! Default Lua bindings — `print` and other small host helpers.
+
 use crate::ffi;
 use crate::state::LuaState;
 use std::ffi::CStr;

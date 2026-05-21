@@ -6,8 +6,11 @@
 
 use crate::state::LuaState;
 
+/// One Lua interpreter bound to a single script file path.
 pub struct ScriptInstance {
+    /// Owned Lua state for this script.
     pub lua: LuaState,
+    /// VFS-relative path of the loaded script.
     pub path: String,
     /// `false` until the first `script_start_all` pass invokes `on_start`,
     /// then `true`. Hot reload resets this back to `false`.

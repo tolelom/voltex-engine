@@ -1,3 +1,6 @@
+//! Crate-wide error type and `Result` alias for `voltex_script`.
+
+/// All errors produced by `voltex_script` (Lua execution, FFI marshaling).
 #[derive(Debug, thiserror::Error)]
 pub enum ScriptError {
     /// String 메시지를 그대로 보존하는 generic variant (마이그레이션 호환).

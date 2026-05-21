@@ -173,6 +173,24 @@
 
 v1.0.9 부터는 **서비스 배포 완성도** 로드맵 (`docs/superpowers/specs/2026-05-21-service-readiness-roadmap.md`) 기준으로 진행.
 
+### v1.0.27 (2026-05-21) — voltex_script 100% missing_docs + `#![warn(missing_docs)]`
+
+아홉 번째 crate. 11 파일 (LuaState/bindings/engine_api/instance/pool/system + ffi/sandbox/coroutine).
+
+**작업**:
+- Crate-level docstring + `#![warn(missing_docs)]`.
+- 모듈 헤더 4개 (state/bindings/instance/pool).
+- Public API:
+  - `LuaValue` 5 variant (Nil/Bool/Number/String/Table)
+  - `LuaState::new` + global getter/setter
+  - `ScriptInstance` 3 field (lua/path/started)
+  - `ScriptInstancePool` (new/get/get_mut/find_by_path/len/is_empty)
+- `ffi.rs` (47 Lua C FFI) 은 `#![allow(missing_docs)]` + lua.org 참조 코멘트.
+
+**검증**:
+- `cargo build -p voltex_script` — 0 missing_docs warning.
+- `cargo test -p voltex_script --lib` — 42 통과.
+
 ### v1.0.26 (2026-05-21) — voltex_ecs 100% missing_docs + `#![warn(missing_docs)]`
 
 여덟 번째 crate. 18 파일 — ECS 코어 (entity/sparse_set/world/archetype/queries + transform/world_transform/hierarchy + scheduler/dep_scheduler + component_registry + scene/binary_scene/json).

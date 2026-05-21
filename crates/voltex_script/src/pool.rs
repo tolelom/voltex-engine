@@ -15,6 +15,8 @@ use crate::engine_api::register_engine_api;
 use crate::instance::ScriptInstance;
 use crate::state::LuaState;
 
+/// Runtime store of one [`ScriptInstance`] per `.lua` path. Each instance is
+/// identified by a stable `u32` cached on the entity's `ScriptComponent`.
 pub struct ScriptInstancePool {
     instances: HashMap<u32, ScriptInstance>,
     path_to_id: HashMap<String, u32>,
@@ -22,6 +24,7 @@ pub struct ScriptInstancePool {
 }
 
 impl ScriptInstancePool {
+    /// Creates an empty pool.
     pub fn new() -> Self {
         Self {
             instances: HashMap::new(),
@@ -62,22 +65,27 @@ impl ScriptInstancePool {
         Ok(id)
     }
 
+    /// Borrows the instance at `id`, if any.
     pub fn get(&self, id: u32) -> Option<&ScriptInstance> {
         self.instances.get(&id)
     }
 
+    /// Mutable equivalent of [`get`](Self::get).
     pub fn get_mut(&mut self, id: u32) -> Option<&mut ScriptInstance> {
         self.instances.get_mut(&id)
     }
 
+    /// Looks up the id assigned to `path`, if any.
     pub fn find_by_path(&self, path: &str) -> Option<u32> {
         self.path_to_id.get(path).copied()
     }
 
+    /// Number of loaded script instances.
     pub fn len(&self) -> usize {
         self.instances.len()
     }
 
+    /// `true` if no scripts are loaded.
     pub fn is_empty(&self) -> bool {
         self.instances.is_empty()
     }

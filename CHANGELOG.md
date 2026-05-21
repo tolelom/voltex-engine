@@ -10,6 +10,28 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## [v1.0.27] — 2026-05-21 — `voltex_script` 100% documented (→ 0 `missing_docs`)
+
+Ninth crate in the workspace `missing_docs` sweep. Covers LuaState wrapper + script instance pool + system integration + engine API + Lua C FFI bindings across 11 source files.
+
+### Added
+
+- Crate-level docstring + `#![warn(missing_docs)]` guard.
+- Module headers for `state` / `bindings` / `instance` / `pool` (others already had `//!`).
+- Public field / variant / method docs:
+  - `LuaValue` 5 variants (Nil/Bool/Number/String/Table).
+  - `LuaState` (new + global getters/setters).
+  - `ScriptInstance` 3 fields (lua/path/started).
+  - `ScriptInstancePool` (new/get/get_mut/find_by_path/len/is_empty).
+- `ffi.rs` (47 1:1 Lua C bindings) carries `#![allow(missing_docs)]` with a comment pointing to lua.org's manual.
+
+### Verified
+
+- `cargo build -p voltex_script` — zero `missing_docs` warnings.
+- `cargo test -p voltex_script --lib` — 42 passed (no regression).
+
+---
+
 ## [v1.0.26] — 2026-05-21 — `voltex_ecs` 100% documented (→ 0 `missing_docs`)
 
 Eighth crate in the workspace `missing_docs` sweep. Covers Entity/SparseSet/Archetype/World/queries + Transform/WorldTransform + Hierarchy + Scheduler/DependencyScheduler + ComponentRegistry + Scene/JSON across 18 source files.

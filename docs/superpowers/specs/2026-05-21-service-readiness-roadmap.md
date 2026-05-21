@@ -86,7 +86,8 @@
 | 15 | v1.0.23 voltex_ai missing_docs →0 | `[✅]` | (inline STATUS § v1.0.23) | 096a460 |
 | 16 | v1.0.24 voltex_audio missing_docs →0 | `[✅]` | (inline STATUS § v1.0.24) | 49121a2 |
 | 17 | v1.0.25 voltex_physics missing_docs →0 | `[✅]` | (inline STATUS § v1.0.25) | c013eba |
-| 18 | v1.0.26 voltex_ecs missing_docs →0 | `[✅]` | (inline STATUS § v1.0.26) | (pending commit) |
+| 18 | v1.0.26 voltex_ecs missing_docs →0 | `[✅]` | (inline STATUS § v1.0.26) | 0cb3972 |
+| 19 | v1.0.27 voltex_script missing_docs →0 | `[✅]` | (inline STATUS § v1.0.27) | (pending commit) |
 | 7 | v1.0.15 cargo-deny | `[ ]` | — | — |
 | 8 | v1.0.16 CHANGELOG enforcement | `[ ]` | — | — |
 | 9 | v1.0.17 SemVer check | `[ ]` | — | — |

@@ -1,16 +1,24 @@
+//! Owned Lua state wrapper + values that cross the FFI boundary.
+
 use std::ffi::{CStr, CString};
 use crate::ffi;
 
 /// Represents a value that can be passed to/from Lua.
 #[derive(Debug, Clone, PartialEq)]
 pub enum LuaValue {
+    /// Lua `nil`.
     Nil,
+    /// Lua boolean.
     Bool(bool),
+    /// Lua number (f64).
     Number(f64),
+    /// Lua string.
     String(String),
+    /// Lua table — key/value pairs, insertion order preserved.
     Table(Vec<(String, LuaValue)>),
 }
 
+/// Owns one `lua_State` (created by `luaL_newstate`).
 pub struct LuaState {
     state: *mut ffi::lua_State,
 }
@@ -24,6 +32,7 @@ impl Default for LuaState {
 }
 
 impl LuaState {
+    /// Creates a fresh Lua state with stdlibs opened.
     pub fn new() -> Self {
         unsafe {
             let state = ffi::luaL_newstate();
@@ -78,6 +87,7 @@ impl LuaState {
         }
     }
 
+    /// Reads a global Lua number, or `None` if `name` is unset / non-numeric.
     pub fn get_global_number(&self, name: &str) -> Option<f64> {
         let c_name = CString::new(name).ok()?;
         unsafe {
@@ -93,6 +103,7 @@ impl LuaState {
         }
     }
 
+    /// Reads a global Lua string, or `None` if `name` is unset / non-string.
     pub fn get_global_string(&self, name: &str) -> Option<String> {
         let c_name = CString::new(name).ok()?;
         unsafe {
@@ -108,6 +119,7 @@ impl LuaState {
         }
     }
 
+    /// Writes a global Lua number.
     pub fn set_global_number(&self, name: &str, value: f64) {
         let c_name = CString::new(name).unwrap();
         unsafe {
@@ -116,6 +128,7 @@ impl LuaState {
         }
     }
 
+    /// Writes a global Lua string.
     pub fn set_global_string(&self, name: &str, value: &str) {
         let c_name = CString::new(name).unwrap();
         let c_value = CString::new(value).unwrap();
