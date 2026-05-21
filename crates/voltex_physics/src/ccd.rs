@@ -3,7 +3,7 @@ use crate::ray::ray_vs_aabb;
 
 /// Swept sphere vs AABB continuous collision detection.
 /// Expands the AABB by the sphere radius, then tests a ray from start to end.
-/// Returns t in [0,1] of first contact, or None if no contact.
+/// Returns `t` in `[0, 1]` of first contact, or `None` if no contact.
 pub fn swept_sphere_vs_aabb(start: Vec3, end: Vec3, radius: f32, aabb: &AABB) -> Option<f32> {
     // Expand AABB by sphere radius
     let r = Vec3::new(radius, radius, radius);

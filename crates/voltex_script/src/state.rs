@@ -192,8 +192,9 @@ impl LuaState {
         self.push_table(&pairs);
     }
 
-    /// Read a Vec3 table from the stack. Supports {x=, y=, z=} named fields
-    /// or {[1]=, [2]=, [3]=} array-style fields.
+    /// Read a Vec3 table from the stack. Supports `{x=, y=, z=}` named fields
+    /// or `{[1]=, [2]=, [3]=}` array-style fields (escape the brackets to keep
+    /// rustdoc happy).
     pub fn read_vec3(&self, index: i32) -> crate::Result<[f32; 3]> {
         unsafe {
             if ffi::lua_type(self.state, index) != ffi::LUA_TTABLE {

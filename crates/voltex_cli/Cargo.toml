@@ -6,6 +6,10 @@ edition = "2021"
 [[bin]]
 name = "voltex"
 path = "src/main.rs"
+# Suppress rustdoc for the CLI bin — the same crate name `voltex` is already
+# used by the facade lib crate, and cargo issue #6313 emits a known
+# filename-collision warning otherwise. The bin still builds normally.
+doc = false
 
 [dependencies]
 voltex_asset = { path = "../voltex_asset" }

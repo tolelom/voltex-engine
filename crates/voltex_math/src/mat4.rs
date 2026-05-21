@@ -161,7 +161,7 @@ impl Mat4 {
         }
     }
 
-    /// Orthographic projection (wgpu NDC: z [0,1])
+    /// Orthographic projection (wgpu NDC: z in `[0, 1]`).
     pub fn orthographic(left: f32, right: f32, bottom: f32, top: f32, near: f32, far: f32) -> Self {
         let rml = right - left;
         let tmb = top - bottom;

@@ -1410,8 +1410,9 @@ fn create_bloom_down_bind_groups(
 }
 
 /// Helper: create bloom upsample bind groups (4 total).
-/// Each reads from mip[i+1] and renders additively into mip[i].
-/// Order: j=0 → input=mip[4] target=mip[3], j=1 → input=mip[3] target=mip[2], etc.
+/// Each reads from `mip\[i + 1\]` and renders additively into `mip\[i\]`.
+/// Order: `j=0` → input `mip\[4\]` target `mip\[3\]`; `j=1` → input `mip\[3\]`
+/// target `mip\[2\]`; etc.
 fn create_bloom_up_bind_groups(
     device: &wgpu::Device,
     layout: &wgpu::BindGroupLayout,

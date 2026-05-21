@@ -135,10 +135,12 @@ impl RtAccel {
 /// Convert a column-major 4×4 matrix to a row-major 3×4 affine transform.
 ///
 /// The TLAS expects `[f32; 12]` in row-major order (3 rows × 4 columns).
-/// A standard column-major mat4 stores: col0=[m0,m1,m2,m3], col1=[m4,m5,m6,m7], ...
-/// Row 0: m[0], m[4], m[8],  m[12]
-/// Row 1: m[1], m[5], m[9],  m[13]
-/// Row 2: m[2], m[6], m[10], m[14]
+/// A standard column-major mat4 stores: `col0 = (m0, m1, m2, m3)`,
+/// `col1 = (m4, m5, m6, m7)`, ...
+///
+/// - Row 0: `m\[0\], m\[4\], m\[8\],  m\[12\]`
+/// - Row 1: `m\[1\], m\[5\], m\[9\],  m\[13\]`
+/// - Row 2: `m\[2\], m\[6\], m\[10\], m\[14\]`
 pub fn mat4_to_tlas_transform(m: &[f32; 16]) -> [f32; 12] {
     [
         m[0], m[4], m[8],  m[12],

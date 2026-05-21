@@ -47,10 +47,12 @@ impl NavMesh {
         )
     }
 
-    /// Return the midpoint of the shared edge between `tri_idx` and neighbor slot `edge_idx` (0, 1, or 2).
-    /// Edge 0 is between vertex indices[0] and indices[1],
-    /// Edge 1 is between indices[1] and indices[2],
-    /// Edge 2 is between indices[2] and indices[0].
+    /// Return the midpoint of the shared edge between `tri_idx` and neighbor
+    /// slot `edge_idx` (0, 1, or 2).
+    ///
+    /// - Edge 0 is between vertex `indices\[0\]` and `indices\[1\]`.
+    /// - Edge 1 is between `indices\[1\]` and `indices\[2\]`.
+    /// - Edge 2 is between `indices\[2\]` and `indices\[0\]`.
     pub fn edge_midpoint(&self, tri_idx: usize, edge_idx: usize) -> Vec3 {
         let tri = &self.triangles[tri_idx];
         let (i0, i1) = match edge_idx {

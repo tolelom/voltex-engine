@@ -123,9 +123,9 @@ pub fn find_path_triangles(navmesh: &NavMesh, start: Vec3, goal: Vec3) -> Option
 
 /// Find a path from `start` to `goal` on the given NavMesh using A*.
 ///
-/// Returns Some(path) where path[0] == start, path[last] == goal, and
-/// intermediate points are triangle centers. Returns None if either
-/// point is outside the mesh or no path exists.
+/// Returns `Some(path)` where `path[0] == start`, the last element equals
+/// `goal`, and intermediate points are triangle centers. Returns `None` if
+/// either point is outside the mesh or no path exists.
 pub fn find_path(navmesh: &NavMesh, start: Vec3, goal: Vec3) -> Option<Vec<Vec3>> {
     let tri_path = find_path_triangles(navmesh, start, goal)?;
 
