@@ -10,6 +10,23 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## [v1.0.39] — 2026-05-21 — README polish (status badge + service-readiness bullets)
+
+P2. README's status badge was frozen at v1.0.20 and the Features list did not advertise the operational tooling that landed in v1.0.29–v1.0.34.
+
+### Updated
+
+- `README.md` status badge: `v1.0.20` → `v1.0.38`.
+- `README.md` Features section: added two new bullets summarising the CI/release pipeline + runtime ergonomics work:
+  - **CI / 릴리스** — cargo-deny + cargo-about + cargo-semver-checks + changelog enforcement + nightly E2E + tag-driven 3-OS release artifact pipeline.
+  - **Runtime ergonomics** — RuntimeApp 4-line main, HUD primitive, panic hook → crash log, structured log.
+
+### Notes
+
+Closes the 10-hour service-readiness push (v1.0.21–v1.0.39, 19 cycles). Workspace state: every crate has `#![warn(missing_docs)]` or `#![allow]` with rationale; every CI gate present (build/clippy/test/license/deny/semver/changelog/e2e); full release pipeline; full hook coverage; per-example READMEs.
+
+---
+
 ## [v1.0.38] — 2026-05-21 — Per-example READMEs
 
 P2 service-readiness item. v1.0.15 added `examples/README.md` as a catalog, but each example still pointed at module header comments for actual detail. v1.0.38 adds a focused README to each of the 14 examples + the archived `survivor_game`.

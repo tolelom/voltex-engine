@@ -5,7 +5,7 @@
 > 스크립팅, 멀티 OS 빌드 파이프라인까지 제공한다. 자세한 카운트와 정책은
 > 아래 "의존성 정책" 섹션 참고.
 
-![status: v1.0.20](https://img.shields.io/badge/status-v1.0.20-brightgreen)
+![status: v1.0.38](https://img.shields.io/badge/status-v1.0.38-brightgreen)
 ![clippy: 0 warnings](https://img.shields.io/badge/clippy-0%20warnings-brightgreen)
 ![audit: 0 vulnerabilities](https://img.shields.io/badge/cargo--audit-0%20vulnerabilities-brightgreen)
 ![coverage: 82%](https://img.shields.io/badge/coverage-82%25%20lib-brightgreen)
@@ -129,6 +129,15 @@ voltex build
   API), `include_bytes!` 기반 self-contained exe 산출
 - **Build pipeline** — `voltex_cli` (`new` / `build` / `run`) + `voltex.toml`
   매니페스트 + native-only 멀티 OS 디스패치 + 친화 에러 메시지
+- **CI / 릴리스** — GitHub Actions full matrix (Linux + Windows blocking,
+  macOS advisory), cargo-deny (RUSTSEC + license + duplicate + source),
+  cargo-about (license listing), cargo-semver-checks (API stability),
+  changelog enforcement (pre-push + PR gate), nightly E2E `voltex new+build`
+  smoke test, tag-driven 3-OS release artifact pipeline
+  ([`docs/release.md`](docs/release.md))
+- **Runtime ergonomics** — `RuntimeApp` 4-line `main()`, HUD primitive
+  (FPS + user segment in window title), panic hook → crash log file,
+  structured `voltex_runtime::log` (env-driven, no external crate)
 
 ---
 

@@ -98,7 +98,8 @@
 | 27 | v1.0.35 voltex_renderer_ecs missing_docs →0 | `[✅]` | (inline STATUS § v1.0.35) | fd9536b |
 | 28 | v1.0.36 voltex_editor missing_docs →0 | `[✅]` | (inline STATUS § v1.0.36) | fcefa83 |
 | 29 | v1.0.37 voltex_renderer missing_docs →0 | `[✅]` | (inline STATUS § v1.0.37) | 0865102 |
-| 30 | v1.0.38 per-example READMEs | `[✅]` | (inline STATUS § v1.0.38) | (pending commit) |
+| 30 | v1.0.38 per-example READMEs | `[✅]` | (inline STATUS § v1.0.38) | 3bb37a2 |
+| 31 | v1.0.39 README polish + summary | `[✅]` | (inline STATUS § v1.0.39) | (pending commit) |
 | 7 | v1.0.15 cargo-deny | `[ ]` | — | — |
 | 8 | v1.0.16 CHANGELOG enforcement | `[ ]` | — | — |
 | 9 | v1.0.17 SemVer check | `[ ]` | — | — |

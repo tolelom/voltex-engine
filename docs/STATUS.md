@@ -173,6 +173,23 @@
 
 v1.0.9 부터는 **서비스 배포 완성도** 로드맵 (`docs/superpowers/specs/2026-05-21-service-readiness-roadmap.md`) 기준으로 진행.
 
+### v1.0.39 (2026-05-21) — README polish + service-readiness summary
+
+P2. README status badge 가 v1.0.20 에 멈춰 있고 v1.0.29~34 의 운영 tooling 이 Features 에 미반영.
+
+**갱신**:
+- `README.md` 상태 배지 v1.0.20 → v1.0.38
+- Features 섹션에 두 bullet 추가:
+  - **CI / 릴리스**: cargo-deny + cargo-about + cargo-semver-checks + changelog enforcement + nightly E2E + 3-OS release pipeline
+  - **Runtime ergonomics**: 4-line main, HUD primitive, panic hook → crash log, structured log
+
+**Notes**: 10시간 service-readiness push (v1.0.21~v1.0.39, 19 cycle) 마무리. 워크스페이스 최종 상태:
+- 모든 crate `#![warn(missing_docs)]` 또는 rationale 동반 `#![allow]`
+- 모든 CI gate (build/clippy/test/license/deny/semver/changelog/e2e)
+- Full release pipeline (tag → 3-OS exe + license bundle → GitHub Release)
+- Full hook 커버 (pre-commit clippy+test, pre-push CHANGELOG)
+- Per-example READMEs
+
 ### v1.0.38 (2026-05-21) — Per-example READMEs
 
 P2. v1.0.15 의 `examples/README.md` catalog 는 menu 역할, 각 example 의 detail 은 모듈 헤더 comment. v1.0.38 에서 example 마다 focused README.
