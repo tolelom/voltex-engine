@@ -166,10 +166,30 @@
 - examples/editor_demo: 시드 엔티티 (ground + 3 cube + Cube1↔Cube2 hierarchy)를 `EditorSession::dispatch` 경로로 옮김 → jsonl 로그 + Save/Load round-trip 일관성
 - v1 한계 (문서화): picking은 sphere 근사 (메시 AABB는 미구현). gizmo translate/rotate/scale 핸들은 미구현
 
-## 🎉 v1.0 release — 2026-05-21 (tag `v1.0.0`) → **v1.0.1** ~ **v1.0.7** patches
+## 🎉 v1.0 release — 2026-05-21 (tag `v1.0.0`) → **v1.0.1** ~ **v1.0.8** patches
 
 15 cycle / 37 세션 / 약 4 일에 걸쳐 진행된 v1.0 로드맵 완료. 회고는
 [docs/v1.0-retrospective.md](v1.0-retrospective.md). 미뤄진 항목은 v1.1+ 후속.
+
+### v1.0.8 (2026-05-21) — parser panic-resistance fuzz + OGG/Vorbis dead-module 발견
+
+**21 신규 fuzz test** — 5 parser 공개 entry point 모두 (`parse_png` / `parse_jpg` / `parse_gltf` / `parse_obj` / `parse_wav`) 에 동일 패턴 4종 input 추가:
+1. empty
+2. valid magic / sample 의 every truncation
+3. 128 seeds × 6 size 의 xorshift32 PRNG random bytes
+4. valid magic + random tail
+
+→ **panic 0건**. 모든 parser 가 graceful `Err` 또는 빈/부분 `ObjData` 반환. 외부 dep (rand/proptest/arbitrary) 정책 위반 회피 위해 각 test 파일에 inline xorshift32 ~10줄.
+
+**부산물 발견**: `crates/voltex_audio/src/ogg.rs` + `vorbis/` 디렉토리가 **lib.rs 에 `mod ogg;` / `mod vorbis;` 선언 없음** → cargo가 컴파일하지 않음 = dead source. STATUS.md Phase 6-1 의 "OGG/Vorbis 디코더 자체 구현 완료" 주장과 모순. 임시 wire 시도 시 4 dead_code 워닝 + 27 clippy error 동반 → v1.0.8 범위 초과. lib.rs 등록 revert 하고 v1.0.9 로 분리. ogg.rs 의 fuzz test 들은 그대로 보존 (v1.0.9 wire 시 자동 활성).
+
+**셀프 피드백**:
+- 단계 1 parser API 점검 → 5 parser identified, OGG는 모듈 등록 안 됨 첫 발견.
+- 단계 2 fuzz test 추가 → 21건 panic 0.
+- 단계 3 panic fix 단계 skip (발견 0).
+- 단계 4 회귀 검증 → 921 → **942 lib tests**, clippy 0, build 0 warning.
+
+deferred to v1.0.9+: OGG/Vorbis wire (27 clippy + 4 dead_code fix + audio_clip 통합), coverage-guided fuzzing (cargo-fuzz 등).
 
 ### v1.0.7 (2026-05-21) — third-party license 인벤토리 + license-check CI
 
@@ -498,7 +518,7 @@ crates/
 └── voltex_cli         — bin "voltex" (new/build/run), voltex.toml 매니페스트, .vpkg packing (B1+B2)
 ```
 
-## 테스트: 951개 통과 (Windows host, `cargo test --workspace`). `--lib` 기준은 921 (voltex_cli 는 bin-only 라 lib count 에서 빠지나 `cargo test -p voltex_cli` 로 30 개 실행됨). macOS host 에서는 +2 (CoreAudio 모듈) = 953 예상. v1.0.1 +5 (input_system 순서/참조 ×2, Bounds default ×2, ScriptComponent default ×1). v1.0.3 +4 (canonicalize_friendly Windows verbatim strip ×3 + cross-OS integration ×1).
+## 테스트: 972개 통과 (Windows host, `cargo test --workspace`). `--lib` 기준은 942 (voltex_cli 는 bin-only 라 lib count 에서 빠지나 `cargo test -p voltex_cli` 로 30 개 실행됨). macOS host 에서는 +2 (CoreAudio 모듈) = 974 예상. v1.0.1 +5 (input_system 순서/참조 ×2, Bounds default ×2, ScriptComponent default ×1). v1.0.3 +4 (canonicalize_friendly Windows verbatim strip ×3 + cross-OS integration ×1). v1.0.8 +21 (parser panic-resistance fuzz: PNG ×4 + JPG ×4 + GLTF ×5 + OBJ ×4 + WAV ×4).
 
 - voltex: 2 (M6: prelude/module 경로 컴파일 검증)
 - voltex_math: 39 (8-7 +2: inverse roundtrip × VP+translation)
@@ -542,7 +562,7 @@ crates/
 ```bash
 git clone https://git.tolelom.xyz/tolelom/game_engine
 cd game_engine
-cargo test --workspace --lib   # 검증: 921개 통과해야 함 (v1.0.5 시점)
+cargo test --workspace --lib   # 검증: 942개 통과해야 함 (v1.0.8 시점)
 ```
 
 진행 상황과 다음 단계는 이 파일과 `docs/DEFERRED.md`, `docs/superpowers/plans/`, `docs/superpowers/specs/` 를 본다. 자동 루프가 master에 계속 작업을 푸시할 수 있으므로 작업 전 `git pull --ff-only` 필수.

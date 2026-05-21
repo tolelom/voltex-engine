@@ -10,6 +10,83 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## [v1.0.8] — 2026-05-21 — parser panic-resistance fuzz tests + OGG/Vorbis dead-module discovery
+
+### Added (21 new panic-resistance tests across 5 parsers)
+
+Every public parser entry point now has a `fuzz_parse_*` test
+suite that feeds it the same four classes of input:
+
+1. empty `&[]`
+2. every truncation of a representative valid sample / known magic
+   header
+3. 128 seeds × 6 lengths of deterministic xorshift32-pseudo-random
+   bytes (0..2048 typical range)
+4. valid magic prefix + xorshift32 tail (catches the "magic OK but
+   then garbage" path, which is the classic source of unwrap /
+   index panics)
+
+| Parser            | File                                                    | New tests |
+|-------------------|---------------------------------------------------------|-----------|
+| `parse_png`       | `voltex_renderer/src/png.rs`                            | 4 |
+| `parse_jpg`       | `voltex_renderer/src/jpg/mod.rs`                        | 4 |
+| `parse_gltf`      | `voltex_renderer/src/gltf/mod.rs`                       | 5 |
+| `parse_obj`       | `voltex_renderer/src/obj.rs`                            | 4 |
+| `parse_wav`       | `voltex_audio/src/wav.rs`                               | 4 |
+| **Total**         |                                                         | **21** |
+
+All 21 pass. **Zero panics surfaced** — every parser returns an
+`Err` (or, for `parse_obj` which returns `ObjData` directly,
+returns an empty/partial `ObjData`) on malformed input. The
+engine's dependency policy forbids `rand` / `proptest` / `arbitrary`,
+so each test file inlines a tiny xorshift32 PRNG (~10 lines, no
+allocations beyond the result Vec).
+
+### Discovered (and deferred to v1.0.9)
+
+While adding `fuzz_parse_ogg_*` to `voltex_audio/src/ogg.rs`, the
+tests never showed up in `cargo test --lib --list`. Root cause:
+`crates/voltex_audio/src/ogg.rs` and `crates/voltex_audio/src/vorbis/`
+exist on disk but are **not declared** in `crates/voltex_audio/src/lib.rs`
+(no `pub mod ogg;` / `pub mod vorbis;`). Cargo therefore never
+compiles them, and they are effectively dead source files.
+
+This contradicts STATUS.md Phase 6-1 ("OGG/Vorbis 디코더 자체
+구현 완료") — the code exists but is invisible to the rest of the
+build. Tentatively wiring them in surfaced 4 `dead_code` warnings
+(spec-required fields the decoder doesn't yet consume) **and** 27
+pre-existing clippy errors inside the modules. Fixing all of that
+exceeds the v1.0.8 scope; the lib.rs registration was reverted to
+keep this patch atomic. A note in lib.rs records the intentional
+omission and points at v1.0.9.
+
+v1.0.8 deliberately preserves the `fuzz_parse_ogg_*` tests inside
+the unmounted `ogg.rs` so v1.0.9 can wire the module and the tests
+will start running on the first re-registration. The source change
+to `ogg.rs` is therefore harmless dead code today and useful
+infrastructure tomorrow.
+
+### Not in scope (deferred to v1.0.9+)
+
+- Wire `voltex_audio::ogg` + `voltex_audio::vorbis` into the
+  module graph, fix the 27 clippy errors and 4 dead-code warnings
+  they bring in, plumb vorbis output through `AudioClip` so OGG
+  files are actually loadable, run the OGG fuzz tests.
+- Coverage-style fuzz orchestration (cargo-fuzz / honggfuzz /
+  AFL.rs) — current tests are deterministic and CI-friendly, which
+  is the right v1.0 trade-off. Coverage-guided fuzzing is v1.1+.
+
+### Verified
+
+- 921 → **942** lib tests (+21 fuzz, no behavior changes).
+- `cargo clippy --workspace --all-targets -- -D warnings` still
+  passes (one unrelated unnecessary_cast in `parse_obj`'s test
+  helper fixed in this patch — `(32 + r) as u8 as char` → `as
+  char`).
+- voltex_cli still 30 tests; workspace build still 0 warnings.
+
+---
+
 ## [v1.0.7] — 2026-05-21 — third-party license inventory + license-check CI job
 
 Closes P4 #28 from the post-v1.0.5 audit ("외부 라이선스 고지

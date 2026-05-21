@@ -169,7 +169,7 @@
 - ~~**gizmo (translate/rotate/scale)**~~ ✅ Cycle 3 (E1) — translate/rotate/scale 3축 핸들 + LINE wgpu 파이프라인. End-drag 시 SetTransform 단일 undo 엔트리.
 - ~~**Despawn 정확한 undo**~~ ✅ Cycle 12 (E3) — `EntityAllocator::restore_at_generation` + 등록된 모든 컴포넌트 snapshot/restore. 슬롯 재사용 시 silent skip.
 
-## v1.0 / v1.0.1 / v1.0.2 / v1.0.3 / v1.0.4 / v1.0.5 / v1.0.6 / v1.0.7 추가 한계
+## v1.0 / v1.0.1 / v1.0.2 / v1.0.3 / v1.0.4 / v1.0.5 / v1.0.6 / v1.0.7 / v1.0.8 추가 한계
 
 - **3 OS exe artifact 검증** — Windows host 빌드 + runtime 검증만. Linux + macOS 실 머신 검증 v1.1 사용자 PR.
 - **Lua input API** — 입력은 Rust `add_input_system` 만. Lua 측 `input.is_key_pressed(...)` v1.1 후속.
@@ -195,3 +195,6 @@
 - **license-check advisory → blocking** — CI 첫 green run 후 승격. v1.1+.
 - **THIRD-PARTY-LICENSES.md 를 `voltex build` artifact 에 동봉** — 현재 `dist/<name>.exe` 옆에 안 들어감. v1.1+.
 - **`cargo-deny` 통합** — license + advisory + duplicate 통합 스캔. 현재 cargo-audit + cargo-about 으로 대체 가능. v1.1+.
+- **parser panic-resistance fuzz** ✅ v1.0.8 — 21 신규 test (PNG/JPG/WAV/GLTF/OBJ), panic 0건. 외부 dep 없는 inline xorshift32.
+- **OGG/Vorbis lib.rs 등록** — Phase 6-1 코드 존재하지만 `mod` 선언 없어 cargo가 컴파일 안 함. 임시 wire 시 27 clippy + 4 dead_code error 동반. v1.0.9 분리.
+- **coverage-guided fuzzing (cargo-fuzz / honggfuzz)** — 현재 deterministic xorshift32 만. nightly toolchain + libfuzzer 인프라는 v1.1+.
