@@ -2,6 +2,7 @@
 name = "tutorial_minigame"
 version = "0.1.0"
 edition = "2021"
+license.workspace = true
 
 # The end-state of `docs/tutorial.md` — a minimal voltex project that doubles
 # as both a `cargo run -p tutorial_minigame` example (code-first) and a

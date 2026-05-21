@@ -34,6 +34,12 @@ members = [
     "games/voltex_survivor",
 ]
 
+[workspace.package]
+# Shared metadata for every workspace crate. Each crate's Cargo.toml
+# opts in with `license.workspace = true`. The dual licensing matches
+# the LICENSE-MIT and LICENSE-APACHE files at the repo root.
+license = "MIT OR Apache-2.0"
+
 [workspace.dependencies]
 voltex = { path = "crates/voltex" }
 voltex_math = { path = "crates/voltex_math" }

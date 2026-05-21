@@ -2,6 +2,7 @@
 name = "voltex_survivor"
 version = "0.1.0"
 edition = "2021"
+license.workspace = true
 
 # Flagship game for v1.0 — game logic lives in scripts/*.lua + scene.vscn,
 # Rust side only bootstraps voltex_runtime and translates keyboard input
