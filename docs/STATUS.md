@@ -173,6 +173,30 @@
 
 v1.0.9 부터는 **서비스 배포 완성도** 로드맵 (`docs/superpowers/specs/2026-05-21-service-readiness-roadmap.md`) 기준으로 진행.
 
+### v1.0.19 (2026-05-21) — voltex_math 100% missing_docs (59 → 0) + `#![warn(missing_docs)]`
+
+1573 workspace-wide missing_docs 의 첫 chunk 해소. 가장 작고 stable한 voltex_math 부터 — 이후 crate 들의 sweep 패턴 확립.
+
+**작업**:
+- `crates/voltex_math/src/lib.rs`: crate-level docstring (RH coord / column-major / radians 컨벤션 + 사용 예시) + `#![warn(missing_docs)]` (회귀 방지).
+- 6 모듈 (vec2/vec3/vec4/mat4/aabb/ray) 각자 module-level `//!` (한 줄 책임 명시).
+- 모든 pub struct / field / const / 메서드 doc:
+  - Vec2/Vec3/Vec4: x/y/z/w field 명시, ZERO/ONE/X/Y/Z 상수 + new/dot/cross/length{,_squared}/normalize 메서드
+  - Mat4: cols field 명세 (column-major)
+  - AABB: min/max 필드 + new/from_center_half_extents/center/half_extents/contains_point/intersects/merged/surface_area
+  - Ray: origin/direction 필드 + new (normalize 부작용 명시) + at
+
+**검증**:
+- `cargo build -p voltex_math` 0 missing_docs warning (이전 59 → 0)
+- `cargo doc -p voltex_math --no-deps` 클린
+- `cargo test -p voltex_math --lib` 39 통과 (회귀 0)
+- 워크스페이스 clippy/test 0 회귀
+
+**셀프 피드백**: 단계 1 lib + vec2 → 59→48. 단계 2 vec3/vec4 → 48→20. 단계 3 mat4/aabb/ray → 0. 일괄 처리 효율적.
+
+**나머지 1514 missing_docs 의 후속 cycle 후보** (small → large, stable → volatile):
+- voltex_platform (3 tests), voltex_asset, voltex_net, voltex_ai, voltex_physics, voltex_audio, voltex_ecs, voltex_script, voltex_renderer_ecs, voltex_editor, voltex_runtime, voltex_renderer (가장 큼).
+
 ### v1.0.18 (2026-05-21) — panic hook + logger 를 `RuntimeApp::new` 로 이동
 
 **갭**: v1.0.10 가 panic hook 을 `RuntimeApp::run` 에 설치 → `RuntimeApp::new` 안에서 실행되는 사용자 callback (`build_scene` / `setup_systems`) 또는 scene 로드 단계가 panic 시 hook 미설치 상태라 크래시 로그 안 남음. 신규 사용자가 가장 자주 만나는 init-time crash 가 사일런트.
@@ -778,7 +802,7 @@ crates/
 ## 테스트: ~1044개 통과 (Windows host, `cargo test --workspace`). `--lib` 기준은 989 (voltex_cli 는 bin-only 라 lib count 에서 빠지나 `cargo test -p voltex_cli` 로 55 개 실행됨). macOS host 에서는 +2 (CoreAudio 모듈) = 1038 예상. v1.0.1 +5 (input_system 순서/참조 ×2, Bounds default ×2, ScriptComponent default ×1). v1.0.3 +4 (canonicalize_friendly Windows verbatim strip ×3 + cross-OS integration ×1). v1.0.8 +21 (parser panic-resistance fuzz: PNG ×4 + JPG ×4 + GLTF ×5 + OBJ ×4 + WAV ×4). v1.0.9 +30 (OGG +11 + Vorbis +17 + decode_ogg_vorbis_bytes +2 — 모두 wire 직전까지 dead, 이제 실 컴파일). v1.0.10 +14 (voltex_runtime crash module ×11 + config crash log ×3). v1.0.11 +13 (voltex_cli schema/path validation + Levenshtein helper + error Display). v1.0.12 +4 (voltex_cli copy_license_files).
 
 - voltex: 2 (M6: prelude/module 경로 컴파일 검증)
-- voltex_math: 39 (8-7 +2: inverse roundtrip × VP+translation)
+- voltex_math: 39 (8-7 +2: inverse roundtrip × VP+translation; v1.0.19: missing_docs 59→0, doc 강화만, 테스트 카운트 변경 없음)
 - voltex_platform: 3
 - voltex_ecs: 134 (E3 +10, v1.0.1 +3 Bounds/ScriptComponent default round-trip)
 - voltex_asset: 36 (B2 +12: vpkg ×6 + vfs ×6; C0a +2: Handle accessors)

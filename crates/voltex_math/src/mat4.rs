@@ -1,3 +1,5 @@
+//! 4x4 column-major matrix — view / projection / TRS transforms.
+
 use std::ops::Mul;
 use crate::{Vec3, Vec4};
 
@@ -6,6 +8,7 @@ use crate::{Vec3, Vec4};
 /// `cols[i]` is the i-th column, stored as `[f32; 4]`.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Mat4 {
+    /// Column-major storage: `cols[i][j]` is row `j` of column `i`.
     pub cols: [[f32; 4]; 4],
 }
 

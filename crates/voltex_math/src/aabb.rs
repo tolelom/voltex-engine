@@ -1,17 +1,26 @@
-// crates/voltex_math/src/aabb.rs
+//! Axis-aligned bounding box (`f32`) — collision / BVH / culling primitive.
+
 use crate::Vec3;
 
+/// Axis-aligned bounding box. Invariant: each component of `min` is ≤
+/// the corresponding component of `max` (constructors do not enforce
+/// this — caller's responsibility).
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct AABB {
+    /// Lower corner.
     pub min: Vec3,
+    /// Upper corner.
     pub max: Vec3,
 }
 
 impl AABB {
+    /// Construct from explicit `min` / `max` corners.
     pub fn new(min: Vec3, max: Vec3) -> Self {
         Self { min, max }
     }
 
+    /// Construct from center + half-extents. The result satisfies
+    /// `center() == center` and `half_extents() == half`.
     pub fn from_center_half_extents(center: Vec3, half: Vec3) -> Self {
         Self {
             min: center - half,
@@ -19,26 +28,32 @@ impl AABB {
         }
     }
 
+    /// Geometric center.
     pub fn center(&self) -> Vec3 {
         (self.min + self.max) * 0.5
     }
 
+    /// Half-extents (size / 2 per axis).
     pub fn half_extents(&self) -> Vec3 {
         (self.max - self.min) * 0.5
     }
 
+    /// `true` iff `p` is inside (or on the boundary of) this AABB.
     pub fn contains_point(&self, p: Vec3) -> bool {
         p.x >= self.min.x && p.x <= self.max.x
             && p.y >= self.min.y && p.y <= self.max.y
             && p.z >= self.min.z && p.z <= self.max.z
     }
 
+    /// `true` iff `self` and `other` overlap (touching counts).
     pub fn intersects(&self, other: &AABB) -> bool {
         self.min.x <= other.max.x && self.max.x >= other.min.x
             && self.min.y <= other.max.y && self.max.y >= other.min.y
             && self.min.z <= other.max.z && self.max.z >= other.min.z
     }
 
+    /// Smallest AABB enclosing both `self` and `other`. Used by BVH
+    /// node-up refit.
     pub fn merged(&self, other: &AABB) -> AABB {
         AABB {
             min: Vec3::new(
@@ -54,6 +69,8 @@ impl AABB {
         }
     }
 
+    /// Surface area of all 6 faces. Used as the SAH heuristic in BVH
+    /// build.
     pub fn surface_area(&self) -> f32 {
         let d = self.max - self.min;
         2.0 * (d.x * d.y + d.y * d.z + d.z * d.x)

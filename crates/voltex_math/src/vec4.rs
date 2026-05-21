@@ -1,40 +1,58 @@
+//! 4D `f32` vector — homogeneous coords + RGBA + shader uniform packing.
+
 use std::ops::{Add, Sub, Mul, Neg};
 
 use crate::Vec3;
 
-/// 4D vector (f32)
+/// Four-component `f32` vector. Common uses: homogeneous coords
+/// (`w=1` for points, `w=0` for directions), RGBA colour, and matching
+/// `vec4` shader uniforms.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Vec4 {
+    /// X component.
     pub x: f32,
+    /// Y component.
     pub y: f32,
+    /// Z component.
     pub z: f32,
+    /// W component.
     pub w: f32,
 }
 
 impl Vec4 {
+    /// `(0, 0, 0, 0)`.
     pub const ZERO: Self = Self { x: 0.0, y: 0.0, z: 0.0, w: 0.0 };
+    /// `(1, 1, 1, 1)`.
     pub const ONE: Self = Self { x: 1.0, y: 1.0, z: 1.0, w: 1.0 };
 
+    /// Construct a new vector.
     pub const fn new(x: f32, y: f32, z: f32, w: f32) -> Self {
         Self { x, y, z, w }
     }
 
+    /// Promote a [`Vec3`] to [`Vec4`] with the given `w`
+    /// (commonly `1.0` for positions or `0.0` for directions).
     pub fn from_vec3(v: Vec3, w: f32) -> Self {
         Self { x: v.x, y: v.y, z: v.z, w }
     }
 
+    /// Drop the `w` component and return the leading `(x, y, z)` as
+    /// a [`Vec3`].
     pub fn xyz(self) -> Vec3 {
         Vec3::new(self.x, self.y, self.z)
     }
 
+    /// Dot product `self · rhs`.
     pub fn dot(self, rhs: Self) -> f32 {
         self.x * rhs.x + self.y * rhs.y + self.z * rhs.z + self.w * rhs.w
     }
 
+    /// Squared length `|self|²`.
     pub fn length_squared(self) -> f32 {
         self.dot(self)
     }
 
+    /// Euclidean length `|self|`.
     pub fn length(self) -> f32 {
         self.length_squared().sqrt()
     }

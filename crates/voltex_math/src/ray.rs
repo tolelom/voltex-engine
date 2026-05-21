@@ -1,12 +1,21 @@
+//! Infinite ray with unit-length direction — picking / raycasting primitive.
+
 use crate::Vec3;
 
+/// A ray starting at `origin` and travelling in unit-length `direction`.
+/// Construction always normalises the direction.
 #[derive(Debug, Clone, Copy)]
 pub struct Ray {
+    /// Origin point.
     pub origin: Vec3,
+    /// Unit-length direction.
     pub direction: Vec3,
 }
 
 impl Ray {
+    /// Construct a ray. The direction is normalised before storage —
+    /// callers can pass an unnormalised vector. Panics if direction is
+    /// the zero vector.
     pub fn new(origin: Vec3, direction: Vec3) -> Self {
         Self {
             origin,
@@ -14,6 +23,7 @@ impl Ray {
         }
     }
 
+    /// Point along the ray at parameter `t`: `origin + direction * t`.
     pub fn at(&self, t: f32) -> Vec3 {
         self.origin + self.direction * t
     }

@@ -1,32 +1,46 @@
+//! 2D `f32` vector + basic operator overloads.
+
 use std::ops::{Add, Sub, Mul, Neg};
 
-/// 2D vector (f32)
+/// Two-component `f32` vector. Used for 2D positions, UVs, and
+/// screen-space coordinates.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Vec2 {
+    /// X component.
     pub x: f32,
+    /// Y component.
     pub y: f32,
 }
 
 impl Vec2 {
+    /// `(0, 0)`.
     pub const ZERO: Self = Self { x: 0.0, y: 0.0 };
+    /// `(1, 1)`.
     pub const ONE: Self = Self { x: 1.0, y: 1.0 };
 
+    /// Construct a new vector.
     pub const fn new(x: f32, y: f32) -> Self {
         Self { x, y }
     }
 
+    /// Dot product `self · rhs`.
     pub fn dot(self, rhs: Self) -> f32 {
         self.x * rhs.x + self.y * rhs.y
     }
 
+    /// Squared length `|self|²`. Cheaper than [`length`](Self::length)
+    /// when only relative magnitudes are needed.
     pub fn length_squared(self) -> f32 {
         self.dot(self)
     }
 
+    /// Euclidean length `|self|`.
     pub fn length(self) -> f32 {
         self.length_squared().sqrt()
     }
 
+    /// Returns a unit-length vector pointing in the same direction.
+    /// Panics if the input is the zero vector (division by zero).
     pub fn normalize(self) -> Self {
         let len = self.length();
         Self {

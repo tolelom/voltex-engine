@@ -175,7 +175,7 @@
 - **Lua input API** — 입력은 Rust `add_input_system` 만. Lua 측 `input.is_key_pressed(...)` v1.1 후속.
 - **voltex_cli editor 모드** — `voltex new/build/run` 만. `voltex editor` 서브커맨드 v1.1.
 - **HUD 통합** — 런타임 UiContext 정식 API 없음. 점수 등 표시는 콘솔 print 만.
-- **1573 missing_docs** — facade prelude + tier-1 API 만 보장. crate 별 점진 작성 v1.1.
+- **1573 missing_docs** — facade prelude + tier-1 API 만 보장. crate 별 점진 작성 v1.1. v1.0.19 부터 시작: voltex_math 59 → 0 + `#![warn(missing_docs)]` 가드. 나머지 12 crate 는 후속 cycle.
 - **`pub(crate)` 다운그레이드** — 후보 노트 (`docs/v1.0-pub-audit.md`) 만 작성. 실 변경 v1.1.
 - **600줄 한도 위반 4건** ✅ v1.0.2 에서 재분리.
 - **macOS/Linux 백엔드 runtime** — Cycle 10 (P1) ALSA + Cycle 11 (B3) CoreAudio 코드 작성 완료. 실 머신 audio 출력 v1.1.

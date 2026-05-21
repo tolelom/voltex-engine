@@ -10,6 +10,44 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## [v1.0.19] — 2026-05-21 — `voltex_math` 100% documented (59 → 0 `missing_docs`)
+
+First chunk of the 1573-warning workspace-wide `missing_docs` sweep.
+`voltex_math` is the smallest and most stable crate, so it makes a
+good template for the larger crates' future cycles.
+
+### Added
+
+- `crates/voltex_math/src/lib.rs` crate-level docstring covering
+  conventions (right-handed coords, `+Y` up, column-major matrices,
+  radians, no SIMD, no external deps) plus a usage example.
+- Crate-level `#![warn(missing_docs)]` so the count cannot regress
+  silently.
+- Module-level `//!` headers on `vec2`, `vec3`, `vec4`, `mat4`,
+  `aabb`, `ray`.
+- Per-item docs for every `pub` struct, field, constant, and method.
+  Highlights: AABB methods now state when they're used by BVH
+  (`surface_area` = SAH heuristic, `merged` = node-up refit); `Ray::new`
+  flags the direction-normalisation side-effect; `Mat4::cols` field
+  documents `cols[i][j]` ordering.
+
+### Verified
+
+- `cargo build -p voltex_math` — 0 `missing_docs` warnings (was 59).
+- `cargo doc -p voltex_math --no-deps` — clean.
+- `cargo test -p voltex_math --lib` — 39 pass (no behaviour change).
+- Workspace `clippy -- -D warnings` and `test --lib` — no regressions.
+
+### Up next
+
+Remaining sweep order (small → large, stable → volatile):
+`voltex_platform`, `voltex_asset`, `voltex_net`, `voltex_ai`,
+`voltex_physics`, `voltex_audio`, `voltex_ecs`, `voltex_script`,
+`voltex_renderer_ecs`, `voltex_editor`, `voltex_runtime`,
+`voltex_renderer` (largest).
+
+---
+
 ## [v1.0.18] — 2026-05-21 — Panic hook + logger moved to `RuntimeApp::new`
 
 The v1.0.10 hook was installed in `run()`, but several callbacks
