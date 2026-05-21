@@ -166,10 +166,44 @@
 - examples/editor_demo: 시드 엔티티 (ground + 3 cube + Cube1↔Cube2 hierarchy)를 `EditorSession::dispatch` 경로로 옮김 → jsonl 로그 + Save/Load round-trip 일관성
 - v1 한계 (문서화): picking은 sphere 근사 (메시 AABB는 미구현). gizmo translate/rotate/scale 핸들은 미구현
 
-## 🎉 v1.0 release — 2026-05-21 (tag `v1.0.0`) → **v1.0.1** ~ **v1.0.8** patches
+## 🎉 v1.0 release — 2026-05-21 (tag `v1.0.0`) → **v1.0.1** ~ **v1.0.9** patches
 
 15 cycle / 37 세션 / 약 4 일에 걸쳐 진행된 v1.0 로드맵 완료. 회고는
 [docs/v1.0-retrospective.md](v1.0-retrospective.md). 미뤄진 항목은 v1.1+ 후속.
+
+v1.0.9 부터는 **서비스 배포 완성도** 로드맵 (`docs/superpowers/specs/2026-05-21-service-readiness-roadmap.md`) 기준으로 진행.
+
+### v1.0.9 (2026-05-21) — OGG/Vorbis lib.rs wire + clippy 27→0 + AudioClip 진입점
+
+v1.0.8 에서 발견된 dead-module 회귀 해소. STATUS Phase 6-1 의 "OGG/Vorbis 자체 구현 완료" 주장을 사실로 만듦.
+
+**Wire**: `crates/voltex_audio/src/lib.rs` 에 `pub mod ogg;` + `pub mod vorbis;` 등록 (이전 `#`-comment 5줄 deferral 마커 제거).
+
+**Clippy 24 lib + 3 test → 0** (`-D warnings` 통과):
+- **`cargo clippy --fix`** 가 5건 자동 적용 (manual_range_contains, unused var prefix 등).
+- **`#![allow(clippy::needless_range_loop)]` 6 파일** (codebook/decoder/floor/headers/imdct/residue) — 각 파일 상단에 spec 인용 코멘트 1줄 ("Vorbis spec § X 의 인덱스 수식 그대로 옮긴 코드, iterator translation 은 spec traceability 손상"). silence 가 아닌 정당화.
+- **진짜 개선 3건**:
+  - `decoder.rs:149` needless_late_init → `let output_samples = if ... { ... } else { ... };` 인라인 바인딩
+  - `floor.rs:153` manual_memcpy → `copy_from_slice`
+  - `ogg.rs:174` enumerate_discard_index → 인덱스 제거 후 `for packet in packets_data`
+  - `ogg.rs:181` same_item_push → `segment_table.resize(len + N, 255u8)`
+
+**숨겨진 테스트 회귀 2건 fix** (dead 시절 컴파일 안 돼 보이지 않던 것):
+- `ogg::invalid_capture_pattern` — 짧은 입력 (`NotOGGdata` 10B) 이 size-truncation 분기로 가서 "No OGG pages found" 리턴 → "Invalid OGG capture pattern" 미반환. magic 체크를 size 체크 앞으로 이동 (4-byte 만 있어도 magic 확정 가능).
+- `vorbis::bitreader_basics` — 어셔션 자체 산수 오류 (저자가 "5 bits 가 byte 0 의 3..7 (4 bits) + byte 1 의 bit 0" 으로 잘못 계산. 실제로는 byte 0 의 3..7 이 이미 5 bits). expected `0b1_1011` (27) → 실측 `0b10110` (22) 로 정정 + 코멘트 명확화 + 8-bit 후속 읽기 어셔션 1건 추가.
+
+**진입점 추가**: `voltex_audio::decode_ogg_vorbis_bytes(&[u8]) -> Result<AudioClip>` — `ogg::parse_ogg` + `vorbis::decode_vorbis` 의 2줄 합성. 외부 사용자가 단일 함수로 `.ogg` 바이트 → AudioClip 가능.
+
+**테스트**: voltex_audio 89 → **119** (+30). 분해: ogg ×11 (기존 4 + 4 fuzz + truncated capture +1 + 추가 검증 +2) + vorbis ×17 (기존 11 + 6 신규 = bitreader 보강 +1 + decode_ogg_vorbis ×2 + 기타) + 8-bit read 추가 1건. 워크스페이스 lib total: 942 → **~968**.
+
+**셀프 피드백** (각 단계 후 검증):
+- 단계 1 wire 후 clippy: 22 lib + 2 test 잔여 (예측 5건 더 줄 줄 알았으나 needless_range_loop 가 본질적).
+- 단계 2 allow + 진짜 fix 후 clippy: 0. 그러나 테스트 2건 fail 노출 (dead 시절 보이지 않던 것).
+- 단계 3 테스트 fix: 119 통과.
+- 단계 4 진입점 추가: +2 테스트 (decode_ogg_vorbis_bytes empty / invalid_magic).
+- 단계 5 워크스페이스 회귀: build 클린, clippy 클린, lib tests 968.
+
+deferred to v1.0.x+: 실제 `.ogg` 파일 디코드 검증 (Vorbis decoder 자체가 simplified — scalar codebook only, no coupled channels), `audio_demo` 에서 OGG 로딩 데모.
 
 ### v1.0.8 (2026-05-21) — parser panic-resistance fuzz + OGG/Vorbis dead-module 발견
 
@@ -518,7 +552,7 @@ crates/
 └── voltex_cli         — bin "voltex" (new/build/run), voltex.toml 매니페스트, .vpkg packing (B1+B2)
 ```
 
-## 테스트: 972개 통과 (Windows host, `cargo test --workspace`). `--lib` 기준은 942 (voltex_cli 는 bin-only 라 lib count 에서 빠지나 `cargo test -p voltex_cli` 로 30 개 실행됨). macOS host 에서는 +2 (CoreAudio 모듈) = 974 예상. v1.0.1 +5 (input_system 순서/참조 ×2, Bounds default ×2, ScriptComponent default ×1). v1.0.3 +4 (canonicalize_friendly Windows verbatim strip ×3 + cross-OS integration ×1). v1.0.8 +21 (parser panic-resistance fuzz: PNG ×4 + JPG ×4 + GLTF ×5 + OBJ ×4 + WAV ×4).
+## 테스트: ~998개 통과 (Windows host, `cargo test --workspace`). `--lib` 기준은 968 (voltex_cli 는 bin-only 라 lib count 에서 빠지나 `cargo test -p voltex_cli` 로 30 개 실행됨). macOS host 에서는 +2 (CoreAudio 모듈) = 1000 예상. v1.0.1 +5 (input_system 순서/참조 ×2, Bounds default ×2, ScriptComponent default ×1). v1.0.3 +4 (canonicalize_friendly Windows verbatim strip ×3 + cross-OS integration ×1). v1.0.8 +21 (parser panic-resistance fuzz: PNG ×4 + JPG ×4 + GLTF ×5 + OBJ ×4 + WAV ×4). v1.0.9 +30 (OGG +11 + Vorbis +17 + decode_ogg_vorbis_bytes +2 — 모두 wire 직전까지 dead, 이제 실 컴파일).
 
 - voltex: 2 (M6: prelude/module 경로 컴파일 검증)
 - voltex_math: 39 (8-7 +2: inverse roundtrip × VP+translation)
@@ -528,7 +562,7 @@ crates/
 - voltex_renderer: 200
 - voltex_renderer_ecs: 7 (C0b 신규: RenderAssets material roundtrip ×2, missing handle ×2, items empty/skip-no-mesh/stale/hierarchy)
 - voltex_physics: 106
-- voltex_audio: 89 (Windows host). macOS host: 91 (B3 +2: format constants + ASBD struct size, cfg(target_os = "macos"))
+- voltex_audio: 119 (v1.0.9 +30 from wiring previously-dead ogg+vorbis modules; was 89). Windows host. macOS host: +2 (B3 CoreAudio) = 121
 - voltex_ai: 34
 - voltex_net: 47
 - voltex_script: 42 (S1 +12: pool ×6 [get_or_create same/load/reload/unknown/poll_reload/clear], system ×4 [start/update/5-cubes/missing-callbacks], engine_api ×2 [iter_entities/iter_by_tag])

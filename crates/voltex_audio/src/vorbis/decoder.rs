@@ -1,6 +1,11 @@
 // ---------------------------------------------------------------------------
 // Audio packet decode (per-frame, post-headers)
 // ---------------------------------------------------------------------------
+//
+// Vorbis spec § 4.3 uses cross-channel index loops (per-channel arrays
+// addressed by the same index). Iterator translation hides the parallel
+// addressing — keep index loops.
+#![allow(clippy::needless_range_loop)]
 
 use super::bit_reader::{ilog, BitReader};
 use super::floor::decode_floor1_packet;
@@ -146,9 +151,7 @@ pub(super) fn decode_audio_packet(
 
     let overlap = if prev_n > 0 { prev_n.min(n) / 2 } else { 0 };
 
-    let output_samples;
-
-    if prev_window.is_empty() || prev_n == 0 {
+    let output_samples = if prev_window.is_empty() || prev_n == 0 {
         // First frame: no overlap, just store for next frame
         *prev_window = pcm_channels;
         *prev_block_flag = Some(block_flag);
@@ -186,8 +189,8 @@ pub(super) fn decode_audio_packet(
             }
         }
 
-        output_samples = frame_output;
-    }
+        frame_output
+    };
 
     *prev_window = pcm_channels;
     *prev_block_flag = Some(block_flag);

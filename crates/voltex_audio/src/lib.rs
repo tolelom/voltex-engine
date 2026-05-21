@@ -1,10 +1,8 @@
 pub mod error;
 pub mod audio_clip;
 pub mod wav;
-// `ogg` + `vorbis` are intentionally NOT registered here in v1.0.x.
-// Their source exists under src/ but is not in the compilation graph —
-// v1.0.8 surfaced this as an unintentional deferral from Phase 6-1.
-// Wiring (+ clippy/audio-path integration) is scheduled for v1.0.9.
+pub mod ogg;
+pub mod vorbis;
 pub mod mixing;
 #[cfg(target_os = "windows")]
 pub mod wasapi;
@@ -21,6 +19,19 @@ pub use error::{AudioError, Result};
 pub use audio_clip::AudioClip;
 pub use audio_source::AudioSource;
 pub use wav::{parse_wav, generate_wav_bytes};
+pub use ogg::parse_ogg;
+pub use vorbis::decode_vorbis;
+
+/// Decode an in-memory OGG/Vorbis byte slice into an [`AudioClip`].
+///
+/// Composes [`ogg::parse_ogg`] (container) and [`vorbis::decode_vorbis`]
+/// (codec). Returns `Err` on malformed container, missing/invalid Vorbis
+/// headers, or unsupported codec features (Vorbis simplified — scalar
+/// codebooks + floor1 + residue2 only).
+pub fn decode_ogg_vorbis_bytes(data: &[u8]) -> Result<AudioClip> {
+    let packets = ogg::parse_ogg(data)?;
+    vorbis::decode_vorbis(&packets)
+}
 pub use mixing::{PlayingSound, mix_sounds};
 pub use audio_system::AudioSystem;
 pub use spatial::{Listener, SpatialParams, distance_attenuation, stereo_pan, compute_spatial_gains};

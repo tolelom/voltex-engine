@@ -1,6 +1,11 @@
 // ---------------------------------------------------------------------------
 // MDCT (Modified Discrete Cosine Transform) — inverse + window
 // ---------------------------------------------------------------------------
+//
+// IMDCT uses indices i,k in the cosine-table equation. Index loops mirror
+// the standard MDCT formulation — iterator translation would obscure
+// the closed-form summation.
+#![allow(clippy::needless_range_loop)]
 
 use std::f32::consts::PI;
 

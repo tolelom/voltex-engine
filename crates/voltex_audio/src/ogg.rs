@@ -28,13 +28,18 @@ pub fn parse_ogg_pages(data: &[u8]) -> crate::Result<Vec<OggPage>> {
     let mut offset = 0;
 
     while offset < data.len() {
-        if offset + 27 > data.len() {
+        // Magic check first — for short inputs that don't look like OGG at all,
+        // surface "invalid capture pattern" rather than the more generic
+        // "no pages found" (only valid OGG should produce the size-truncation
+        // path below).
+        if offset + 4 > data.len() {
             break;
         }
-
-        // Capture pattern "OggS"
         if &data[offset..offset + 4] != b"OggS" {
             return Err(format!("Invalid OGG capture pattern at offset {}", offset).into());
+        }
+        if offset + 27 > data.len() {
+            break;
         }
 
         let version = data[offset + 4];
@@ -126,11 +131,10 @@ pub fn extract_packets(pages: &[OggPage]) -> crate::Result<Vec<Vec<u8>>> {
 
             // A segment length < 255 terminates the current packet.
             // A segment length of exactly 255 means the packet continues in the next segment.
-            if seg_len < 255 {
-                if !current_packet.is_empty() {
+            if seg_len < 255
+                && !current_packet.is_empty() {
                     packets.push(std::mem::take(&mut current_packet));
                 }
-            }
             // If seg_len == 255 and this is the last segment of the page,
             // the packet continues on the next page.
             let _ = seg_idx; // suppress unused warning
@@ -172,15 +176,13 @@ mod tests {
         let mut segment_table = Vec::new();
         let mut page_data = Vec::new();
 
-        for (i, packet) in packets_data.iter().enumerate() {
+        for packet in packets_data {
             let len = packet.len();
             // Write full 255-byte segments
             let full_segments = len / 255;
             let remainder = len % 255;
 
-            for _ in 0..full_segments {
-                segment_table.push(255u8);
-            }
+            segment_table.resize(segment_table.len() + full_segments, 255u8);
             // Terminating segment (< 255), even if 0 to signal end of packet
             segment_table.push(remainder as u8);
 

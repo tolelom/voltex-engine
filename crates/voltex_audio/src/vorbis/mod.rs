@@ -91,14 +91,17 @@ mod tests {
 
     #[test]
     fn bitreader_basics() {
+        // byte 0 = 0xB4 = 0b10110100, byte 1 = 0x69 = 0b01101001.
+        // BitReader reads LSB-first within each byte.
         let data = [0b10110100u8, 0b01101001u8];
         let mut r = BitReader::new(&data);
 
-        // Read 3 bits from byte 0: 0b100 = 4 (LSB first)
+        // First 3 bits (byte 0 bits 0..2): 0,0,1 → 0b100 = 4
         assert_eq!(r.read_bits(3).unwrap(), 0b100);
-        // Next 5 bits: 0b10110 from the rest of byte 0 (5 bits) = 0b10110 but we need
-        // bits 3..7 of byte0 = 1011, then bit 0 of byte1 = 1 → 0b1_1011 = 0b11011 = 27
-        assert_eq!(r.read_bits(5).unwrap(), 0b1_1011);
+        // Next 5 bits (byte 0 bits 3..7): 0,1,1,0,1 → 0b10110 = 22
+        assert_eq!(r.read_bits(5).unwrap(), 0b10110);
+        // Following 8 bits = full byte 1 = 0x69 = 105
+        assert_eq!(r.read_bits(8).unwrap(), 0x69);
     }
 
     #[test]
@@ -179,7 +182,7 @@ mod tests {
 
         // All values should be in [0, 1]
         for &v in &w {
-            assert!(v >= 0.0 && v <= 1.0, "Window value out of range: {}", v);
+            assert!((0.0..=1.0).contains(&v), "Window value out of range: {}", v);
         }
     }
 
@@ -221,6 +224,24 @@ mod tests {
         let result = decode_vorbis(&packets);
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("at least 3"));
+    }
+
+    #[test]
+    fn decode_ogg_vorbis_bytes_empty() {
+        let result = crate::decode_ogg_vorbis_bytes(&[]);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn decode_ogg_vorbis_bytes_invalid_magic() {
+        let result = crate::decode_ogg_vorbis_bytes(b"NotOggVorbis");
+        assert!(result.is_err());
+        let msg = result.unwrap_err().to_string();
+        assert!(
+            msg.contains("capture pattern") || msg.contains("OGG"),
+            "expected OGG-related error, got: {}",
+            msg
+        );
     }
 
     #[test]

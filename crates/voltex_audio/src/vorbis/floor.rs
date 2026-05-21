@@ -1,6 +1,11 @@
 // ---------------------------------------------------------------------------
 // Floor type 1 (config + audio-packet decode)
 // ---------------------------------------------------------------------------
+//
+// Vorbis spec § 7.2 uses indexed equations on the sorted x_list / y_list
+// arrays. Iterator translation obscures the spec equations — keep
+// index loops where the index is itself part of the equation.
+#![allow(clippy::needless_range_loop)]
 
 use super::bit_reader::{ilog, BitReader};
 use super::codebook::Codebook;
@@ -150,9 +155,7 @@ pub(super) fn decode_floor1_packet(
     let mut final_y = vec![0i32; n_points];
 
     // Step 1: Amplitude value synthesis (simplified — just use raw y values)
-    for i in 0..n_points {
-        final_y[i] = y_list[i];
-    }
+    final_y[..n_points].copy_from_slice(&y_list[..n_points]);
 
     // Step 2: Curve synthesis — iterate through sorted x positions
     let sorted = &floor.sorted_order;

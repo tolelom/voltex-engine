@@ -10,6 +10,62 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## [v1.0.9] — 2026-05-21 — OGG/Vorbis lib.rs wire + clippy 27→0 + AudioClip entry point
+
+First cycle of the **service-readiness roadmap**
+(`docs/superpowers/specs/2026-05-21-service-readiness-roadmap.md`).
+Resolves the dead-module regression discovered in v1.0.8.
+
+### Fixed
+
+- `crates/voltex_audio/src/lib.rs` was missing `pub mod ogg;` and
+  `pub mod vorbis;`, leaving ~1.5k lines of Phase 6-1 source code out
+  of the compilation graph. STATUS's "OGG/Vorbis decoder 자체 구현 완료"
+  claim was therefore false. Now wired.
+- `voltex_audio` clippy warnings: 24 lib + 3 test → **0** (with
+  `-D warnings`). Combination of `cargo clippy --fix` (5 auto),
+  per-file `#![allow(clippy::needless_range_loop)]` on the 6 Vorbis
+  sub-modules (each with a one-line spec-traceability justification),
+  and 4 substantive fixes (`needless_late_init`, `manual_memcpy`,
+  `enumerate_discard_index`, `same_item_push`).
+- Two latent test regressions surfaced by re-enabling compilation:
+  - `ogg::tests::invalid_capture_pattern` — short inputs went down
+    the size-truncation branch and returned the generic "No OGG
+    pages found" instead of "Invalid OGG capture pattern". Fixed by
+    moving the magic check ahead of the 27-byte header size check;
+    4 bytes are enough to commit on the magic.
+  - `vorbis::tests::bitreader_basics` — assertion arithmetic was
+    wrong (author over-counted the bits remaining in byte 0).
+    Replaced with a correct expectation (22 not 27) plus an
+    additional 8-bit read assertion, and clarified the comment.
+
+### Added
+
+- `voltex_audio::decode_ogg_vorbis_bytes(&[u8]) -> Result<AudioClip>`
+  — single entry point that composes `ogg::parse_ogg` and
+  `vorbis::decode_vorbis`. External callers can decode `.ogg` bytes
+  in one call.
+- Re-exports: `voltex_audio::{parse_ogg, decode_vorbis}` at crate
+  root (previously only reachable via the now-public `ogg` /
+  `vorbis` modules).
+
+### Tests
+
+- `voltex_audio` lib: 89 → **119** (+30) — ogg ×11 (4 original +
+  4 fuzz + 1 invalid_capture rewrite + 2 entry-point), vorbis ×17
+  (11 original + 1 BitReader 8-bit read + 5 more headers/imdct/
+  decoder/floor coverage), `decode_ogg_vorbis_bytes` ×2.
+- Workspace lib: 942 → **~968**.
+
+### Known limits (deferred)
+
+- Decoding real `.ogg` files end-to-end is **not** verified — the
+  Vorbis decoder is simplified (scalar codebooks only, no coupled
+  channels, residue type 2 only). `audio_demo` does not yet load
+  OGG. Both deferred to a later v1.0.x cycle.
+
+---
+
 ## [v1.0.8] — 2026-05-21 — parser panic-resistance fuzz tests + OGG/Vorbis dead-module discovery
 
 ### Added (21 new panic-resistance tests across 5 parsers)

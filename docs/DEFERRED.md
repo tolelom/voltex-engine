@@ -196,5 +196,6 @@
 - **THIRD-PARTY-LICENSES.md 를 `voltex build` artifact 에 동봉** — 현재 `dist/<name>.exe` 옆에 안 들어감. v1.1+.
 - **`cargo-deny` 통합** — license + advisory + duplicate 통합 스캔. 현재 cargo-audit + cargo-about 으로 대체 가능. v1.1+.
 - **parser panic-resistance fuzz** ✅ v1.0.8 — 21 신규 test (PNG/JPG/WAV/GLTF/OBJ), panic 0건. 외부 dep 없는 inline xorshift32.
-- **OGG/Vorbis lib.rs 등록** — Phase 6-1 코드 존재하지만 `mod` 선언 없어 cargo가 컴파일 안 함. 임시 wire 시 27 clippy + 4 dead_code error 동반. v1.0.9 분리.
+- **OGG/Vorbis lib.rs 등록** ✅ v1.0.9 — `pub mod ogg; pub mod vorbis;` 등록 + clippy 27→0 (자동 5 + #![allow] 6 파일 + 진짜 fix 4) + `decode_ogg_vorbis_bytes` 진입점. 숨겨진 테스트 회귀 2건 (ogg invalid_capture_pattern, vorbis bitreader_basics) fix. voltex_audio 89→119 tests.
 - **coverage-guided fuzzing (cargo-fuzz / honggfuzz)** — 현재 deterministic xorshift32 만. nightly toolchain + libfuzzer 인프라는 v1.1+.
+- **실제 `.ogg` 파일 디코드 검증** — v1.0.9 는 unit test (≤100 byte 합성 입력) 만. Vorbis decoder 자체가 simplified (scalar codebook only, no coupled channels). 실 파일 + audio_demo 통합은 v1.0.x+.

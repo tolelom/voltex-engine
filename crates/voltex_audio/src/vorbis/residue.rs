@@ -1,6 +1,11 @@
 // ---------------------------------------------------------------------------
 // Residue (config + audio-packet decode)
 // ---------------------------------------------------------------------------
+//
+// Vorbis spec § 8.6 residue type 2 (interleaved) uses indexed partition +
+// classification loops where the index addresses parallel arrays
+// (cascade[i], books[i][j], classifications[j]). Keep index loops.
+#![allow(clippy::needless_range_loop)]
 
 use super::bit_reader::BitReader;
 use super::codebook::Codebook;

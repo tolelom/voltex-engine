@@ -1,6 +1,10 @@
 // ---------------------------------------------------------------------------
 // Vorbis headers (id + setup) and the per-frame Mapping/Mode tables they own.
 // ---------------------------------------------------------------------------
+//
+// Vorbis spec § 4.2.4 references the channel index `ch` in equations for
+// mapping.mux[ch]. Keep the indexed loop for spec traceability.
+#![allow(clippy::needless_range_loop)]
 
 use super::bit_reader::{ilog, BitReader};
 use super::codebook::{decode_codebook, Codebook};

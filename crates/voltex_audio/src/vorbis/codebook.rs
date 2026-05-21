@@ -1,6 +1,11 @@
 // ---------------------------------------------------------------------------
 // Codebook (scalar + VQ decode + setup parsing)
 // ---------------------------------------------------------------------------
+//
+// Vorbis spec § 3.2 uses indexed equations on parallel arrays (lengths +
+// codewords + values). Iterator translations sacrifice spec line-by-line
+// traceability without measurable benefit — keep index loops.
+#![allow(clippy::needless_range_loop)]
 
 use super::bit_reader::{bit_reverse, float32_unpack, ilog, lookup1_values, BitReader};
 
@@ -36,7 +41,7 @@ impl Codebook {
                 // Try to match what we have
                 break;
             }
-            let bit = reader.read_bits(1)? as u32;
+            let bit = reader.read_bits(1)?;
             code |= bit << code_len;
             code_len += 1;
 
