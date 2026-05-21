@@ -1,8 +1,7 @@
 # Voltex Examples — Catalog
 
-각 example 은 `cargo run -p <name>` 으로 실행. 더 자세한 정보는
-크레이트별 `Cargo.toml` 의 `[package].description` 또는 소스 코드의
-모듈 헤더 주석 참고.
+각 example 은 `cargo run -p <name>` 으로 실행. 더 자세한 정보는 example
+디렉토리의 `README.md` (v1.0.38 부터) 또는 소스 코드의 모듈 헤더 주석 참고.
 
 > **시각 검증 한계**: GUI 자동화가 없어 README 의 동작 묘사는 _개발 호스트
 > (Windows) 에서의 수동 실행 결과 기준_. 다른 OS / 머신에서의 실측은

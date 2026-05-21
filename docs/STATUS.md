@@ -173,6 +173,17 @@
 
 v1.0.9 부터는 **서비스 배포 완성도** 로드맵 (`docs/superpowers/specs/2026-05-21-service-readiness-roadmap.md`) 기준으로 진행.
 
+### v1.0.38 (2026-05-21) — Per-example READMEs
+
+P2. v1.0.15 의 `examples/README.md` catalog 는 menu 역할, 각 example 의 detail 은 모듈 헤더 comment. v1.0.38 에서 example 마다 focused README.
+
+**신규** (15 파일):
+- `examples/{triangle,model_viewer,many_cubes,hierarchy_demo,asset_demo,pbr_demo,multi_light_demo,shadow_demo,ibl_demo,deferred_demo,audio_demo,editor_demo,runtime_demo,tutorial_minigame,survivor_game}/README.md`
+- 각자 일관된 섹션: What it demonstrates / Run / Controls / Next step
+- `examples/README.md` catalog 갱신: per-example doc 안내로 문구 수정
+
+**runtime_demo README**: v1.0.32 HUD 와이어링 (title bar = `"voltex_runtime: solar system | N planets, M moons | XX fps"`) 설명 포함.
+
 ### v1.0.37 (2026-05-21) — voltex_renderer 100% missing_docs + `#![warn(missing_docs)]`
 
 워크스페이스 missing_docs sweep 13번째이자 마지막 crate. 약 80 파일 — 워크스페이스 최대 crate. 513 → 0.

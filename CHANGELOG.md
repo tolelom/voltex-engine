@@ -10,6 +10,27 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## [v1.0.38] — 2026-05-21 — Per-example READMEs
+
+P2 service-readiness item. v1.0.15 added `examples/README.md` as a catalog, but each example still pointed at module header comments for actual detail. v1.0.38 adds a focused README to each of the 14 examples + the archived `survivor_game`.
+
+### Added
+
+Per-example `README.md` files with consistent sections (what it demonstrates / run command / controls / next step):
+
+- `triangle`, `model_viewer`, `many_cubes`, `hierarchy_demo`, `asset_demo`
+- `pbr_demo`, `multi_light_demo`, `shadow_demo`, `ibl_demo`, `deferred_demo`
+- `audio_demo`, `editor_demo`, `runtime_demo`, `tutorial_minigame`
+- `survivor_game` (archive note pointing at the v1.0 flagship)
+
+`examples/README.md` catalog updated to point at the new per-example docs.
+
+### Notes
+
+The runtime_demo README documents the HUD wiring added in v1.0.32 — title bar shows `"voltex_runtime: solar system | N planets, M moons | XX fps"`.
+
+---
+
 ## [v1.0.37] — 2026-05-21 — `voltex_renderer` 100% documented (→ 0 `missing_docs`)
 
 Thirteenth and last crate in the workspace `missing_docs` sweep. Largest crate in the workspace — ~80 source files, 513 initial warnings.
