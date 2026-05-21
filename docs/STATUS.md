@@ -166,10 +166,45 @@
 - examples/editor_demo: 시드 엔티티 (ground + 3 cube + Cube1↔Cube2 hierarchy)를 `EditorSession::dispatch` 경로로 옮김 → jsonl 로그 + Save/Load round-trip 일관성
 - v1 한계 (문서화): picking은 sphere 근사 (메시 AABB는 미구현). gizmo translate/rotate/scale 핸들은 미구현
 
-## 🎉 v1.0 release — 2026-05-21 (tag `v1.0.0`) → **v1.0.1** + **v1.0.2** + **v1.0.3** + **v1.0.4** patches
+## 🎉 v1.0 release — 2026-05-21 (tag `v1.0.0`) → **v1.0.1** + **v1.0.2** + **v1.0.3** + **v1.0.4** + **v1.0.5** patches
 
 15 cycle / 37 세션 / 약 4 일에 걸쳐 진행된 v1.0 로드맵 완료. 회고는
 [docs/v1.0-retrospective.md](v1.0-retrospective.md). 미뤄진 항목은 v1.1+ 후속.
+
+### v1.0.5 (2026-05-21) — clippy clean (84 → 0) + cargo audit + CI 워크플로
+
+**"quality gate" 패치**. v1.0.3 (Windows build P0) / v1.0.4 (clippy deny error) 모두 `cargo build` + `cargo test --lib` 의 단일 게이트만 있었던 게 회귀를 가린 원인 → 이번 사이클이 그 구멍을 막음.
+
+**clippy 워닝 84 → 0**:
+- baseline: `cargo clippy --workspace --all-targets` 84 lines (51 unique diagnostics, 13 카테고리).
+- **auto-fix 43건**: `cargo clippy --fix --workspace --all-targets` → manual_div_ceil ×13, RangeInclusive::contains ×4, excessive_precision ×4, manual_is_multiple_of ×1, collapsible_if ×1, identity_op ×1, len_zero ×1, unwrap_or_else_default ×1, needless_range_loop 일부.
+- **manual fix 24건**:
+  - dead code 2건 삭제 (`voltex_audio::make_stereo_clip`, `voltex_ecs::world::tests::Name`).
+  - `voltex_script::state` ×5: `b"name\0".as_ptr() as *const _` → `c"name".as_ptr()` (Rust 1.77+ c-string literal).
+  - `voltex_renderer::jpg::mod` ×4: `for _ in 0..N { push }` → `extend_from_slice(&[byte; N])` (JPEG marker padding).
+  - `needless_range_loop` index-essential 4건 (mat4, sh): `#[allow]` + 코멘트.
+  - `too_many_arguments` 3건 (hierarchy::draw_entity_node, picking::pick_entity, deferred_demo::create_shadow_bind_group): `#[allow]` + 코멘트 (struct 묶기는 v1.1).
+  - `voltex_cli::manifest::extract_build` 의 `very_complex_type` (6-tuple) → `BuildConfig` 직접 반환으로 리팩토링 (callsite 코드 더 짧아짐).
+  - examples 작은 loop refactor 3건.
+
+**`.github/workflows/ci.yml` 신규**:
+- matrix: ubuntu-latest + windows-latest (blocking) + macos-latest (advisory, `continue-on-error: true`).
+- gate 4단계: `cargo build --workspace` → `cargo clippy --workspace --all-targets -- -D warnings` → `cargo test --workspace --lib` → `cargo test -p voltex_cli`.
+- Linux 잡은 `libasound2-dev` 자동 install (voltex_audio ALSA FFI link 용).
+- README "Contributing" 섹션에 동일 4-command 로컬 verify 레시피 문서화.
+- CI 파일은 GitHub Actions 표준이지만 gitea/forgejo 호환. 비-GitHub 원격에서는 inert.
+
+**`cargo audit`**:
+- 298 crate 스캔 (1,096 advisory 대비). **vulnerability 0건**.
+- **warning 1건**: `paste 1.0.15` unmaintained (RUSTSEC-2024-0436). transitive (`paste ← metal ← wgpu-hal ← wgpu`), voltex 통제 불가. 향후 wgpu 업그레이드로 해결.
+
+**셀프 피드백** (각 단계 후 검증):
+- 단계 1 baseline: 84 워닝.
+- 단계 2 auto-fix 후: 41 워닝, 921 lib tests 통과.
+- 단계 3 manual fix 후: **0 워닝**, 921 lib tests + 30 voltex_cli tests 통과.
+- 단계 5 CI gate 로컬 재실행: `RUSTFLAGS="-D warnings"` 환경에서 4 명령 모두 green.
+
+deferred to v1.1+: 실제 GitHub runner 첫 green run (mirror 필요), `cargo audit` CI 통합 (별도 install step 필요), 3-OS exe runtime 검증.
 
 ### v1.0.4 (2026-05-21) — clippy `approx_constant` clean + README 의존성 정직성
 
@@ -437,7 +472,7 @@ crates/
 ```bash
 git clone https://git.tolelom.xyz/tolelom/game_engine
 cd game_engine
-cargo test --workspace --lib   # 검증: 760개 통과해야 함
+cargo test --workspace --lib   # 검증: 921개 통과해야 함 (v1.0.5 시점)
 ```
 
 진행 상황과 다음 단계는 이 파일과 `docs/DEFERRED.md`, `docs/superpowers/plans/`, `docs/superpowers/specs/` 를 본다. 자동 루프가 master에 계속 작업을 푸시할 수 있으므로 작업 전 `git pull --ff-only` 필수.
