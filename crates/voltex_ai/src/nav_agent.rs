@@ -1,16 +1,24 @@
+//! `NavAgent` ECS component: target + computed waypoint path + progress state.
+
 use voltex_math::Vec3;
 
 /// ECS component for AI pathfinding navigation.
 #[derive(Debug, Clone)]
 pub struct NavAgent {
+    /// Goal position; `None` while the agent is idle.
     pub target: Option<Vec3>,
+    /// Movement speed in world units per second.
     pub speed: f32,
+    /// Sequence of waypoints from the agent's current position to `target`.
     pub path: Vec<Vec3>,
+    /// Index into `path` of the waypoint the agent is currently heading to.
     pub current_waypoint: usize,
+    /// `true` once the agent has reached the final waypoint.
     pub reached: bool,
 }
 
 impl NavAgent {
+    /// Creates an idle agent with the given movement `speed`.
     pub fn new(speed: f32) -> Self {
         NavAgent {
             target: None,
@@ -21,6 +29,7 @@ impl NavAgent {
         }
     }
 
+    /// Sets a new target and resets the cached path / waypoint / reached flag.
     pub fn set_target(&mut self, target: Vec3) {
         self.target = Some(target);
         self.path.clear();
@@ -28,6 +37,7 @@ impl NavAgent {
         self.reached = false;
     }
 
+    /// Clears the target, cached path, and progress state — agent is idle again.
     pub fn clear_target(&mut self) {
         self.target = None;
         self.path.clear();

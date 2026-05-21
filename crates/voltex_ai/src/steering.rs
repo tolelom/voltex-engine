@@ -1,15 +1,24 @@
+//! Reynolds-style steering behaviours (seek/flee/arrive/wander/follow_path).
+//! Each free function returns a desired steering force; integration is left to
+//! the caller.
+
 use voltex_math::Vec3;
 
 /// An agent that can be steered through the world.
 #[derive(Debug, Clone)]
 pub struct SteeringAgent {
+    /// World position.
     pub position: Vec3,
+    /// Current velocity (world units / second).
     pub velocity: Vec3,
+    /// Velocity magnitude cap.
     pub max_speed: f32,
+    /// Steering-force magnitude cap (applied each behaviour call).
     pub max_force: f32,
 }
 
 impl SteeringAgent {
+    /// Creates an agent at `position` with zero velocity and the given caps.
     pub fn new(position: Vec3, max_speed: f32, max_force: f32) -> Self {
         Self {
             position,

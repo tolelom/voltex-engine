@@ -1,3 +1,15 @@
+//! # voltex_ai
+//!
+//! AI primitives for the engine:
+//!
+//! - [`NavMesh`] — triangle-based navigation mesh.
+//! - [`find_path`] — A\* pathfinding over a [`NavMesh`].
+//! - [`NavAgent`] — ECS component tracking target + computed waypoint path.
+//! - [`SteeringAgent`] + [`seek`] / [`flee`] / [`arrive`] / [`wander`] /
+//!   [`follow_path`] — Reynolds-style steering behaviours.
+
+#![warn(missing_docs)]
+
 pub mod error;
 pub mod nav_agent;
 pub mod navmesh;

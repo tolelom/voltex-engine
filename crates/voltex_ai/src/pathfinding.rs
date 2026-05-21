@@ -1,3 +1,7 @@
+//! A* pathfinding over a [`NavMesh`]. Returns waypoint vectors threaded
+//! through triangle centroids; consumers typically run a funnel / string-pulling
+//! step afterwards to straighten the corridor.
+
 use std::collections::BinaryHeap;
 use std::cmp::Ordering;
 use voltex_math::Vec3;

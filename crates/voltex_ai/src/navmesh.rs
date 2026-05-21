@@ -1,3 +1,5 @@
+//! Navigation mesh data structure used by [`find_path`](crate::find_path).
+
 use voltex_math::Vec3;
 
 /// A triangle in the navigation mesh, defined by vertex indices and neighbor triangle indices.
@@ -11,11 +13,15 @@ pub struct NavTriangle {
 
 /// Navigation mesh composed of triangles for pathfinding.
 pub struct NavMesh {
+    /// All triangle vertex positions.
     pub vertices: Vec<Vec3>,
+    /// Triangles indexing into [`vertices`](Self::vertices), with adjacency.
     pub triangles: Vec<NavTriangle>,
 }
 
 impl NavMesh {
+    /// Builds a navmesh from pre-computed vertex + triangle arrays. The caller
+    /// is responsible for the `neighbors` adjacency being consistent.
     pub fn new(vertices: Vec<Vec3>, triangles: Vec<NavTriangle>) -> Self {
         Self { vertices, triangles }
     }

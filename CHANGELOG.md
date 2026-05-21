@@ -10,6 +10,31 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## [v1.0.23] — 2026-05-21 — `voltex_ai` 100% documented (→ 0 `missing_docs`)
+
+Fifth crate in the workspace `missing_docs` sweep. Covers NavMesh / NavTriangle / NavAgent / find_path / SteeringAgent + 5 steering behaviours across 5 source files.
+
+### Added
+
+- Crate-level docstring + `#![warn(missing_docs)]` guard.
+- Module headers for `nav_agent` / `navmesh` / `pathfinding` / `steering` / `error`.
+- Public field + method docs:
+  - `NavAgent` (5 fields, `new`/`set_target`/`clear_target`).
+  - `NavMesh` (vertices/triangles fields, `new`).
+  - `SteeringAgent` (4 fields, `new`).
+  - `AiError` enum-level doc.
+
+### Verified
+
+- `cargo build -p voltex_ai` — zero `missing_docs` warnings.
+- `cargo test -p voltex_ai --lib` — 34 passed.
+
+### Notes
+
+`obstacle.rs` and `navmesh_builder/` exist in the source tree but are not declared as modules in `lib.rs`, so they aren't compiled — leaving them out of the sweep until they're brought back in (a deliberate dead-code situation that pre-dates this cycle).
+
+---
+
 ## [v1.0.22] — 2026-05-21 — `voltex_net` 100% documented (71 → 0 `missing_docs`)
 
 Fourth crate in the workspace `missing_docs` sweep. Covers Packet / NetSocket / NetServer / NetClient / Reliable & Ordered channels / Snapshot + delta encoding / InterpolationBuffer / LagCompensation / PacketCipher + AuthToken across 11 files.

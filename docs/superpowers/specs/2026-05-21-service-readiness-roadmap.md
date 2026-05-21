@@ -82,7 +82,8 @@
 | 11 | v1.0.19 voltex_math missing_docs 59→0 | `[✅]` | (inline STATUS § v1.0.19) | 8b44fed |
 | 12 | v1.0.20 voltex_platform missing_docs 38→0 | `[✅]` | (inline STATUS § v1.0.20) | ced2333 |
 | 13 | v1.0.21 voltex_asset missing_docs 64→0 | `[✅]` | (inline STATUS § v1.0.21) | 338e815 |
-| 14 | v1.0.22 voltex_net missing_docs 71→0 | `[✅]` | (inline STATUS § v1.0.22) | (pending commit) |
+| 14 | v1.0.22 voltex_net missing_docs 71→0 | `[✅]` | (inline STATUS § v1.0.22) | 4a26514 |
+| 15 | v1.0.23 voltex_ai missing_docs →0 | `[✅]` | (inline STATUS § v1.0.23) | (pending commit) |
 | 7 | v1.0.15 cargo-deny | `[ ]` | — | — |
 | 8 | v1.0.16 CHANGELOG enforcement | `[ ]` | — | — |
 | 9 | v1.0.17 SemVer check | `[ ]` | — | — |

@@ -173,6 +173,25 @@
 
 v1.0.9 부터는 **서비스 배포 완성도** 로드맵 (`docs/superpowers/specs/2026-05-21-service-readiness-roadmap.md`) 기준으로 진행.
 
+### v1.0.23 (2026-05-21) — voltex_ai 100% missing_docs + `#![warn(missing_docs)]`
+
+다섯 번째 crate. 5 모듈 (error/nav_agent/navmesh/pathfinding/steering).
+
+**작업**:
+- Crate-level docstring + `#![warn(missing_docs)]`.
+- 모듈 헤더 4개 (nav_agent/navmesh/pathfinding/steering).
+- Public API:
+  - `NavAgent` (target/speed/path/current_waypoint/reached + new/set_target/clear_target)
+  - `NavMesh` (vertices/triangles + new), `NavTriangle` (이미 doc 있음)
+  - `SteeringAgent` (position/velocity/max_speed/max_force + new)
+  - `AiError` enum-level doc
+
+**검증**:
+- `cargo build -p voltex_ai` — 0 missing_docs warning.
+- `cargo test -p voltex_ai --lib` — 34 통과.
+
+**한계**: `obstacle.rs` 및 `navmesh_builder/` 는 `lib.rs` 에 mod 선언이 없어서 컴파일되지 않음 — 이 cycle 의 sweep 대상 외 (사전 dead-code).
+
 ### v1.0.22 (2026-05-21) — voltex_net 100% missing_docs (71 → 0) + `#![warn(missing_docs)]`
 
 네 번째 crate. 11 파일 (lib/error/packet/socket/server/client/reliable/snapshot/interpolation/lag_compensation/encryption).

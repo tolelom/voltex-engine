@@ -1,3 +1,7 @@
+//! Crate-wide error type and `Result` alias for `voltex_ai`.
+
+/// All errors produced by `voltex_ai` operations (navmesh build, pathfinding,
+/// steering input validation).
 #[derive(Debug, thiserror::Error)]
 pub enum AiError {
     /// String 메시지를 그대로 보존하는 generic variant (마이그레이션 호환).
