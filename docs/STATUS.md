@@ -173,6 +173,19 @@
 
 v1.0.9 부터는 **서비스 배포 완성도** 로드맵 (`docs/superpowers/specs/2026-05-21-service-readiness-roadmap.md`) 기준으로 진행.
 
+### v1.0.49 (2026-05-22) — propagate_transforms cycle / depth-limit
+
+P0 robustness round 10. v1.0.42 의 `add_child` 사이클 가드는 새 hierarchy 변경만 막음 — scene 파일에서 raw `world.add(_, Children(_))` / `world.add(_, Parent(_))` 로 로드한 사이클은 `propagate_transforms` 의 재귀에서 스택 오버플로 유발.
+
+**Fix (`voltex_ecs/src/world_transform.rs`)**:
+- `MAX_HIERARCHY_DEPTH = 1024` 도입 — 현실적 hierarchy 의 깊이 (5~10) 보다 한참 위, 사이클 / 적대적 scene 만 잡음
+- `propagate_entity` 가 depth 인자를 받아 한계 초과시 graceful return
+
+**검증**:
+- voltex_ecs 144 → 146 (+2). 회귀 테스트:
+  - `world_transform::tests::propagate_transforms_does_not_overflow_on_raw_cycle` — A↔B raw cycle
+  - `world_transform::tests::propagate_transforms_handles_long_acyclic_chain` — 256-deep 정상 chain sanity
+
 ### v1.0.48 (2026-05-22) — Animation system: zero-duration / OOB keyframe / quat slerp NaN
 
 P0 robustness round 9. animation.rs 의 세 가지 잠재 NaN/panic 경로 정리:

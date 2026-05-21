@@ -10,6 +10,33 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## [v1.0.49] — 2026-05-22 — propagate_transforms cycle / depth-limit
+
+**Fix**. The `add_child` cycle guard introduced in v1.0.42 only catches cycles created *after* it landed. A scene file loaded via raw `world.add(_, Children(_))` / `world.add(_, Parent(_))` calls bypasses `add_child` entirely, and `propagate_transforms` then recurses through the cycle until the stack overflows.
+
+### Fixed
+
+- **`voltex_ecs::world_transform::propagate_transforms`** now accepts a `depth` argument and bails out at `MAX_HIERARCHY_DEPTH = 1024`. Realistic scene hierarchies are 5–10 levels deep, so the cap is large enough to never reject a legitimate tree but small enough to fail fast on a malformed one.
+
+### Tests
+
+`voltex_ecs` 144 → 146 (+2):
+
+- `voltex_ecs::world_transform::tests::propagate_transforms_does_not_overflow_on_raw_cycle` — explicit A↔B Parent/Children cycle.
+- `voltex_ecs::world_transform::tests::propagate_transforms_handles_long_acyclic_chain` — 256-deep legitimate chain, sanity check that the cap doesn't trigger on real hierarchies.
+
+### Verification
+
+- `cargo build --workspace` — clean.
+- `cargo clippy --workspace --all-targets -- -D warnings` — 0 warnings.
+- `cargo test --workspace --lib` — every crate green.
+
+### Notes
+
+GJK / EPA narrow-phase audited in this round; existing length / cross-product guards (`if dot.abs() < 1e-8 { return None }`, `length_squared() < 1e-10` checks, and `make_face` Vec3::Y fallback for degenerate triangles) cover the obvious NaN-source paths. No fixes needed there in this cycle.
+
+---
+
 ## [v1.0.48] — 2026-05-22 — Animation system zero-duration / OOB keyframe / quat slerp NaN
 
 **Fix**. Three latent NaN / panic paths in `voltex_renderer/src/animation.rs`:
