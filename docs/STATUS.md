@@ -166,10 +166,48 @@
 - examples/editor_demo: 시드 엔티티 (ground + 3 cube + Cube1↔Cube2 hierarchy)를 `EditorSession::dispatch` 경로로 옮김 → jsonl 로그 + Save/Load round-trip 일관성
 - v1 한계 (문서화): picking은 sphere 근사 (메시 AABB는 미구현). gizmo translate/rotate/scale 핸들은 미구현
 
-## 🎉 v1.0 release — 2026-05-21 (tag `v1.0.0`) → **v1.0.1** ~ **v1.0.6** patches
+## 🎉 v1.0 release — 2026-05-21 (tag `v1.0.0`) → **v1.0.1** ~ **v1.0.7** patches
 
 15 cycle / 37 세션 / 약 4 일에 걸쳐 진행된 v1.0 로드맵 완료. 회고는
 [docs/v1.0-retrospective.md](v1.0-retrospective.md). 미뤄진 항목은 v1.1+ 후속.
+
+### v1.0.7 (2026-05-21) — third-party license 인벤토리 + license-check CI
+
+v1.0 release 부터 "외부 의존 라이선스 고지 v1.0 release artifact 에 포함 예정" 으로 미뤄왔던 항목 해결.
+
+**`THIRD-PARTY-LICENSES.md` 자동 생성** (4,795 라인) — `cargo install --locked cargo-about --features cli` 후 `cargo about generate about.hbs -o THIRD-PARTY-LICENSES.md`. 모든 transitive Cargo dependency 가 SPDX license 별 grouping + license 텍스트 inline.
+
+**`about.toml` 정책 + `about.hbs` 템플릿** — accepted SPDX 리스트 (MIT/Apache-2.0/BSD/Zlib/ISC/Unicode/CC0/MPL-2.0/BSL/OFL). 리스트 밖이면 CI license-check 가 자동 실패.
+
+**`[workspace.package] license = "MIT OR Apache-2.0"`** + 31 워크스페이스 crate Cargo.toml 에 `license.workspace = true` 추가. 이전엔 모든 voltex crate 가 license metadata 없어서 cargo-about 가 워닝.
+
+**`.github/workflows/ci.yml` license-check 잡 추가** (Ubuntu, advisory):
+- `cargo-about` install (taiki-e/install-action) → `cargo about generate` 실행
+- 새 transitive 가 accepted 리스트 밖이거나 license 불명이면 advisory 실패
+
+**라이선스 분포** (284 license-bearing crates):
+| License | Crates |
+|---|---|
+| MIT | 264 |
+| Apache-2.0 | 11 |
+| Zlib | 3 |
+| BSD-3-Clause | 2 |
+| BSD-2-Clause | 1 |
+| CC0-1.0 | 1 |
+| ISC | 1 |
+| Unicode-3.0 | 1 |
+
+**GPL/AGPL/LGPL 0건, proprietary 0건** — MIT OR Apache-2.0 dual 과 100% 호환.
+
+**README "License" 섹션 재작성** — 이전 "v1.0 release 후 포함 예정" deferral 제거, THIRD-PARTY-LICENSES.md 링크 + count + 재생성 명령 + CI 통합 명시. 신규 배지 `licenses: permissive only`.
+
+**셀프 피드백** (각 단계 후 검증):
+- 단계 1 cargo-about install + 생성: 4,795 라인 파일.
+- 단계 2 분석: 8 distinct license, 모두 permissive.
+- 단계 3 README + CI: cosmetic only.
+- 단계 4 최종 gate: build / clippy / test / cargo about 모두 0 warning + 0 error. 921 lib + 30 cli 유지.
+
+deferred to v1.1+: license-check advisory → blocking 승격 (CI 실 runner 확인 후), THIRD-PARTY-LICENSES.md 를 `voltex_cli build` artifact 에 동봉, `cargo-deny` 통합.
 
 ### v1.0.6 (2026-05-21) — coverage baseline (82%) + advisory CI + CLI 친화성
 

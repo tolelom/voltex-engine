@@ -169,7 +169,7 @@
 - ~~**gizmo (translate/rotate/scale)**~~ ✅ Cycle 3 (E1) — translate/rotate/scale 3축 핸들 + LINE wgpu 파이프라인. End-drag 시 SetTransform 단일 undo 엔트리.
 - ~~**Despawn 정확한 undo**~~ ✅ Cycle 12 (E3) — `EntityAllocator::restore_at_generation` + 등록된 모든 컴포넌트 snapshot/restore. 슬롯 재사용 시 silent skip.
 
-## v1.0 / v1.0.1 / v1.0.2 / v1.0.3 / v1.0.4 / v1.0.5 / v1.0.6 추가 한계
+## v1.0 / v1.0.1 / v1.0.2 / v1.0.3 / v1.0.4 / v1.0.5 / v1.0.6 / v1.0.7 추가 한계
 
 - **3 OS exe artifact 검증** — Windows host 빌드 + runtime 검증만. Linux + macOS 실 머신 검증 v1.1 사용자 PR.
 - **Lua input API** — 입력은 Rust `add_input_system` 만. Lua 측 `input.is_key_pressed(...)` v1.1 후속.
@@ -191,3 +191,7 @@
 - **GPU/winit 의존 4 crate (renderer 66 / runtime 61 / renderer_ecs 54 / platform 46%) 의 coverage 보완** — headless GPU adapter + event-loop stub 필요. v1.1+.
 - **`--fail-under-lines 80` CI gate** — 4 low-coverage crate 통합 테스트 도입 후 활성. v1.1+.
 - **HTML coverage 리포트 (codecov/coveralls upload)** — CI 가 실제 runner 에서 동작한 후. v1.1+.
+- **외부 의존 라이선스 고지** ✅ v1.0.7 — THIRD-PARTY-LICENSES.md (4,795 라인) + about.toml/hbs + CI license-check job. 284 transitive 모두 permissive, 0 copyleft.
+- **license-check advisory → blocking** — CI 첫 green run 후 승격. v1.1+.
+- **THIRD-PARTY-LICENSES.md 를 `voltex build` artifact 에 동봉** — 현재 `dist/<name>.exe` 옆에 안 들어감. v1.1+.
+- **`cargo-deny` 통합** — license + advisory + duplicate 통합 스캔. 현재 cargo-audit + cargo-about 으로 대체 가능. v1.1+.
