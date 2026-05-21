@@ -65,7 +65,28 @@ impl RuntimeApp {
     /// Pre-window setup. Runs `register_components`, optionally loads the
     /// initial scene, then runs `build_scene` and `setup_systems`. Window /
     /// GPU init is deferred to the winit `resumed` callback inside `run()`.
+    ///
+    /// Side-effects (v1.0.18): when `config.enable_crash_log` is true
+    /// (default), installs the panic hook and the env logger **here** —
+    /// not in [`Self::run`] — so that panics during `build_scene` /
+    /// `setup_systems` (which run inside this constructor) still produce
+    /// a crash report. Both are `OnceLock`-guarded, so a later
+    /// `RuntimeApp::run` call is a no-op.
     pub fn new(mut config: RuntimeConfig) -> RuntimeResult<Self> {
+        if config.enable_crash_log {
+            crate::crash::install_panic_hook(
+                config.window.title.clone(),
+                config.crash_log_dir.clone(),
+            );
+        }
+        crate::log::init_from_env();
+        crate::log_info!(
+            "voltex_runtime::new: title={:?} size={}x{}",
+            config.window.title,
+            config.window.width,
+            config.window.height
+        );
+
         let mut registry = ComponentRegistry::new();
         registry.register_defaults();
         if let Some(setup) = config.register_components.take() {
@@ -164,21 +185,10 @@ impl RuntimeApp {
     /// `<window_title>-crash-<UTC>.txt` alongside the default stderr panic.
     /// Idempotent across multiple `run` calls in the same process.
     pub fn run(self) -> RuntimeResult<()> {
-        if self.config.enable_crash_log {
-            crate::crash::install_panic_hook(
-                self.config.window.title.clone(),
-                self.config.crash_log_dir.clone(),
-            );
-        }
-        // Auto-init logger from VOLTEX_LOG env var. Idempotent — safe even if
-        // the user already called `voltex_runtime::log::init` explicitly.
-        crate::log::init_from_env();
-        crate::log_info!(
-            "voltex_runtime starting: title={:?} size={}x{}",
-            self.config.window.title,
-            self.config.window.width,
-            self.config.window.height
-        );
+        // The panic hook + logger were installed in `new`; both are
+        // OnceLock-guarded so re-installing here would be a no-op. We do
+        // log the "entering event loop" transition explicitly.
+        crate::log_info!("voltex_runtime: entering event loop");
         let event_loop = winit::event_loop::EventLoop::new()
             .map_err(|e| RuntimeError::WindowInit(e.to_string()))?;
         let mut handler = crate::handler::RuntimeHandler { app: Some(self) };
@@ -307,6 +317,34 @@ mod tests {
         // a fresh project can boot before any scene is saved.
         let app = RuntimeApp::new(cfg).expect("RuntimeApp::new should not fail on missing scene");
         assert_eq!(app.world.entity_count(), 0);
+    }
+
+    // ── v1.0.18: hook + logger installed in new(), not run() ─────────────
+
+    #[test]
+    fn new_with_crash_log_disabled_still_succeeds() {
+        // Asserts that opting out of the crash hook does not break the
+        // `new` path. With v1.0.18 the hook install moved from `run` to
+        // `new`, so the opt-out branch needed to remain wired.
+        let cfg = RuntimeConfig::new().disable_crash_log();
+        let app = RuntimeApp::new(cfg).expect("new should succeed with crash log disabled");
+        assert_eq!(app.world.entity_count(), 0);
+    }
+
+    #[test]
+    fn new_runs_build_scene_with_logger_initialised() {
+        // The logger is initialised at the top of `new`. A build_scene
+        // callback that touches the log macros must therefore work.
+        // Pre-v1.0.18 the macros would have been emit-only via the
+        // default fallback Info-level logger initialised lazily — still
+        // fine, but this test pins the contract: macros never panic when
+        // called from build_scene.
+        let cfg = RuntimeConfig::new()
+            .disable_crash_log() // skip global panic-hook install in test
+            .with_scene_builder(|world, _reg| {
+                crate::log_info!("scene builder ran with {} entities", world.entity_count());
+            });
+        let _app = RuntimeApp::new(cfg).expect("new should succeed");
     }
 
     // ── v1.0.1: add_input_system regression coverage ─────────────────────

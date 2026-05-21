@@ -173,6 +173,25 @@
 
 v1.0.9 부터는 **서비스 배포 완성도** 로드맵 (`docs/superpowers/specs/2026-05-21-service-readiness-roadmap.md`) 기준으로 진행.
 
+### v1.0.18 (2026-05-21) — panic hook + logger 를 `RuntimeApp::new` 로 이동
+
+**갭**: v1.0.10 가 panic hook 을 `RuntimeApp::run` 에 설치 → `RuntimeApp::new` 안에서 실행되는 사용자 callback (`build_scene` / `setup_systems`) 또는 scene 로드 단계가 panic 시 hook 미설치 상태라 크래시 로그 안 남음. 신규 사용자가 가장 자주 만나는 init-time crash 가 사일런트.
+
+**fix**:
+- `crash::install_panic_hook` 호출을 `run()` → `new()` 의 첫 번째 작업으로 이동.
+- `log::init_from_env()` 도 `new()` 시작 시점으로 이동.
+- `run()` 은 이제 "entering event loop" log 만 (둘 다 `OnceLock` / `Once` 가드라 no-op).
+
+**테스트**: voltex_runtime 34 → 36 (+2):
+- `new_with_crash_log_disabled_still_succeeds` — opt-out 회귀 방지.
+- `new_runs_build_scene_with_logger_initialised` — build_scene 안에서 `log_info!` 호출이 panic 안 나는지 (logger 초기화 시점 가드).
+
+**검증**: 테스트 실행 시 실제 logger 출력이 stderr 에 표시 — `2026-05-21T11:42:21Z [INFO ] voltex_runtime::app: voltex_runtime::new: title="Voltex Engine" size=1280x720` 형식 동작 확인.
+
+**셀프 피드백**: 단계 1 hook 이동 + 새 테스트. 단계 2 기존 8 app::tests 모두 통과 (이미 매크로 자동 init 정확히 의도대로). 워크스페이스 회귀 0.
+
+**한계 (v1.1+)**: panic-during-`RuntimeConfig` 빌드 chain (e.g. `with_window_title("...")` 직전 panic) 은 여전히 hook 전. user main() 시작 첫 줄에서 명시적 install 하는 게 더 강력 — public re-export 는 이미 있음 (`voltex_runtime::install_panic_hook`).
+
 ### v1.0.17 (2026-05-21) — 외부 dep 0 structured logger (`voltex_runtime::log`)
 
 배포된 게임의 디버그 visibility. 이전엔 `eprintln!` 산발 사용 → level 필터 / 파일 미러 / 일관 포맷 없었음.
@@ -771,7 +790,7 @@ crates/
 - voltex_net: 47
 - voltex_script: 42 (S1 +12: pool ×6 [get_or_create same/load/reload/unknown/poll_reload/clear], system ×4 [start/update/5-cubes/missing-callbacks], engine_api ×2 [iter_entities/iter_by_tag])
 - voltex_editor: 169 (E3 +11: command ×5 add/remove/unknown/dead-entity + session ×4 add_undo/remove_undo/despawn_restores/despawn_history/slot_reused + inspector ×2 - 1 obsolete despawn_clears test)
-- voltex_runtime: 34 (v1.0.17 +7: log module ×7; v1.0.10 +14; was 13)
+- voltex_runtime: 36 (v1.0.18 +2 panic hook relocation guards; v1.0.17 +7; v1.0.10 +14; was 13)
 - voltex_cli: 55 (v1.0.16 +1 manifest reference doc gating; v1.0.13 +7; v1.0.12 +4; v1.0.11 +13; was 30)
 
 ## Examples (14개) + Games (1개) + 기존 survivor_game (archived)

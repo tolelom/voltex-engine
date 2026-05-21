@@ -10,6 +10,42 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## [v1.0.18] — 2026-05-21 — Panic hook + logger moved to `RuntimeApp::new`
+
+The v1.0.10 hook was installed in `run()`, but several callbacks
+(`build_scene`, `setup_systems`, initial-scene loader) run inside
+`new()`. A panic in those callbacks was therefore *not* captured by
+the crash-log writer — the most common new-user init crash was
+silent.
+
+### Changed
+
+- `crash::install_panic_hook` and `log::init_from_env` now run at
+  the top of `RuntimeApp::new` instead of `RuntimeApp::run`. The
+  `OnceLock` / `Once` guards make this a no-op on the later `run`
+  call.
+- `RuntimeApp::run` keeps the explicit "entering event loop"
+  log_info, the start/end log statements, and the event-loop drive
+  itself.
+
+### Added
+
+- Tests `new_with_crash_log_disabled_still_succeeds` and
+  `new_runs_build_scene_with_logger_initialised` — the first guards
+  the opt-out branch through the relocated install; the second
+  pins the contract that logger macros are safe to call from inside
+  `build_scene` (because the logger is now initialised earlier).
+- `voltex_runtime`: 34 → **36** (+2).
+
+### Known limits
+
+- Panics inside `RuntimeConfig` builder calls (i.e. before
+  `RuntimeApp::new` is even invoked) are still uncaught. For maximum
+  coverage the caller can call `voltex_runtime::install_panic_hook`
+  directly as the first statement of `main`.
+
+---
+
 ## [v1.0.17] — 2026-05-21 — `voltex_runtime::log` — minimal structured logger
 
 Gives shipped games visibility for debugging. Previously only scattered
