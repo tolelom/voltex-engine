@@ -5,9 +5,10 @@
 > 스크립팅, 멀티 OS 빌드 파이프라인까지 제공한다. 자세한 카운트와 정책은
 > 아래 "의존성 정책" 섹션 참고.
 
-![status: v1.0.5](https://img.shields.io/badge/status-v1.0.5-brightgreen)
+![status: v1.0.6](https://img.shields.io/badge/status-v1.0.6-brightgreen)
 ![clippy: 0 warnings](https://img.shields.io/badge/clippy-0%20warnings-brightgreen)
 ![audit: 0 vulnerabilities](https://img.shields.io/badge/cargo--audit-0%20vulnerabilities-brightgreen)
+![coverage: 82%](https://img.shields.io/badge/coverage-82%25%20lib-brightgreen)
 ![runtime: Windows verified](https://img.shields.io/badge/runtime-Windows%20verified-green)
 ![runtime: Linux/macOS unverified](https://img.shields.io/badge/runtime-Linux%2FmacOS%20unverified-orange)
 ![rust: stable](https://img.shields.io/badge/rust-stable-orange)
@@ -16,6 +17,8 @@
 ---
 
 ## 5분 quickstart
+
+### 예제 실행
 
 ```bash
 git clone https://git.tolelom.xyz/tolelom/game_engine
@@ -28,6 +31,22 @@ cargo run --example triangle
 다른 example: `cargo run --example pbr_demo` / `runtime_demo` / `editor_demo` /
 `shadow_demo` / `multi_light_demo` / `ibl_demo` / `deferred_demo` /
 `hierarchy_demo` / `asset_demo` / `audio_demo` / `model_viewer` / `many_cubes`.
+
+### 새 게임 만들기 (`voltex` CLI)
+
+```bash
+# 위 clone 한 디렉토리에서:
+cargo install --path crates/voltex_cli       # voltex 바이너리 설치
+export VOLTEX_REPO=$(pwd)                    # 또는 매번 --engine-path 사용
+cd ~/projects
+voltex new my_game && cd my_game             # scene.vscn + spinner.lua scaffold
+voltex build                                 # → dist/my_game.exe (self-contained)
+voltex run                                   # 빌드 + 실행
+```
+
+`VOLTEX_REPO` 가 없으면 `voltex build --engine-path /path/to/voltex` 로
+한 번씩 명시. CLI 가 누락 시 친화 에러 메시지로 두 가지 방법을 안내한다.
+PowerShell 은 `$env:VOLTEX_REPO='C:/path/to/voltex'`.
 
 자세한 단계별 안내는 [docs/tutorial.md](docs/tutorial.md) 참고 (30분).
 
@@ -205,6 +224,27 @@ CI (`.github/workflows/ci.yml`) 는 위 4 명령을 Ubuntu + Windows 매트릭�
 실행하고, macOS 는 advisory (non-blocking) 잡으로 돌린다. 모두 통과해야
 merge 가능. Linux 빌드는 ALSA 헤더 (`sudo apt-get install -y libasound2-dev`)
 필요 — CI 가 자동 설치한다.
+
+### Coverage
+
+선택 검증 (의존성: `cargo install cargo-llvm-cov` + `rustup component add
+llvm-tools-preview`):
+
+```bash
+cargo llvm-cov --workspace --lib --summary-only
+```
+
+**현재 baseline (v1.0.6)**: 82.06% functions / 82.74% lines / 73.01%
+regions across all 14 crate. 80% 평균 목표 충족. 14 crate 중 10 개가
+crate-단위 80%+; 낮은 4 crate (`voltex_platform` 46%, `voltex_renderer_ecs`
+54%, `voltex_runtime` 61%, `voltex_renderer` 66%) 는 모두 GPU/winit
+의존 코드 (BasicRenderer, ApplicationHandler 콜백, shadow/RT/TAA 컴퓨트
+셰이더) — 헤드리스 unit test 로는 도달 불가. E2E + GPU 통합 테스트는
+v1.1+ 후속.
+
+CI 는 coverage 를 advisory job (`coverage`, `continue-on-error: true`)
+으로 측정한다. 임계치 enforcement (`--fail-under-lines 80`) 는 GPU
+패스가 통합 테스트로 커버되기 전까지 비활성.
 
 빠른 이슈 / 제안은 git repo 의 issue tracker 에 — Korean / English 둘 다 환영.
 
