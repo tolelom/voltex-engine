@@ -222,3 +222,4 @@
 - **Input first-mouse-move 카메라 점프** ✅ v1.0.51 — `mouse_seen: bool` 도입, 첫 이벤트는 warp 취급. +2 회귀 테스트.
 - **GameTimer hz=0 panic + alpha div-by-zero** ✅ v1.0.52 — `clamp(1, 100_000)` + alpha 가드. +3 회귀 테스트.
 - **Camera::right NaN at pitch ±90°** ✅ v1.0.53 — `normalize_or_zero` + Vec3::X fallback. +2 회귀 테스트.
+- **Sphere generator degenerate-input** ✅ v1.0.54 — sectors/stacks/radius clamp. +2 회귀 테스트.

@@ -10,6 +10,39 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## [v1.0.54] — 2026-05-22 — Sphere generator degenerate-input clamp
+
+**Fix**. `voltex_renderer::sphere::generate_sphere(radius, sectors, stacks)` divided by zero on multiple paths when called with degenerate inputs:
+
+- `sector_step = 2π / sectors` → ∞ when `sectors == 0`.
+- `stack_step = π / stacks` → ∞ when `stacks == 0`.
+- `normal = [x/radius, y/radius, z/radius]` → NaN when `radius == 0`.
+- `uv = [j/sectors, i/stacks]` → NaN when either is zero.
+
+A `generate_sphere(0.0, 0, 0)` call produced a NaN-filled vertex buffer that then panicked downstream when a renderer tried to upload it. Realistic callers always pass valid arguments, but PBR demos with user-driven sliders could plausibly hit zero.
+
+### Fixed
+
+Inputs are now clamped to sensible minimums up front:
+
+- `sectors.max(3)`, `stacks.max(2)` — minimum geometry for a closed mesh.
+- `radius` validated as finite and > `f32::MIN_POSITIVE`, otherwise clamped.
+
+### Tests
+
+`voltex_renderer` 230 → 232 (+2):
+
+- `voltex_renderer::sphere::tests::generate_sphere_with_degenerate_inputs_produces_finite_mesh`
+- `voltex_renderer::sphere::tests::generate_sphere_with_negative_radius_clamps`
+
+### Verification
+
+- `cargo build --workspace` — clean.
+- `cargo clippy --workspace --all-targets -- -D warnings` — 0 warnings.
+- `cargo test --workspace --lib` — every crate green.
+
+---
+
 ## [v1.0.53] — 2026-05-22 — `Camera::right` NaN at pitch ±90°
 
 **Fix**. `voltex_renderer::Camera::right()` computed `forward × Vec3::Y` and called `.normalize()`. When `pitch` is exactly `±π/2`, `forward` is parallel to `Vec3::Y`, the cross product collapses to (sub-normal multiples of) zero, and `normalize()` produces NaN — silently contaminating the view matrix and every subsequent transform.

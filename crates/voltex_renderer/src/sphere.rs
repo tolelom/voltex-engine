@@ -5,7 +5,22 @@ use std::f32::consts::PI;
 
 /// Generate a UV sphere with Y-up coordinate system.
 /// Returns (vertices, indices).
+///
+/// **Input clamping**: `sectors`, `stacks`, and `radius` are all clamped to
+/// minimum sensible values (3 sectors, 2 stacks, radius `f32::MIN_POSITIVE`)
+/// to avoid div-by-zero on degenerate inputs. Pre-clamp, `generate_sphere(0.0,
+/// 0, 0)` produced a NaN-filled vertex buffer (every position/normal/UV had
+/// `/0`) and 0 indices — which then panicked downstream when a renderer tried
+/// to upload the NaN data.
 pub fn generate_sphere(radius: f32, sectors: u32, stacks: u32) -> (Vec<MeshVertex>, Vec<u32>) {
+    let sectors = sectors.max(3);
+    let stacks = stacks.max(2);
+    let radius = if radius.is_finite() && radius > f32::MIN_POSITIVE {
+        radius
+    } else {
+        f32::MIN_POSITIVE
+    };
+
     let mut vertices: Vec<MeshVertex> = Vec::new();
     let mut indices: Vec<u32> = Vec::new();
 
@@ -96,6 +111,32 @@ mod tests {
                 "Normal length {} is not unit length",
                 len
             );
+        }
+    }
+
+    #[test]
+    fn generate_sphere_with_degenerate_inputs_produces_finite_mesh() {
+        // Pre-fix: generate_sphere(0.0, 0, 0) produced a vertex buffer
+        // full of NaN (every position/normal/UV had `/0`). The clamp
+        // makes the result a finite, drawable mesh even on degenerate
+        // input.
+        let (vertices, indices) = generate_sphere(0.0, 0, 0);
+        assert!(!vertices.is_empty());
+        assert!(!indices.is_empty());
+        for v in &vertices {
+            for &c in &v.position { assert!(c.is_finite(), "position has non-finite component"); }
+            for &c in &v.normal   { assert!(c.is_finite(), "normal has non-finite component"); }
+            for &c in &v.uv       { assert!(c.is_finite(), "uv has non-finite component"); }
+        }
+    }
+
+    #[test]
+    fn generate_sphere_with_negative_radius_clamps() {
+        // Negative or NaN radius would have produced flipped normals or
+        // NaN normals. Clamped to a sensible positive minimum.
+        let (vertices, _) = generate_sphere(f32::NAN, 12, 8);
+        for v in &vertices {
+            for &c in &v.normal { assert!(c.is_finite()); }
         }
     }
 }

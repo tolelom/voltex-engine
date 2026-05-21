@@ -173,6 +173,18 @@
 
 v1.0.9 부터는 **서비스 배포 완성도** 로드맵 (`docs/superpowers/specs/2026-05-21-service-readiness-roadmap.md`) 기준으로 진행.
 
+### v1.0.54 (2026-05-22) — Sphere generator degenerate-input clamp
+
+P2 robustness. `generate_sphere(radius, sectors, stacks)` 가 sectors=0/stacks=0/radius=0 에서 div-by-zero → NaN 가득 vertex buffer. 비현실적이지만 PBR demo / IBL 미리보기에서 사용자가 sliders 0 까지 끌면 발생.
+
+**Fix (`voltex_renderer/src/sphere.rs`)**:
+- `sectors.max(3)`, `stacks.max(2)`, `radius` 가 finite + > MIN_POSITIVE 검사 후 fallback
+
+**검증**:
+- voltex_renderer 230 → 232 (+2). 회귀 테스트:
+  - `sphere::tests::generate_sphere_with_degenerate_inputs_produces_finite_mesh`
+  - `sphere::tests::generate_sphere_with_negative_radius_clamps`
+
 ### v1.0.53 (2026-05-22) — Camera::right NaN at pitch ±90°
 
 P1 robustness. `Camera::right()` 가 forward × Vec3::Y 를 정규화 — pitch 가 ±π/2 이면 forward 가 Y 와 평행 → cross product 0 → normalize NaN. `FpsController::process_mouse` 가 pitch 를 ±89° 로 clamp 하지만 `Camera.pitch` 는 public 필드라 user code 가 직접 설정 가능.
