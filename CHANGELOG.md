@@ -10,6 +10,38 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## [v1.0.1] — 2026-05-21 — Runtime verification + P0/P1 regression patch
+
+### Fixed
+- **handler.rs camera ↔ user-system WASD double-binding** (P0). FPS camera
+  movement now requires RMB-held, matching scene-view convention. Games can
+  use WASD freely via `add_input_system`.
+- **`is_key_just_pressed()` always false in user systems** (P1). Moved
+  `app.input.begin_frame()` to end-of-frame so just_pressed survives into
+  user-system observation.
+- **`Bounds::default_bytes` was zero-volume AABB** (P0). Returned 24 zero
+  bytes → frustum culling discarded every Inspector "+ bounds" entity. Now
+  encodes the unit cube `min=(-0.5)^3, max=(0.5)^3`.
+- **`ScriptComponent::default_bytes` was empty path** (P0). Inspector "+
+  script" produced an unrunnable component. Now encodes
+  `UNBOUND + "scripts/spinner.lua"` so the placeholder exercises the script
+  system end-to-end on every `voltex new` project.
+- **voltex_survivor enemies / projectiles never executed scripts**. Lua
+  `spawn_entity()` returns a bare entity with no ScriptComponent. The
+  game's handle-attach system was extended to attach the matching .lua
+  based on Tag (`enemy` / `projectile`).
+
+### Added
+- 5 regression tests (`voltex_runtime` ×2 input_system order/reference,
+  `voltex_ecs` ×3 default_bytes round-trips and non-degenerate Bounds).
+
+### Verified at runtime (Windows host)
+- `cargo run -p voltex_survivor`: 6 waves in 30s, 24 enemy kills, no panics.
+- `cargo run -p tutorial_minigame`: score system prints, no panics.
+- `cargo run -p runtime_demo`: clean exit.
+
+---
+
 ## [v1.0.0] — 2026-05-21
 
 ### Added (Cycle 15, D3)

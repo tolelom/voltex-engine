@@ -166,10 +166,20 @@
 - examples/editor_demo: 시드 엔티티 (ground + 3 cube + Cube1↔Cube2 hierarchy)를 `EditorSession::dispatch` 경로로 옮김 → jsonl 로그 + Save/Load round-trip 일관성
 - v1 한계 (문서화): picking은 sphere 근사 (메시 AABB는 미구현). gizmo translate/rotate/scale 핸들은 미구현
 
-## 🎉 v1.0 release — 2026-05-21 (tag `v1.0.0`)
+## 🎉 v1.0 release — 2026-05-21 (tag `v1.0.0`) → **v1.0.1 verification patch** (tag `v1.0.1`)
 
 15 cycle / 37 세션 / 약 4 일에 걸쳐 진행된 v1.0 로드맵 완료. 회고는
 [docs/v1.0-retrospective.md](v1.0-retrospective.md). 미뤄진 항목은 v1.1+ 후속.
+
+### v1.0.1 (2026-05-21) — runtime 동작 검증 + P0/P1 회귀 패치
+v1.0 release 후 실 머신 (Windows) 검증에서 4개 회귀 발견, 즉시 fix:
+- **P0-1 카메라 ↔ player WASD 충돌**: `handler.rs` 의 WASD/Space/Shift 가 매 프레임 카메라를 움직였음 → RMB-held 조건부로 변경. 게임의 `add_input_system` 이 WASD 를 자유롭게 쓸 수 있게 됨 (Bevy/Unity/Godot 패턴).
+- **P1-4 `is_key_just_pressed` 항상 false**: `app.input.begin_frame()` 이 `tick_systems_only` 직전 호출 → just_pressed HashSet 이 user system 이전에 clear. 호출 위치를 frame 끝으로 이동.
+- **P0-3 `Bounds::default_bytes` = zero AABB**: degenerate volume → frustum culling 이 항상 컬링. Inspector "+ bounds" 가 invisible entity 생성. unit cube (-0.5 ~ +0.5) 로 변경.
+- **P0-2 `ScriptComponent::default_bytes` = empty path**: Inspector "+ script" 가 no-op 컴포넌트 생성. `"scripts/spinner.lua"` placeholder 로 변경 (모든 `voltex new` 스캐폴드에 동봉된 파일).
+- **voltex_survivor**: Lua `spawn_entity()` 가 ScriptComponent 자동 부착 안 함 → enemy.lua / projectile.lua 절대 실행 안 됨. main.rs 의 handle-attach 시스템이 Tag 기반으로 ScriptComponent 도 부착하도록 확장.
+- 회귀 테스트 +5 (voltex_runtime ×2 input_system 순서/참조, voltex_ecs ×3 Bounds 와 ScriptComponent default round-trip).
+- **실 실행 검증** (Windows): voltex_survivor 30초 안정 (6 wave, 24 enemy kill, 0 panic) + tutorial_minigame + runtime_demo 모두 클린.
 
 ### Cycle 15 (D3): voltex_survivor flagship + v1.0 release (2026-05-21)
 - **`games/voltex_survivor/` (신규)** — survivor 게임 재제작. `voltex.toml` + `scene.vscn` + 4 `.lua` 파일 + `src/main.rs` (RuntimeApp + input system + mesh upload). 게임 로직 100% Lua + scene; Rust 측은 부트스트랩 + input → Transform + Lua 가 spawn 한 entity 에 mesh/material handle 자동 부착의 3 가지 boilerplate.
@@ -329,7 +339,7 @@ crates/
 └── voltex_cli         — bin "voltex" (new/build/run), voltex.toml 매니페스트, .vpkg packing (B1+B2)
 ```
 
-## 테스트: 940개 통과 (Windows host, `cargo test --workspace`). `--lib` 기준은 914 (voltex_cli 는 bin-only 라 lib count 에서 빠지나 `cargo test -p voltex_cli` 로 26 개 실행됨). macOS host 에서는 +2 (CoreAudio 모듈) = 942 예상.
+## 테스트: 947개 통과 (Windows host, `cargo test --workspace`). `--lib` 기준은 921 (voltex_cli 는 bin-only 라 lib count 에서 빠지나 `cargo test -p voltex_cli` 로 26 개 실행됨). macOS host 에서는 +2 (CoreAudio 모듈) = 949 예상. v1.0.1 +5 (input_system 순서/참조 ×2, Bounds default ×2, ScriptComponent default ×1).
 
 - voltex: 2 (M6: prelude/module 경로 컴파일 검증)
 - voltex_math: 39 (8-7 +2: inverse roundtrip × VP+translation)
