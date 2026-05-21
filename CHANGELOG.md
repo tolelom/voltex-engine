@@ -10,6 +10,35 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## [v1.0.52] — 2026-05-22 — GameTimer hz=0 panic + alpha div-by-zero
+
+**Fix**. Two `voltex_platform::GameTimer` footguns:
+
+### Fixed
+
+- **`GameTimer::new(0)` panic.** `Duration::from_secs_f64(1.0 / 0.0)` evaluates `1.0 / 0.0 = inf`, which `from_secs_f64` rejects with a panic. `new` now clamps `fixed_hz` to `1..=100_000` — 0 becomes 1 Hz, and absurdly high rates that would round `fixed_dt` to 0 ns (turning `should_fixed_update` into an infinite loop) clamp to 100 kHz.
+- **`alpha()` div-by-zero defence.** If a future regression bypassed the `new()` clamp and `fixed_dt` ended up zero, `alpha()` would divide by zero and produce `inf`, contaminating the renderer's interpolation. Now returns `0.0` when `fixed_dt <= 0`.
+
+### Tests
+
+`voltex_platform` 5 → 8 (+3):
+
+- `voltex_platform::game_loop::tests::new_with_zero_hz_does_not_panic`
+- `voltex_platform::game_loop::tests::new_with_extreme_hz_does_not_round_to_zero`
+- `voltex_platform::game_loop::tests::alpha_with_zero_fixed_dt_returns_zero_not_inf`
+
+### Verification
+
+- `cargo build --workspace` — clean.
+- `cargo clippy --workspace --all-targets -- -D warnings` — 0 warnings.
+- `cargo test --workspace --lib` — every crate green.
+
+### Notes
+
+Cumulative for v1.0.40 – v1.0.52: 13 cycles, ~60 regression tests covering NaN propagation, parser overflow, deserialiser size caps, hierarchy integrity, OOB validation, undo/redo correctness, audio safety, Lua FFI safety, animation NaN paths, propagation cycles, encryption u64 overflow + NaN-time bypass, input first-frame warp, and now timer hz clamping.
+
+---
+
 ## [v1.0.51] — 2026-05-22 — Input first-mouse-move warp fix
 
 **Fix**. `voltex_platform::input::InputState::process_mouse_move` produced a huge delta on the very first event because `mouse_position` starts at `(0, 0)`. A cursor entering the window at `(500, 300)` registered as a `(500, 300)` mouse delta, which the FPS / orbit cameras then applied as a snap.

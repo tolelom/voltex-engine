@@ -173,6 +173,22 @@
 
 v1.0.9 부터는 **서비스 배포 완성도** 로드맵 (`docs/superpowers/specs/2026-05-21-service-readiness-roadmap.md`) 기준으로 진행.
 
+### v1.0.52 (2026-05-22) — GameTimer hz=0 panic + alpha div-by-zero
+
+P1 robustness. `GameTimer::new(0)` 가 `Duration::from_secs_f64(1.0 / 0.0 = inf)` 호출 → "non-finite value" 패닉. 또한 `u32::MAX` Hz 면 fixed_dt 가 0 ns 로 라운드 → `should_fixed_update` 무한 루프.
+
+**Fix (`voltex_platform/src/game_loop.rs`)**:
+- `fixed_hz.clamp(1, 100_000)` — 0 은 1 Hz, 그 이상은 100 kHz 로 silently clamp
+- `alpha()` 가 fixed_dt <= 0 시 0.0 반환 (방어선)
+
+**검증**:
+- voltex_platform 5 → 8 (+3). 회귀 테스트:
+  - `game_loop::tests::new_with_zero_hz_does_not_panic`
+  - `game_loop::tests::new_with_extreme_hz_does_not_round_to_zero`
+  - `game_loop::tests::alpha_with_zero_fixed_dt_returns_zero_not_inf`
+
+**누적 (v1.0.40~52)**: 13 cycle, 약 60 회귀 테스트.
+
 ### v1.0.51 (2026-05-22) — Input first-mouse-move warp fix
 
 P1 UX. `InputState::process_mouse_move` 의 첫 이벤트가 `mouse_position = (0, 0)` 시작점 기준으로 거대 delta 생성 → 카메라가 포커스 시점에 점프.

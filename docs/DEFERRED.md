@@ -220,3 +220,4 @@
 - **propagate_transforms cycle stack-overflow** ✅ v1.0.49 — raw `world.add(Children/Parent)` 가 add_child 가드를 우회한 cycle 에 대비 `MAX_HIERARCHY_DEPTH = 1024` depth-limit 추가. +2 회귀 테스트.
 - **PacketCipher u64::MAX seq wrap + AuthToken NaN-time bypass** ✅ v1.0.50 — `saturating_add` + `is_finite()` 가드. +2 회귀 테스트.
 - **Input first-mouse-move 카메라 점프** ✅ v1.0.51 — `mouse_seen: bool` 도입, 첫 이벤트는 warp 취급. +2 회귀 테스트.
+- **GameTimer hz=0 panic + alpha div-by-zero** ✅ v1.0.52 — `clamp(1, 100_000)` + alpha 가드. +3 회귀 테스트.
