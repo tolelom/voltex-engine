@@ -166,10 +166,28 @@
 - examples/editor_demo: 시드 엔티티 (ground + 3 cube + Cube1↔Cube2 hierarchy)를 `EditorSession::dispatch` 경로로 옮김 → jsonl 로그 + Save/Load round-trip 일관성
 - v1 한계 (문서화): picking은 sphere 근사 (메시 AABB는 미구현). gizmo translate/rotate/scale 핸들은 미구현
 
-## 🎉 v1.0 release — 2026-05-21 (tag `v1.0.0`) → **v1.0.1** + **v1.0.2** + **v1.0.3** patches
+## 🎉 v1.0 release — 2026-05-21 (tag `v1.0.0`) → **v1.0.1** + **v1.0.2** + **v1.0.3** + **v1.0.4** patches
 
 15 cycle / 37 세션 / 약 4 일에 걸쳐 진행된 v1.0 로드맵 완료. 회고는
 [docs/v1.0-retrospective.md](v1.0-retrospective.md). 미뤄진 항목은 v1.1+ 후속.
+
+### v1.0.4 (2026-05-21) — clippy `approx_constant` clean + README 의존성 정직성
+
+v1.0.3 이후 점검에서 발견된 두 가지 흠을 fix.
+
+**clippy `approx_constant` 9건 → 0건**:
+- `voltex_physics::integrator` 테스트 2건 (`3.14159` → `std::f32::consts::PI`. 코멘트도 이미 "PI rad/s" 였음).
+- `voltex_renderer::animation::test_quat_slerp_endpoints` 3건 (`0.7071` → `std::f32::consts::FRAC_1_SQRT_2`. 90° 쿼터니언 정확 표현).
+- `voltex_ecs::world::tests::test_clear_changed_all_storages` 1건 (`3.14f32` → `2.5f32`. 의미상 임의 f32 값이라 의존 없음).
+- `voltex_ecs::json` 2건 + `voltex_renderer::json_parser` 1건: 의도적 "3.14" / "-3.14" JSON round-trip payload → `#[allow(clippy::approx_constant)]` + 코멘트 ("값은 데이터, π 아님") 부착.
+- 결과: `cargo clippy --workspace --all-targets` 의 `#[deny(clippy::approx_constant)]` 더이상 실패하지 않음. 외부 contributor 가 clippy 돌릴 수 있게 됨.
+
+**README 의존성 주장 정정**:
+- 헤더의 "외부 crate 의존 단 2개 (winit / wgpu)" 는 실측과 불일치 → **3 (winit / wgpu / bytemuck)** 로 정정.
+- "의존성 정책" 섹션의 표를 두 카테고리 (런타임 3 + 빌드 전용 2: thiserror / cc) 로 재구성. 각 crate 의 역할과 "런타임 표면 비노출" 여부 명시. 예제 전용 보조 (log / env_logger / pollster) 도 별도 명시.
+- 트랜지티브 총합 (Cargo.lock 298 crate) 도 추가 (정직성).
+
+검증: 921 lib tests 유지 (테스트 본문 5곳만 수정, production 코드 0줄 변경). v1.0.4 는 deny 레벨 clippy 만 fix — 약 80개의 warning 레벨 lint (manual RangeInclusive::contains, needless_range_loop, dead code 등) 는 v1.1+. clippy를 강제하는 CI 워크플로도 v1.1 후속.
 
 ### v1.0.3 (2026-05-21) — `voltex build` Windows P0 회귀 fix
 

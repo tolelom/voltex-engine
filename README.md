@@ -1,10 +1,11 @@
 # Voltex Engine
 
-> Rust 로 작성한 winit + wgpu 기반 3D 게임 엔진. 외부 crate 의존 단 2개 (winit / wgpu)
-> 만으로 PBR, 물리, 오디오, AI, 에디터, Lua 스크립팅, 멀티 OS 빌드 파이프라인까지
-> 제공한다.
+> Rust 로 작성한 winit + wgpu 기반 3D 게임 엔진. 런타임 crate 의존 3 개
+> (`winit` / `wgpu` / `bytemuck`) 만으로 PBR, 물리, 오디오, AI, 에디터, Lua
+> 스크립팅, 멀티 OS 빌드 파이프라인까지 제공한다. 자세한 카운트와 정책은
+> 아래 "의존성 정책" 섹션 참고.
 
-![status: v1.0.3](https://img.shields.io/badge/status-v1.0.3-brightgreen)
+![status: v1.0.4](https://img.shields.io/badge/status-v1.0.4-brightgreen)
 ![runtime: Windows verified](https://img.shields.io/badge/runtime-Windows%20verified-green)
 ![runtime: Linux/macOS unverified](https://img.shields.io/badge/runtime-Linux%2FmacOS%20unverified-orange)
 ![rust: stable](https://img.shields.io/badge/rust-stable-orange)
@@ -110,20 +111,30 @@ voltex build
 
 ## 의존성 정책
 
-런타임 crate 의존: **2 개 만**.
+런타임 crate 직접 의존: **3 개**.
 
 | Crate | Version | 역할 |
 |---|---|---|
 | `winit` | 0.30.x | 크로스플랫폼 윈도우 + 키보드/마우스 입력 |
 | `wgpu` | 28.x | Vulkan / DX12 / Metal / WebGPU 추상 |
+| `bytemuck` | 1.x | GPU 메모리 레이아웃 (Pod/Zeroable derive + cast) — wgpu 사용 시 사실상 표준 동반 |
+
+빌드 전용 의존 (런타임 표면 비노출, **2 개**):
+
+| Crate | Version | 역할 |
+|---|---|---|
+| `thiserror` | 2.x | `Error` derive 매크로 (M4 에러 표준화). 컴파일 후 별도 코드 없음 |
+| `cc` | 1.x | `voltex_script` 의 Lua 5.4 C 소스 빌드 스크립트 (`build.rs` 전용) |
 
 OS / 시스템 API (Win32, WASAPI, ALSA, CoreAudio, Lua C) 는 모두 FFI 직접
 호출. 그 외 모든 것 (수학, 이미지/메시 파서, 오디오 디코더, 물리, AI,
 네트워킹, 에디터 GUI, 폰트 래스터라이저, asset packing, CLI, manifest
 parser) 은 자체 구현.
 
-개발 전용 의존 (`thiserror`) 은 런타임 표면에 노출되지 않으므로 위 제한에서
-제외.
+예제/바이너리 전용 보조 (`log`, `env_logger`, `pollster`) 는 라이브러리
+crate 어디에도 들어가지 않으며 위 카운트와는 별개다. 트랜지티브 포함
+`Cargo.lock` 의 총 crate 수는 298 (대부분 wgpu / winit 의 GPU / 윈도우
+스택).
 
 ---
 

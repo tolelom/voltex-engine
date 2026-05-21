@@ -10,6 +10,67 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## [v1.0.4] — 2026-05-21 — clippy `approx_constant` clean + README dependency honesty
+
+### Fixed
+- **clippy `approx_constant` errors (9 → 0)** across
+  `voltex_physics::integrator`, `voltex_renderer::animation`,
+  `voltex_ecs::world::tests`, `voltex_ecs::json`, and
+  `voltex_renderer::json_parser`.
+  - `integrator.rs` test used `3.14159` for `rb.angular_velocity` /
+    expected_rot_y → replaced with `std::f32::consts::PI` (real intent
+    was 1 PI rad/s — comment already said so).
+  - `animation.rs::test_quat_slerp_endpoints` used `0.7071` for 90°
+    quaternion components → replaced with `std::f32::consts::FRAC_1_SQRT_2`
+    (more precise + self-documenting).
+  - `world/tests.rs::test_clear_changed_all_storages` used `3.14f32`
+    only as "a different-typed value" → replaced with `2.5f32` (no
+    semantic dependency on the value at all).
+  - `json.rs::test_write_number`, `json.rs::test_parse_negative_number`,
+    `json_parser.rs::test_parse_number` use `3.14` / `-3.14` as
+    representative decimal payloads for serialization round-trip —
+    annotated with `#[allow(clippy::approx_constant)]` + comment
+    explaining the intent (the value is data, not π).
+  - Net result: `cargo clippy --workspace --all-targets` no longer
+    fails on `#[deny(clippy::approx_constant)]`. External contributors
+    can now run clippy without a hard error.
+
+### Corrected (documentation honesty)
+- **README "외부 crate 의존 단 2개 (winit / wgpu)" claim was inaccurate.**
+  Actual measured direct dependencies:
+  - **Runtime (3):** `winit`, `wgpu`, `bytemuck` (Pod/Zeroable derive +
+    cast — wgpu's de-facto companion, but a real direct dep nonetheless).
+  - **Build-only (2, never present in shipped runtime):** `thiserror`
+    (`Error` derive macro; no runtime crate after compilation), `cc`
+    (`voltex_script`'s Lua 5.4 C source `build.rs`).
+  - **Example/binary helpers (not in any library crate):** `log`,
+    `env_logger`, `pollster`. Listed separately so future audits don't
+    mistake them for engine deps.
+  - **Transitive total:** 298 crates in `Cargo.lock` (dominated by
+    wgpu's GPU stack and winit's per-OS windowing).
+  README header and "의존성 정책" table updated to reflect this with
+  rationale per crate.
+
+### Verified
+- `cargo clippy --workspace --all-targets` — `approx_constant` count
+  3 errors / 5 hits  →  0.
+- `cargo test --workspace --lib` — 921 lib tests still pass (the 3
+  test files touched are part of the standard suite; `voltex_physics`
+  106 / `voltex_ecs` 134 / `voltex_renderer` 200 unchanged).
+- No production-code changes — only test bodies and 2 `use std::f32::consts::*`
+  imports inside `#[cfg(test)]` modules.
+
+### Not in scope (deferred to v1.1+)
+- The remaining ~80 clippy warnings (manual `RangeInclusive::contains`,
+  `needless_range_loop`, dead code in `voltex_audio::make_stereo_clip`
+  / `voltex_ai::Name`, excessive float precision in `voltex_audio::wav`,
+  etc.) are non-deny lints. v1.0.4 deliberately addresses only the
+  hard errors that block external `cargo clippy --all-targets` runs.
+- CI workflow that enforces `cargo clippy --workspace --all-targets`
+  going forward — recommended next step but not added in this patch.
+
+---
+
 ## [v1.0.3] — 2026-05-21 — `voltex build` Windows P0 regression fix
 
 ### Fixed
