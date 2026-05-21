@@ -1,0 +1,205 @@
+//! voltex_survivor — v1.0 flagship game.
+//!
+//! Game logic lives in `scripts/*.lua` + `scene.vscn`. The Rust side does
+//! three things:
+//!
+//! 1. Bootstrap `RuntimeApp` with title/size/window.
+//! 2. Seed the scene with a ground plane + player + game manager entity.
+//! 3. Translate keyboard input into player Transform deltas (WASD/arrows).
+//!
+//! The flagship test for v1.0: `cargo run -p voltex_survivor` boots a game
+//! whose behaviour is fully described by Lua + scene.
+
+use voltex::ecs::{Bounds, MaterialHandle, MeshHandle, ScriptComponent, Tag};
+use voltex::math::{Vec3, AABB};
+use voltex::prelude::*;
+use voltex_renderer::{material::MaterialUniform, mesh::Mesh, vertex::MeshVertex};
+use voltex_runtime::{RuntimeApp, RuntimeConfig, RuntimeResult};
+use winit::keyboard::KeyCode;
+
+const PLAYER_SPEED: f32 = 4.0;
+
+fn main() -> RuntimeResult<()> {
+    env_logger::init();
+    RuntimeApp::new(
+        RuntimeConfig::new()
+            .with_window_title("Voltex Survivor")
+            .with_window_size(1280, 720)
+            .with_scene_builder(setup_scene)
+            .with_gpu_init(upload_meshes)
+            .with_system_setup(register_systems),
+    )?
+    .run()
+}
+
+/// Seed: ground plane (visual reference) + player (Tag="player") + game
+/// manager (ScriptComponent → game.lua). Every other entity (enemies,
+/// projectiles, markers) is created at runtime by Lua.
+fn setup_scene(world: &mut World, _registry: &mut ComponentRegistry) {
+    // Ground — flat large cube at y = -0.5.
+    let ground = world.spawn();
+    let mut t_ground = Transform::from_position(Vec3::new(0.0, -0.5, 0.0));
+    t_ground.scale = Vec3::new(20.0, 0.1, 20.0);
+    world.add(ground, t_ground);
+    world.add(ground, Tag("ground".to_string()));
+
+    // Player.
+    let player = world.spawn();
+    world.add(player, Transform::from_position(Vec3::new(0.0, 0.5, 0.0)));
+    world.add(player, Tag("player".to_string()));
+    world.add(player, ScriptComponent::new("scripts/player.lua"));
+
+    // Game manager — invisible entity that just runs game.lua.
+    let manager = world.spawn();
+    world.add(manager, Transform::new());
+    world.add(manager, Tag("game_manager".to_string()));
+    world.add(manager, ScriptComponent::new("scripts/game.lua"));
+}
+
+/// Upload shared cube mesh + material, then attach handles to every
+/// entity that has a Transform (covers ground + player + game_manager).
+fn upload_meshes(app: &mut RuntimeApp, device: &wgpu::Device, queue: &wgpu::Queue) {
+    let _ = queue;
+    let mesh = make_unit_cube(device);
+    let mesh_h = app.assets.add_mesh(mesh);
+    let mat_h = app.assets.add_material(MaterialUniform::new());
+    let bounds = Bounds(AABB::new(Vec3::new(-0.5, -0.5, -0.5), Vec3::new(0.5, 0.5, 0.5)));
+
+    // Attach to the three seed entities.
+    let entities: Vec<_> = app.world.query::<Transform>().map(|(e, _)| e).collect();
+    for e in entities {
+        // Skip the game_manager so it stays invisible.
+        let is_manager = app
+            .world
+            .get::<Tag>(e)
+            .map(|t| t.0 == "game_manager")
+            .unwrap_or(false);
+        if is_manager {
+            continue;
+        }
+        app.world.add(e, MeshHandle(mesh_h.0));
+        app.world.add(e, MaterialHandle(mat_h.0));
+        app.world.add(e, bounds);
+    }
+}
+
+fn register_systems(app: &mut RuntimeApp) {
+    // 1. Player input → Transform.position. Input-aware system gives us
+    //    read access to the per-frame InputState.
+    app.add_input_system(|world, input, dt| {
+        // Skip while game.lua reports game over by checking for a Tag we
+        // remove — for v1.0 simplicity we just keep moving regardless.
+        let mut dir_x = 0.0f32;
+        let mut dir_z = 0.0f32;
+        if input.is_key_pressed(KeyCode::KeyW) || input.is_key_pressed(KeyCode::ArrowUp) {
+            dir_z -= 1.0;
+        }
+        if input.is_key_pressed(KeyCode::KeyS) || input.is_key_pressed(KeyCode::ArrowDown) {
+            dir_z += 1.0;
+        }
+        if input.is_key_pressed(KeyCode::KeyA) || input.is_key_pressed(KeyCode::ArrowLeft) {
+            dir_x -= 1.0;
+        }
+        if input.is_key_pressed(KeyCode::KeyD) || input.is_key_pressed(KeyCode::ArrowRight) {
+            dir_x += 1.0;
+        }
+        if dir_x == 0.0 && dir_z == 0.0 {
+            return;
+        }
+        let len = (dir_x * dir_x + dir_z * dir_z).sqrt();
+        let step = PLAYER_SPEED * dt;
+        let (nx, nz) = (dir_x / len * step, dir_z / len * step);
+
+        let player: Option<Entity> = world
+            .query::<Tag>()
+            .find(|(_, t)| t.0 == "player")
+            .map(|(e, _)| e);
+        if let Some(p) = player {
+            if let Some(t) = world.get_mut::<Transform>(p) {
+                t.position.x += nx;
+                t.position.z += nz;
+            }
+        }
+    });
+
+    // 2. Lua-spawned entities (enemy / projectile / kill_marker /
+    //    damage_marker) come into the world without mesh / material handles.
+    //    Attach the shared cube + material so they render. Markers stay
+    //    invisible because they have no Transform; Lua creates them with a
+    //    default Transform via spawn_entity, but we mask them by Tag.
+    app.add_system(|world, _dt| {
+        // Find a shared mesh/material handle by sampling the player's.
+        let sample = world
+            .query::<Tag>()
+            .find(|(_, t)| t.0 == "player")
+            .map(|(e, _)| e);
+        let Some(sample_player) = sample else { return };
+        let mesh = world.get::<MeshHandle>(sample_player).copied();
+        let mat = world.get::<MaterialHandle>(sample_player).copied();
+        let (Some(mesh), Some(mat)) = (mesh, mat) else { return };
+        let bounds = Bounds(AABB::new(Vec3::new(-0.5, -0.5, -0.5), Vec3::new(0.5, 0.5, 0.5)));
+
+        let needy: Vec<Entity> = world
+            .query::<Tag>()
+            .filter(|(e, t)| {
+                (t.0 == "enemy" || t.0 == "projectile") && world.get::<MeshHandle>(*e).is_none()
+            })
+            .map(|(e, _)| e)
+            .collect();
+        for e in needy {
+            world.add(e, mesh);
+            world.add(e, mat);
+            world.add(e, bounds);
+        }
+    });
+}
+
+/// Standard 24-vertex unit cube. Same routine as runtime_demo /
+/// tutorial_minigame — kept inline so the flagship game has no extra
+/// shared helper crate.
+fn make_unit_cube(device: &wgpu::Device) -> Mesh {
+    let s = 0.5;
+    let mut verts: Vec<MeshVertex> = Vec::with_capacity(24);
+    verts.extend([
+        MeshVertex { position: [ s, -s, -s], normal: [1.0, 0.0, 0.0], uv: [0.0, 0.0], tangent: [0.0, 0.0, 1.0, 1.0] },
+        MeshVertex { position: [ s, -s,  s], normal: [1.0, 0.0, 0.0], uv: [1.0, 0.0], tangent: [0.0, 0.0, 1.0, 1.0] },
+        MeshVertex { position: [ s,  s,  s], normal: [1.0, 0.0, 0.0], uv: [1.0, 1.0], tangent: [0.0, 0.0, 1.0, 1.0] },
+        MeshVertex { position: [ s,  s, -s], normal: [1.0, 0.0, 0.0], uv: [0.0, 1.0], tangent: [0.0, 0.0, 1.0, 1.0] },
+    ]);
+    verts.extend([
+        MeshVertex { position: [-s, -s,  s], normal: [-1.0, 0.0, 0.0], uv: [0.0, 0.0], tangent: [0.0, 0.0, -1.0, 1.0] },
+        MeshVertex { position: [-s, -s, -s], normal: [-1.0, 0.0, 0.0], uv: [1.0, 0.0], tangent: [0.0, 0.0, -1.0, 1.0] },
+        MeshVertex { position: [-s,  s, -s], normal: [-1.0, 0.0, 0.0], uv: [1.0, 1.0], tangent: [0.0, 0.0, -1.0, 1.0] },
+        MeshVertex { position: [-s,  s,  s], normal: [-1.0, 0.0, 0.0], uv: [0.0, 1.0], tangent: [0.0, 0.0, -1.0, 1.0] },
+    ]);
+    verts.extend([
+        MeshVertex { position: [-s,  s, -s], normal: [0.0, 1.0, 0.0], uv: [0.0, 0.0], tangent: [1.0, 0.0, 0.0, 1.0] },
+        MeshVertex { position: [ s,  s, -s], normal: [0.0, 1.0, 0.0], uv: [1.0, 0.0], tangent: [1.0, 0.0, 0.0, 1.0] },
+        MeshVertex { position: [ s,  s,  s], normal: [0.0, 1.0, 0.0], uv: [1.0, 1.0], tangent: [1.0, 0.0, 0.0, 1.0] },
+        MeshVertex { position: [-s,  s,  s], normal: [0.0, 1.0, 0.0], uv: [0.0, 1.0], tangent: [1.0, 0.0, 0.0, 1.0] },
+    ]);
+    verts.extend([
+        MeshVertex { position: [-s, -s,  s], normal: [0.0, -1.0, 0.0], uv: [0.0, 0.0], tangent: [1.0, 0.0, 0.0, 1.0] },
+        MeshVertex { position: [ s, -s,  s], normal: [0.0, -1.0, 0.0], uv: [1.0, 0.0], tangent: [1.0, 0.0, 0.0, 1.0] },
+        MeshVertex { position: [ s, -s, -s], normal: [0.0, -1.0, 0.0], uv: [1.0, 1.0], tangent: [1.0, 0.0, 0.0, 1.0] },
+        MeshVertex { position: [-s, -s, -s], normal: [0.0, -1.0, 0.0], uv: [0.0, 1.0], tangent: [1.0, 0.0, 0.0, 1.0] },
+    ]);
+    verts.extend([
+        MeshVertex { position: [ s, -s,  s], normal: [0.0, 0.0, 1.0], uv: [0.0, 0.0], tangent: [-1.0, 0.0, 0.0, 1.0] },
+        MeshVertex { position: [-s, -s,  s], normal: [0.0, 0.0, 1.0], uv: [1.0, 0.0], tangent: [-1.0, 0.0, 0.0, 1.0] },
+        MeshVertex { position: [-s,  s,  s], normal: [0.0, 0.0, 1.0], uv: [1.0, 1.0], tangent: [-1.0, 0.0, 0.0, 1.0] },
+        MeshVertex { position: [ s,  s,  s], normal: [0.0, 0.0, 1.0], uv: [0.0, 1.0], tangent: [-1.0, 0.0, 0.0, 1.0] },
+    ]);
+    verts.extend([
+        MeshVertex { position: [-s, -s, -s], normal: [0.0, 0.0, -1.0], uv: [0.0, 0.0], tangent: [1.0, 0.0, 0.0, 1.0] },
+        MeshVertex { position: [ s, -s, -s], normal: [0.0, 0.0, -1.0], uv: [1.0, 0.0], tangent: [1.0, 0.0, 0.0, 1.0] },
+        MeshVertex { position: [ s,  s, -s], normal: [0.0, 0.0, -1.0], uv: [1.0, 1.0], tangent: [1.0, 0.0, 0.0, 1.0] },
+        MeshVertex { position: [-s,  s, -s], normal: [0.0, 0.0, -1.0], uv: [0.0, 1.0], tangent: [1.0, 0.0, 0.0, 1.0] },
+    ]);
+    let mut indices = Vec::with_capacity(36);
+    for face in 0..6u32 {
+        let base = face * 4;
+        indices.extend([base, base + 1, base + 2, base, base + 2, base + 3]);
+    }
+    Mesh::new(device, &verts, &indices)
+}

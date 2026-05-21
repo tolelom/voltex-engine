@@ -1,0 +1,16 @@
+[package]
+name = "voltex_survivor"
+version = "0.1.0"
+edition = "2021"
+
+# Flagship game for v1.0 — game logic lives in scripts/*.lua + scene.vscn,
+# Rust side only bootstraps voltex_runtime and translates keyboard input
+# into Transform deltas on the player entity.
+
+[dependencies]
+voltex.workspace = true
+voltex_runtime.workspace = true
+voltex_renderer.workspace = true
+wgpu = { workspace = true }
+env_logger = { workspace = true }
+winit = { workspace = true }

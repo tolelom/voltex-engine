@@ -41,10 +41,15 @@ pub(crate) struct RuntimeState {
 }
 
 type UserSystem = Box<dyn FnMut(&mut World, f32) + 'static>;
+/// User system that also gets read-only access to the per-frame InputState.
+/// Added in D3 so a flagship game can drive entities from keyboard / mouse
+/// without requiring a full `InputState as ECS resource` abstraction (v1.1).
+type InputSystem = Box<dyn FnMut(&mut World, &InputState, f32) + 'static>;
 
 pub struct RuntimeApp {
     pub(crate) runtime_state: Option<RuntimeState>,
     user_systems: Vec<UserSystem>,
+    input_systems: Vec<InputSystem>,
     pub file_watcher: FileWatcher,
     pub timer: GameTimer,
     pub input: InputState,
@@ -84,6 +89,7 @@ impl RuntimeApp {
         let mut app = Self {
             runtime_state: None,
             user_systems: Vec::new(),
+            input_systems: Vec::new(),
             file_watcher: FileWatcher::new(Duration::from_millis(500)),
             timer: GameTimer::new(60),
             input: InputState::new(),
@@ -114,6 +120,20 @@ impl RuntimeApp {
         self.user_systems.len()
     }
 
+    /// Register a per-frame system that also receives the current
+    /// `InputState`. Runs after the regular user systems each frame.
+    /// Use for camera control, player input, etc.
+    pub fn add_input_system<F>(&mut self, system: F)
+    where
+        F: FnMut(&mut World, &InputState, f32) + 'static,
+    {
+        self.input_systems.push(Box::new(system));
+    }
+
+    pub fn input_system_count(&self) -> usize {
+        self.input_systems.len()
+    }
+
     /// Run one frame's worth of non-rendering systems. Used internally by the
     /// winit handler and directly by unit tests / headless harnesses that
     /// don't need a window.
@@ -129,6 +149,9 @@ impl RuntimeApp {
         }
         for sys in self.user_systems.iter_mut() {
             sys(&mut self.world, dt);
+        }
+        for sys in self.input_systems.iter_mut() {
+            sys(&mut self.world, &self.input, dt);
         }
     }
 

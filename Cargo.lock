@@ -2254,6 +2254,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "voltex_survivor"
+version = "0.1.0"
+dependencies = [
+ "env_logger",
+ "voltex",
+ "voltex_renderer",
+ "voltex_runtime",
+ "wgpu",
+ "winit",
+]
+
+[[package]]
 name = "walkdir"
 version = "2.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
