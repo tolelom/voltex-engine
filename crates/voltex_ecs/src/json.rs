@@ -1,22 +1,31 @@
-/// Mini JSON writer and parser for scene serialization.
-/// No external dependencies — self-contained within voltex_ecs.
+//! Mini JSON writer and parser for scene serialization.
+//! No external dependencies — self-contained within voltex_ecs.
 
+/// JSON value variants understood by this mini parser/writer.
 #[derive(Debug, Clone, PartialEq)]
 pub enum JsonVal {
+    /// `null`.
     Null,
+    /// `true` / `false`.
     Bool(bool),
+    /// JSON number (always read as f64).
     Number(f64),
+    /// JSON string.
     Str(String),
+    /// JSON array.
     Array(Vec<JsonVal>),
+    /// JSON object — key insertion order is preserved.
     Object(Vec<(String, JsonVal)>),
 }
 
 // ── Writer helpers ──────────────────────────────────────────────────
 
+/// Serialises `null`.
 pub fn json_write_null() -> String {
     "null".to_string()
 }
 
+/// Serialises an `f32` (integer form when fractional == 0).
 pub fn json_write_f32(v: f32) -> String {
     // Emit integer form when the value has no fractional part
     if v.fract() == 0.0 && v.abs() < 1e15 {
@@ -26,6 +35,7 @@ pub fn json_write_f32(v: f32) -> String {
     }
 }
 
+/// Serialises a JSON string (escapes `"`, `\\`, `\n`, `\r`, `\t`).
 pub fn json_write_string(s: &str) -> String {
     let mut out = String::with_capacity(s.len() + 2);
     out.push('"');
@@ -43,7 +53,7 @@ pub fn json_write_string(s: &str) -> String {
     out
 }
 
-/// Write a JSON array from pre-formatted element strings.
+/// Builds a JSON array literal from pre-formatted element strings.
 pub fn json_write_array(elements: &[&str]) -> String {
     let mut out = String::from("[");
     for (i, elem) in elements.iter().enumerate() {
@@ -56,7 +66,7 @@ pub fn json_write_array(elements: &[&str]) -> String {
     out
 }
 
-/// Write a JSON object from (key, pre-formatted-value) pairs.
+/// Builds a JSON object literal from `(key, pre-formatted-value)` pairs.
 pub fn json_write_object(pairs: &[(&str, &str)]) -> String {
     let mut out = String::from("{");
     for (i, (key, val)) in pairs.iter().enumerate() {
@@ -74,6 +84,7 @@ pub fn json_write_object(pairs: &[(&str, &str)]) -> String {
 // ── Accessors on JsonVal ────────────────────────────────────────────
 
 impl JsonVal {
+    /// Looks up a key on an object value, or returns `None`.
     pub fn get(&self, key: &str) -> Option<&JsonVal> {
         match self {
             JsonVal::Object(pairs) => pairs.iter().find(|(k, _)| k == key).map(|(_, v)| v),
@@ -81,6 +92,7 @@ impl JsonVal {
         }
     }
 
+    /// Returns the value as f64, or `None` if it is not a number.
     pub fn as_f64(&self) -> Option<f64> {
         match self {
             JsonVal::Number(n) => Some(*n),
@@ -88,6 +100,7 @@ impl JsonVal {
         }
     }
 
+    /// Returns the value as `&str`, or `None` if it is not a string.
     pub fn as_str(&self) -> Option<&str> {
         match self {
             JsonVal::Str(s) => Some(s.as_str()),
@@ -95,6 +108,7 @@ impl JsonVal {
         }
     }
 
+    /// Returns the underlying array, or `None` if not an array.
     pub fn as_array(&self) -> Option<&Vec<JsonVal>> {
         match self {
             JsonVal::Array(a) => Some(a),
@@ -102,6 +116,7 @@ impl JsonVal {
         }
     }
 
+    /// Returns the underlying object, or `None` if not an object.
     pub fn as_object(&self) -> Option<&Vec<(String, JsonVal)>> {
         match self {
             JsonVal::Object(o) => Some(o),
@@ -109,6 +124,7 @@ impl JsonVal {
         }
     }
 
+    /// Returns the value as `bool`, or `None` if not a bool.
     pub fn as_bool(&self) -> Option<bool> {
         match self {
             JsonVal::Bool(b) => Some(*b),
@@ -119,6 +135,8 @@ impl JsonVal {
 
 // ── Parser (recursive descent) ──────────────────────────────────────
 
+/// Parses a complete JSON document from `input`. Returns `Err` on any
+/// trailing garbage or malformed token.
 pub fn json_parse(input: &str) -> crate::Result<JsonVal> {
     let bytes = input.as_bytes();
     let (val, pos) = parse_value(bytes, skip_ws(bytes, 0))?;

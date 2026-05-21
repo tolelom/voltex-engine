@@ -1,6 +1,11 @@
+//! Sparse set storage for a single component type `T`. Provides O(1) insert,
+//! remove, lookup, and a packed dense iterator. Tracks per-component change
+//! ticks for filtering "changed this frame" queries.
+
 use std::any::Any;
 use crate::entity::Entity;
 
+/// Sparse set of `(Entity, T)` pairs with O(1) operations + change tracking.
 pub struct SparseSet<T> {
     sparse: Vec<Option<usize>>,
     dense_entities: Vec<Entity>,
@@ -10,6 +15,7 @@ pub struct SparseSet<T> {
 }
 
 impl<T> SparseSet<T> {
+    /// Creates an empty sparse set.
     pub fn new() -> Self {
         Self {
             sparse: Vec::new(),
@@ -20,6 +26,7 @@ impl<T> SparseSet<T> {
         }
     }
 
+    /// Inserts (or overwrites) `value` for `entity`, marking it as changed.
     pub fn insert(&mut self, entity: Entity, value: T) {
         let id = entity.id as usize;
         // Grow sparse vec if needed
@@ -41,6 +48,7 @@ impl<T> SparseSet<T> {
         }
     }
 
+    /// Removes `entity`'s component, returning the value if present.
     pub fn remove(&mut self, entity: Entity) -> Option<T> {
         let id = entity.id as usize;
         let dense_idx = *self.sparse.get(id)?.as_ref()?;
@@ -67,6 +75,7 @@ impl<T> SparseSet<T> {
         }
     }
 
+    /// Returns the component for `entity`, or `None`.
     pub fn get(&self, entity: Entity) -> Option<&T> {
         let id = entity.id as usize;
         let dense_idx = self.sparse.get(id)?.as_ref().copied()?;
@@ -76,6 +85,7 @@ impl<T> SparseSet<T> {
         Some(&self.dense_data[dense_idx])
     }
 
+    /// Mutable equivalent of [`get`](Self::get); bumps `entity`'s change tick.
     pub fn get_mut(&mut self, entity: Entity) -> Option<&mut T> {
         let id = entity.id as usize;
         let dense_idx = self.sparse.get(id)?.as_ref().copied()?;
@@ -86,6 +96,7 @@ impl<T> SparseSet<T> {
         Some(&mut self.dense_data[dense_idx])
     }
 
+    /// `true` if `entity` has a component in this set.
     pub fn contains(&self, entity: Entity) -> bool {
         let id = entity.id as usize;
         self.sparse
@@ -94,30 +105,37 @@ impl<T> SparseSet<T> {
             .is_some_and(|&dense_idx| self.dense_entities[dense_idx] == entity)
     }
 
+    /// Number of stored components.
     pub fn len(&self) -> usize {
         self.dense_data.len()
     }
 
+    /// `true` if no components are stored.
     pub fn is_empty(&self) -> bool {
         self.dense_data.is_empty()
     }
 
+    /// Packed iterator of `(entity, &component)` pairs.
     pub fn iter(&self) -> impl Iterator<Item = (Entity, &T)> {
         self.dense_entities.iter().copied().zip(self.dense_data.iter())
     }
 
+    /// Packed iterator of `(entity, &mut component)` pairs.
     pub fn iter_mut(&mut self) -> impl Iterator<Item = (Entity, &mut T)> {
         self.dense_entities.iter().copied().zip(self.dense_data.iter_mut())
     }
 
+    /// Borrows the dense entity slice (parallel to [`data`](Self::data)).
     pub fn entities(&self) -> &[Entity] {
         &self.dense_entities
     }
 
+    /// Borrows the dense component slice.
     pub fn data(&self) -> &[T] {
         &self.dense_data
     }
 
+    /// Mutable borrow of the dense component slice.
     pub fn data_mut(&mut self) -> &mut [T] {
         &mut self.dense_data
     }
@@ -152,11 +170,18 @@ impl<T> Default for SparseSet<T> {
     }
 }
 
+/// Type-erased view of a [`SparseSet<T>`] — lets [`World`](crate::World)
+/// hold heterogeneous component stores in a single map.
 pub trait ComponentStorage: Any {
+    /// Downcast view as `&dyn Any`.
     fn as_any(&self) -> &dyn Any;
+    /// Downcast view as `&mut dyn Any`.
     fn as_any_mut(&mut self) -> &mut dyn Any;
+    /// Removes `entity`'s component from this storage, if any.
     fn remove_entity(&mut self, entity: Entity);
+    /// Number of components currently stored.
     fn storage_len(&self) -> usize;
+    /// Advance the internal change-tick counter (call once per frame).
     fn increment_tick(&mut self);
 }
 

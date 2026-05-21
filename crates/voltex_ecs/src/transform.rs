@@ -1,13 +1,20 @@
+//! Engine built-in `Transform` component — position + Euler rotation + scale.
+
 use voltex_math::{Vec3, Mat4};
 
+/// 3D affine transform stored as position + Euler rotation (XYZ radians) + scale.
 #[derive(Debug, Clone, Copy)]
 pub struct Transform {
+    /// World position.
     pub position: Vec3,
-    pub rotation: Vec3, // euler angles (radians): pitch(x), yaw(y), roll(z)
+    /// Euler rotation in radians: `pitch(x), yaw(y), roll(z)`.
+    pub rotation: Vec3,
+    /// Non-uniform scale.
     pub scale: Vec3,
 }
 
 impl Transform {
+    /// Identity transform (zero position, zero rotation, unit scale).
     pub fn new() -> Self {
         Self {
             position: Vec3::ZERO,
@@ -16,6 +23,7 @@ impl Transform {
         }
     }
 
+    /// Convenience: transform at `position` with zero rotation, unit scale.
     pub fn from_position(position: Vec3) -> Self {
         Self {
             position,
@@ -24,6 +32,7 @@ impl Transform {
         }
     }
 
+    /// Convenience: transform at `position` with zero rotation and given scale.
     pub fn from_position_scale(position: Vec3, scale: Vec3) -> Self {
         Self {
             position,

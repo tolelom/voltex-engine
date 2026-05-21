@@ -1,3 +1,5 @@
+//! Entity handle + slot allocator with generation tracking.
+
 /// Generation-tracked entity handle. Composed of a stable id (slot index) and
 /// a generation counter that increments on each despawn, so handles to slots
 /// that have been reused refer to a different generation and `World::is_alive`
@@ -15,6 +17,8 @@ struct EntityEntry {
     alive: bool,
 }
 
+/// Generation-bumping allocator used by [`World`](crate::World) to hand out
+/// safe [`Entity`] ids.
 pub struct EntityAllocator {
     entries: Vec<EntityEntry>,
     free_list: Vec<u32>,
@@ -22,6 +26,7 @@ pub struct EntityAllocator {
 }
 
 impl EntityAllocator {
+    /// Creates an empty allocator.
     pub fn new() -> Self {
         Self {
             entries: Vec::new(),
@@ -30,6 +35,7 @@ impl EntityAllocator {
         }
     }
 
+    /// Returns a fresh [`Entity`]; reuses a freed slot if any.
     pub fn allocate(&mut self) -> Entity {
         self.alive_count += 1;
         if let Some(id) = self.free_list.pop() {
@@ -50,6 +56,8 @@ impl EntityAllocator {
         }
     }
 
+    /// Frees `entity`'s slot, bumping its generation. Returns `false` if the
+    /// handle is stale or out of range.
     pub fn deallocate(&mut self, entity: Entity) -> bool {
         let Some(entry) = self.entries.get_mut(entity.id as usize) else {
             return false;
@@ -64,12 +72,14 @@ impl EntityAllocator {
         true
     }
 
+    /// `true` if `entity`'s slot is still live at the same generation.
     pub fn is_alive(&self, entity: Entity) -> bool {
         self.entries
             .get(entity.id as usize)
             .is_some_and(|e| e.alive && e.generation == entity.generation)
     }
 
+    /// Number of currently-live entities.
     pub fn alive_count(&self) -> usize {
         self.alive_count
     }

@@ -1,7 +1,11 @@
+//! Simple in-order system scheduler. See [`DependencyScheduler`](crate::DependencyScheduler)
+//! for the parallel variant.
+
 use crate::World;
 
 /// A system that can be run on the world.
 pub trait System {
+    /// Executes one tick of the system against `world`.
     fn run(&mut self, world: &mut World);
 }
 
@@ -18,6 +22,7 @@ pub struct Scheduler {
 }
 
 impl Scheduler {
+    /// Creates an empty scheduler.
     pub fn new() -> Self {
         Self { systems: Vec::new() }
     }
@@ -40,6 +45,7 @@ impl Scheduler {
         self.systems.len()
     }
 
+    /// `true` if no systems are registered.
     pub fn is_empty(&self) -> bool {
         self.systems.is_empty()
     }

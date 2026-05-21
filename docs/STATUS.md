@@ -173,6 +173,29 @@
 
 v1.0.9 부터는 **서비스 배포 완성도** 로드맵 (`docs/superpowers/specs/2026-05-21-service-readiness-roadmap.md`) 기준으로 진행.
 
+### v1.0.26 (2026-05-21) — voltex_ecs 100% missing_docs + `#![warn(missing_docs)]`
+
+여덟 번째 crate. 18 파일 — ECS 코어 (entity/sparse_set/world/archetype/queries + transform/world_transform/hierarchy + scheduler/dep_scheduler + component_registry + scene/binary_scene/json).
+
+**작업**:
+- Crate-level docstring + `#![warn(missing_docs)]`.
+- 모듈 헤더 14개.
+- Public API:
+  - `EntityAllocator` 5 method (new/allocate/deallocate/is_alive/alive_count)
+  - `SparseSet` 12 method + `ComponentStorage` trait 5 method
+  - `JsonVal` 6 variant + 6 accessor (get/as_f64/as_str/as_array/as_object/as_bool) + writer 5개 / parser
+  - `Archetype`/`ArchetypeSignature`/`ArchetypeRegistry` 모든 method + field
+  - `SystemAccess` (name/reads/writes + new/read/write), `DependencyScheduler` (new/add/system_count) + `ParallelGroup` 타입 alias
+  - `Transform` 3 field + new/from_position/from_position_scale
+  - `Parent`/`Children` tuple field, `WorldTransform` + identity, `propagate_transforms`
+  - `Component` trait 4 method + `ComponentEntry`/`ComponentRegistry` + fn pointer alias 4종
+  - `ScriptComponent` 2 field + new
+  - `World` query/query2/3/4/storage/storage_mut/has_component
+
+**검증**:
+- `cargo build -p voltex_ecs` — 0 missing_docs warning.
+- `cargo test -p voltex_ecs --lib` — 134 통과.
+
 ### v1.0.25 (2026-05-21) — voltex_physics 100% missing_docs + `#![warn(missing_docs)]`
 
 일곱 번째 crate. 14 파일 (BVH/Colliders/Narrow/GJK+EPA/Contact/RigidBody/Integrator/Solver/Raycast/CCD/MeshCollider).

@@ -1,20 +1,30 @@
+//! Dependency-aware scheduler. Each system declares the components it reads
+//! and writes; the scheduler groups non-conflicting systems for parallel
+//! execution.
+
 use std::any::TypeId;
 use std::collections::HashSet;
 
 /// Describes what components a system reads and writes.
 #[derive(Debug, Clone)]
 pub struct SystemAccess {
+    /// Human-readable system name (for logging/debugging).
     pub name: String,
+    /// Component types this system reads.
     pub reads: HashSet<TypeId>,
+    /// Component types this system writes (exclusive).
     pub writes: HashSet<TypeId>,
 }
 
 impl SystemAccess {
+    /// Creates an access spec with the given name and empty read/write sets.
     pub fn new(name: &str) -> Self {
         SystemAccess { name: name.to_string(), reads: HashSet::new(), writes: HashSet::new() }
     }
 
+    /// Builder: declares a read on component `T`.
     pub fn read<T: 'static>(mut self) -> Self { self.reads.insert(TypeId::of::<T>()); self }
+    /// Builder: declares a write on component `T`.
     pub fn write<T: 'static>(mut self) -> Self { self.writes.insert(TypeId::of::<T>()); self }
 
     /// Check if this system conflicts with another (write-read or write-write on same type).
@@ -36,8 +46,9 @@ pub struct DependencyScheduler {
     systems: Vec<SystemAccess>,
 }
 
-/// A group of systems that can execute in parallel.
-pub type ParallelGroup = Vec<usize>; // indices into systems
+/// A group of systems that can execute in parallel (indices into
+/// [`DependencyScheduler::add`]'s insertion order).
+pub type ParallelGroup = Vec<usize>;
 
 impl Default for DependencyScheduler {
     fn default() -> Self {
@@ -46,8 +57,10 @@ impl Default for DependencyScheduler {
 }
 
 impl DependencyScheduler {
+    /// Creates an empty scheduler.
     pub fn new() -> Self { DependencyScheduler { systems: Vec::new() } }
 
+    /// Registers a system. Returns the system's index in the schedule.
     pub fn add(&mut self, access: SystemAccess) -> usize {
         let idx = self.systems.len();
         self.systems.push(access);
@@ -77,6 +90,7 @@ impl DependencyScheduler {
         schedule
     }
 
+    /// Number of registered systems.
     pub fn system_count(&self) -> usize { self.systems.len() }
 }
 

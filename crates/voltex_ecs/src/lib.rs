@@ -1,3 +1,22 @@
+//! # voltex_ecs
+//!
+//! Entity Component System. Generation-checked entity ids + SparseSet
+//! storage + Archetype storage + scheduler + scene (de)serialization +
+//! hierarchy + transform propagation.
+//!
+//! - [`Entity`] / [`EntityAllocator`] — generation-checked ids.
+//! - [`World`] — primary container; stores type-erased components.
+//! - [`SparseSet`] — single-type packed storage.
+//! - [`ArchetypeRegistry`] / [`Archetype`] — signature-based archetype store.
+//! - [`Transform`] / [`WorldTransform`] / [`propagate_transforms`].
+//! - [`Parent`] / [`Children`] hierarchy helpers.
+//! - [`Scheduler`] / [`System`] + dependency-aware [`DependencyScheduler`].
+//! - [`Component`] trait + [`ComponentRegistry`] for typed serialization.
+//! - [`serialize_scene`] / [`deserialize_scene`] (text JSON) +
+//!   [`serialize_scene_binary`] / [`deserialize_scene_binary`] (VSCN).
+
+#![warn(missing_docs)]
+
 pub mod error;
 pub mod entity;
 pub mod sparse_set;

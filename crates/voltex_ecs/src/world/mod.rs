@@ -1,3 +1,5 @@
+//! `World` — owns the entity allocator + every type-erased component storage.
+
 use std::any::TypeId;
 use std::collections::HashMap;
 use crate::entity::{Entity, EntityAllocator};
@@ -114,18 +116,21 @@ impl World {
         set.remove(entity)
     }
 
+    /// Borrows the underlying [`SparseSet<T>`], if a storage for `T` exists yet.
     pub fn storage<T: 'static>(&self) -> Option<&SparseSet<T>> {
         let type_id = TypeId::of::<T>();
         let storage = self.storages.get(&type_id)?;
         storage.as_any().downcast_ref::<SparseSet<T>>()
     }
 
+    /// Mutable equivalent of [`storage`](Self::storage).
     pub fn storage_mut<T: 'static>(&mut self) -> Option<&mut SparseSet<T>> {
         let type_id = TypeId::of::<T>();
         let storage = self.storages.get_mut(&type_id)?;
         storage.as_any_mut().downcast_mut::<SparseSet<T>>()
     }
 
+    /// Iterates `(entity, &T)` for every entity that has component `T`.
     pub fn query<T: 'static>(&self) -> impl Iterator<Item = (Entity, &T)> {
         self.storage::<T>()
             .map(|s| s.iter())
@@ -133,6 +138,8 @@ impl World {
             .flatten()
     }
 
+    /// Joins every entity that has both `A` and `B`. Iterates the smaller
+    /// storage and looks up in the larger.
     pub fn query2<A: 'static, B: 'static>(&self) -> Vec<(Entity, &A, &B)> {
         let a_storage = match self.storage::<A>() {
             Some(s) => s,
@@ -161,6 +168,7 @@ impl World {
         result
     }
 
+    /// 3-way join — every entity that has `A` + `B` + `C`.
     pub fn query3<A: 'static, B: 'static, C: 'static>(&self) -> Vec<(Entity, &A, &B, &C)> {
         let a_storage = match self.storage::<A>() {
             Some(s) => s,
@@ -203,6 +211,7 @@ impl World {
         result
     }
 
+    /// 4-way join — every entity that has `A` + `B` + `C` + `D`.
     pub fn query4<A: 'static, B: 'static, C: 'static, D: 'static>(
         &self,
     ) -> Vec<(Entity, &A, &B, &C, &D)> {
@@ -291,6 +300,7 @@ impl World {
         }
     }
 
+    /// `true` if `entity` has a component of type `T`.
     pub fn has_component<T: 'static>(&self, entity: Entity) -> bool {
         self.storage::<T>().is_some_and(|s| s.contains(entity))
     }

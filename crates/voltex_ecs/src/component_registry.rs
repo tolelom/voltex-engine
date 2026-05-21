@@ -8,9 +8,15 @@
 use crate::entity::Entity;
 use crate::world::World;
 
+/// Function pointer that serialises one component to bytes.
 pub type SerializeFn = fn(&World, Entity) -> Option<Vec<u8>>;
+/// Function pointer that deserialises bytes back into a component on `entity`.
 pub type DeserializeFn = fn(&mut World, Entity, &[u8]) -> crate::Result<()>;
+/// Function pointer that removes the component from `entity`. Returns `true`
+/// if a component was actually present.
 pub type RemoveFn = fn(&mut World, Entity) -> bool;
+/// Function pointer that produces a "sensible default" byte payload used by
+/// `ComponentRegistry`'s Add Component flows.
 pub type DefaultBytesFn = fn() -> Vec<u8>;
 
 /// 직렬화 가능한 컴포넌트가 구현하는 trait.
@@ -43,19 +49,27 @@ pub trait Component: 'static + Sized {
     }
 }
 
+/// Registered metadata for one component type.
 pub struct ComponentEntry {
+    /// Name used in the on-disk scene format.
     pub name: String,
+    /// Serialiser function pointer.
     pub serialize: SerializeFn,
+    /// Deserialiser function pointer.
     pub deserialize: DeserializeFn,
+    /// Remove function pointer.
     pub remove: RemoveFn,
+    /// Default-bytes function pointer.
     pub default_bytes: DefaultBytesFn,
 }
 
+/// Holds every component type the runtime knows how to (de)serialise.
 pub struct ComponentRegistry {
     entries: Vec<ComponentEntry>,
 }
 
 impl ComponentRegistry {
+    /// Creates an empty registry (no components registered yet).
     pub fn new() -> Self {
         Self { entries: Vec::new() }
     }
@@ -84,10 +98,12 @@ impl ComponentRegistry {
         });
     }
 
+    /// Finds the entry registered under `name`.
     pub fn find(&self, name: &str) -> Option<&ComponentEntry> {
         self.entries.iter().find(|e| e.name == name)
     }
 
+    /// Borrows the slice of every registered entry.
     pub fn entries(&self) -> &[ComponentEntry] {
         &self.entries
     }

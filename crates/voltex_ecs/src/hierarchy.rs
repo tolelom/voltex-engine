@@ -1,12 +1,23 @@
+//! Entity hierarchy components + helpers (`Parent`, `Children`, `add_child`,
+//! `remove_child`, `despawn_recursive`, `roots`).
+
 use crate::entity::Entity;
 use crate::world::World;
 use crate::transform::Transform;
 
+/// Component pointing at the entity's parent in the hierarchy.
 #[derive(Debug, Clone, Copy)]
-pub struct Parent(pub Entity);
+pub struct Parent(
+    /// Parent entity.
+    pub Entity,
+);
 
+/// Component holding the entity's immediate children.
 #[derive(Debug, Clone)]
-pub struct Children(pub Vec<Entity>);
+pub struct Children(
+    /// Immediate children, in insertion order.
+    pub Vec<Entity>,
+);
 
 /// Set `child`'s Parent to `parent` and register `child` in `parent`'s Children list.
 /// Does nothing if `child` is already in the Children list (no duplicates).

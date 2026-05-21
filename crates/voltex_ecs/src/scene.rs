@@ -1,3 +1,6 @@
+//! Text/JSON scene (de)serialization. The binary VSCN format lives in
+//! [`binary_scene`](crate::binary_scene).
+
 use std::collections::HashMap;
 use voltex_math::Vec3;
 use crate::entity::Entity;

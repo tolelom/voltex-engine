@@ -1,3 +1,5 @@
+//! Archetype storage — groups entities sharing the same component set.
+
 use std::any::TypeId;
 use std::collections::HashMap;
 use crate::entity::Entity;
@@ -7,20 +9,24 @@ use crate::entity::Entity;
 pub struct ArchetypeSignature(Vec<TypeId>);
 
 impl ArchetypeSignature {
+    /// Creates a signature; `types` is sorted + deduplicated for stable hashing.
     pub fn new(mut types: Vec<TypeId>) -> Self {
         types.sort();
         types.dedup();
         ArchetypeSignature(types)
     }
 
+    /// `true` if the signature contains `type_id`.
     pub fn contains(&self, type_id: &TypeId) -> bool {
         self.0.contains(type_id)
     }
 
+    /// Borrows the sorted slice of `TypeId`s.
     pub fn types(&self) -> &[TypeId] {
         &self.0
     }
 
+    /// `true` if every type in `required` is part of this signature.
     pub fn matches_all(&self, required: &[TypeId]) -> bool {
         required.iter().all(|t| self.0.contains(t))
     }
@@ -28,21 +34,26 @@ impl ArchetypeSignature {
 
 /// A single archetype: stores entities and their component data.
 pub struct Archetype {
+    /// Sorted component signature shared by every entity in this archetype.
     pub signature: ArchetypeSignature,
+    /// Entities currently in this archetype.
     pub entities: Vec<Entity>,
     // In a full implementation, component data would be stored in typed columns.
     // For now, just track which entities belong to this archetype.
 }
 
 impl Archetype {
+    /// Creates an empty archetype with the given signature.
     pub fn new(signature: ArchetypeSignature) -> Self {
         Archetype { signature, entities: Vec::new() }
     }
 
+    /// Appends `entity` to this archetype.
     pub fn add_entity(&mut self, entity: Entity) {
         self.entities.push(entity);
     }
 
+    /// Removes `entity` if present. Returns `true` on success.
     pub fn remove_entity(&mut self, entity: Entity) -> bool {
         if let Some(pos) = self.entities.iter().position(|&e| e.id == entity.id) {
             self.entities.swap_remove(pos);
@@ -52,7 +63,9 @@ impl Archetype {
         }
     }
 
+    /// Number of entities in this archetype.
     pub fn len(&self) -> usize { self.entities.len() }
+    /// `true` if no entities are in this archetype.
     pub fn is_empty(&self) -> bool { self.entities.is_empty() }
 }
 
@@ -69,6 +82,7 @@ impl Default for ArchetypeRegistry {
 }
 
 impl ArchetypeRegistry {
+    /// Creates an empty registry.
     pub fn new() -> Self {
         ArchetypeRegistry { archetypes: Vec::new(), entity_archetype: HashMap::new() }
     }
@@ -99,8 +113,10 @@ impl ArchetypeRegistry {
         self.archetypes.iter().filter(|a| a.signature.matches_all(required)).collect()
     }
 
+    /// Number of distinct archetypes registered.
     pub fn archetype_count(&self) -> usize { self.archetypes.len() }
 
+    /// Total number of entities tracked across all archetypes.
     pub fn entity_count(&self) -> usize { self.entity_archetype.len() }
 }
 

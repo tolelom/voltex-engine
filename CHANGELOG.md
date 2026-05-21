@@ -10,6 +10,35 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## [v1.0.26] — 2026-05-21 — `voltex_ecs` 100% documented (→ 0 `missing_docs`)
+
+Eighth crate in the workspace `missing_docs` sweep. Covers Entity/SparseSet/Archetype/World/queries + Transform/WorldTransform + Hierarchy + Scheduler/DependencyScheduler + ComponentRegistry + Scene/JSON across 18 source files.
+
+### Added
+
+- Crate-level docstring + `#![warn(missing_docs)]` guard.
+- Module headers for all 14 sub-modules including the `world/` directory.
+- Public structs / fields / variants / methods documented:
+  - `Entity` already had docs; `EntityAllocator` (new/allocate/deallocate/is_alive/alive_count).
+  - `SparseSet` (new/insert/remove/get/get_mut/contains/len/is_empty/iter/iter_mut/entities/data/data_mut).
+  - `ComponentStorage` trait (5 methods).
+  - `Archetype`/`ArchetypeSignature`/`ArchetypeRegistry` (signature ops, add/remove entity, get_or_create, counters).
+  - `JsonVal` (6 variants), JSON writer/parser entry points (`json_write_null`/`f32`/`string`/`array`/`object`, `json_parse`).
+  - `JsonVal::{get, as_f64, as_str, as_array, as_object, as_bool}`.
+  - `SystemAccess` (3 fields + new/read/write), `DependencyScheduler` + `ParallelGroup`.
+  - `Transform` + 3 fields + new/from_position/from_position_scale.
+  - `Parent`/`Children` tuple fields, `WorldTransform` + identity.
+  - `ComponentEntry`/`ComponentRegistry` + 4 fn-pointer aliases.
+  - `ScriptComponent` 2 fields + `new`.
+  - `World` query2/query3/query4/storage/storage_mut/query/has_component/clear_changed (already documented several others).
+
+### Verified
+
+- `cargo build -p voltex_ecs` — zero `missing_docs` warnings.
+- `cargo test -p voltex_ecs --lib` — 134 passed (no regression).
+
+---
+
 ## [v1.0.25] — 2026-05-21 — `voltex_physics` 100% documented (→ 0 `missing_docs`)
 
 Seventh crate in the workspace `missing_docs` sweep. Covers BVH / Colliders (Sphere/Box/Capsule/ConvexHull/Mesh) / Narrowphase / GJK+EPA / Contact manifold / RigidBody + PhysicsConfig / Integrator / Sequential-Impulse Solver / Raycasting / Swept-sphere CCD across 14 source files.

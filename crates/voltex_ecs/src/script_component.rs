@@ -11,9 +11,12 @@ use crate::component_registry::Component;
 use crate::entity::Entity;
 use crate::world::World;
 
+/// Marker tying an entity to a Lua script file by path + cached instance id.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ScriptComponent {
+    /// VFS-relative path to the script file.
     pub script_path: String,
+    /// Cached `ScriptInstancePool` id, or [`UNBOUND`](Self::UNBOUND) if not yet resolved.
     pub instance_id: u32,
 }
 
@@ -22,6 +25,7 @@ impl ScriptComponent {
     /// real id on first start/update.
     pub const UNBOUND: u32 = u32::MAX;
 
+    /// Creates a component pointing at `path` with [`UNBOUND`](Self::UNBOUND).
     pub fn new(path: impl Into<String>) -> Self {
         Self {
             script_path: path.into(),

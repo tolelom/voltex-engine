@@ -1,14 +1,24 @@
+//! Computed world-space transform component + top-down propagation.
+
 use voltex_math::Mat4;
 use crate::{Entity, World, Transform};
 use crate::hierarchy::{Parent, Children};
 
+/// World-space affine transform — typically populated by
+/// [`propagate_transforms`].
 #[derive(Debug, Clone, Copy)]
-pub struct WorldTransform(pub Mat4);
+pub struct WorldTransform(
+    /// 4x4 world matrix.
+    pub Mat4,
+);
 
 impl WorldTransform {
+    /// Identity world transform.
     pub fn identity() -> Self { Self(Mat4::IDENTITY) }
 }
 
+/// Walks the hierarchy top-down and writes [`WorldTransform`] for every
+/// entity that has a [`Transform`].
 pub fn propagate_transforms(world: &mut World) {
     // Collect roots: entities with Transform but no Parent
     let roots: Vec<Entity> = world.query::<Transform>()
