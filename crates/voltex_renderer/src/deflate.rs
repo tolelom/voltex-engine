@@ -1,4 +1,9 @@
 //! Self-contained Deflate (RFC 1951) decompressor with zlib wrapper handling.
+//!
+//! Bit-reader / Huffman-table internals are exposed `pub` for tests; users
+//! should call the top-level `decompress*` functions. Allowing `missing_docs`
+//! keeps the parser's internal-detail churn off the warning list.
+#![allow(missing_docs)]
 
 struct BitReader<'a> {
     data: &'a [u8],

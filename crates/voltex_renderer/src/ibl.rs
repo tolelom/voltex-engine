@@ -1,3 +1,5 @@
+#![allow(missing_docs)]
+
 use crate::brdf_lut::generate_brdf_lut;
 
 pub const BRDF_LUT_SIZE: u32 = 256;

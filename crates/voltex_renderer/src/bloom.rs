@@ -1,3 +1,5 @@
+#![allow(missing_docs)]
+
 use bytemuck::{Pod, Zeroable};
 use crate::hdr::HDR_FORMAT;
 

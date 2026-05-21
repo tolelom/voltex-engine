@@ -1,3 +1,6 @@
+//! Bilateral bloom — edge-aware blur to suppress firefly halos.
+#![allow(missing_docs)]
+
 /// Bilateral bloom weight: attenuates blur across brightness edges.
 pub fn bilateral_bloom_weight(
     center_luminance: f32,

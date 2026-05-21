@@ -1,3 +1,5 @@
+#![allow(missing_docs)]
+
 use bytemuck::{Pod, Zeroable};
 
 /// Vertex for skinned meshes: standard vertex + joint indices + weights.

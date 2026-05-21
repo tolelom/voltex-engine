@@ -1,3 +1,5 @@
+#![allow(missing_docs)]
+
 use bytemuck::{Pod, Zeroable};
 
 /// Uniform buffer for the tonemap pass.

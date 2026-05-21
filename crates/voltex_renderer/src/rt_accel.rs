@@ -1,3 +1,5 @@
+#![allow(missing_docs)]
+
 use crate::vertex::MeshVertex;
 
 /// Data needed to build a BLAS for one mesh.

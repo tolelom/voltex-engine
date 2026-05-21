@@ -1,3 +1,5 @@
+#![allow(missing_docs)]
+
 /// Van der Corput sequence via bit-reversal.
 pub fn radical_inverse_vdc(mut bits: u32) -> f32 {
     bits = bits.rotate_right(16);

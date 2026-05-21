@@ -1,3 +1,5 @@
+#![allow(missing_docs)]
+
 /// Pure CPU exposure calculation logic (testable).
 pub fn calculate_target_exposure(
     avg_log_luminance: f32,

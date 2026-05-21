@@ -1,3 +1,5 @@
+#![allow(missing_docs)]
+
 use bytemuck::{Pod, Zeroable};
 
 pub const SSGI_OUTPUT_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba16Float;

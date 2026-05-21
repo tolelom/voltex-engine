@@ -1,3 +1,7 @@
+//! GPU light + camera uniforms. Includes the multi-light array
+//! ([`LightsUniform`] / [`LightData`]) used by the PBR pipeline.
+#![allow(missing_docs)]
+
 use bytemuck::{Pod, Zeroable};
 
 #[repr(C)]

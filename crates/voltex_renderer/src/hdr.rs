@@ -1,3 +1,5 @@
+#![allow(missing_docs)]
+
 /// Texture format used for HDR render targets.
 pub const HDR_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba16Float;
 

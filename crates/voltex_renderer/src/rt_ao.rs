@@ -1,3 +1,5 @@
+#![allow(missing_docs)]
+
 use bytemuck::{Pod, Zeroable};
 
 /// Uniform parameters for the RT ambient occlusion compute pass.

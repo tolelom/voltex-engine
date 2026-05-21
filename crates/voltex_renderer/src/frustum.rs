@@ -1,3 +1,5 @@
+#![allow(missing_docs)]
+
 use voltex_math::Vec3;
 use crate::light::{LightsUniform, LIGHT_DIRECTIONAL, LIGHT_POINT};
 

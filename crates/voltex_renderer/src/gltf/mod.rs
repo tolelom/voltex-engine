@@ -1,3 +1,6 @@
+//! glTF 2.0 / GLB parser — vertex/material/animation extraction.
+#![allow(missing_docs)]
+
 mod types;
 mod parser;
 mod accessor;

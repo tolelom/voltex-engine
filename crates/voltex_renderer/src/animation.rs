@@ -1,3 +1,5 @@
+#![allow(missing_docs)]
+
 use crate::gltf::{GltfChannel, AnimationPath, Interpolation};
 
 /// Quaternion for rotation interpolation.

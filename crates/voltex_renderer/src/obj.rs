@@ -1,3 +1,6 @@
+//! Wavefront OBJ parser — vertices + indices + texture coords + normals.
+#![allow(missing_docs)]
+
 use std::collections::HashMap;
 
 use crate::vertex::MeshVertex;

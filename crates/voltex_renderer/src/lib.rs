@@ -1,3 +1,17 @@
+//! # voltex_renderer
+//!
+//! wgpu-backed rendering stack: GPU context, mesh + material assets,
+//! PBR/Blinn-Phong pipelines, shadow systems (CSM/point/spot + RT),
+//! deferred + forward passes, post-process chain (HDR/bloom/tonemap/TAA/SSR/
+//! DoF/motion-blur), IBL, ray-traced shadows/reflections/AO, animation +
+//! skinning.
+//!
+//! Asset parsing (PNG/JPG/glTF/OBJ) is bundled here for the engine's
+//! dependency-free pipeline. The public surface is large; each module has
+//! its own narrative `//!` header.
+
+#![warn(missing_docs)]
+
 pub mod error;
 pub mod json_parser;
 pub mod gltf;

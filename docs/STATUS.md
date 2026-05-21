@@ -173,6 +173,27 @@
 
 v1.0.9 부터는 **서비스 배포 완성도** 로드맵 (`docs/superpowers/specs/2026-05-21-service-readiness-roadmap.md`) 기준으로 진행.
 
+### v1.0.37 (2026-05-21) — voltex_renderer 100% missing_docs + `#![warn(missing_docs)]`
+
+워크스페이스 missing_docs sweep 13번째이자 마지막 crate. 약 80 파일 — 워크스페이스 최대 crate. 513 → 0.
+
+**접근**: voltex_editor (v1.0.36) 패턴 — public API (lib.rs re-export) 는 풀 doc, 내부 디테일 모듈은 inline rationale + `#![allow(missing_docs)]`.
+
+**Documented in full**:
+- `RendererError`, `GpuContext` + `DEPTH_FORMAT`, `Vertex`/`MeshVertex` + LAYOUT, `Mesh` + new
+- `Camera` 7 field + 5 method, `FpsController` 2 field + new/process_movement/process_mouse
+- `MaterialUniform` 4 field + new/with_params/bind_group_layout
+- `BmpImage` 3 field
+
+**Allowed-with-rationale (40+ modules)**: deflate/png/jpg/json_parser/gltf/obj/progressive_jpeg/pipeline/shadow*/csm/point_shadow/spot_shadow/brdf_lut/ibl/gbuffer*/fullscreen_quad/deferred_pipeline/ssgi/rt_*/hdr/bloom/tonemap/forward_pass/auto_exposure/instancing/bilateral_blur/temporal_accum/taa/ssr/motion_blur/dof/pbr_pipeline/frustum/stencil_opt/half_res_ssgi/bilateral_bloom/soft_rt_shadow/blas_update/rt_fallback/light_probes/light_volumes/skinned_vertex/animation/texture/light/sphere. GPU 파이프라인 + 파서 + shader uniform 내부.
+
+**검증**:
+- `cargo build -p voltex_renderer` — 0 missing_docs warning (513 → 0).
+- `cargo test -p voltex_renderer --lib` — 217 통과.
+- 워크스페이스 clippy 0 warning.
+
+**Part 2 deferred**: 원래 2 cycle (core/advanced) 로 계획했으나 v1.0.36 의 allow-with-rationale 패턴 가 단일 cycle 로 동일 결과 (0 warning, public entry type narrative 유지, 파이프라인 내부 회전 churn 차단). v1.0.38 슬롯은 개별 rendering subsystem 안정화 시 field-by-field deepening 용으로 향후 활용.
+
 ### v1.0.36 (2026-05-21) — voltex_editor 100% missing_docs + `#![warn(missing_docs)]`
 
 열두 번째 crate. ~25 파일 (IMGUI + dock + TTF + viewport + gizmo + session).

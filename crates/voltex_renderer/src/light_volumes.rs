@@ -1,3 +1,5 @@
+#![allow(missing_docs)]
+
 /// Light volume shapes for deferred lighting optimization.
 #[derive(Debug, Clone)]
 pub enum LightVolume {

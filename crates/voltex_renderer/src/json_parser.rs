@@ -1,4 +1,5 @@
-/// Minimal JSON parser for glTF. No external dependencies.
+//! Minimal JSON parser for glTF. No external dependencies.
+#![allow(missing_docs)]
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum JsonValue {

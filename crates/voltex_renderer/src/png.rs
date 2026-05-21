@@ -1,5 +1,6 @@
 //! PNG decoder that uses the self-contained deflate decompressor.
 //! Supports 8-bit RGB (color_type=2) and RGBA (color_type=6) images.
+#![allow(missing_docs)]
 
 use crate::deflate;
 

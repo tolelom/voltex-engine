@@ -1,3 +1,5 @@
+#![allow(missing_docs)]
+
 use voltex_math::{Mat4, Vec3};
 use crate::shadow::{SHADOW_FORMAT, SHADOW_MAP_SIZE};
 

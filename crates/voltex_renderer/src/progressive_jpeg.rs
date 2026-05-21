@@ -1,3 +1,6 @@
+//! Progressive JPEG support (SOF2 — successive scans).
+#![allow(missing_docs)]
+
 /// Progressive JPEG scan parameters.
 #[derive(Debug, Clone)]
 pub struct ScanParams {

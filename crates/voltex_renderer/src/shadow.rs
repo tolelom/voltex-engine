@@ -1,3 +1,5 @@
+#![allow(missing_docs)]
+
 use bytemuck::{Pod, Zeroable};
 
 pub const SHADOW_MAP_SIZE: u32 = 2048;

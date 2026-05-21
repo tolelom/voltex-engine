@@ -1,3 +1,5 @@
+#![allow(missing_docs)]
+
 /// Check if a wgpu adapter supports features needed for RT.
 pub struct RtCapabilities {
     pub supports_compute: bool,

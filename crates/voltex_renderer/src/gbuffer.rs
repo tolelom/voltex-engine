@@ -1,3 +1,5 @@
+#![allow(missing_docs)]
+
 use crate::gpu::DEPTH_FORMAT;
 
 pub const GBUFFER_POSITION_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba32Float;

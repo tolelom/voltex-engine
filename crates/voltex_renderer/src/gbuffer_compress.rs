@@ -1,3 +1,5 @@
+#![allow(missing_docs)]
+
 /// Octahedral normal encoding: vec3 normal → vec2 (compact).
 pub fn encode_octahedral(n: [f32; 3]) -> [f32; 2] {
     let sum = n[0].abs() + n[1].abs() + n[2].abs();

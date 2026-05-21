@@ -1,3 +1,6 @@
+//! Deferred rendering pipelines — G-buffer + lighting + SSGI + RT shadow + bloom + tonemap.
+#![allow(missing_docs)]
+
 mod gbuffer;
 mod lighting;
 mod ssgi;

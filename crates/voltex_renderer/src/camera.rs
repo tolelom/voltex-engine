@@ -1,16 +1,27 @@
+//! Free-flying first-person camera + WASD/mouse controller.
+
 use voltex_math::{Vec3, Mat4};
 
+/// First-person camera — position + yaw + pitch + projection params.
 pub struct Camera {
+    /// World position of the eye.
     pub position: Vec3,
-    pub yaw: f32,   // radians, Y-axis rotation
-    pub pitch: f32,  // radians, X-axis rotation
-    pub fov_y: f32,  // radians
+    /// Yaw in radians (rotation around the Y axis).
+    pub yaw: f32,
+    /// Pitch in radians (rotation around the X axis).
+    pub pitch: f32,
+    /// Vertical field of view in radians.
+    pub fov_y: f32,
+    /// Aspect ratio (width / height).
     pub aspect: f32,
+    /// Near clipping plane distance.
     pub near: f32,
+    /// Far clipping plane distance.
     pub far: f32,
 }
 
 impl Camera {
+    /// New camera at `position` with sensible defaults (45° fov, near 0.1, far 100).
     pub fn new(position: Vec3, aspect: f32) -> Self {
         Self {
             position,
@@ -23,6 +34,7 @@ impl Camera {
         }
     }
 
+    /// Unit-length forward direction in world space.
     pub fn forward(&self) -> Vec3 {
         Vec3::new(
             self.yaw.sin() * self.pitch.cos(),
@@ -31,26 +43,33 @@ impl Camera {
         )
     }
 
+    /// Unit-length right direction (forward × Y axis).
     pub fn right(&self) -> Vec3 {
         self.forward().cross(Vec3::Y).normalize()
     }
 
+    /// View matrix from eye looking along [`forward`](Self::forward).
     pub fn view_matrix(&self) -> Mat4 {
         let target = self.position + self.forward();
         Mat4::look_at(self.position, target, Vec3::Y)
     }
 
+    /// Perspective projection matrix from the camera's `fov_y`/aspect/near/far.
     pub fn projection_matrix(&self) -> Mat4 {
         Mat4::perspective(self.fov_y, self.aspect, self.near, self.far)
     }
 
+    /// Combined `proj * view` ready to upload as a camera UBO.
     pub fn view_projection(&self) -> Mat4 {
         self.projection_matrix() * self.view_matrix()
     }
 }
 
+/// FPS-style WASD/mouse controller for [`Camera`].
 pub struct FpsController {
+    /// Movement speed in world units per second.
     pub speed: f32,
+    /// Mouse delta multiplier for yaw/pitch.
     pub mouse_sensitivity: f32,
 }
 
@@ -61,10 +80,13 @@ impl Default for FpsController {
 }
 
 impl FpsController {
+    /// New controller with sensible defaults (5 units/s, 0.003 mouse).
     pub fn new() -> Self {
         Self { speed: 5.0, mouse_sensitivity: 0.003 }
     }
 
+    /// Translates the camera by the per-frame `(forward, right, up)` input
+    /// (in the camera's local frame), scaled by speed and `dt`.
     pub fn process_movement(
         &self, camera: &mut Camera,
         forward: f32, right: f32, up: f32, dt: f32,
@@ -78,6 +100,8 @@ impl FpsController {
             + Vec3::Y * (up * velocity);
     }
 
+    /// Applies a mouse-delta (`dx`, `dy` in screen pixels) to the camera's
+    /// yaw and pitch, clamping pitch to ±89° to avoid gimbal flip.
     pub fn process_mouse(&self, camera: &mut Camera, dx: f64, dy: f64) {
         camera.yaw += dx as f32 * self.mouse_sensitivity;
         camera.pitch -= dy as f32 * self.mouse_sensitivity;

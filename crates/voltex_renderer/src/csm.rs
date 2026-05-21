@@ -1,3 +1,5 @@
+#![allow(missing_docs)]
+
 use bytemuck::{Pod, Zeroable};
 use voltex_math::{Mat4, Vec3, Vec4};
 

@@ -1,3 +1,6 @@
+//! Stencil-buffer optimisation for tiled/clustered light volume culling.
+#![allow(missing_docs)]
+
 /// Stencil state for marking pixels inside a light volume.
 pub fn light_volume_stencil_mark() -> wgpu::DepthStencilState {
     wgpu::DepthStencilState {

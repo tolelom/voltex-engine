@@ -1,3 +1,5 @@
+#![allow(missing_docs)]
+
 use bytemuck::{Pod, Zeroable};
 
 /// Texture format used for the RT point/spot shadow output (single-channel float).

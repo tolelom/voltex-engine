@@ -1,3 +1,6 @@
+//! Half-resolution SSGI — downsample, GI pass, bilateral upsample.
+#![allow(missing_docs)]
+
 /// Calculate half-resolution dimensions (rounded up).
 pub fn half_resolution(width: u32, height: u32) -> (u32, u32) {
     (width.div_ceil(2), height.div_ceil(2))

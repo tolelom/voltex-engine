@@ -1,6 +1,9 @@
+//! GPU context — owns the wgpu surface/device/queue + the depth attachment.
+
 use std::sync::Arc;
 use winit::window::Window;
 
+/// Depth attachment format the renderer uses everywhere.
 pub const DEPTH_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth32Float;
 
 fn create_depth_texture(device: &wgpu::Device, width: u32, height: u32) -> wgpu::TextureView {
@@ -17,16 +20,26 @@ fn create_depth_texture(device: &wgpu::Device, width: u32, height: u32) -> wgpu:
     texture.create_view(&wgpu::TextureViewDescriptor::default())
 }
 
+/// wgpu surface + device + queue + surface config + depth attachment, all
+/// constructed against a single window.
 pub struct GpuContext {
+    /// Window-backed surface to present into.
     pub surface: wgpu::Surface<'static>,
+    /// The wgpu device used for resource creation.
     pub device: wgpu::Device,
+    /// Submission queue paired with [`device`](Self::device).
     pub queue: wgpu::Queue,
+    /// Current surface configuration (size/format/present mode).
     pub config: wgpu::SurfaceConfiguration,
+    /// Surface texture format (sRGB-preferred when supported).
     pub surface_format: wgpu::TextureFormat,
+    /// Depth attachment view, sized to the surface.
     pub depth_view: wgpu::TextureView,
 }
 
 impl GpuContext {
+    /// Creates a default GpuContext (no extra features). Blocks on adapter +
+    /// device acquisition via pollster.
     pub fn new(window: Arc<Window>) -> Self {
         pollster::block_on(Self::new_async(window, wgpu::Features::empty()))
     }
@@ -114,6 +127,8 @@ impl GpuContext {
         }
     }
 
+    /// Reconfigures the surface for a new window size and rebuilds the
+    /// depth attachment. No-op when either dimension is zero.
     pub fn resize(&mut self, width: u32, height: u32) {
         if width > 0 && height > 0 {
             self.config.width = width;

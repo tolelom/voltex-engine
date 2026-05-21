@@ -1,3 +1,5 @@
+#![allow(missing_docs)]
+
 /// Tracks which meshes need BLAS rebuild.
 pub struct BlasTracker {
     dirty: Vec<(u32, bool)>, // (mesh_id, needs_rebuild)

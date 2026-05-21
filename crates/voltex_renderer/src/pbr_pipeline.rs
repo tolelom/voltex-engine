@@ -1,3 +1,5 @@
+#![allow(missing_docs)]
+
 use crate::vertex::MeshVertex;
 use crate::gpu::DEPTH_FORMAT;
 

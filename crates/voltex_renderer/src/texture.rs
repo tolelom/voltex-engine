@@ -1,7 +1,15 @@
+//! GPU texture wrapper + BMP loader + bind-group-layout helpers for the PBR
+//! material slots (albedo / normal / ORM / emissive).
+#![allow(missing_docs)]
+
+/// In-memory decoded BMP image (RGBA pixel rows).
 pub struct BmpImage {
+    /// Pixel width.
     pub width: u32,
+    /// Pixel height.
     pub height: u32,
-    pub pixels: Vec<u8>, // RGBA
+    /// Pixel data — `width * height * 4` bytes, RGBA.
+    pub pixels: Vec<u8>,
 }
 
 pub fn parse_bmp(data: &[u8]) -> crate::Result<BmpImage> {

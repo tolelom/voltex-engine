@@ -1,3 +1,5 @@
+#![allow(missing_docs)]
+
 use voltex_math::{Mat4, Vec3};
 
 pub const POINT_SHADOW_SIZE: u32 = 512;

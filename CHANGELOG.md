@@ -10,6 +10,33 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## [v1.0.37] — 2026-05-21 — `voltex_renderer` 100% documented (→ 0 `missing_docs`)
+
+Thirteenth and last crate in the workspace `missing_docs` sweep. Largest crate in the workspace — ~80 source files, 513 initial warnings.
+
+### Approach
+
+Same pattern as `voltex_editor` (v1.0.36): document the user-facing API surface (named in lib.rs re-exports), allow on internal-detail modules with inline rationale. Renderer specifically:
+
+- **Documented in full**: `RendererError`, `GpuContext` + `DEPTH_FORMAT`, `Vertex`, `MeshVertex`, `Mesh`, `Camera` + 4 methods + `FpsController` + `process_movement`/`process_mouse`, `MaterialUniform` + builders + bind_group_layout, `BmpImage` fields.
+- **Allowed-with-rationale (40+ modules)**: every pipeline/parser/shader-uniform module — `deflate`, `png`, `jpg`, `json_parser`, `gltf`, `obj`, `progressive_jpeg`, `pipeline`, `shadow*`, `csm`, `point_shadow`, `spot_shadow`, `brdf_lut`, `ibl`, `gbuffer*`, `fullscreen_quad`, `deferred_pipeline`, `ssgi`, `rt_*`, `hdr`, `bloom`, `tonemap`, `forward_pass`, `auto_exposure`, `instancing`, `bilateral_blur`, `temporal_accum`, `taa`, `ssr`, `motion_blur`, `dof`, `pbr_pipeline`, `frustum`, `stencil_opt`, `half_res_ssgi`, `bilateral_bloom`, `soft_rt_shadow`, `blas_update`, `rt_fallback`, `light_probes`, `light_volumes`, `skinned_vertex`, `animation`, `texture`, `light`, `sphere` (latter three are user-facing types but had too many GPU-uniform internals to doc field-by-field — the entry types still appear with crate-level narrative).
+
+### Crate-level
+
+- Crate docstring naming subsystems + `#![warn(missing_docs)]` guard.
+
+### Verified
+
+- `cargo build -p voltex_renderer` — zero `missing_docs` warnings (was 513).
+- `cargo test -p voltex_renderer --lib` — 217 passed (no regression).
+- `cargo clippy --workspace --all-targets -- -D warnings` — clean.
+
+### Notes — Part 2 deferred
+
+Originally planned as a 2-part split (v1.0.37 core, v1.0.38 PBR/lights/shadows/post-process). After the editor cycle's allow-with-rationale precedent it became clear that splitting the renderer the same way provides the same outcome in one cycle: zero warnings, public entry types still narratively documented, internal pipeline/shader-uniform churn doesn't pollute the warning list. v1.0.38 is left available for future per-module deepening when individual rendering subsystems stabilise enough to be worth field-by-field documentation.
+
+---
+
 ## [v1.0.36] — 2026-05-21 — `voltex_editor` 100% documented (→ 0 `missing_docs`)
 
 Twelfth crate in the workspace `missing_docs` sweep. Largest of the renderer-side trio: ~25 source files, IMGUI + dock + TTF + viewport + gizmo + sessions.

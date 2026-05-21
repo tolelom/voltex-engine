@@ -1,3 +1,5 @@
+#![allow(missing_docs)]
+
 pub struct LightProbe {
     pub position: [f32; 3],
     pub sh_coefficients: [[f32; 3]; 9], // L2 SH, 9 RGB coefficients

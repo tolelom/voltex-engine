@@ -96,7 +96,8 @@
 | 25 | v1.0.33 SemVer-checks CI | `[✅]` | (inline STATUS § v1.0.33) | d4d6e0c |
 | 26 | v1.0.34 release artifact automation | `[✅]` | (inline STATUS § v1.0.34) | 6b60589 |
 | 27 | v1.0.35 voltex_renderer_ecs missing_docs →0 | `[✅]` | (inline STATUS § v1.0.35) | fd9536b |
-| 28 | v1.0.36 voltex_editor missing_docs →0 | `[✅]` | (inline STATUS § v1.0.36) | (pending commit) |
+| 28 | v1.0.36 voltex_editor missing_docs →0 | `[✅]` | (inline STATUS § v1.0.36) | fcefa83 |
+| 29 | v1.0.37 voltex_renderer missing_docs →0 | `[✅]` | (inline STATUS § v1.0.37) | (pending commit) |
 | 7 | v1.0.15 cargo-deny | `[ ]` | — | — |
 | 8 | v1.0.16 CHANGELOG enforcement | `[ ]` | — | — |
 | 9 | v1.0.17 SemVer check | `[ ]` | — | — |

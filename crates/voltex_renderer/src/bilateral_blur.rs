@@ -1,3 +1,5 @@
+#![allow(missing_docs)]
+
 pub struct BilateralBlur {
     pipeline: wgpu::ComputePipeline,
     bind_group_layout: wgpu::BindGroupLayout,

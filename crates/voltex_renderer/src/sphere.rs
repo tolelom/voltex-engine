@@ -1,3 +1,5 @@
+//! Procedural UV sphere generator — primary use is PBR demo + IBL preview.
+
 use crate::vertex::MeshVertex;
 use std::f32::consts::PI;
 
