@@ -166,6 +166,14 @@
 - examples/editor_demo: 시드 엔티티 (ground + 3 cube + Cube1↔Cube2 hierarchy)를 `EditorSession::dispatch` 경로로 옮김 → jsonl 로그 + Save/Load round-trip 일관성
 - v1 한계 (문서화): picking은 sphere 근사 (메시 AABB는 미구현). gizmo translate/rotate/scale 핸들은 미구현
 
+### Cycle 14 (D1+D2): README + 30분 tutorial + tutorial_minigame (2026-05-21)
+- **`README.md` (신규)** — 5분 quickstart (clone → cargo run --example triangle) + Code-first / Editor-first 두 워크플로 + Features 한 줄씩 (14 카테고리) + 의존성 정책 (winit + wgpu 만) + crate 의존 그래프 + 문서 인덱스 + license + contributing + 개발자 노트 (검증 한계 명시).
+- **`docs/tutorial.md` (신규)** — 30분 안에 0 에서 빌드된 미니 게임까지. Chapter 1~7: 프로젝트 만들기 / 에디터 + 첫 씬 / Lua 스크립트 / 적 + 입력 / UI + 점수 / Save + Build / 다음 단계. 각 chapter 끝 체크포인트 + 스크린샷 placeholder (`<screenshot: ...>`).
+- **`examples/tutorial_minigame/` (신규)** — 튜토리얼 최종 산출물. 듀얼 워크플로 호환 (`cargo run -p tutorial_minigame` + `voltex build`). 1 player + 3 enemy 큐브, spinner.lua (player 자전) + enemy.lua (player 추적), score 시스템 (살아있는 enemy 수 stdout). main 본문 4 줄.
+- v1.0 한계 명시: 스크린샷 미포함 (사용자 머신 PR 환영), Lua 측 입력 API 부재 (v1.1), `voltex_cli` 의 editor 모드 미구현 (튜토리얼은 `examples/editor_demo` 로 안내).
+- 테스트 +0 (코드 변경 없음 — 새 example crate 의 빌드만 확장).
+- spec: docs/superpowers/specs/2026-05-21-d1-d2-readme-tutorial-design.md
+
 ### Cycle 13 (A): rustdoc 0 워닝 + facade prelude 완성 + CHANGELOG (2026-05-21)
 - **`cargo doc --workspace --no-deps` 워닝 0** — 7개 파일의 intra-doc link 깨짐 escape (mat4/ccd/pathfinding/navmesh/state/rt_accel + deferred_demo). `voltex_cli` bin 에 `doc = false` 추가해 cargo issue #6313 (voltex lib + voltex bin filename collision) 우회.
 - **`voltex` facade prelude 보강**: C0a (Bounds/MeshHandle/MaterialHandle) + S1 (ScriptComponent) + B0 (RuntimeApp/RuntimeConfig) + B2 (Vfs) 추가. `pub use voltex_runtime as runtime` 모듈 re-export 추가 (B0 의 누락 fix). 신규 prelude 타입 6개의 컴파일 검증 테스트.
@@ -320,12 +328,13 @@ crates/
 - voltex_runtime: 11 (B0 신규: config ×5, error ×2, app ×4 [registry/scene order, system order, transform propagation, missing-scene graceful])
 - voltex_cli: 26 (B1-spike +3, B1 +16, B2 +1, B3 +6: validate_target ×5 + cross_compile_error_message)
 
-## Examples (13개 + survivor_game)
+## Examples (14개 + survivor_game)
 
 - triangle, model_viewer, many_cubes, hierarchy_demo, asset_demo
 - pbr_demo, multi_light_demo, shadow_demo, ibl_demo
 - audio_demo, deferred_demo, editor_demo
 - **runtime_demo (B0 신규)** — RuntimeApp 으로 솔라 시스템, main 본문 4줄
+- **tutorial_minigame (D1+D2 신규)** — docs/tutorial.md 의 최종 산출물. 1 player + 3 enemy 큐브, spinner.lua + enemy.lua, score 시스템. 듀얼 워크플로 호환 (`cargo run -p tutorial_minigame` + `voltex build`)
 - survivor_game (ECS + voltex_physics + voltex facade로 재작성 완료, 2026-05-20)
 
 ## 다음 작업 후보 (2026-05-20 8-7 이후)

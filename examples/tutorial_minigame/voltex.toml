@@ -1,0 +1,10 @@
+[project]
+name = "tutorial_minigame"
+version = "0.1.0"
+
+[build]
+scene = "scene.vscn"
+scripts = ["scripts/**/*.lua"]
+assets = ["assets/**/*"]
+window_title = "Voltex Tutorial Minigame"
+window_size = [1280, 720]

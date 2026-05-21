@@ -30,6 +30,7 @@ members = [
     "examples/editor_demo",
     "examples/survivor_game",
     "examples/runtime_demo",
+    "examples/tutorial_minigame",
 ]
 
 [workspace.dependencies]

@@ -1,0 +1,16 @@
+[package]
+name = "tutorial_minigame"
+version = "0.1.0"
+edition = "2021"
+
+# The end-state of `docs/tutorial.md` — a minimal voltex project that doubles
+# as both a `cargo run -p tutorial_minigame` example (code-first) and a
+# `voltex build` target (editor-first). See `voltex.toml` alongside this file
+# for the CLI workflow.
+
+[dependencies]
+voltex.workspace = true
+voltex_runtime.workspace = true
+voltex_renderer.workspace = true
+wgpu = { workspace = true }
+env_logger = { workspace = true }
