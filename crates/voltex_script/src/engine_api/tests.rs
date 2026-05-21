@@ -355,3 +355,52 @@ fn stale_handle_get_position_returns_nothing() {
     // get_global_number returns None for nil globals.
     assert_eq!(lua.get_global_number("stale_read"), None);
 }
+
+#[test]
+fn entity_count_without_world_global_returns_nothing() {
+    // get_world used to dereference a null pointer when the
+    // __voltex_world global was missing or non-userdata. Pre-fix
+    // this was SIGSEGV; now the function returns 0 and Lua sees nil.
+    let lua = LuaState::new();
+    // No register_engine_api call: skip world registration. We still
+    // need the function bound, so do it manually.
+    lua.register_fn("entity_count", lua_entity_count);
+    lua.exec("count = entity_count()").unwrap();
+    // entity_count not called against a world → Lua sees nil.
+    assert_eq!(lua.get_global_number("count"), None);
+}
+
+#[test]
+fn entity_count_after_global_overwrite_does_not_crash() {
+    // A misbehaving script that reassigns the world global must not
+    // crash the engine. Pre-fix the next FFI call dereferenced a
+    // null/garbage pointer.
+    let lua = LuaState::new();
+    let mut world = World::new();
+    register_engine_api(&lua, &mut world as *mut World);
+    lua.exec("
+        __voltex_world = nil
+        count = entity_count()
+    ").unwrap();
+    assert_eq!(lua.get_global_number("count"), None);
+}
+
+#[test]
+fn set_position_with_non_numeric_args_is_silent_noop() {
+    // Pre-fix: lua_tonumberx coerced "hello"/nil to 0 silently,
+    // making set_position("a","b",1,2,3) mutate entity (0, 0).
+    // Now the FFI rejects non-numeric handle args via isnum check.
+    let lua = LuaState::new();
+    let mut world = World::new();
+    register_engine_api(&lua, &mut world as *mut World);
+
+    // Spawn entity 0 explicitly so a silent (0,0) mutation would be observable.
+    lua.exec("
+        local id, gen = spawn_entity()
+        set_position(\"bogus\", \"id\", 99.0, 99.0, 99.0)
+        local x, y, z = get_position(id, gen)
+        pos_x = x
+    ").unwrap();
+    // Position must still be 0 — non-numeric set was rejected.
+    assert_eq!(lua.get_global_number("pos_x"), Some(0.0));
+}

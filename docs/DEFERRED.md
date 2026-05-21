@@ -215,3 +215,4 @@
 - **glTF accessor count + attribute mismatch** ✅ v1.0.45 — 7개 read_accessor_* 가 공통 `validate_count` (MAX=4M) + POSITION/NORMAL/UV/TANGENT 길이 일치 강제. +2 회귀 테스트.
 - **Editor redo-Spawn entity leak** ✅ v1.0.46 — `Spawn→Undo→Redo→Undo` 시 두 번째 undo 가 stale entity 를 가리켜 새로 생성된 entity 가 영구 생존하던 버그. redo 후 inverse 패치. +1 회귀.
 - **Audio mixer clip_index OOB** ✅ v1.0.46 — `clips.get()` 으로 안전 접근. +1 회귀.
+- **Lua FFI null-deref + type confusion** ✅ v1.0.47 — `get_world` 가 Option 반환, 비숫자 handle/좌표 arg silent no-op 으로 거부. +3 회귀 테스트.

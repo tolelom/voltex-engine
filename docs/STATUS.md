@@ -173,6 +173,34 @@
 
 v1.0.9 부터는 **서비스 배포 완성도** 로드맵 (`docs/superpowers/specs/2026-05-21-service-readiness-roadmap.md`) 기준으로 진행.
 
+### v1.0.47 (2026-05-22) — Lua FFI null-deref 차단 + type-confusion 가드
+
+P0 critical safety. voltex_script 의 engine_api 가 unsafe FFI 표면이라 세 종류의 잠재 UB / silent corruption:
+
+**1. `get_world()` 가 null pointer dereference (UB → SIGSEGV)** — `__voltex_world` 글로벌이 nil 이거나 light userdata 가 아니면 `&mut *ptr` 이 null deref. 발생 시나리오:
+  - 스크립트가 실수로 `__voltex_world = nil`
+  - `register_engine_api` 호출 전 스크립트 실행
+  - 다른 코드가 글로벌을 덮어쓰기
+
+Fix: `get_world()` 가 `Option<&'static mut World>` 반환. 모든 호출자 (17개 함수) 가 `let Some(world) = get_world(L) else { return 0 }` 로 graceful skip.
+
+**2. 비숫자 entity handle 이 entity (0,0) 으로 silent 변환** — `lua_tonumberx` 의 `isnum` 출력을 무시. `set_position("foo", "bar", 1, 2, 3)` 가 entity (0,0) 의 position 을 silently 수정 → 신선한 world 의 첫 entity 데이터 손상.
+
+Fix: `read_handle_strict` / `read_handle_strict_at` 헬퍼 도입. `isnum == 0` 시 `None` → silent no-op.
+
+**3. 비숫자 x/y/z 좌표가 0으로 silent 변환** — `set_position(id, gen, "x", "y", "z")` 가 좌표를 모두 0 으로 설정. set_rotation / set_scale 동일.
+
+Fix: 모든 좌표 인자에 개별 `isnum` 변수 + 한 개라도 실패시 early return 0.
+
+**검증**:
+- `cargo build --workspace` 클린, clippy 0 워닝
+- voltex_script 42 → 45 (+3). 회귀 테스트:
+  - `engine_api::tests::entity_count_without_world_global_returns_nothing`
+  - `engine_api::tests::entity_count_after_global_overwrite_does_not_crash`
+  - `engine_api::tests::set_position_with_non_numeric_args_is_silent_noop`
+
+**누적 (v1.0.40~47)**: 8 cycle, ~50 회귀 테스트. 워크스페이스 ~1090 → ~1095.
+
 ### v1.0.46 (2026-05-22) — Editor redo Spawn 누수 fix + audio mixer OOB defence + runtime resize cleanup
 
 P0 robustness round 7. 세 곳의 작은 버그를 정리:

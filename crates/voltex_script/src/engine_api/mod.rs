@@ -50,17 +50,41 @@ pub fn register_engine_api(lua: &LuaState, world: *mut World) {
 }
 
 /// Helper to retrieve the World pointer from the Lua registry global.
-unsafe fn get_world(L: *mut ffi::lua_State) -> &'static mut World {
+///
+/// Returns `None` if the `__voltex_world` global is missing or not a light
+/// userdata. Pre-fix this dereferenced a null pointer (UB → SIGSEGV) any
+/// time a script ran before `register_engine_api` or accidentally
+/// reassigned the global.
+unsafe fn get_world(L: *mut ffi::lua_State) -> Option<&'static mut World> {
     let name = std::ffi::CString::new("__voltex_world").unwrap();
     ffi::lua_getglobal(L, name.as_ptr());
     let ptr = ffi::lua_touserdata(L, -1) as *mut World;
     ffi::lua_pop(L, 1);
-    &mut *ptr
+    if ptr.is_null() {
+        None
+    } else {
+        Some(&mut *ptr)
+    }
+}
+
+/// Helper: read a strict-typed `(id, gen)` pair from Lua args at positions
+/// 1 and 2. Returns `None` if either argument is not a number — so callers
+/// who pass strings/nils/tables get a silent no-op instead of accidentally
+/// targeting entity (0, 0).
+unsafe fn read_handle_strict(L: *mut ffi::lua_State) -> Option<voltex_ecs::Entity> {
+    let mut isnum_id: c_int = 0;
+    let mut isnum_gen: c_int = 0;
+    let id = ffi::lua_tonumberx(L, 1, &mut isnum_id) as u32;
+    let generation = ffi::lua_tonumberx(L, 2, &mut isnum_gen) as u32;
+    if isnum_id == 0 || isnum_gen == 0 {
+        return None;
+    }
+    Some(voltex_ecs::Entity { id, generation })
 }
 
 /// `spawn_entity()` → `id, gen`
 unsafe extern "C" fn lua_spawn_entity(L: *mut ffi::lua_State) -> c_int {
-    let world = get_world(L);
+    let Some(world) = get_world(L) else { return 0 };
     let entity = world.spawn();
     world.add(entity, Transform::new());
     ffi::lua_pushnumber(L, entity.id as f64);
@@ -70,15 +94,18 @@ unsafe extern "C" fn lua_spawn_entity(L: *mut ffi::lua_State) -> c_int {
 
 /// `set_position(id, gen, x, y, z)` — writes only if the handle is still alive.
 unsafe extern "C" fn lua_set_position(L: *mut ffi::lua_State) -> c_int {
-    let world = get_world(L);
-    let mut isnum = 0;
-    let id = ffi::lua_tonumberx(L, 1, &mut isnum) as u32;
-    let generation = ffi::lua_tonumberx(L, 2, &mut isnum) as u32;
-    let x = ffi::lua_tonumberx(L, 3, &mut isnum) as f32;
-    let y = ffi::lua_tonumberx(L, 4, &mut isnum) as f32;
-    let z = ffi::lua_tonumberx(L, 5, &mut isnum) as f32;
+    let Some(world) = get_world(L) else { return 0 };
+    let Some(entity) = read_handle_strict(L) else { return 0 };
+    let mut isnum_x: c_int = 0;
+    let mut isnum_y: c_int = 0;
+    let mut isnum_z: c_int = 0;
+    let x = ffi::lua_tonumberx(L, 3, &mut isnum_x) as f32;
+    let y = ffi::lua_tonumberx(L, 4, &mut isnum_y) as f32;
+    let z = ffi::lua_tonumberx(L, 5, &mut isnum_z) as f32;
+    if isnum_x == 0 || isnum_y == 0 || isnum_z == 0 {
+        return 0;
+    }
 
-    let entity = voltex_ecs::Entity { id, generation };
     if !world.is_alive(entity) {
         return 0;
     }
@@ -90,12 +117,9 @@ unsafe extern "C" fn lua_set_position(L: *mut ffi::lua_State) -> c_int {
 
 /// `get_position(id, gen)` → `x, y, z` (or nothing if handle stale / no Transform).
 unsafe extern "C" fn lua_get_position(L: *mut ffi::lua_State) -> c_int {
-    let world = get_world(L);
-    let mut isnum = 0;
-    let id = ffi::lua_tonumberx(L, 1, &mut isnum) as u32;
-    let generation = ffi::lua_tonumberx(L, 2, &mut isnum) as u32;
+    let Some(world) = get_world(L) else { return 0 };
+    let Some(entity) = read_handle_strict(L) else { return 0 };
 
-    let entity = voltex_ecs::Entity { id, generation };
     if !world.is_alive(entity) {
         return 0;
     }
@@ -110,23 +134,16 @@ unsafe extern "C" fn lua_get_position(L: *mut ffi::lua_State) -> c_int {
 }
 
 unsafe extern "C" fn lua_entity_count(L: *mut ffi::lua_State) -> c_int {
-    let world = get_world(L);
+    let Some(world) = get_world(L) else { return 0 };
     ffi::lua_pushnumber(L, world.entity_count() as f64);
     1
 }
 
-/// Helper: extract `(id, gen)` from Lua args at positions 1, 2.
-unsafe fn read_handle(L: *mut ffi::lua_State) -> voltex_ecs::Entity {
-    let mut isnum = 0;
-    let id = ffi::lua_tonumberx(L, 1, &mut isnum) as u32;
-    let generation = ffi::lua_tonumberx(L, 2, &mut isnum) as u32;
-    voltex_ecs::Entity { id, generation }
-}
-
-/// `destroy_entity(id, gen)` — despawns the entity. No-op on stale handles.
+/// `destroy_entity(id, gen)` — despawns the entity. No-op on stale handles
+/// or non-numeric args.
 unsafe extern "C" fn lua_destroy_entity(L: *mut ffi::lua_State) -> c_int {
-    let world = get_world(L);
-    let entity = read_handle(L);
+    let Some(world) = get_world(L) else { return 0 };
+    let Some(entity) = read_handle_strict(L) else { return 0 };
     if world.is_alive(entity) {
         world.despawn(entity);
     }
@@ -135,12 +152,17 @@ unsafe extern "C" fn lua_destroy_entity(L: *mut ffi::lua_State) -> c_int {
 
 /// `set_rotation(id, gen, x, y, z)`
 unsafe extern "C" fn lua_set_rotation(L: *mut ffi::lua_State) -> c_int {
-    let world = get_world(L);
-    let entity = read_handle(L);
-    let mut isnum = 0;
-    let x = ffi::lua_tonumberx(L, 3, &mut isnum) as f32;
-    let y = ffi::lua_tonumberx(L, 4, &mut isnum) as f32;
-    let z = ffi::lua_tonumberx(L, 5, &mut isnum) as f32;
+    let Some(world) = get_world(L) else { return 0 };
+    let Some(entity) = read_handle_strict(L) else { return 0 };
+    let mut isnum_x: c_int = 0;
+    let mut isnum_y: c_int = 0;
+    let mut isnum_z: c_int = 0;
+    let x = ffi::lua_tonumberx(L, 3, &mut isnum_x) as f32;
+    let y = ffi::lua_tonumberx(L, 4, &mut isnum_y) as f32;
+    let z = ffi::lua_tonumberx(L, 5, &mut isnum_z) as f32;
+    if isnum_x == 0 || isnum_y == 0 || isnum_z == 0 {
+        return 0;
+    }
     if !world.is_alive(entity) {
         return 0;
     }
@@ -152,8 +174,8 @@ unsafe extern "C" fn lua_set_rotation(L: *mut ffi::lua_State) -> c_int {
 
 /// `get_rotation(id, gen)` → `x, y, z` (or nothing if stale).
 unsafe extern "C" fn lua_get_rotation(L: *mut ffi::lua_State) -> c_int {
-    let world = get_world(L);
-    let entity = read_handle(L);
+    let Some(world) = get_world(L) else { return 0 };
+    let Some(entity) = read_handle_strict(L) else { return 0 };
     if !world.is_alive(entity) {
         return 0;
     }
@@ -169,12 +191,17 @@ unsafe extern "C" fn lua_get_rotation(L: *mut ffi::lua_State) -> c_int {
 
 /// `set_scale(id, gen, x, y, z)`
 unsafe extern "C" fn lua_set_scale(L: *mut ffi::lua_State) -> c_int {
-    let world = get_world(L);
-    let entity = read_handle(L);
-    let mut isnum = 0;
-    let x = ffi::lua_tonumberx(L, 3, &mut isnum) as f32;
-    let y = ffi::lua_tonumberx(L, 4, &mut isnum) as f32;
-    let z = ffi::lua_tonumberx(L, 5, &mut isnum) as f32;
+    let Some(world) = get_world(L) else { return 0 };
+    let Some(entity) = read_handle_strict(L) else { return 0 };
+    let mut isnum_x: c_int = 0;
+    let mut isnum_y: c_int = 0;
+    let mut isnum_z: c_int = 0;
+    let x = ffi::lua_tonumberx(L, 3, &mut isnum_x) as f32;
+    let y = ffi::lua_tonumberx(L, 4, &mut isnum_y) as f32;
+    let z = ffi::lua_tonumberx(L, 5, &mut isnum_z) as f32;
+    if isnum_x == 0 || isnum_y == 0 || isnum_z == 0 {
+        return 0;
+    }
     if !world.is_alive(entity) {
         return 0;
     }
@@ -186,8 +213,8 @@ unsafe extern "C" fn lua_set_scale(L: *mut ffi::lua_State) -> c_int {
 
 /// `get_scale(id, gen)` → `x, y, z` (or nothing if stale).
 unsafe extern "C" fn lua_get_scale(L: *mut ffi::lua_State) -> c_int {
-    let world = get_world(L);
-    let entity = read_handle(L);
+    let Some(world) = get_world(L) else { return 0 };
+    let Some(entity) = read_handle_strict(L) else { return 0 };
     if !world.is_alive(entity) {
         return 0;
     }
@@ -203,8 +230,8 @@ unsafe extern "C" fn lua_get_scale(L: *mut ffi::lua_State) -> c_int {
 
 /// `set_tag(id, gen, tag_string)` — replaces any existing Tag.
 unsafe extern "C" fn lua_set_tag(L: *mut ffi::lua_State) -> c_int {
-    let world = get_world(L);
-    let entity = read_handle(L);
+    let Some(world) = get_world(L) else { return 0 };
+    let Some(entity) = read_handle_strict(L) else { return 0 };
     if !world.is_alive(entity) {
         return 0;
     }
@@ -220,8 +247,8 @@ unsafe extern "C" fn lua_set_tag(L: *mut ffi::lua_State) -> c_int {
 
 /// `get_tag(id, gen)` → tag string (or nothing if stale / no Tag).
 unsafe extern "C" fn lua_get_tag(L: *mut ffi::lua_State) -> c_int {
-    let world = get_world(L);
-    let entity = read_handle(L);
+    let Some(world) = get_world(L) else { return 0 };
+    let Some(entity) = read_handle_strict(L) else { return 0 };
     if !world.is_alive(entity) {
         return 0;
     }
@@ -238,7 +265,11 @@ unsafe extern "C" fn lua_get_tag(L: *mut ffi::lua_State) -> c_int {
 /// entity with that Tag. Returns an empty table if nothing matches (callers can
 /// use `#result` to count). Always pushes exactly one Lua value.
 unsafe extern "C" fn lua_find_all_by_tag(L: *mut ffi::lua_State) -> c_int {
-    let world = get_world(L);
+    let Some(world) = get_world(L) else {
+        // Still push an empty table so callers can `ipairs` without error.
+        ffi::lua_createtable(L, 0, 0);
+        return 1;
+    };
     let cstr = ffi::lua_tostring(L, 1);
     ffi::lua_createtable(L, 0, 0);
     if cstr.is_null() {
@@ -264,19 +295,24 @@ unsafe extern "C" fn lua_find_all_by_tag(L: *mut ffi::lua_State) -> c_int {
     1
 }
 
+/// Helper: read a strict-typed `(id, gen)` pair from arbitrary slot positions.
+unsafe fn read_handle_strict_at(L: *mut ffi::lua_State, id_pos: c_int, gen_pos: c_int) -> Option<voltex_ecs::Entity> {
+    let mut isnum_id: c_int = 0;
+    let mut isnum_gen: c_int = 0;
+    let id = ffi::lua_tonumberx(L, id_pos, &mut isnum_id) as u32;
+    let generation = ffi::lua_tonumberx(L, gen_pos, &mut isnum_gen) as u32;
+    if isnum_id == 0 || isnum_gen == 0 {
+        return None;
+    }
+    Some(voltex_ecs::Entity { id, generation })
+}
+
 /// `add_child(parent_id, parent_gen, child_id, child_gen)` — attaches `child`
-/// under `parent`. No-op if either handle is stale.
+/// under `parent`. No-op if either handle is stale or non-numeric.
 unsafe extern "C" fn lua_add_child(L: *mut ffi::lua_State) -> c_int {
-    let world = get_world(L);
-    let mut isnum = 0;
-    let parent = voltex_ecs::Entity {
-        id: ffi::lua_tonumberx(L, 1, &mut isnum) as u32,
-        generation: ffi::lua_tonumberx(L, 2, &mut isnum) as u32,
-    };
-    let child = voltex_ecs::Entity {
-        id: ffi::lua_tonumberx(L, 3, &mut isnum) as u32,
-        generation: ffi::lua_tonumberx(L, 4, &mut isnum) as u32,
-    };
+    let Some(world) = get_world(L) else { return 0 };
+    let Some(parent) = read_handle_strict_at(L, 1, 2) else { return 0 };
+    let Some(child) = read_handle_strict_at(L, 3, 4) else { return 0 };
     if !world.is_alive(parent) || !world.is_alive(child) {
         return 0;
     }
@@ -285,19 +321,12 @@ unsafe extern "C" fn lua_add_child(L: *mut ffi::lua_State) -> c_int {
 }
 
 /// `remove_child(parent_id, parent_gen, child_id, child_gen)` — detaches
-/// `child` from `parent`. No-op if either handle is stale or not currently
-/// attached.
+/// `child` from `parent`. No-op if either handle is stale, non-numeric, or
+/// the child is not currently attached.
 unsafe extern "C" fn lua_remove_child(L: *mut ffi::lua_State) -> c_int {
-    let world = get_world(L);
-    let mut isnum = 0;
-    let parent = voltex_ecs::Entity {
-        id: ffi::lua_tonumberx(L, 1, &mut isnum) as u32,
-        generation: ffi::lua_tonumberx(L, 2, &mut isnum) as u32,
-    };
-    let child = voltex_ecs::Entity {
-        id: ffi::lua_tonumberx(L, 3, &mut isnum) as u32,
-        generation: ffi::lua_tonumberx(L, 4, &mut isnum) as u32,
-    };
+    let Some(world) = get_world(L) else { return 0 };
+    let Some(parent) = read_handle_strict_at(L, 1, 2) else { return 0 };
+    let Some(child) = read_handle_strict_at(L, 3, 4) else { return 0 };
     if !world.is_alive(parent) || !world.is_alive(child) {
         return 0;
     }
@@ -308,7 +337,10 @@ unsafe extern "C" fn lua_remove_child(L: *mut ffi::lua_State) -> c_int {
 /// `iter_entities()` → array table of `{id=, gen=}` for every currently live
 /// entity (in id order). Empty table if the world is empty.
 unsafe extern "C" fn lua_iter_entities(L: *mut ffi::lua_State) -> c_int {
-    let world = get_world(L);
+    let Some(world) = get_world(L) else {
+        ffi::lua_createtable(L, 0, 0);
+        return 1;
+    };
     ffi::lua_createtable(L, 0, 0);
     let id_key = std::ffi::CString::new("id").unwrap();
     let gen_key = std::ffi::CString::new("gen").unwrap();
@@ -335,7 +367,7 @@ unsafe extern "C" fn lua_iter_by_tag(L: *mut ffi::lua_State) -> c_int {
 /// `find_by_tag(tag_string)` → `id, gen` of the first entity with that Tag,
 /// or nothing if no match. The returned handle is fresh (valid generation).
 unsafe extern "C" fn lua_find_by_tag(L: *mut ffi::lua_State) -> c_int {
-    let world = get_world(L);
+    let Some(world) = get_world(L) else { return 0 };
     let cstr = ffi::lua_tostring(L, 1);
     if cstr.is_null() {
         return 0;

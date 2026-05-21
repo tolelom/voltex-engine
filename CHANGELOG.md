@@ -10,6 +10,42 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## [v1.0.47] — 2026-05-22 — Lua FFI null-deref + type-confusion guards
+
+**Fix**. The Lua engine_api FFI surface had three latent safety bugs reachable from arbitrary script code:
+
+### Fixed
+
+- **`get_world()` null-pointer dereference (UB → SIGSEGV).** Pre-fix:
+  ```rust
+  let ptr = ffi::lua_touserdata(L, -1) as *mut World;
+  ffi::lua_pop(L, 1);
+  &mut *ptr   // UB if ptr is null
+  ```
+  triggered any time the `__voltex_world` global was missing or not a light userdata. Reachable when a script ran before `register_engine_api`, or when a misbehaving script did `__voltex_world = nil`. `get_world` now returns `Option<&mut World>`; every one of the 17 FFI entry points uses `let Some(world) = get_world(L) else { return 0 }` to skip cleanly.
+- **Non-numeric entity handles silently mutated entity (0, 0).** `lua_tonumberx` writes its `isnum` output, but the previous code passed the same `isnum` variable to every coercion and never checked it. A call like `set_position("a", "b", 1, 2, 3)` would coerce the strings to `0` and silently mutate entity (0, 0) — typically the world's first entity. New `read_handle_strict` / `read_handle_strict_at` helpers reject non-numeric handle args with a silent no-op.
+- **Non-numeric coordinates silently coerced to 0.** Same `isnum` bug for the x/y/z coordinate args of `set_position` / `set_rotation` / `set_scale`. Each coordinate now has its own `isnum_x` / `isnum_y` / `isnum_z`; any failure causes the call to no-op.
+
+### Tests
+
+`voltex_script` 42 → 45 (+3):
+
+- `voltex_script::engine_api::tests::entity_count_without_world_global_returns_nothing`
+- `voltex_script::engine_api::tests::entity_count_after_global_overwrite_does_not_crash`
+- `voltex_script::engine_api::tests::set_position_with_non_numeric_args_is_silent_noop`
+
+### Verification
+
+- `cargo build --workspace` — clean.
+- `cargo clippy --workspace --all-targets -- -D warnings` — 0 warnings.
+- `cargo test --workspace --lib` — every crate green.
+
+### Notes
+
+Cumulative for the v1.0.40 – v1.0.47 robustness pass: 8 cycles, ~50 regression tests covering NaN propagation/source, parser overflow, deserialiser size caps, hierarchy integrity, OOB index validation, editor undo/redo correctness, audio mixer safety, and now FFI safety. Workspace test count ~1056 → ~1095.
+
+---
+
 ## [v1.0.46] — 2026-05-22 — Editor redo-Spawn leak + audio mixer OOB defence + runtime resize cleanup
 
 **Fix**. Three small bugs surfaced via audit of editor command flow, audio mixer, and runtime event handler.
