@@ -42,7 +42,12 @@ impl PacketCipher {
         if seq < self.recv_counter {
             return Err(format!("replay detected: got seq {}, expected >= {}", seq, self.recv_counter).into());
         }
-        self.recv_counter = seq + 1;
+        // Adversary-supplied `seq = u64::MAX` used to wrap recv_counter to 0
+        // via `seq + 1`, which (debug) panicked or (release) caused every
+        // subsequent legitimate packet to be flagged as a replay. Saturating
+        // add keeps the counter pinned at MAX — strictly safer and the
+        // protocol is already terminated at that point.
+        self.recv_counter = seq.saturating_add(1);
 
         let derived = self.derive_key(seq);
         let mut plaintext = Vec::with_capacity(ciphertext.len() - 8);
@@ -85,7 +90,15 @@ impl AuthToken {
     }
 
     /// Validate token against secret.
+    ///
+    /// Returns `false` if the token has expired, if `current_time` or
+    /// `expires_at` is NaN (NaN comparisons always return `false`, so a
+    /// NaN `current_time` used to slip past the expiry check), or if the
+    /// HMAC bytes don't match.
     pub fn validate(&self, secret: &[u8], current_time: f64) -> bool {
+        if !current_time.is_finite() || !self.expires_at.is_finite() {
+            return false;
+        }
         if current_time > self.expires_at { return false; }
         let expected = AuthToken::generate(self.player_id, secret, self.expires_at);
         self.token == expected.token
@@ -145,5 +158,32 @@ mod tests {
     fn test_auth_token_wrong_secret() {
         let token = AuthToken::generate(42, b"correct", 1000.0);
         assert!(!token.validate(b"wronggg", 999.0));
+    }
+
+    #[test]
+    fn decrypt_with_max_u64_seq_does_not_panic_or_wrap() {
+        // Pre-fix, an adversarial packet header of [0xFF; 8] (seq = u64::MAX)
+        // caused recv_counter = seq + 1 to wrap to 0 (debug: panic, release:
+        // future legitimate packets rejected as replays).
+        let key = b"key";
+        let mut dec = PacketCipher::new(key);
+        let mut fake = vec![0xFFu8; 8]; // seq = u64::MAX
+        fake.extend_from_slice(&[0; 4]); // dummy ciphertext body
+        let _ = dec.decrypt(&fake);
+        // recv_counter must be pinned at u64::MAX, not wrapped to 0.
+        assert_eq!(dec.recv_counter, u64::MAX);
+    }
+
+    #[test]
+    fn auth_token_rejects_nan_current_time() {
+        // Pre-fix, NaN > expires_at is false (all NaN comparisons are false),
+        // so a NaN current_time slipped past the expiry check.
+        let secret = b"secret";
+        let token = AuthToken::generate(42, secret, 100.0);
+        assert!(!token.validate(secret, f64::NAN));
+        assert!(!token.validate(secret, f64::INFINITY));
+        // Token with NaN expiry should also fail.
+        let bad_token = AuthToken { player_id: 1, token: vec![1, 2], expires_at: f64::NAN };
+        assert!(!bad_token.validate(secret, 0.0));
     }
 }

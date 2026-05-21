@@ -10,6 +10,37 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## [v1.0.50] — 2026-05-22 — PacketCipher u64 overflow + AuthToken NaN-time bypass
+
+**Fix**. Two `voltex_net::encryption` bugs reachable from adversarial input:
+
+### Fixed
+
+- **`PacketCipher::decrypt` u64 overflow on `seq = u64::MAX`.** An attacker can craft a packet whose 8-byte sequence header is `[0xFF; 8]`. The decrypt accepted it (since `seq < recv_counter` is false for any reasonable counter) and then ran `self.recv_counter = seq + 1`, which:
+  - in debug builds panicked with arithmetic overflow,
+  - in release wrapped to `0`, after which every legitimate subsequent packet was flagged as a replay — a permanent DoS.
+  Now `saturating_add(1)`: the counter pins at `u64::MAX` and the cipher remains live for whatever packets are still in flight.
+- **`AuthToken::validate` NaN-time bypass.** `if current_time > self.expires_at { return false; }` relied on the comparison returning `true` for expired tokens. NaN comparisons always return `false`, so a NaN `current_time` (e.g. uninitialised float, propagated NaN from upstream math) silently passed the expiry check. Now any non-finite `current_time` or `expires_at` is rejected up front.
+
+### Tests
+
+`voltex_net` 49 → 51 (+2):
+
+- `voltex_net::encryption::tests::decrypt_with_max_u64_seq_does_not_panic_or_wrap`
+- `voltex_net::encryption::tests::auth_token_rejects_nan_current_time` (also pins NaN expiry rejection)
+
+### Verification
+
+- `cargo build --workspace` — clean.
+- `cargo clippy --workspace --all-targets -- -D warnings` — 0 warnings.
+- `cargo test --workspace --lib` — every crate green.
+
+### Notes
+
+`AssetStorage` and `SparseSet` were also audited this round; both already have generation-checked handle lookups and bounded resize behaviour for realistic entity-id ranges. No fixes needed there.
+
+---
+
 ## [v1.0.49] — 2026-05-22 — propagate_transforms cycle / depth-limit
 
 **Fix**. The `add_child` cycle guard introduced in v1.0.42 only catches cycles created *after* it landed. A scene file loaded via raw `world.add(_, Children(_))` / `world.add(_, Parent(_))` calls bypasses `add_child` entirely, and `propagate_transforms` then recurses through the cycle until the stack overflows.

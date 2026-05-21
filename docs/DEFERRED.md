@@ -218,3 +218,4 @@
 - **Lua FFI null-deref + type confusion** ✅ v1.0.47 — `get_world` 가 Option 반환, 비숫자 handle/좌표 arg silent no-op 으로 거부. +3 회귀 테스트.
 - **Animation zero-duration / extract_keyframe OOB / quat slerp NaN** ✅ v1.0.48 — `AnimationPlayer::update` duration=0 early-out, `extract_keyframe` start>=values.len() 기본값 반환, `Quat::slerp` dot clamp(-1,1). +3 회귀 테스트.
 - **propagate_transforms cycle stack-overflow** ✅ v1.0.49 — raw `world.add(Children/Parent)` 가 add_child 가드를 우회한 cycle 에 대비 `MAX_HIERARCHY_DEPTH = 1024` depth-limit 추가. +2 회귀 테스트.
+- **PacketCipher u64::MAX seq wrap + AuthToken NaN-time bypass** ✅ v1.0.50 — `saturating_add` + `is_finite()` 가드. +2 회귀 테스트.

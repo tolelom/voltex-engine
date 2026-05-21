@@ -173,6 +173,22 @@
 
 v1.0.9 부터는 **서비스 배포 완성도** 로드맵 (`docs/superpowers/specs/2026-05-21-service-readiness-roadmap.md`) 기준으로 진행.
 
+### v1.0.50 (2026-05-22) — PacketCipher u64 overflow + AuthToken NaN-time bypass
+
+P0 robustness round 11. voltex_net::encryption 의 두 가지 결함:
+
+**1. `decrypt` 가 적대적 `seq = u64::MAX` 에서 wrap-around** — `recv_counter = seq + 1` 가 debug 빌드 panic 또는 release 에서 0 으로 wrap. 다음 정상 패킷이 replay 로 거부됨 → DoS.
+- Fix: `seq.saturating_add(1)`. u64::MAX 에 도달하면 그 자리에 고정 — 그 시점이면 어차피 통신 종료.
+
+**2. `AuthToken::validate` 가 NaN `current_time` 을 통과** — `if current_time > self.expires_at { return false; }` 에서 NaN 비교는 항상 false → expired 토큰도 NaN 시간이면 valid.
+- Fix: `!current_time.is_finite() || !self.expires_at.is_finite()` 시 즉시 false.
+
+**검증**:
+- `cargo build --workspace` 클린, clippy 0 워닝
+- voltex_net 49 → 51 (+2). 회귀 테스트:
+  - `encryption::tests::decrypt_with_max_u64_seq_does_not_panic_or_wrap`
+  - `encryption::tests::auth_token_rejects_nan_current_time`
+
 ### v1.0.49 (2026-05-22) — propagate_transforms cycle / depth-limit
 
 P0 robustness round 10. v1.0.42 의 `add_child` 사이클 가드는 새 hierarchy 변경만 막음 — scene 파일에서 raw `world.add(_, Children(_))` / `world.add(_, Parent(_))` 로 로드한 사이클은 `propagate_transforms` 의 재귀에서 스택 오버플로 유발.
