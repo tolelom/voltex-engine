@@ -18,6 +18,12 @@ pub struct InputState {
     just_pressed: HashSet<KeyCode>,
     just_released: HashSet<KeyCode>,
     mouse_position: (f64, f64),
+    /// Tracks whether `mouse_position` has been initialised by a real
+    /// winit `CursorMoved` event. The first event is treated as a warp
+    /// (delta = 0) so the camera doesn't snap when the cursor enters
+    /// the window — `(0, 0) → (500, 300)` used to produce a 500-px
+    /// delta on the first frame.
+    mouse_seen: bool,
     mouse_delta: (f64, f64),
     mouse_buttons: HashSet<MouseButton>,
     mouse_buttons_just_pressed: HashSet<MouseButton>,
@@ -40,6 +46,7 @@ impl InputState {
             just_pressed: HashSet::new(),
             just_released: HashSet::new(),
             mouse_position: (0.0, 0.0),
+            mouse_seen: false,
             mouse_delta: (0.0, 0.0),
             mouse_buttons: HashSet::new(),
             mouse_buttons_just_pressed: HashSet::new(),
@@ -115,9 +122,19 @@ impl InputState {
 
     /// Apply a `CursorMoved` event from winit. Adds the delta to the
     /// accumulator and replaces the stored cursor position.
+    ///
+    /// The very first event after construction (or after the window
+    /// regains focus and produces a CursorMoved at the cursor's
+    /// arrival position) does **not** contribute to the delta — that
+    /// gap is treated as a warp, not motion. Without this, the camera
+    /// snapped on focus.
     pub fn process_mouse_move(&mut self, x: f64, y: f64) {
-        self.mouse_delta.0 += x - self.mouse_position.0;
-        self.mouse_delta.1 += y - self.mouse_position.1;
+        if self.mouse_seen {
+            self.mouse_delta.0 += x - self.mouse_position.0;
+            self.mouse_delta.1 += y - self.mouse_position.1;
+        } else {
+            self.mouse_seen = true;
+        }
         self.mouse_position = (x, y);
     }
 
@@ -137,5 +154,37 @@ impl InputState {
     /// per-frame accumulator.
     pub fn process_scroll(&mut self, delta: f32) {
         self.mouse_scroll_delta += delta;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn first_mouse_move_produces_zero_delta() {
+        // Pre-fix: mouse_position starts at (0,0); first CursorMoved at
+        // (500,300) produced delta (500,300) which the camera then applied
+        // as a huge snap.
+        let mut input = InputState::new();
+        input.process_mouse_move(500.0, 300.0);
+        assert_eq!(input.mouse_delta(), (0.0, 0.0), "first move must not produce delta");
+        // Subsequent moves produce normal deltas.
+        input.process_mouse_move(505.0, 302.0);
+        assert!((input.mouse_delta().0 - 5.0).abs() < 1e-9);
+        assert!((input.mouse_delta().1 - 2.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn begin_frame_clears_delta_but_keeps_mouse_seen() {
+        // After a frame ends, the next move still uses the proper delta —
+        // mouse_seen survives begin_frame so we don't get a second false zero.
+        let mut input = InputState::new();
+        input.process_mouse_move(100.0, 100.0); // initialise
+        input.process_mouse_move(110.0, 100.0); // delta (10, 0)
+        input.begin_frame();
+        assert_eq!(input.mouse_delta(), (0.0, 0.0), "begin_frame clears delta");
+        input.process_mouse_move(115.0, 100.0); // delta (5, 0)
+        assert!((input.mouse_delta().0 - 5.0).abs() < 1e-9);
     }
 }

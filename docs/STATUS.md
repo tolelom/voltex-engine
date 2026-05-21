@@ -173,6 +173,19 @@
 
 v1.0.9 부터는 **서비스 배포 완성도** 로드맵 (`docs/superpowers/specs/2026-05-21-service-readiness-roadmap.md`) 기준으로 진행.
 
+### v1.0.51 (2026-05-22) — Input first-mouse-move warp fix
+
+P1 UX. `InputState::process_mouse_move` 의 첫 이벤트가 `mouse_position = (0, 0)` 시작점 기준으로 거대 delta 생성 → 카메라가 포커스 시점에 점프.
+
+**Fix (`voltex_platform/src/input.rs`)**:
+- `mouse_seen: bool` 필드 추가. 첫 이벤트는 warp 로 취급 (delta 기여 없음), 이후 정상 처리
+- `begin_frame` 은 `mouse_seen` 유지 — 매 프레임 다시 false 가 되어 zero-delta 가 반복되지 않도록
+
+**검증**:
+- voltex_platform 3 → 5 (+2). 회귀 테스트:
+  - `input::tests::first_mouse_move_produces_zero_delta`
+  - `input::tests::begin_frame_clears_delta_but_keeps_mouse_seen`
+
 ### v1.0.50 (2026-05-22) — PacketCipher u64 overflow + AuthToken NaN-time bypass
 
 P0 robustness round 11. voltex_net::encryption 의 두 가지 결함:

@@ -10,6 +10,29 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## [v1.0.51] — 2026-05-22 — Input first-mouse-move warp fix
+
+**Fix**. `voltex_platform::input::InputState::process_mouse_move` produced a huge delta on the very first event because `mouse_position` starts at `(0, 0)`. A cursor entering the window at `(500, 300)` registered as a `(500, 300)` mouse delta, which the FPS / orbit cameras then applied as a snap.
+
+### Fixed
+
+- Added `mouse_seen: bool` to `InputState`. The first event after construction is treated as a warp (no delta contributed) and only flips `mouse_seen = true`. Subsequent events compute the delta normally. `begin_frame` does not reset `mouse_seen`, so the zero-delta path only fires once per program run.
+
+### Tests
+
+`voltex_platform` 3 → 5 (+2). This crate had no `input` tests before — now exercised:
+
+- `voltex_platform::input::tests::first_mouse_move_produces_zero_delta`
+- `voltex_platform::input::tests::begin_frame_clears_delta_but_keeps_mouse_seen`
+
+### Verification
+
+- `cargo build --workspace` — clean.
+- `cargo clippy --workspace --all-targets -- -D warnings` — 0 warnings.
+- `cargo test --workspace --lib` — every crate green.
+
+---
+
 ## [v1.0.50] — 2026-05-22 — PacketCipher u64 overflow + AuthToken NaN-time bypass
 
 **Fix**. Two `voltex_net::encryption` bugs reachable from adversarial input:
