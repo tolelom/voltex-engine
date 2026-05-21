@@ -173,6 +173,25 @@
 
 v1.0.9 부터는 **서비스 배포 완성도** 로드맵 (`docs/superpowers/specs/2026-05-21-service-readiness-roadmap.md`) 기준으로 진행.
 
+### v1.0.16 (2026-05-21) — `docs/voltex-toml-reference.md` — 매니페스트 schema 완전 reference
+
+v1.0.11 가 manifest 의 unknown key/section 을 strict-reject 한 이후, 사용자가 "어떤 키가 valid 한지" 확인할 단일 문서가 부재. 이 cycle 이 그 갭을 메움.
+
+**신규**:
+- `docs/voltex-toml-reference.md` — 모든 섹션 (`[project]` / `[build]` / `[build.<triple>]`) × 모든 키 (name/version/scene/scripts/assets/window_title/window_size/targets/icon) 의 타입 / 필수여부 / 기본값 / 설명 표. 최소/전체 예시. mini-TOML 파싱 규칙 (코멘트/escape/미지원 항목). v1.0.11 strict validation 에러 시나리오 3종. `voltex build` 출력 (`dist/`) 매핑. CLI 옵션 매핑.
+- 향후 추가 후보 (v1.1+): release_profile / optimize_for / binary_name / [publish] / [deps] 섹션.
+
+**연동 갱신**:
+- README "문서" 섹션에 reference 링크 + `examples/README.md` + `CONTRIBUTING.md` + service-readiness 로드맵 4개 새 링크 추가.
+- `voltex_cli::help::BUILD` 끝에 "See docs/voltex-toml-reference.md..." 한 줄.
+- 신규 가드 테스트 `build_help_references_manifest_reference_doc` — help 가 reference doc 가리키는지 회귀 방지.
+
+**테스트**: voltex_cli 54 → 55 (+1). 다른 변경 없음.
+
+**셀프 피드백**: 단계 1 reference doc 작성 + README/help 연동. 단계 2 가드 테스트 추가. 단계 3 워크스페이스 회귀 0.
+
+**한계 (v1.1+)**: reference doc 가 manifest/mod.rs 의 코드와 별도 유지보수. 새 키 추가 시 reference 누락 가능 — 자동 generator (struct → markdown) 는 별 cycle.
+
 ### v1.0.15 (2026-05-21) — examples catalog + voltex_survivor flagship README
 
 신규 사용자가 14 example + 1 game 디렉토리 중 어디부터 봐야 할지 안내.
@@ -719,7 +738,7 @@ crates/
 - voltex_script: 42 (S1 +12: pool ×6 [get_or_create same/load/reload/unknown/poll_reload/clear], system ×4 [start/update/5-cubes/missing-callbacks], engine_api ×2 [iter_entities/iter_by_tag])
 - voltex_editor: 169 (E3 +11: command ×5 add/remove/unknown/dead-entity + session ×4 add_undo/remove_undo/despawn_restores/despawn_history/slot_reused + inspector ×2 - 1 obsolete despawn_clears test)
 - voltex_runtime: 27 (v1.0.10 +14: crash module ×11 + config crash log ×3; was 13)
-- voltex_cli: 54 (v1.0.13 +7: help.rs gating tests; v1.0.12 +4; v1.0.11 +13; was 30)
+- voltex_cli: 55 (v1.0.16 +1 manifest reference doc gating; v1.0.13 +7; v1.0.12 +4; v1.0.11 +13; was 30)
 
 ## Examples (14개) + Games (1개) + 기존 survivor_game (archived)
 

@@ -10,6 +10,41 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## [v1.0.16] — 2026-05-21 — Complete `voltex.toml` schema reference
+
+v1.0.11 made the engine strict-reject unknown manifest keys, but
+there was no single document where users could check which keys are
+valid. This closes that gap.
+
+### Added
+
+- `docs/voltex-toml-reference.md` — every section (`[project]` /
+  `[build]` / `[build.<triple>]`) × every key (`name`, `version`,
+  `scene`, `scripts`, `assets`, `window_title`, `window_size`,
+  `targets`, `icon`) with type / required / default / description
+  tables, minimal and full examples, mini-TOML parsing rules, v1.0.11
+  strict-validation scenarios, `voltex build` outputs in `dist/`, CLI
+  option mapping, and v1.1+ field candidates.
+- README "문서" section now links the reference plus
+  `examples/README.md`, `CONTRIBUTING.md`, and the service-readiness
+  roadmap.
+- `voltex_cli::help::BUILD` ends with a pointer line to the
+  reference doc.
+
+### Tests
+
+- `voltex_cli`: 54 → **55** (+1). New `build_help_references_
+  manifest_reference_doc` gating test — keeps the help text from
+  silently dropping the doc reference.
+
+### Known limits
+
+- The reference doc is maintained separately from
+  `manifest/mod.rs`; new keys can drift unless both are updated.
+  Auto-generator (struct → markdown) is deferred.
+
+---
+
 ## [v1.0.15] — 2026-05-21 — Examples catalog + flagship game README
 
 Helps a fresh clone-and-explore user find their way through 14

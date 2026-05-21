@@ -5,7 +5,7 @@
 > 스크립팅, 멀티 OS 빌드 파이프라인까지 제공한다. 자세한 카운트와 정책은
 > 아래 "의존성 정책" 섹션 참고.
 
-![status: v1.0.15](https://img.shields.io/badge/status-v1.0.15-brightgreen)
+![status: v1.0.16](https://img.shields.io/badge/status-v1.0.16-brightgreen)
 ![clippy: 0 warnings](https://img.shields.io/badge/clippy-0%20warnings-brightgreen)
 ![audit: 0 vulnerabilities](https://img.shields.io/badge/cargo--audit-0%20vulnerabilities-brightgreen)
 ![coverage: 82%](https://img.shields.io/badge/coverage-82%25%20lib-brightgreen)
@@ -189,12 +189,16 @@ voltex (facade, L4)
 ## 문서
 
 - [docs/tutorial.md](docs/tutorial.md) — 30분 안에 0에서 빌드된 미니 게임까지
+- [docs/voltex-toml-reference.md](docs/voltex-toml-reference.md) — `voltex.toml` 매니페스트 전체 reference (v1.0.16)
 - [docs/build-matrix.md](docs/build-matrix.md) — 3 OS 빌드 명령 + GitHub Actions 예시
+- [examples/README.md](examples/README.md) — 14 example 추천 학습 순서 + 카테고리별
+- [CONTRIBUTING.md](CONTRIBUTING.md) — 외부 contributor 가이드 (의존성 정책 / 600줄 / 에러 표준 / 첫 PR 체크리스트)
 - [docs/STATUS.md](docs/STATUS.md) — 작업 현황 + Cycle history + 테스트 통계
 - [docs/DEFERRED.md](docs/DEFERRED.md) — 간소화 / 미뤄진 항목 목록
 - [CHANGELOG.md](CHANGELOG.md) — Cycle 별 주요 변경
 - [docs/superpowers/specs/2026-03-24-voltex-engine-design.md](docs/superpowers/specs/2026-03-24-voltex-engine-design.md) — 전체 엔진 설계 (원본 spec)
 - [docs/superpowers/specs/2026-05-20-voltex-v1.0-roadmap.md](docs/superpowers/specs/2026-05-20-voltex-v1.0-roadmap.md) — v1.0 까지의 cycle 로드맵
+- [docs/superpowers/specs/2026-05-21-service-readiness-roadmap.md](docs/superpowers/specs/2026-05-21-service-readiness-roadmap.md) — v1.0.x 서비스 배포 완성도 로드맵
 - API reference: `cargo doc --workspace --no-deps --open`
 
 ---

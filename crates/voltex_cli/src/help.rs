@@ -71,6 +71,9 @@ OPTIONS:
                                build flows that synthesise paths.
     -h, --help                 Print this help
 
+See docs/voltex-toml-reference.md in the engine repo for the full
+manifest schema (every section / key / type / default).
+
 OUTPUTS (written to dist/ next to voltex.toml):
     dist/<name>.exe (Windows) or dist/<name> (Linux/macOS)
     dist/<name>.vscn                    Scene from manifest
@@ -158,5 +161,12 @@ mod tests {
     fn top_help_includes_examples() {
         assert!(TOP.contains("EXAMPLES:"));
         assert!(TOP.contains("voltex new my_game"));
+    }
+
+    #[test]
+    fn build_help_references_manifest_reference_doc() {
+        // v1.0.16: pointer to docs/voltex-toml-reference.md so first-time
+        // users can find the full schema without spelunking source.
+        assert!(BUILD.contains("voltex-toml-reference.md"));
     }
 }
