@@ -10,6 +10,43 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## [v1.0.13] — 2026-05-21 — `voltex --version` + rich per-subcommand `--help`
+
+First-user friction reduction. Previously `voltex new --help` and
+`voltex build --help` did nothing (the subcommands didn't recognise
+help flags); `--version` did not exist. Both v1.0.11
+`--no-validate-paths` and v1.0.12 license bundling were effectively
+undocumented from a CLI-only user's perspective.
+
+### Added
+
+- New `crates/voltex_cli/src/help.rs` containing four `pub const &str`
+  help texts: TOP, NEW, BUILD, RUN. Single review surface; regression-
+  testable.
+- Top-level `--version` / `-V` flag prints `voltex <CARGO_PKG_VERSION>`.
+- `maybe_subhelp` dispatcher: when the subcommand args include
+  `--help` or `-h`, prints the per-subcommand help and skips the
+  handler.
+- BUILD help now explicitly documents both `--no-validate-paths`
+  (v1.0.11) and the OUTPUTS list including `THIRD-PARTY-LICENSES.md`
+  / `LICENSE-MIT` / `LICENSE-APACHE` (v1.0.12).
+
+### Tests
+
+- `voltex_cli`: 47 → **54** (+7). Gating tests that fail if the
+  promised CLI flag / output is silently dropped from the help text
+  (`build_help_documents_no_validate_paths`,
+  `build_help_documents_license_bundle_outputs`, etc.).
+
+### Known limits
+
+- `voltex --version` prints `0.1.0` (the Cargo.toml package version)
+  rather than the v1.0.x release tag. Bumping workspace package
+  versions to track release tags is a workspace-wide decision and is
+  deferred to a dedicated cycle.
+
+---
+
 ## [v1.0.12] — 2026-05-21 — Missing LICENSE files added + `voltex build` bundles them
 
 A compliance gap discovered while writing the v1.0.12 tests: the

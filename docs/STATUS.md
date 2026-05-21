@@ -173,6 +173,24 @@
 
 v1.0.9 부터는 **서비스 배포 완성도** 로드맵 (`docs/superpowers/specs/2026-05-21-service-readiness-roadmap.md`) 기준으로 진행.
 
+### v1.0.13 (2026-05-21) — voltex CLI `--version` + 풍부한 per-subcommand `--help`
+
+첫 사용자 마찰 줄이기. 이전: top-level help 만 있고 `voltex new --help` / `voltex build --help` / `voltex run --help` 무동작 (subcommand 가 help flag 인식 안 함). `--version` 도 없었음.
+
+**추가**:
+- 신규 `crates/voltex_cli/src/help.rs` — TOP / NEW / BUILD / RUN 4 static help string. 한 곳에서 review 가능, regression-test 가능.
+- main.rs: top-level `--version` / `-V` → `voltex 0.1.0` 출력 후 exit 0.
+- main.rs: `maybe_subhelp` 헬퍼 — subcommand args 에 `--help` / `-h` 있으면 해당 텍스트 출력 후 dispatch 스킵.
+- BUILD help 가 **v1.0.11 의 `--no-validate-paths`** + **v1.0.12 의 라이선스 번들 OUTPUTS** 명시 (이전엔 두 기능 다 undocumented 가까웠음).
+
+**테스트**: voltex_cli 47 → 54 (+7):
+- top_help_lists_all_commands / build_help_documents_no_validate_paths / build_help_documents_license_bundle_outputs / build_help_lists_engine_path_resolution_order / new_help_describes_scaffold_contents / run_help_references_build_options / top_help_includes_examples
+- "subcommand 가 약속한 flag 가 help 에 실제로 나타나는지" 가드. silent regression 방지.
+
+**셀프 피드백**: 단계 1 clippy `redundant_closure` 3건 (`|a| new::cmd(a)` → `new::cmd`) 즉시 fix. 첫 빌드 실패 → 두 번째 통과.
+
+**알려진 한계 (v1.1+)**: `voltex --version` 이 `0.1.0` (Cargo.toml package version) 을 출력. 사용자 시점 v1.0.x 와 mismatch. 워크스페이스 package version bump (v1.0.x 별 sync) 는 별 cycle (모든 31 crate Cargo.toml 일괄 변경 + workspace.package 정책 결정 필요).
+
 ### v1.0.12 (2026-05-21) — LICENSE 파일 누락 fix + `voltex build` 가 라이선스 번들
 
 **발견된 컴플라이언스 갭**: repo 루트의 `Cargo.toml` 워크스페이스가 `license = "MIT OR Apache-2.0"` 명시하고 README 에 명시되어 있으나, **실제 `LICENSE-MIT` / `LICENSE-APACHE` 파일이 부재**. dual-license 약속이 텍스트 없이 떠 있던 상태.
@@ -646,7 +664,7 @@ crates/
 └── voltex_cli         — bin "voltex" (new/build/run), voltex.toml 매니페스트, .vpkg packing (B1+B2)
 ```
 
-## 테스트: ~1029개 통과 (Windows host, `cargo test --workspace`). `--lib` 기준은 982 (voltex_cli 는 bin-only 라 lib count 에서 빠지나 `cargo test -p voltex_cli` 로 47 개 실행됨). macOS host 에서는 +2 (CoreAudio 모듈) = 1031 예상. v1.0.1 +5 (input_system 순서/참조 ×2, Bounds default ×2, ScriptComponent default ×1). v1.0.3 +4 (canonicalize_friendly Windows verbatim strip ×3 + cross-OS integration ×1). v1.0.8 +21 (parser panic-resistance fuzz: PNG ×4 + JPG ×4 + GLTF ×5 + OBJ ×4 + WAV ×4). v1.0.9 +30 (OGG +11 + Vorbis +17 + decode_ogg_vorbis_bytes +2 — 모두 wire 직전까지 dead, 이제 실 컴파일). v1.0.10 +14 (voltex_runtime crash module ×11 + config crash log ×3). v1.0.11 +13 (voltex_cli schema/path validation + Levenshtein helper + error Display). v1.0.12 +4 (voltex_cli copy_license_files).
+## 테스트: ~1036개 통과 (Windows host, `cargo test --workspace`). `--lib` 기준은 982 (voltex_cli 는 bin-only 라 lib count 에서 빠지나 `cargo test -p voltex_cli` 로 54 개 실행됨). macOS host 에서는 +2 (CoreAudio 모듈) = 1038 예상. v1.0.1 +5 (input_system 순서/참조 ×2, Bounds default ×2, ScriptComponent default ×1). v1.0.3 +4 (canonicalize_friendly Windows verbatim strip ×3 + cross-OS integration ×1). v1.0.8 +21 (parser panic-resistance fuzz: PNG ×4 + JPG ×4 + GLTF ×5 + OBJ ×4 + WAV ×4). v1.0.9 +30 (OGG +11 + Vorbis +17 + decode_ogg_vorbis_bytes +2 — 모두 wire 직전까지 dead, 이제 실 컴파일). v1.0.10 +14 (voltex_runtime crash module ×11 + config crash log ×3). v1.0.11 +13 (voltex_cli schema/path validation + Levenshtein helper + error Display). v1.0.12 +4 (voltex_cli copy_license_files).
 
 - voltex: 2 (M6: prelude/module 경로 컴파일 검증)
 - voltex_math: 39 (8-7 +2: inverse roundtrip × VP+translation)
@@ -662,7 +680,7 @@ crates/
 - voltex_script: 42 (S1 +12: pool ×6 [get_or_create same/load/reload/unknown/poll_reload/clear], system ×4 [start/update/5-cubes/missing-callbacks], engine_api ×2 [iter_entities/iter_by_tag])
 - voltex_editor: 169 (E3 +11: command ×5 add/remove/unknown/dead-entity + session ×4 add_undo/remove_undo/despawn_restores/despawn_history/slot_reused + inspector ×2 - 1 obsolete despawn_clears test)
 - voltex_runtime: 27 (v1.0.10 +14: crash module ×11 + config crash log ×3; was 13)
-- voltex_cli: 47 (v1.0.12 +4: copy_license_files; v1.0.11 +13; was 30)
+- voltex_cli: 54 (v1.0.13 +7: help.rs gating tests; v1.0.12 +4; v1.0.11 +13; was 30)
 
 ## Examples (14개) + Games (1개) + 기존 survivor_game (archived)
 
