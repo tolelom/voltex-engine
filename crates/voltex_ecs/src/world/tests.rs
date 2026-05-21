@@ -290,7 +290,7 @@ fn test_clear_changed_all_storages() {
     let mut world = World::new();
     let e = world.spawn();
     world.add(e, 42u32);
-    world.add(e, 3.14f32);
+    world.add(e, 2.5f32);
     let changed_u32 = world.query_changed::<u32>();
     assert_eq!(changed_u32.len(), 1);
     world.clear_changed();

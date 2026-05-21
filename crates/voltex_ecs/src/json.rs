@@ -355,6 +355,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::approx_constant)] // "3.14" is a representative decimal, not π.
     fn test_write_number() {
         assert_eq!(json_write_f32(3.14), "3.14");
         assert_eq!(json_write_f32(1.0), "1");
@@ -387,6 +388,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::approx_constant)] // "-3.14" is a representative negative decimal, not π.
     fn test_parse_negative_number() {
         match json_parse("-3.14").unwrap() {
             JsonVal::Number(n) => assert!((n - (-3.14)).abs() < 1e-10),

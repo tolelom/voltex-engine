@@ -123,6 +123,7 @@ fn update_sleep_timers(world: &mut World, config: &PhysicsConfig) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::f32::consts::PI;
     use voltex_ecs::World;
     use voltex_ecs::Transform;
     use voltex_math::Vec3;
@@ -228,7 +229,7 @@ mod tests {
         let e = world.spawn();
         world.add(e, Transform::from_position(Vec3::ZERO));
         let mut rb = RigidBody::dynamic(1.0);
-        rb.angular_velocity = Vec3::new(0.0, 3.14159, 0.0); // ~PI rad/s around Y
+        rb.angular_velocity = Vec3::new(0.0, PI, 0.0); // PI rad/s around Y
         rb.gravity_scale = 0.0;
         world.add(e, rb);
 
@@ -236,7 +237,7 @@ mod tests {
         integrate(&mut world, &config);
 
         let t = world.get::<Transform>(e).unwrap();
-        let expected_rot_y = 3.14159 * config.fixed_dt;
+        let expected_rot_y = PI * config.fixed_dt;
         assert!(approx(t.rotation.y, expected_rot_y));
         // Position should not change (no linear velocity, no gravity)
         assert!(approx(t.position.x, 0.0));

@@ -162,6 +162,7 @@ pub fn mat4_mul(a: &[[f32; 4]; 4], b: &[[f32; 4]; 4]) -> [[f32; 4]; 4] {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::f32::consts::FRAC_1_SQRT_2;
 
     #[test]
     fn test_quat_identity_to_mat4() {
@@ -176,11 +177,11 @@ mod tests {
     #[test]
     fn test_quat_slerp_endpoints() {
         let a = Quat::identity();
-        let b = Quat { x: 0.0, y: 0.7071, z: 0.0, w: 0.7071 }; // 90° around Y
+        let b = Quat { x: 0.0, y: FRAC_1_SQRT_2, z: 0.0, w: FRAC_1_SQRT_2 }; // 90° around Y
         let r0 = Quat::slerp(a, b, 0.0);
         assert!((r0.w - 1.0).abs() < 0.01);
         let r1 = Quat::slerp(a, b, 1.0);
-        assert!((r1.y - 0.7071).abs() < 0.01);
+        assert!((r1.y - FRAC_1_SQRT_2).abs() < 0.01);
     }
 
     #[test]

@@ -233,6 +233,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::approx_constant)] // "-3.14" is a representative negative decimal, not π.
     fn test_parse_number() {
         match parse_json("42").unwrap() {
             JsonValue::Number(n) => assert!((n - 42.0).abs() < 1e-10),
