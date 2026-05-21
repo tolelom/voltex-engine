@@ -1,0 +1,162 @@
+name: release
+
+# Voltex release artifact pipeline.
+#
+# Trigger: pushing a `v*` tag (typically `v1.0.x`). The workflow builds the
+# `voltex` CLI binary on Linux + Windows + macOS, packages each with the
+# repo's LICENSE files, and attaches the archives to a GitHub Release.
+#
+# Why exists: until v1.0.33 the only way to ship a release was a manual
+# cargo build + zip dance, which is exactly the kind of step that drifts
+# (LICENSE missing, wrong target triple, forgot a platform). Promoting this
+# to a tag-driven workflow turns "ship v1.0.x" into "git tag v1.0.x &&
+# git push --tags".
+#
+# Per-platform matrix is intentionally limited to the three triples we
+# actually test (linux-x64, windows-x64, macos-aarch64). Adding more is
+# additive — drop new entries into the `build` matrix and the upload step
+# picks them up automatically.
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to build from (e.g. v1.0.34). Leave empty to use the current ref."
+        required: false
+
+permissions:
+  contents: write # required to upload release assets
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    name: build voltex (${{ matrix.target }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            exe_name: voltex
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            exe_name: voltex.exe
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            exe_name: voltex
+    steps:
+      - name: Checkout (full history for tag resolution)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Install Linux audio dev headers (ALSA)
+        if: matrix.os == 'ubuntu-latest'
+        run: sudo apt-get update && sudo apt-get install -y libasound2-dev
+
+      - name: Cache cargo registry + target
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-release-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-release-
+
+      - name: cargo build --release -p voltex_cli --target ${{ matrix.target }}
+        run: cargo build --release -p voltex_cli --target ${{ matrix.target }}
+
+      - name: Resolve tag name
+        id: tag
+        shell: bash
+        run: |
+          if [ -n "${{ github.event.inputs.tag }}" ]; then
+            echo "name=${{ github.event.inputs.tag }}" >> "$GITHUB_OUTPUT"
+          elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            echo "name=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
+          else
+            echo "name=dev-${{ github.sha }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      # ── Pack the artifact ─────────────────────────────────────────────
+      # Layout inside the archive:
+      #   voltex-<version>-<triple>/
+      #     voltex(.exe)
+      #     LICENSE-MIT
+      #     LICENSE-APACHE
+      #     README.md
+      - name: Stage artifact directory (Unix)
+        if: matrix.os != 'windows-latest'
+        shell: bash
+        run: |
+          set -e
+          ROOT="voltex-${{ steps.tag.outputs.name }}-${{ matrix.target }}"
+          mkdir -p "$ROOT"
+          cp "target/${{ matrix.target }}/release/${{ matrix.exe_name }}" "$ROOT/"
+          cp LICENSE-MIT LICENSE-APACHE README.md "$ROOT/"
+          tar -czf "$ROOT.tar.gz" "$ROOT"
+          echo "ARTIFACT_PATH=$ROOT.tar.gz" >> "$GITHUB_ENV"
+
+      - name: Stage artifact directory (Windows)
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
+        run: |
+          $root = "voltex-${{ steps.tag.outputs.name }}-${{ matrix.target }}"
+          New-Item -ItemType Directory -Path $root | Out-Null
+          Copy-Item "target/${{ matrix.target }}/release/${{ matrix.exe_name }}" -Destination $root
+          Copy-Item LICENSE-MIT, LICENSE-APACHE, README.md -Destination $root
+          Compress-Archive -Path $root -DestinationPath "$root.zip"
+          echo "ARTIFACT_PATH=$root.zip" >> $env:GITHUB_ENV
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: voltex-${{ steps.tag.outputs.name }}-${{ matrix.target }}
+          path: ${{ env.ARTIFACT_PATH }}
+          if-no-files-found: error
+          retention-days: 14
+
+  release:
+    name: publish GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Flatten artifact list
+        run: |
+          mkdir -p dist
+          find artifacts -type f \( -name "*.tar.gz" -o -name "*.zip" \) -exec cp {} dist/ \;
+          ls -lh dist/
+
+      - name: Create / update GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          files: |
+            dist/voltex-*-x86_64-unknown-linux-gnu.tar.gz
+            dist/voltex-*-x86_64-pc-windows-msvc.zip
+            dist/voltex-*-aarch64-apple-darwin.tar.gz

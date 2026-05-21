@@ -10,6 +10,29 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## [v1.0.34] — 2026-05-21 — Release artifact automation
+
+P1 service-readiness item. Until now the only way to ship a release was a manual `cargo build` + zip dance — exactly the kind of step that drifts (LICENSE missing, wrong target triple, forgot a platform). Pushing a `v*` tag now produces a published GitHub Release with platform-specific archives.
+
+### Added
+
+- `.github/workflows/release.yml` — new workflow with two jobs:
+  - `build`: 3-platform matrix (`ubuntu-latest`, `windows-latest`, `macos-latest`) building `voltex_cli` for `x86_64-unknown-linux-gnu`, `x86_64-pc-windows-msvc`, `aarch64-apple-darwin`. Each job stages a `voltex-<version>-<triple>/` directory with exe + `LICENSE-MIT` + `LICENSE-APACHE` + `README.md`, packages as `.tar.gz` (Unix) or `.zip` (Windows), uploads via `actions/upload-artifact@v4`.
+  - `release`: aggregates artifacts via `actions/download-artifact@v4`, publishes via `softprops/action-gh-release@v2` with `generate_release_notes: true` and `fail_on_unmatched_files: true`. Only runs on `refs/tags/v*`.
+- `docs/release.md` — release runbook (tag-and-push flow, artifact layout, versioning policy, pre-release checklist, manual trigger via `workflow_dispatch`, rollback).
+- `README.md` "문서" section: new link to `docs/release.md`.
+
+### Triggers
+
+- `push` of any `v*` tag (canonical release path).
+- `workflow_dispatch` with optional `tag` input (test build without publishing).
+
+### Notes
+
+macOS matrix entry targets `aarch64-apple-darwin` only (Apple Silicon). x86_64 macOS is intentionally out — matches `ci.yml`'s test matrix. Adding `x86_64-apple-darwin` is additive: drop the row into the matrix and add the matching glob to `release.files`.
+
+---
+
 ## [v1.0.33] — 2026-05-21 — SemVer-checks CI (advisory)
 
 P1 service-readiness item. From `v1.0.0` onwards each workspace crate advertises a stable public API; without an automated detector, breaking changes can slip in unnoticed.

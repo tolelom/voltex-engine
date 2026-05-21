@@ -191,6 +191,7 @@ voltex (facade, L4)
 - [docs/tutorial.md](docs/tutorial.md) — 30분 안에 0에서 빌드된 미니 게임까지
 - [docs/voltex-toml-reference.md](docs/voltex-toml-reference.md) — `voltex.toml` 매니페스트 전체 reference (v1.0.16)
 - [docs/build-matrix.md](docs/build-matrix.md) — 3 OS 빌드 명령 + GitHub Actions 예시
+- [docs/release.md](docs/release.md) — release tagging + 산출물 자동화 (v1.0.34)
 - [examples/README.md](examples/README.md) — 14 example 추천 학습 순서 + 카테고리별
 - [CONTRIBUTING.md](CONTRIBUTING.md) — 외부 contributor 가이드 (의존성 정책 / 600줄 / 에러 표준 / 첫 PR 체크리스트)
 - [docs/STATUS.md](docs/STATUS.md) — 작업 현황 + Cycle history + 테스트 통계

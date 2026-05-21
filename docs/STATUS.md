@@ -173,6 +173,21 @@
 
 v1.0.9 부터는 **서비스 배포 완성도** 로드맵 (`docs/superpowers/specs/2026-05-21-service-readiness-roadmap.md`) 기준으로 진행.
 
+### v1.0.34 (2026-05-21) — Release artifact automation
+
+P1. tag push 만으로 3-OS exe + 라이선스 번들이 GitHub Release 로 발행되는 파이프라인.
+
+**신규**:
+- `.github/workflows/release.yml` — 2 job:
+  - `build` matrix: ubuntu / windows / macos × 3 triple. `cargo build --release -p voltex_cli --target <triple>` → exe + LICENSE-MIT/APACHE + README → tar.gz 또는 zip → upload-artifact.
+  - `release`: download-artifact 로 모은 후 `softprops/action-gh-release@v2` 로 publish. `refs/tags/v*` 에서만.
+- `docs/release.md` — release 런북.
+- `README.md` 문서 섹션에 링크.
+
+**트리거**: tag push `v*` + `workflow_dispatch` (수동, dry run).
+
+**한계**: macOS aarch64 only. x86_64 macOS 는 ci.yml 매트릭스 정책에 맞춰 의도적 제외.
+
 ### v1.0.33 (2026-05-21) — SemVer-checks CI (advisory)
 
 P1. v1.0.0 이후 모든 workspace crate 가 stable API 라 breaking change 자동 감지 필요.
