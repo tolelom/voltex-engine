@@ -10,6 +10,33 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## [v1.0.15] — 2026-05-21 — Examples catalog + flagship game README
+
+Helps a fresh clone-and-explore user find their way through 14
+example crates plus the flagship game.
+
+### Added
+
+- `examples/README.md` — a recommended learning order (triangle →
+  model_viewer → many_cubes → ... → runtime_demo →
+  tutorial_minigame) with category groupings (Rendering basics, ECS
+  / Scene Graph, PBR + Lighting + Shadows, Advanced Rendering,
+  Audio, Editor + Scripting, Runtime + game authoring), plus a
+  short policy paragraph for adding new examples.
+- `games/voltex_survivor/README.md` — flagship game catalog:
+  directory layout table (voltex.toml / scene.vscn / scripts/*.lua /
+  src/main.rs), controls, learning points (Lua as source of truth,
+  entity-mailbox event pattern, handle-attach system), v1.0 limits.
+
+### Notes
+
+- Documentation-only. Workspace tests / clippy unchanged.
+- Per-example READMEs are not added — each example's module header
+  (`//!`) already documents the demo. The catalog covers menu-level
+  navigation.
+
+---
+
 ## [v1.0.14] — 2026-05-21 — `CONTRIBUTING.md` + git pre-commit hook
 
 Lowers external-contributor friction. The README "Contributing"

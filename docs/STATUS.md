@@ -173,6 +173,20 @@
 
 v1.0.9 부터는 **서비스 배포 완성도** 로드맵 (`docs/superpowers/specs/2026-05-21-service-readiness-roadmap.md`) 기준으로 진행.
 
+### v1.0.15 (2026-05-21) — examples catalog + voltex_survivor flagship README
+
+신규 사용자가 14 example + 1 game 디렉토리 중 어디부터 봐야 할지 안내.
+
+**신규**:
+- `examples/README.md` — 14 example 추천 학습 순서 표 (`triangle` → `model_viewer` → `many_cubes` → ... → `runtime_demo` → `tutorial_minigame`). 카테고리별 (Rendering / ECS / PBR+Light+Shadow / Advanced / Audio / Editor / Runtime+게임) 분류. 실행 공통 + 작성 정책 (description / catalog 업데이트 / 모듈 헤더) 명시.
+- `games/voltex_survivor/README.md` — flagship 게임 catalog (디렉토리 구조 표 + 조작 + 학습 포인트: Lua source of truth, entity 메일박스 패턴, handle-attach 시스템 + 한계 + 실행 명령).
+
+**검증**: 문서만, 코드 변경 0 — 워크스페이스 테스트/클리피 영향 0.
+
+**알려진 한계 (v1.1+)**:
+- 14 example 각자의 상세 README 부재 (이 catalog 가 menu 역할). 각 example 의 모듈 헤더 (`//!`) 가 사실상 README 대체.
+- 스크린샷 부재 (`screenshot:` 자리만 마련) — GUI 자동화 없어 미수집.
+
 ### v1.0.14 (2026-05-21) — CONTRIBUTING.md + git pre-commit hook
 
 외부 contributor 가 로컬 검증 → 커밋 → PR 흐름에서 마찰 줄이기. 이전엔 README 의 "Contributing" 섹션에 4개 cargo 명령만 있고, 새 contributor 가 한 번 잊으면 CI 에서 실패해야 학습.

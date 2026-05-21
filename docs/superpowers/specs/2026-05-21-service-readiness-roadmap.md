@@ -74,8 +74,9 @@
 | 4 | v1.0.12 license bundle in build | `[✅]` | (inline STATUS § v1.0.12) | c4ea097 |
 | 5 | v1.0.13 CLI help/version richness | `[✅]` | (inline STATUS § v1.0.13) | d64c9ca |
 | 5b | E2E new/build/run test | `[ ]` | — | re-numbered (heavy: ~60s cargo build per run, #[ignore]'d) |
-| 6 | v1.0.14 CONTRIBUTING + pre-commit hook | `[✅]` | (inline STATUS § v1.0.14) | (pending commit) — re-prioritised P3→here |
-| 6b | structured logging | `[ ]` | — | re-numbered |
+| 6 | v1.0.14 CONTRIBUTING + pre-commit hook | `[✅]` | (inline STATUS § v1.0.14) | 5e7b9de |
+| 7 | v1.0.15 examples catalog + flagship README | `[✅]` | (inline STATUS § v1.0.15) | (pending commit) |
+| 7b | structured logging | `[ ]` | — | re-numbered |
 | 7 | v1.0.15 cargo-deny | `[ ]` | — | — |
 | 8 | v1.0.16 CHANGELOG enforcement | `[ ]` | — | — |
 | 9 | v1.0.17 SemVer check | `[ ]` | — | — |
