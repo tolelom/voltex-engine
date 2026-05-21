@@ -22,6 +22,27 @@ pub enum CliError {
     /// Manifest `targets = [...]` listed only non-host triples — we cannot
     /// build any of them from the current machine.
     HostNotInManifestTargets { host: String, listed: Vec<String> },
+    /// A key was found in `voltex.toml` that the engine does not recognise
+    /// for that section. Suggests close matches when possible.
+    UnknownField {
+        section: String,
+        field: String,
+        valid: Vec<&'static str>,
+        suggestion: Option<&'static str>,
+    },
+    /// A top-level section was found in `voltex.toml` that the engine does
+    /// not recognise.
+    UnknownSection {
+        name: String,
+        valid_prefixes: Vec<&'static str>,
+    },
+    /// A path referenced by the manifest (scene, scripts dir, assets dir)
+    /// does not exist.
+    ManifestPathMissing {
+        field: &'static str,
+        path: PathBuf,
+        base_dir: PathBuf,
+    },
 }
 
 impl fmt::Display for CliError {
@@ -80,6 +101,33 @@ impl fmt::Display for CliError {
                     f,
                     "manifest targets do not include host triple.\n  current host: {}\n  manifest targets = {:?}\n  hint: add \"{}\" to the targets array, or pass --target {} explicitly.",
                     host, listed, host, host
+                )
+            }
+            CliError::UnknownField { section, field, valid, suggestion } => {
+                let hint = match suggestion {
+                    Some(s) => format!("\n  hint: did you mean `{}`?", s),
+                    None => format!("\n  valid keys: {:?}", valid),
+                };
+                write!(
+                    f,
+                    "unknown key `{}` in [{}] section of voltex.toml{}",
+                    field, section, hint
+                )
+            }
+            CliError::UnknownSection { name, valid_prefixes } => {
+                write!(
+                    f,
+                    "unknown section [{}] in voltex.toml\n  valid sections: {:?}",
+                    name, valid_prefixes
+                )
+            }
+            CliError::ManifestPathMissing { field, path, base_dir } => {
+                write!(
+                    f,
+                    "manifest field `{}` references missing path\n  path:     {}\n  base dir: {}\n  hint: create the file/directory, or remove the entry from voltex.toml",
+                    field,
+                    path.display(),
+                    base_dir.display()
                 )
             }
         }

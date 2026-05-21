@@ -10,6 +10,46 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## [v1.0.11] — 2026-05-21 — `voltex.toml` strict schema + path validation
+
+Deployment workflow friction reduction: `voltex build` now rejects
+manifest typos and missing assets *before* invoking cargo, instead of
+emitting either silent defaults or cryptic cargo errors.
+
+### Added
+
+- New `CliError` variants in `voltex_cli`:
+  - `UnknownField { section, field, valid, suggestion }`
+  - `UnknownSection { name, valid_prefixes }`
+  - `ManifestPathMissing { field, path, base_dir }`
+- `manifest::validate_schema(TomlDoc)` — called automatically from
+  `Manifest::parse`. Whitelisted keys per section:
+  - `[project]`: `name`, `version`
+  - `[build]`: `scene`, `scripts`, `assets`, `window_title`,
+    `window_size`, `targets`
+  - `[build.<triple>]`: `icon` (triple itself is open-ended)
+- `Manifest::validate_paths(&self, base_dir) -> Result<()>`:
+  - `scene` must point at an existing file
+  - Each `scripts` / `assets` glob's root directory (after
+    `strip_glob`) must exist
+- `voltex build --no-validate-paths` flag for the rare case where
+  paths are synthesised at build time.
+- Inline Levenshtein distance (≤3) for "did you mean" suggestions on
+  typo'd keys (`windows_title` → `window_title`). No external dep.
+
+### Tests
+
+- `voltex_cli`: 30 → **43** (+13). Unknown key/section 5, path
+  validation 3, helpers 2, error Display 3.
+
+### Known limits
+
+- `ManifestParse` errors still only report line, not column.
+- `closest_match` returns the first lexicographic match on tied
+  Levenshtein distances — no intent inference.
+
+---
+
 ## [v1.0.10] — 2026-05-21 — Crash-log panic hook in `voltex_runtime`
 
 Deployed game executables hide stderr from the end user, so a panic in

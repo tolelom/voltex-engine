@@ -160,3 +160,245 @@ fn host_triple_matches_current_os() {
     };
     assert!(t.starts_with(expected_prefix), "got {}", t);
 }
+
+// ── v1.0.11: Schema validation (unknown keys + sections) ───────────────────
+
+#[test]
+fn unknown_key_in_project_is_rejected() {
+    let toml = r#"
+[project]
+name = "g"
+version = "0.1.0"
+typo_field = "oops"
+"#;
+    let err = Manifest::parse(toml).unwrap_err();
+    match err {
+        CliError::UnknownField { section, field, .. } => {
+            assert_eq!(section, "project");
+            assert_eq!(field, "typo_field");
+        }
+        other => panic!("expected UnknownField, got {:?}", other),
+    }
+}
+
+#[test]
+fn unknown_key_in_build_includes_suggestion_for_typo() {
+    // `windows_title` is 1 edit away from `window_title` (extra s).
+    let toml = r#"
+[project]
+name = "g"
+version = "0.1.0"
+[build]
+windows_title = "Game"
+"#;
+    let err = Manifest::parse(toml).unwrap_err();
+    match err {
+        CliError::UnknownField { field, suggestion, .. } => {
+            assert_eq!(field, "windows_title");
+            assert_eq!(suggestion, Some("window_title"));
+        }
+        other => panic!("expected UnknownField, got {:?}", other),
+    }
+}
+
+#[test]
+fn unknown_key_with_unrelated_name_omits_suggestion() {
+    // `xyzzy_unrelated_42` has Levenshtein distance > 3 from every valid
+    // key — we should not invent a misleading suggestion.
+    let toml = r#"
+[project]
+name = "g"
+version = "0.1.0"
+[build]
+xyzzy_unrelated_42 = "x"
+"#;
+    let err = Manifest::parse(toml).unwrap_err();
+    match err {
+        CliError::UnknownField { suggestion, .. } => assert!(suggestion.is_none()),
+        other => panic!("expected UnknownField, got {:?}", other),
+    }
+}
+
+#[test]
+fn unknown_section_is_rejected() {
+    let toml = r#"
+[project]
+name = "g"
+version = "0.1.0"
+[deploy]
+url = "https://example.com"
+"#;
+    let err = Manifest::parse(toml).unwrap_err();
+    match err {
+        CliError::UnknownSection { name, .. } => assert_eq!(name, "deploy"),
+        other => panic!("expected UnknownSection, got {:?}", other),
+    }
+}
+
+#[test]
+fn build_subsection_for_arbitrary_triple_is_accepted() {
+    // Triples are open-ended (e.g. windows-x64, wasm32-unknown-unknown,
+    // user's own triple) — we must not reject [build.<anything>].
+    let toml = r#"
+[project]
+name = "g"
+version = "0.1.0"
+[build.aarch64-linux-android]
+icon = "android.png"
+"#;
+    let m = Manifest::parse(toml).unwrap();
+    assert!(m.target_overrides.contains_key("aarch64-linux-android"));
+}
+
+// ── v1.0.11: validate_paths ────────────────────────────────────────────────
+
+fn write_manifest_to_dir(dir: &std::path::Path, body: &str) {
+    std::fs::create_dir_all(dir).unwrap();
+    std::fs::write(dir.join("voltex.toml"), body).unwrap();
+}
+
+#[test]
+fn validate_paths_passes_when_all_present() {
+    let tmp = std::env::temp_dir().join(format!(
+        "voltex_cli_validate_paths_ok_{}",
+        std::process::id()
+    ));
+    let _ = std::fs::remove_dir_all(&tmp);
+    write_manifest_to_dir(
+        &tmp,
+        r#"
+[project]
+name = "g"
+version = "0.1.0"
+[build]
+scene = "scene.vscn"
+scripts = ["scripts/**/*.lua"]
+assets = ["assets/**/*"]
+"#,
+    );
+    std::fs::write(tmp.join("scene.vscn"), "").unwrap();
+    std::fs::create_dir_all(tmp.join("scripts")).unwrap();
+    std::fs::create_dir_all(tmp.join("assets")).unwrap();
+
+    let m = Manifest::load_from_dir(&tmp).unwrap();
+    m.validate_paths(&tmp).unwrap();
+
+    let _ = std::fs::remove_dir_all(&tmp);
+}
+
+#[test]
+fn validate_paths_rejects_missing_scene() {
+    let tmp = std::env::temp_dir().join(format!(
+        "voltex_cli_validate_paths_no_scene_{}",
+        std::process::id()
+    ));
+    let _ = std::fs::remove_dir_all(&tmp);
+    write_manifest_to_dir(
+        &tmp,
+        r#"
+[project]
+name = "g"
+version = "0.1.0"
+[build]
+scene = "missing.vscn"
+scripts = ["scripts/**/*.lua"]
+assets = ["assets/**/*"]
+"#,
+    );
+    std::fs::create_dir_all(tmp.join("scripts")).unwrap();
+    std::fs::create_dir_all(tmp.join("assets")).unwrap();
+
+    let m = Manifest::load_from_dir(&tmp).unwrap();
+    let err = m.validate_paths(&tmp).unwrap_err();
+    match err {
+        CliError::ManifestPathMissing { field, .. } => assert_eq!(field, "build.scene"),
+        other => panic!("expected ManifestPathMissing, got {:?}", other),
+    }
+
+    let _ = std::fs::remove_dir_all(&tmp);
+}
+
+#[test]
+fn validate_paths_rejects_missing_scripts_dir() {
+    let tmp = std::env::temp_dir().join(format!(
+        "voltex_cli_validate_paths_no_scripts_{}",
+        std::process::id()
+    ));
+    let _ = std::fs::remove_dir_all(&tmp);
+    write_manifest_to_dir(
+        &tmp,
+        r#"
+[project]
+name = "g"
+version = "0.1.0"
+[build]
+scene = "scene.vscn"
+scripts = ["script/**/*.lua"]
+assets = ["assets/**/*"]
+"#,
+    );
+    std::fs::write(tmp.join("scene.vscn"), "").unwrap();
+    std::fs::create_dir_all(tmp.join("assets")).unwrap();
+    // Note: missing "script" (typo for "scripts") dir.
+
+    let m = Manifest::load_from_dir(&tmp).unwrap();
+    let err = m.validate_paths(&tmp).unwrap_err();
+    match err {
+        CliError::ManifestPathMissing { field, .. } => assert_eq!(field, "build.scripts"),
+        other => panic!("expected ManifestPathMissing, got {:?}", other),
+    }
+
+    let _ = std::fs::remove_dir_all(&tmp);
+}
+
+#[test]
+fn levenshtein_smoke_test() {
+    assert_eq!(levenshtein("kitten", "sitting"), 3);
+    assert_eq!(levenshtein("scene", "scene"), 0);
+    assert_eq!(levenshtein("scrips", "scripts"), 1);
+    assert_eq!(levenshtein("Window_Title", "window_title"), 0); // case-insensitive
+}
+
+#[test]
+fn closest_match_returns_none_when_too_far() {
+    assert_eq!(closest_match("totally_unrelated", VALID_BUILD_KEYS), None);
+    assert_eq!(closest_match("scrips", VALID_BUILD_KEYS), Some("scripts"));
+}
+
+#[test]
+fn unknown_field_display_includes_hint() {
+    let err = CliError::UnknownField {
+        section: "build".into(),
+        field: "windows_title".into(),
+        valid: VALID_BUILD_KEYS.to_vec(),
+        suggestion: Some("window_title"),
+    };
+    let s = format!("{}", err);
+    assert!(s.contains("windows_title"));
+    assert!(s.contains("[build]"));
+    assert!(s.contains("did you mean `window_title`"));
+}
+
+#[test]
+fn unknown_section_display_lists_valid() {
+    let err = CliError::UnknownSection {
+        name: "deploy".into(),
+        valid_prefixes: VALID_SECTION_PREFIXES.to_vec(),
+    };
+    let s = format!("{}", err);
+    assert!(s.contains("deploy"));
+    assert!(s.contains("valid sections"));
+}
+
+#[test]
+fn manifest_path_missing_display_shows_path_and_base() {
+    let err = CliError::ManifestPathMissing {
+        field: "build.scene",
+        path: PathBuf::from("/tmp/missing.vscn"),
+        base_dir: PathBuf::from("/tmp"),
+    };
+    let s = format!("{}", err);
+    assert!(s.contains("build.scene"));
+    assert!(s.contains("missing.vscn"));
+    assert!(s.contains("/tmp"));
+}

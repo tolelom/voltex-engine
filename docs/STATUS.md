@@ -173,6 +173,44 @@
 
 v1.0.9 부터는 **서비스 배포 완성도** 로드맵 (`docs/superpowers/specs/2026-05-21-service-readiness-roadmap.md`) 기준으로 진행.
 
+### v1.0.11 (2026-05-21) — voltex.toml 스키마 강화 (unknown key + section 거부 + path validation)
+
+배포 워크플로 진입 마찰 줄이기. `voltex build` 가 매니페스트의 오타나 누락된 자원을 빌드 *전* 에 친화 에러로 잡아냄 (이전엔 cargo 의 cryptic 에러로 나오거나 그냥 default 가 silent 적용).
+
+**신규 에러 variants** (`voltex_cli::CliError`):
+- `UnknownField { section, field, valid, suggestion }` — 섹션별 화이트리스트 외 키
+- `UnknownSection { name, valid_prefixes }` — `[project] / [build] / [build.*]` 외 섹션
+- `ManifestPathMissing { field, path, base_dir }` — scene/scripts/assets 가 base_dir 기준 부재
+
+**스키마 검증** (`validate_schema(TomlDoc)`, `Manifest::parse` 내부 자동 호출):
+- 화이트리스트:
+  - `[project]`: `name`, `version`
+  - `[build]`: `scene`, `scripts`, `assets`, `window_title`, `window_size`, `targets`
+  - `[build.<triple>]`: `icon` (triple 자체는 open-ended — `aarch64-linux-android` 등 임의 허용)
+- 오타 시 **Levenshtein distance ≤ 3 closest match** 제안 (`windows_title` → `window_title`). 거리 > 3 이면 suggestion 생략 (잘못된 유도 회피).
+- Levenshtein 구현 inline (외부 dep 0). case-insensitive (편의).
+
+**Path validation** (`Manifest::validate_paths(&self, &Path) -> Result<()>`):
+- `scene` 파일 존재 확인
+- `scripts` / `assets` 글롭 패턴의 root 디렉토리 (strip_glob 결과) 존재 확인
+- `voltex build` 가 parse 직후 호출. `--no-validate-paths` 플래그로 opt-out (build-time path 생성 시나리오 용).
+
+**테스트**: voltex_cli 30 → 43 (+13):
+- unknown key/section ×5 (project key 거부 / build typo 거부+suggestion / 거리>3 suggestion 생략 / unknown section 거부 / `[build.<arbitrary>]` 허용)
+- validate_paths ×3 (전부 정상 / 누락 scene 거부 / 누락 scripts 거부)
+- helper ×2 (levenshtein smoke, closest_match 거리 컷)
+- error Display ×3 (UnknownField 힌트 / UnknownSection valid 리스트 / ManifestPathMissing path+base 표시)
+
+**셀프 피드백**:
+- 단계 1 에러 variants + validate_schema + validate_paths 구현: 빌드 통과.
+- 단계 2 기존 30 테스트: 0 회귀 (voltex new 스캐폴드 매니페스트가 화이트리스트 통과 — 정상).
+- 단계 3 신규 13 테스트: 모두 통과 (closest_match 의 거리 컷이 false positive 안 만듦).
+- 단계 4 워크스페이스 clippy/test: 0 워닝, 0 회귀.
+
+**알려진 한계 (v1.1+)**:
+- `parse_value` 가 line+column 중 line 만 제공. column 까지 가려면 mini-TOML 파서 보강 필요.
+- `closest_match` 가 첫 번째 매치만 — 동률 거리 시 알파벳 순. 사용자 의도 추론은 안 함.
+
 ### v1.0.10 (2026-05-21) — 크래시 로그 panic hook (`voltex_runtime::crash`)
 
 배포된 exe 가 죽었을 때 stderr 는 사용자에게 안 보임 → 사용자가 버그 리포트에 첨부할 단일 파일 (`<app>-crash-YYYYMMDD-HHMMSS.txt`) 자동 생성.
@@ -582,7 +620,7 @@ crates/
 └── voltex_cli         — bin "voltex" (new/build/run), voltex.toml 매니페스트, .vpkg packing (B1+B2)
 ```
 
-## 테스트: ~1012개 통과 (Windows host, `cargo test --workspace`). `--lib` 기준은 982 (voltex_cli 는 bin-only 라 lib count 에서 빠지나 `cargo test -p voltex_cli` 로 30 개 실행됨). macOS host 에서는 +2 (CoreAudio 모듈) = 1014 예상. v1.0.1 +5 (input_system 순서/참조 ×2, Bounds default ×2, ScriptComponent default ×1). v1.0.3 +4 (canonicalize_friendly Windows verbatim strip ×3 + cross-OS integration ×1). v1.0.8 +21 (parser panic-resistance fuzz: PNG ×4 + JPG ×4 + GLTF ×5 + OBJ ×4 + WAV ×4). v1.0.9 +30 (OGG +11 + Vorbis +17 + decode_ogg_vorbis_bytes +2 — 모두 wire 직전까지 dead, 이제 실 컴파일). v1.0.10 +14 (voltex_runtime crash module ×11 + config crash log ×3).
+## 테스트: ~1025개 통과 (Windows host, `cargo test --workspace`). `--lib` 기준은 982 (voltex_cli 는 bin-only 라 lib count 에서 빠지나 `cargo test -p voltex_cli` 로 43 개 실행됨). macOS host 에서는 +2 (CoreAudio 모듈) = 1027 예상. v1.0.1 +5 (input_system 순서/참조 ×2, Bounds default ×2, ScriptComponent default ×1). v1.0.3 +4 (canonicalize_friendly Windows verbatim strip ×3 + cross-OS integration ×1). v1.0.8 +21 (parser panic-resistance fuzz: PNG ×4 + JPG ×4 + GLTF ×5 + OBJ ×4 + WAV ×4). v1.0.9 +30 (OGG +11 + Vorbis +17 + decode_ogg_vorbis_bytes +2 — 모두 wire 직전까지 dead, 이제 실 컴파일). v1.0.10 +14 (voltex_runtime crash module ×11 + config crash log ×3). v1.0.11 +13 (voltex_cli schema/path validation + Levenshtein helper + error Display).
 
 - voltex: 2 (M6: prelude/module 경로 컴파일 검증)
 - voltex_math: 39 (8-7 +2: inverse roundtrip × VP+translation)
@@ -598,7 +636,7 @@ crates/
 - voltex_script: 42 (S1 +12: pool ×6 [get_or_create same/load/reload/unknown/poll_reload/clear], system ×4 [start/update/5-cubes/missing-callbacks], engine_api ×2 [iter_entities/iter_by_tag])
 - voltex_editor: 169 (E3 +11: command ×5 add/remove/unknown/dead-entity + session ×4 add_undo/remove_undo/despawn_restores/despawn_history/slot_reused + inspector ×2 - 1 obsolete despawn_clears test)
 - voltex_runtime: 27 (v1.0.10 +14: crash module ×11 + config crash log ×3; was 13)
-- voltex_cli: 30 (B1-spike +3, B1 +16, B2 +1, B3 +6, v1.0.3 +4: canonicalize_friendly ×4 covering Windows verbatim strip, UNC passthrough, non-verbatim passthrough, cross-OS integration)
+- voltex_cli: 43 (v1.0.11 +13: schema validation 5 + path validation 3 + helpers 2 + error Display 3; was 30)
 
 ## Examples (14개) + Games (1개) + 기존 survivor_game (archived)
 

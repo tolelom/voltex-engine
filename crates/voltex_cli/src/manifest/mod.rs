@@ -57,6 +57,7 @@ impl Manifest {
 
     pub fn parse(text: &str) -> Result<Self> {
         let toml = parse_toml(text)?;
+        validate_schema(&toml)?;
 
         let project_section = toml
             .get("project")
@@ -88,6 +89,47 @@ impl Manifest {
         })
     }
 
+    /// Verify that every path referenced by the manifest exists relative to
+    /// `base_dir`. Called by `voltex build`. Pass `--no-validate-paths` on
+    /// the CLI to skip (for build flows that synthesise paths at compile
+    /// time).
+    ///
+    /// Validation rules:
+    /// - `build.scene` must point at an existing file.
+    /// - Each glob in `build.scripts` / `build.assets` must have its root
+    ///   directory (stripped of `**` / `*`) existing.
+    pub fn validate_paths(&self, base_dir: &Path) -> Result<()> {
+        let scene = base_dir.join(&self.build.scene);
+        if !scene.is_file() {
+            return Err(CliError::ManifestPathMissing {
+                field: "build.scene",
+                path: scene,
+                base_dir: base_dir.to_path_buf(),
+            });
+        }
+        for pat in &self.build.scripts {
+            let root = base_dir.join(strip_glob(pat));
+            if !root.exists() {
+                return Err(CliError::ManifestPathMissing {
+                    field: "build.scripts",
+                    path: root,
+                    base_dir: base_dir.to_path_buf(),
+                });
+            }
+        }
+        for pat in &self.build.assets {
+            let root = base_dir.join(strip_glob(pat));
+            if !root.exists() {
+                return Err(CliError::ManifestPathMissing {
+                    field: "build.assets",
+                    path: root,
+                    base_dir: base_dir.to_path_buf(),
+                });
+            }
+        }
+        Ok(())
+    }
+
     /// Resolve every script path in the manifest against `base_dir`.
     pub fn resolved_script_dirs(&self, base_dir: &Path) -> Vec<PathBuf> {
         self.build.scripts.iter().map(|s| base_dir.join(strip_glob(s))).collect()
@@ -95,6 +137,77 @@ impl Manifest {
     pub fn resolved_assets_dirs(&self, base_dir: &Path) -> Vec<PathBuf> {
         self.build.assets.iter().map(|s| base_dir.join(strip_glob(s))).collect()
     }
+}
+
+// ── Schema validation (v1.0.11): catch typos in section / key names ─────
+
+const VALID_PROJECT_KEYS: &[&str] = &["name", "version"];
+const VALID_BUILD_KEYS: &[&str] = &[
+    "scene",
+    "scripts",
+    "assets",
+    "window_title",
+    "window_size",
+    "targets",
+];
+const VALID_TARGET_OVERRIDE_KEYS: &[&str] = &["icon"];
+const VALID_SECTION_PREFIXES: &[&str] = &["project", "build", "build.<triple>"];
+
+/// Compare two strings character by character for the case-insensitive
+/// "did you mean" suggestion. Cheap and sufficient for catching common
+/// typos like `windows_title` vs `window_title` or `scrips` vs `scripts`.
+fn levenshtein(a: &str, b: &str) -> usize {
+    let av: Vec<char> = a.chars().collect();
+    let bv: Vec<char> = b.chars().collect();
+    let mut prev: Vec<usize> = (0..=bv.len()).collect();
+    let mut curr = vec![0usize; bv.len() + 1];
+    for i in 1..=av.len() {
+        curr[0] = i;
+        for j in 1..=bv.len() {
+            let cost = if av[i - 1].eq_ignore_ascii_case(&bv[j - 1]) { 0 } else { 1 };
+            curr[j] = (prev[j] + 1).min(curr[j - 1] + 1).min(prev[j - 1] + cost);
+        }
+        std::mem::swap(&mut prev, &mut curr);
+    }
+    prev[bv.len()]
+}
+
+fn closest_match(field: &str, valid: &[&'static str]) -> Option<&'static str> {
+    valid
+        .iter()
+        .map(|&v| (v, levenshtein(field, v)))
+        .filter(|(_, d)| *d <= 3) // within 3 edits — catches realistic typos, rejects unrelated
+        .min_by_key(|(_, d)| *d)
+        .map(|(v, _)| v)
+}
+
+fn validate_schema(toml: &TomlDoc) -> Result<()> {
+    for (section_name, section) in toml.sections() {
+        let valid_keys: &[&str] = if section_name == "project" {
+            VALID_PROJECT_KEYS
+        } else if section_name == "build" {
+            VALID_BUILD_KEYS
+        } else if section_name.starts_with("build.") {
+            VALID_TARGET_OVERRIDE_KEYS
+        } else {
+            return Err(CliError::UnknownSection {
+                name: section_name.clone(),
+                valid_prefixes: VALID_SECTION_PREFIXES.to_vec(),
+            });
+        };
+
+        for (key, _) in &section.entries {
+            if !valid_keys.iter().any(|v| v == key) {
+                return Err(CliError::UnknownField {
+                    section: section_name.clone(),
+                    field: key.clone(),
+                    valid: valid_keys.to_vec(),
+                    suggestion: closest_match(key, valid_keys),
+                });
+            }
+        }
+    }
+    Ok(())
 }
 
 /// `scripts/**/*.lua` → `scripts`. Just enough for our prototype copy step.

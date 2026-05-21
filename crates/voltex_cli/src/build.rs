@@ -15,8 +15,12 @@ pub fn cmd(args: &[String]) -> Result<()> {
     let manifest_dir = parse_manifest_path(args)?;
     let target_arg = parse_target_arg(args);
     let engine_path = resolve_engine_path(args)?;
+    let skip_path_validation = args.iter().any(|a| a == "--no-validate-paths");
 
     let manifest = Manifest::load_from_dir(&manifest_dir)?;
+    if !skip_path_validation {
+        manifest.validate_paths(&manifest_dir)?;
+    }
     let target = validate_target(&manifest, target_arg.as_deref(), host_triple())?;
 
     build_target(&manifest_dir, &engine_path, &manifest, &target)
