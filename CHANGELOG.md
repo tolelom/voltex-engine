@@ -10,6 +10,25 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## [v1.0.29] — 2026-05-21 — `cargo-deny` integration
+
+P1 service-readiness item. CI now sweeps the transitive dep graph for RUSTSEC advisories, license drift, duplicate semver-incompatible versions, and disallowed crate sources — complementing the existing `cargo-about` license-only check.
+
+### Added
+
+- `deny.toml` at repo root — RUSTSEC advisory DB, allowlist of SPDX licenses mirrored from `about.toml`, multi-version + wildcards + sources policy. All four `[advisories]/[licenses]/[bans]/[sources]` sections wired.
+- `.github/workflows/ci.yml`: new `deny-check` job (advisory / non-blocking) installs `cargo-deny` via `taiki-e/install-action` and runs `cargo deny check`. Advisory now, promote to blocking once the `warn` categories (`[advisories.yanked]`, `[bans.multiple-versions]`) are clean.
+
+### Verified
+
+- `deny.toml` schema follows the cargo-deny v0.16+ reference — verified locally by inspection. Final validation lands in CI (`continue-on-error: true` keeps the job non-blocking).
+
+### Notes
+
+`[graph.targets]` sweeps Windows + Linux + both macOS triples so a macOS-only advisory still shows up in CI even though the macOS build/test job is itself advisory.
+
+---
+
 ## [v1.0.28] — 2026-05-21 — `voltex_runtime` 100% documented (→ 0 `missing_docs`)
 
 Tenth crate in the workspace `missing_docs` sweep. Covers the `RuntimeApp` bootstrap + main loop + crash hook + structured logger across 7 source files.

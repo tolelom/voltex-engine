@@ -1,0 +1,100 @@
+# cargo-deny configuration for Voltex.
+#
+# Why: complements `about.toml` (cargo-about handles license listing only) with
+# a single tool that also catches RUSTSEC advisories, duplicate crate versions,
+# yanked crates, and disallowed sources. Wired into CI as an advisory gate so
+# new transitive vulnerabilities surface immediately without blocking merges
+# while we triage them.
+#
+# Run locally:
+#   cargo install cargo-deny
+#   cargo deny check
+#
+# Schema reference: https://embarkstudios.github.io/cargo-deny/
+
+[graph]
+# Voltex is platform-portable but only Windows + Linux are blocking in CI;
+# macOS is advisory. Sweep every triple so a transitive-only-on-macOS issue
+# (e.g. RUSTSEC advisory limited to core-foundation) doesn't slip past.
+all-features = false
+no-default-features = false
+targets = [
+    { triple = "x86_64-pc-windows-msvc" },
+    { triple = "x86_64-unknown-linux-gnu" },
+    { triple = "x86_64-apple-darwin" },
+    { triple = "aarch64-apple-darwin" },
+]
+
+[output]
+feature-depth = 1
+
+# ----------------------------------------------------------------------------
+# Security advisories (RUSTSEC)
+# ----------------------------------------------------------------------------
+
+[advisories]
+# RustSec advisory db, refreshed at scan time.
+db-path = "~/.cargo/advisory-db"
+db-urls = ["https://github.com/rustsec/advisory-db"]
+# Yanked crates and unmaintained crates are warnings, not failures. Promote
+# to "deny" once we've audited every transitive dep we own (planned v1.1).
+yanked = "warn"
+ignore = []
+
+# ----------------------------------------------------------------------------
+# Licenses
+# ----------------------------------------------------------------------------
+#
+# Mirrors about.toml's accepted SPDX list. cargo-about is the canonical
+# license listing for THIRD-PARTY-LICENSES.md in build output;
+# cargo-deny double-checks the same policy at the CI level so license drift
+# also fails `cargo deny check`, not just the about-generate step.
+
+[licenses]
+# Strict — every non-listed license becomes a build failure.
+confidence-threshold = 0.8
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "BSL-1.0",
+    "ISC",
+    "Zlib",
+    "Unicode-3.0",
+    "Unicode-DFS-2016",
+    "MPL-2.0",
+    "CC0-1.0",
+    "OFL-1.1",
+]
+# Crates that ship without machine-readable license metadata get a manual
+# clarification entry; leave empty until we hit one.
+exceptions = []
+
+# ----------------------------------------------------------------------------
+# Bans (duplicate / disallowed crates)
+# ----------------------------------------------------------------------------
+
+[bans]
+# Duplicate semver-incompatible versions of the same crate are warnings.
+# The wgpu/winit transitive graph routinely pulls multiple `windows-sys`
+# major versions; deny would be noisy. Promote to "deny" once we've pinned
+# core deps to a single major (v1.1+).
+multiple-versions = "warn"
+wildcards = "deny"
+highlight = "all-versions"
+deny = []
+skip = []
+skip-tree = []
+
+# ----------------------------------------------------------------------------
+# Sources
+# ----------------------------------------------------------------------------
+
+[sources]
+# Only allow crates from crates.io plus path/git deps explicitly declared.
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+allow-git = []

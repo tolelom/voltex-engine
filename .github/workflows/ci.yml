@@ -111,6 +111,29 @@ jobs:
       - name: cargo about generate (verify no license drift)
         run: cargo about generate about.hbs -o /tmp/THIRD-PARTY-LICENSES.md
 
+  # Non-blocking cargo-deny job — sweeps RUSTSEC advisories, license drift,
+  # duplicate semver-incompatible versions, and disallowed crate sources.
+  # Complements license-check (cargo-about) by catching the categories
+  # cargo-about does not surface (advisories, duplicates, unknown sources).
+  # Advisory while we audit the existing transitive-dep graph; promote to
+  # blocking once the warn-level categories ([advisories.yanked],
+  # [bans.multiple-versions]) are clean (v1.1+).
+  deny-check:
+    name: cargo-deny (ubuntu-latest, advisory)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install Linux audio dev headers (ALSA)
+        run: sudo apt-get update && sudo apt-get install -y libasound2-dev
+      - name: Install cargo-deny
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-deny
+      - name: cargo deny check (all checks)
+        run: cargo deny check
+
   # Non-blocking coverage job — reports line/function/region coverage so
   # contributors can see the trend over time. Threshold enforcement
   # (--fail-under-lines 80) is deferred until GPU/winit code paths are

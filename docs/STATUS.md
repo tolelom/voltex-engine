@@ -173,6 +173,22 @@
 
 v1.0.9 부터는 **서비스 배포 완성도** 로드맵 (`docs/superpowers/specs/2026-05-21-service-readiness-roadmap.md`) 기준으로 진행.
 
+### v1.0.29 (2026-05-21) — cargo-deny 통합
+
+P1 운영 인프라. 기존 cargo-about(license listing only) 보완 — RUSTSEC advisory + duplicate version + unknown source 추가 스캔.
+
+**신규**:
+- `deny.toml` — `[graph]`/`[advisories]`/`[licenses]`/`[bans]`/`[sources]` 4섹션 전부 설정. license allowlist는 about.toml mirror.
+- `.github/workflows/ci.yml`: `deny-check` job 추가 (advisory). `taiki-e/install-action` 으로 cargo-deny 설치 → `cargo deny check`.
+
+**정책**:
+- advisory / yanked → `warn` (v1.0 동안), v1.1+ 에서 `deny` 승격.
+- license → `deny` (about.toml allowlist 그대로).
+- multiple-versions → `warn` (wgpu/winit 의 `windows-sys` 다중 major 때문).
+- sources → `deny` (crates.io + path/git 명시만 허용).
+
+**검증**: cargo-deny CLI 로컬 미설치라 syntax 검증은 CI 의존. advisory flag 라 push 후 결과 확인 가능 (실패해도 merge block 안 됨).
+
 ### v1.0.28 (2026-05-21) — voltex_runtime 100% missing_docs + `#![warn(missing_docs)]`
 
 열 번째 crate. 7 파일 (app/config/crash/error/handler/log + lib).
