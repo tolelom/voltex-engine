@@ -166,6 +166,25 @@
 - examples/editor_demo: 시드 엔티티 (ground + 3 cube + Cube1↔Cube2 hierarchy)를 `EditorSession::dispatch` 경로로 옮김 → jsonl 로그 + Save/Load round-trip 일관성
 - v1 한계 (문서화): picking은 sphere 근사 (메시 AABB는 미구현). gizmo translate/rotate/scale 핸들은 미구현
 
+## 🎉 v1.0 release — 2026-05-21 (tag `v1.0.0`)
+
+15 cycle / 37 세션 / 약 4 일에 걸쳐 진행된 v1.0 로드맵 완료. 회고는
+[docs/v1.0-retrospective.md](v1.0-retrospective.md). 미뤄진 항목은 v1.1+ 후속.
+
+### Cycle 15 (D3): voltex_survivor flagship + v1.0 release (2026-05-21)
+- **`games/voltex_survivor/` (신규)** — survivor 게임 재제작. `voltex.toml` + `scene.vscn` + 4 `.lua` 파일 + `src/main.rs` (RuntimeApp + input system + mesh upload). 게임 로직 100% Lua + scene; Rust 측은 부트스트랩 + input → Transform + Lua 가 spawn 한 entity 에 mesh/material handle 자동 부착의 3 가지 boilerplate.
+- **voltex_runtime: `add_input_system(FnMut(&mut World, &InputState, f32))`** — input 노출이 필요한 user system 의 정식 등록 경로. `input_systems: Vec<InputSystem>` 필드 추가, `tick_systems_only` 가 user_systems 다음으로 호출. v1.0 한계: Lua 측 input API 는 v1.1.
+- **Lua 4 스크립트**:
+  - `game.lua`: 3초 첫 wave, 이후 5초 간격 4마리 적 생성. score / lives / wave 추적. `kill_marker` / `damage_marker` entity 메일박스 패턴으로 다른 스크립트의 이벤트 수확.
+  - `player.lua`: 가장 가까운 적을 향해 0.8초 주기로 projectile 발사. 방향은 spawned projectile 의 rotation.y 에 인코딩.
+  - `enemy.lua`: 1.2 unit/sec 로 player 추적, 충돌 거리 ≤ 0.55 시 `damage_marker` drop + self-destruct.
+  - `projectile.lua`: rotation.y 방향으로 6 unit/sec 이동, enemy 충돌 시 `kill_marker` drop + 양쪽 despawn, 3초 lifetime.
+- **`docs/v1.0-retrospective.md` (신규)** — 무엇이 성공 / v1.1 deferral / 통계 / 다음 우선 순위.
+- **git tag `v1.0.0`** 로컬 부착. 사용자가 push 시 원격 release 활성.
+- 검증 한계: 3 OS exe 산출은 Mac / Linux 머신에서의 빌드 + 실행 (사용자 PR). Windows 에서는 `cargo build --workspace` 클린 + `cargo run -p voltex_survivor` 빌드 가능.
+- 테스트 +0 (코드 변경: voltex_runtime + input_system 무회귀; 916 lib tests 유지).
+- spec: docs/superpowers/specs/2026-05-21-d3-flagship-game-design.md
+
 ### Cycle 14 (D1+D2): README + 30분 tutorial + tutorial_minigame (2026-05-21)
 - **`README.md` (신규)** — 5분 quickstart (clone → cargo run --example triangle) + Code-first / Editor-first 두 워크플로 + Features 한 줄씩 (14 카테고리) + 의존성 정책 (winit + wgpu 만) + crate 의존 그래프 + 문서 인덱스 + license + contributing + 개발자 노트 (검증 한계 명시).
 - **`docs/tutorial.md` (신규)** — 30분 안에 0 에서 빌드된 미니 게임까지. Chapter 1~7: 프로젝트 만들기 / 에디터 + 첫 씬 / Lua 스크립트 / 적 + 입력 / UI + 점수 / Save + Build / 다음 단계. 각 chapter 끝 체크포인트 + 스크린샷 placeholder (`<screenshot: ...>`).
@@ -328,14 +347,15 @@ crates/
 - voltex_runtime: 11 (B0 신규: config ×5, error ×2, app ×4 [registry/scene order, system order, transform propagation, missing-scene graceful])
 - voltex_cli: 26 (B1-spike +3, B1 +16, B2 +1, B3 +6: validate_target ×5 + cross_compile_error_message)
 
-## Examples (14개 + survivor_game)
+## Examples (14개) + Games (1개) + 기존 survivor_game (archived)
 
 - triangle, model_viewer, many_cubes, hierarchy_demo, asset_demo
 - pbr_demo, multi_light_demo, shadow_demo, ibl_demo
 - audio_demo, deferred_demo, editor_demo
-- **runtime_demo (B0 신규)** — RuntimeApp 으로 솔라 시스템, main 본문 4줄
-- **tutorial_minigame (D1+D2 신규)** — docs/tutorial.md 의 최종 산출물. 1 player + 3 enemy 큐브, spinner.lua + enemy.lua, score 시스템. 듀얼 워크플로 호환 (`cargo run -p tutorial_minigame` + `voltex build`)
-- survivor_game (ECS + voltex_physics + voltex facade로 재작성 완료, 2026-05-20)
+- **runtime_demo (B0)** — RuntimeApp 으로 솔라 시스템, main 본문 4줄
+- **tutorial_minigame (D1+D2)** — docs/tutorial.md 의 최종 산출물. 1 player + 3 enemy 큐브, spinner.lua + enemy.lua, score 시스템. 듀얼 워크플로 호환 (`cargo run -p tutorial_minigame` + `voltex build`)
+- **games/voltex_survivor (D3, v1.0 flagship)** — 4개 Lua 스크립트 + scene 으로 게임 로직 100% 표현. WASD 이동 + 자동 발사 + wave 시스템.
+- examples/survivor_game (ECS + voltex_physics + voltex facade로 재작성, 2026-05-20 — 대조용 archive)
 
 ## 다음 작업 후보 (2026-05-20 8-7 이후)
 

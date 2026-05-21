@@ -10,7 +10,38 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
-## [Unreleased] — Slice 3 in progress
+## [v1.0.0] — 2026-05-21
+
+### Added (Cycle 15, D3)
+- `games/voltex_survivor/` — flagship game. Wave-based arena shooter with
+  4 Lua scripts (game/player/enemy/projectile) + scene + Rust input system.
+  Game logic 100% in Lua + scene.
+- `voltex_runtime::RuntimeApp::add_input_system(F)` — per-frame system that
+  receives `&InputState` alongside `&mut World, f32`. Powers WASD movement
+  for voltex_survivor.
+- `docs/v1.0-retrospective.md` — what worked, what was deferred, statistics,
+  next-priority list for v1.1.
+- `STATUS.md`: v1.0 release header + Cycle 15 entry.
+- Git tag `v1.0.0` (local — user push activates remote release).
+
+### Added (Cycle 14, D1+D2)
+- `README.md` — 5-minute quickstart + code-first / editor-first workflows
+  + feature list (14 categories) + crate dependency graph + license +
+  contributing + verification-limit notes.
+- `docs/tutorial.md` — 7-chapter 30-minute tutorial from scaffold to built exe.
+- `examples/tutorial_minigame/` — final artifact of the tutorial, dual-workflow
+  compatible (cargo run + voltex build). 1 player + 3 enemies + spinner.lua
+  + enemy.lua + score system in stdout.
+
+### Deferred to v1.1
+- Lua input API (currently Rust handles input via `add_input_system`).
+- `voltex_cli editor` subcommand (tutorial points at `examples/editor_demo`).
+- 3-OS exe artifact verification (only Windows build verified locally).
+- Screenshots — README + tutorial have placeholder markers; PR welcome.
+
+---
+
+## [Unreleased pre-v1.0]
 
 ### Added (Cycle 13, A — 2026-05-21)
 - `voltex` facade `prelude` now re-exports `Bounds`, `MeshHandle`,
