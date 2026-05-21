@@ -166,6 +166,16 @@
 - examples/editor_demo: 시드 엔티티 (ground + 3 cube + Cube1↔Cube2 hierarchy)를 `EditorSession::dispatch` 경로로 옮김 → jsonl 로그 + Save/Load round-trip 일관성
 - v1 한계 (문서화): picking은 sphere 근사 (메시 AABB는 미구현). gizmo translate/rotate/scale 핸들은 미구현
 
+### Cycle 13 (A): rustdoc 0 워닝 + facade prelude 완성 + CHANGELOG (2026-05-21)
+- **`cargo doc --workspace --no-deps` 워닝 0** — 7개 파일의 intra-doc link 깨짐 escape (mat4/ccd/pathfinding/navmesh/state/rt_accel + deferred_demo). `voltex_cli` bin 에 `doc = false` 추가해 cargo issue #6313 (voltex lib + voltex bin filename collision) 우회.
+- **`voltex` facade prelude 보강**: C0a (Bounds/MeshHandle/MaterialHandle) + S1 (ScriptComponent) + B0 (RuntimeApp/RuntimeConfig) + B2 (Vfs) 추가. `pub use voltex_runtime as runtime` 모듈 re-export 추가 (B0 의 누락 fix). 신규 prelude 타입 6개의 컴파일 검증 테스트.
+- **Tier-1 API rustdoc** — voltex_ecs::World/Entity 의 핵심 메서드 (spawn/despawn/is_alive/add/get/get_mut/remove/entity_count) + voltex_editor::EditorCommand 10 variants + EditorSession 구조체 docstring.
+- **CHANGELOG.md (신규)** — Cycle 1~13 + M1~M7 + Phase 1~8 7~10 highlights 정리. Unreleased / per-cycle 섹션 구조.
+- **docs/v1.0-pub-audit.md (신규)** — pub(crate) 다운그레이드 후보 노트 (실제 변경은 v1.1 후속).
+- **deferral 정책 명시** — 전체 1586 missing_docs sweep + `#![warn(missing_docs)]` crate 적용 + 실제 pub(crate) 다운그레이드는 v1.1. v1.0 은 prelude + tier-1 API 한정 보장.
+- 테스트 +0 (rustdoc 변경 외 의미 있는 코드 변경 없음). 916 lib tests 유지.
+- spec: docs/superpowers/specs/2026-05-21-a-rustdoc-prelude-changelog-design.md
+
 ### Cycle 12 (E3): AddComponent/RemoveComponent + Despawn full undo (2026-05-21)
 - voltex_ecs::Component trait: **+ `remove(world, entity) -> bool`** (default = `world.remove::<Self>(entity).is_some()`) + **`default_bytes() -> Vec<u8>`** (default = empty Vec). 6 built-in 모두 `default_bytes` 오버라이드 (Transform=identity, Tag=empty, MeshHandle/MaterialHandle/Bounds=zero, ScriptComponent=UNBOUND).
 - voltex_ecs::ComponentEntry: **`remove` + `default_bytes`** 함수 포인터 필드 2개 추가. `register_raw` 는 no-op stub 으로 채움 (Inspector AddComponent UI 에서 제외).
