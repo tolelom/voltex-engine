@@ -10,6 +10,20 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## [v1.0.33] — 2026-05-21 — SemVer-checks CI (advisory)
+
+P1 service-readiness item. From `v1.0.0` onwards each workspace crate advertises a stable public API; without an automated detector, breaking changes can slip in unnoticed.
+
+### Added
+
+- `.github/workflows/ci.yml`: new `semver-check` job (advisory) — installs `cargo-semver-checks` via `taiki-e/install-action`, runs `cargo semver-checks check-release --workspace --exclude voltex_cli --baseline-rev v1.0.0`. The `--exclude voltex_cli` switch skips the binary (no lib API to compare). Falls back to a no-op `::notice::` when the `v1.0.0` tag is missing (fresh forks).
+
+### Notes
+
+Advisory while tagging is selective. Promotes to blocking once we adopt tag-per-cycle and the baseline `v1.0.0` exists on every fork.
+
+---
+
 ## [v1.0.32] — 2026-05-21 — HUD primitive in `voltex_runtime`
 
 P0 service-readiness item. Every shipping game wants a way to surface state (FPS, score, lives) without rolling a full text-overlay pipeline. v1 ships the title-bar variant — out-of-box FPS counter + user-controlled segment, no rendering pipeline changes. In-window overlay rendering is deferred to v1.1 (needs a shared text primitive between editor and runtime).

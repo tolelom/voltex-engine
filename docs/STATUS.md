@@ -173,6 +173,16 @@
 
 v1.0.9 부터는 **서비스 배포 완성도** 로드맵 (`docs/superpowers/specs/2026-05-21-service-readiness-roadmap.md`) 기준으로 진행.
 
+### v1.0.33 (2026-05-21) — SemVer-checks CI (advisory)
+
+P1. v1.0.0 이후 모든 workspace crate 가 stable API 라 breaking change 자동 감지 필요.
+
+**신규**:
+- `.github/workflows/ci.yml`: `semver-check` job (advisory). taiki-e/install-action 으로 cargo-semver-checks 설치 → `cargo semver-checks check-release --workspace --exclude voltex_cli --baseline-rev v1.0.0`.
+- v1.0.0 tag 없는 fork 는 `::notice::` 로 skip.
+
+**한계**: advisory (tag-per-cycle 정책 채택 시 blocking 승격). voltex_cli 는 bin only 라 exclude.
+
 ### v1.0.32 (2026-05-21) — HUD primitive in `voltex_runtime`
 
 P0. shipping 게임의 score/FPS 표시를 위한 최소 HUD. v1 은 title-bar 방식 (rendering pipeline 변경 0). 진짜 in-window overlay 는 v1.1+ (editor 와 공유할 text primitive 가 선행).

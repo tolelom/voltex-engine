@@ -93,6 +93,38 @@ jobs:
       - name: cargo test --workspace --lib
         run: cargo test --workspace --lib
 
+  # Non-blocking SemVer compliance check. From v1.0.0 onwards every workspace
+  # crate advertises stable APIs, so every push should be compatible with the
+  # last published version. Advisory while we tag selectively; promotes to
+  # blocking once we adopt tag-per-cycle. Uses `--baseline-rev v1.0.0` so the
+  # comparison is anchored on a known good release; falls back to a no-op when
+  # the tag is missing (fresh forks).
+  semver-check:
+    name: cargo-semver-checks (ubuntu-latest, advisory)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install Linux audio dev headers (ALSA)
+        run: sudo apt-get update && sudo apt-get install -y libasound2-dev
+      - name: Install cargo-semver-checks
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-semver-checks
+      - name: cargo semver-checks check-release (workspace)
+        run: |
+          if git rev-parse v1.0.0 >/dev/null 2>&1; then
+            cargo semver-checks check-release \
+              --workspace \
+              --exclude voltex_cli \
+              --baseline-rev v1.0.0
+          else
+            echo "::notice::v1.0.0 tag not found in this fork — skipping semver-checks"
+          fi
+
   # Non-blocking license check — runs `cargo about generate` against
   # about.toml's accepted SPDX list. Fails (advisory) if any transitive
   # crate has a license outside the list. Catches GPL/AGPL/LGPL drift

@@ -92,7 +92,8 @@
 | 21 | v1.0.29 cargo-deny integration | `[✅]` | (inline STATUS § v1.0.29) | 0907618 |
 | 22 | v1.0.30 CHANGELOG enforcement | `[✅]` | (inline STATUS § v1.0.30) | 9086db1 |
 | 23 | v1.0.31 E2E new+build test | `[✅]` | (inline STATUS § v1.0.31) | 4a92f12 |
-| 24 | v1.0.32 HUD primitive | `[✅]` | (inline STATUS § v1.0.32) | (pending commit) |
+| 24 | v1.0.32 HUD primitive | `[✅]` | (inline STATUS § v1.0.32) | 3617834 |
+| 25 | v1.0.33 SemVer-checks CI | `[✅]` | (inline STATUS § v1.0.33) | (pending commit) |
 | 7 | v1.0.15 cargo-deny | `[ ]` | — | — |
 | 8 | v1.0.16 CHANGELOG enforcement | `[ ]` | — | — |
 | 9 | v1.0.17 SemVer check | `[ ]` | — | — |
