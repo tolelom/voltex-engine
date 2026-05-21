@@ -20,8 +20,54 @@ pub struct Children(
 );
 
 /// Set `child`'s Parent to `parent` and register `child` in `parent`'s Children list.
-/// Does nothing if `child` is already in the Children list (no duplicates).
+///
+/// **Validation**:
+/// - Self-parenting (`parent == child`) is rejected silently — no change is
+///   made. Previously the call succeeded and produced an entity that was its
+///   own ancestor, which made [`despawn_recursive`] infinite-recurse.
+/// - If `child` is being re-parented (already has a `Parent` component
+///   pointing at some other entity), the old parent's `Children` list is
+///   cleaned up first.
+/// - If `parent` is already an ancestor of `child`, the call is rejected
+///   silently to prevent introducing a cycle into the hierarchy.
+/// - Existing membership in `parent`'s `Children` is preserved without
+///   duplication.
 pub fn add_child(world: &mut World, parent: Entity, child: Entity) {
+    // Self-parenting is degenerate; reject silently.
+    if parent == child {
+        return;
+    }
+
+    // Cycle check: if `parent` is currently a descendant of `child`, adding
+    // child→parent edge would close a cycle. Walk up from `parent` via the
+    // existing Parent chain; if we hit `child`, abort.
+    let mut walk = parent;
+    let mut steps = 0usize;
+    // Conservative cap matches the cycle test below — a healthy hierarchy
+    // does not need millions of ancestors. The cap also defends against
+    // pre-existing cycles in malformed scenes.
+    const MAX_ANCESTOR_WALK: usize = 1 << 20;
+    while let Some(p) = world.get::<Parent>(walk) {
+        if p.0 == child {
+            return; // would create a cycle
+        }
+        walk = p.0;
+        steps += 1;
+        if steps > MAX_ANCESTOR_WALK {
+            return; // pre-existing cycle or absurd depth; bail
+        }
+    }
+
+    // Re-parent: if child has a Parent already, clean up the old parent's
+    // Children list before overwriting.
+    if let Some(old) = world.get::<Parent>(child).map(|p| p.0) {
+        if old != parent {
+            if let Some(old_children) = world.get_mut::<Children>(old) {
+                old_children.0.retain(|&e| e != child);
+            }
+        }
+    }
+
     // Set the Parent component on the child
     world.add(child, Parent(parent));
 
@@ -189,5 +235,90 @@ mod tests {
 
         let c = world.get::<Children>(parent).expect("parent should have Children");
         assert_eq!(c.0.len(), 1, "Children should not contain duplicates");
+    }
+
+    #[test]
+    fn add_child_rejects_self_parent() {
+        // An entity claiming itself as its own parent would make
+        // despawn_recursive infinite-recurse. add_child must silently
+        // refuse the operation.
+        let mut world = World::new();
+        let e = world.spawn();
+        add_child(&mut world, e, e);
+        assert!(world.get::<Parent>(e).is_none(), "self-parent must not assign Parent");
+        assert!(world.get::<Children>(e).is_none(), "self-parent must not assign Children");
+    }
+
+    #[test]
+    fn add_child_rejects_simple_cycle() {
+        // After A→B, attempting B→A would form a cycle.
+        let mut world = World::new();
+        let a = world.spawn();
+        let b = world.spawn();
+        add_child(&mut world, a, b);
+        // This second add_child would create a cycle A↔B.
+        add_child(&mut world, b, a);
+        // A's parent must still be None (the cycle was refused).
+        assert!(world.get::<Parent>(a).is_none(), "cycle-creating add must be refused");
+        // B's parent is still A.
+        let bp = world.get::<Parent>(b).expect("b still has parent");
+        assert_eq!(bp.0, a);
+    }
+
+    #[test]
+    fn add_child_rejects_deeper_cycle() {
+        // A→B→C, then attempting C→A would close a 3-cycle.
+        let mut world = World::new();
+        let a = world.spawn();
+        let b = world.spawn();
+        let c = world.spawn();
+        add_child(&mut world, a, b);
+        add_child(&mut world, b, c);
+        add_child(&mut world, c, a); // would form A↔B↔C↔A
+        assert!(world.get::<Parent>(a).is_none(), "deep cycle must be refused");
+    }
+
+    #[test]
+    fn add_child_reparents_cleanly() {
+        // Move `child` from old_parent to new_parent and confirm the old
+        // parent's Children list no longer references the child.
+        let mut world = World::new();
+        let old_parent = world.spawn();
+        let new_parent = world.spawn();
+        let child = world.spawn();
+        add_child(&mut world, old_parent, child);
+        add_child(&mut world, new_parent, child);
+
+        // child now points at new_parent only.
+        let p = world.get::<Parent>(child).expect("child has parent");
+        assert_eq!(p.0, new_parent);
+
+        // Old parent's Children list must no longer contain `child`.
+        let old_children = world.get::<Children>(old_parent).expect("old still has Children comp");
+        assert!(!old_children.0.contains(&child), "stale entry in old parent's Children");
+
+        // New parent's Children contains child exactly once.
+        let new_children = world.get::<Children>(new_parent).expect("new has Children comp");
+        assert_eq!(new_children.0, vec![child]);
+    }
+
+    #[test]
+    fn despawn_recursive_terminates_on_clean_hierarchy() {
+        // Sanity: with the cycle guard above, a chain that's deep but
+        // acyclic still despawns. (Earlier hidden cycles would have stack-
+        // overflowed this entire test crate.)
+        let mut world = World::new();
+        let mut prev = world.spawn();
+        world.add(prev, Transform::new());
+        let root = prev;
+        for _ in 0..256 {
+            let next = world.spawn();
+            world.add(next, Transform::new());
+            add_child(&mut world, prev, next);
+            prev = next;
+        }
+        despawn_recursive(&mut world, root);
+        assert!(!world.is_alive(root));
+        assert!(!world.is_alive(prev));
     }
 }

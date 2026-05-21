@@ -173,6 +173,34 @@
 
 v1.0.9 부터는 **서비스 배포 완성도** 로드맵 (`docs/superpowers/specs/2026-05-21-service-readiness-roadmap.md`) 기준으로 진행.
 
+### v1.0.42 (2026-05-22) — Hierarchy cycle / self-parent / reparent integrity
+
+P0 robustness round 3. `add_child` 가 세 가지 무결성 위반을 silently 허용:
+
+**1. Self-parent** — `add_child(world, e, e)` 가 entity 의 `Parent` 컴포넌트를 자기 자신으로 설정 → `despawn_recursive(e)` 가 무한 재귀 → stack overflow.
+
+**2. Cycle 생성** — `add_child(A, B)` 후 `add_child(B, A)` 가 A↔B 사이클 생성. `despawn_recursive` 무한 재귀 (B 의 children 에 A, A 의 children 에 B). 더 깊은 사이클 (A→B→C, then C→A) 도 동일.
+
+**3. Re-parent 시 옛 parent leak** — `add_child(old, child)` 후 `add_child(new, child)` 가 `child.Parent = new` 로 변경하지만, `old.Children` 에 child 가 stale 하게 남음. `despawn_recursive(old)` 가 stale child 를 다시 despawn 시도 → child 이미 죽었으니 no-op 이긴 하지만 의도와 다른 동작.
+
+**수정 (`voltex_ecs::hierarchy::add_child`)**:
+- `parent == child` 일 때 silently return
+- `parent` 의 ancestor chain 을 따라 올라가서 `child` 발견시 silently return (cycle)
+- `child` 의 기존 `Parent` 가 있고 다른 entity 라면, 그 entity 의 `Children` 에서 child 제거 후 재할당
+- Ancestor walk 는 `MAX_ANCESTOR_WALK = 2^20` 으로 캡 (pre-existing cycle 방어)
+
+**검증**:
+- `cargo build --workspace` 클린
+- `cargo clippy --workspace --all-targets -- -D warnings` 0 워닝
+- voltex_ecs 134 → 139 (+5). 회귀 테스트 5개:
+  - `add_child_rejects_self_parent`
+  - `add_child_rejects_simple_cycle`
+  - `add_child_rejects_deeper_cycle`
+  - `add_child_reparents_cleanly`
+  - `despawn_recursive_terminates_on_clean_hierarchy` (256-deep chain sanity)
+
+**한계**: 직렬화된 씬 파일에 (악의적/손상된) pre-existing cycle 이 있으면 deserialize 시점에는 `add_child` 가 아닌 raw `world.add(Parent(...))` 경로로 들어옴 — 별도 validate_hierarchy pass 필요. v1.1+ 후속.
+
 ### v1.0.41 (2026-05-22) — NaN-source hardening (math) + snapshot deserialiser cap
 
 P0 robustness round 2. v1.0.40 가 정렬 단계의 NaN 패닉을 막았다면, v1.0.41 은 NaN 이 *어디서 나오는지* 를 추적해서 원천 차단.

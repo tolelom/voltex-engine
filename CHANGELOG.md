@@ -10,6 +10,38 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## [v1.0.42] — 2026-05-22 — Hierarchy cycle / self-parent / reparent integrity
+
+**Fix**. `voltex_ecs::hierarchy::add_child` silently allowed three classes of integrity violation that caused unbounded-recursion stack overflow inside `despawn_recursive`:
+
+### Fixed
+
+- **Self-parenting.** `add_child(world, e, e)` set `e.Parent = e` and put `e` in `e.Children`, after which `despawn_recursive(e)` recursed into itself until the stack overflowed. Now silently refused.
+- **Cycles.** `add_child(A, B)` followed by `add_child(B, A)` formed an A↔B cycle. Deeper cycles (`A→B→C, then C→A`) were equally accepted. `add_child` now walks `parent`'s ancestor chain before writing; if `child` is encountered, the call is silently refused. A `MAX_ANCESTOR_WALK = 2²⁰` cap also defends against pre-existing cycles in malformed scene files.
+- **Stale entries on re-parent.** `add_child(old, child)` followed by `add_child(new, child)` overwrote `child.Parent` but left `child` in `old.Children`. `add_child` now cleans the old parent's `Children` list before assigning the new one.
+
+### Tests
+
+`voltex_ecs` 134 → 139 (+5):
+
+- `voltex_ecs::hierarchy::tests::add_child_rejects_self_parent`
+- `voltex_ecs::hierarchy::tests::add_child_rejects_simple_cycle`
+- `voltex_ecs::hierarchy::tests::add_child_rejects_deeper_cycle`
+- `voltex_ecs::hierarchy::tests::add_child_reparents_cleanly`
+- `voltex_ecs::hierarchy::tests::despawn_recursive_terminates_on_clean_hierarchy` — 256-deep chain sanity check
+
+### Verification
+
+- `cargo build --workspace` — clean.
+- `cargo clippy --workspace --all-targets -- -D warnings` — 0 warnings.
+- `cargo test --workspace --lib` — every crate green.
+
+### Notes
+
+Cycles introduced via direct `world.add(child, Parent(parent))` (e.g. by a corrupted .vscn) bypass `add_child` and still need a separate `validate_hierarchy` pass on scene load. Queued for v1.1+.
+
+---
+
 ## [v1.0.41] — 2026-05-22 — NaN-source hardening (math) + snapshot deserialiser cap
 
 **Fix + additive**. v1.0.40 protected sort comparators from incoming NaN. v1.0.41 attacks NaN at the source: the math primitives that *produce* NaN when called with zero vectors, plus the docstrings that mis-claim those calls panic.
