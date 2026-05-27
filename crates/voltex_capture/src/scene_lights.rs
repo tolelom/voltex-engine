@@ -156,10 +156,10 @@ pub fn render_multi_light(gpu: &HeadlessGpu, width: u32, height: u32) -> Vec<u8>
     let models = object_models();
     let mut cam_staging = vec![0u8; cam_aligned as usize * NUM_OBJECTS];
     let mut mat_staging = vec![0u8; mat_aligned as usize * NUM_OBJECTS];
-    for i in 0..NUM_OBJECTS {
+    for (i, model) in models.iter().enumerate() {
         let cam = CameraUniform {
             view_proj: view_proj.cols,
-            model: models[i].cols,
+            model: model.cols,
             camera_pos: cam_pos,
             _padding: 0.0,
         };
