@@ -27,6 +27,7 @@ members = [
     "crates/voltex_editor",
     "crates/voltex_runtime",
     "crates/voltex_cli",
+    "crates/voltex_capture",
     "examples/editor_demo",
     "examples/survivor_game",
     "examples/runtime_demo",

@@ -1,0 +1,15 @@
+[package]
+name = "voltex_capture"
+version = "0.1.0"
+edition = "2021"
+license.workspace = true
+
+[dependencies]
+voltex_math.workspace = true
+voltex_ecs.workspace = true
+voltex_asset.workspace = true
+voltex_renderer.workspace = true
+voltex_renderer_ecs.workspace = true
+wgpu.workspace = true
+bytemuck.workspace = true
+pollster.workspace = true
