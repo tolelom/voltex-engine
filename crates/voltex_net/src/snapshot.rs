@@ -127,9 +127,10 @@ pub fn deserialize_snapshot(data: &[u8]) -> crate::Result<Snapshot> {
 
 /// Compute a delta between two snapshots.
 /// Format: new_tick(4) + count(4) + [id(4) + flags(1) + changed_fields...]
-/// Flags bitmask: 0x01 = position, 0x02 = rotation, 0x04 = velocity, 0x80 = new entity (full)
+/// Flags bitmask: 0x01 = position, 0x02 = rotation, 0x04 = velocity,
+/// 0x40 = removed entity (no field data), 0x80 = new entity (full).
 pub fn diff_snapshots(old: &Snapshot, new: &Snapshot) -> Vec<u8> {
-    use std::collections::HashMap;
+    use std::collections::{HashMap, HashSet};
 
     let old_map: HashMap<u32, &EntityState> = old.entities.iter().map(|e| (e.id, e)).collect();
 
@@ -171,6 +172,18 @@ pub fn diff_snapshots(old: &Snapshot, new: &Snapshot) -> Vec<u8> {
         }
     }
 
+    // Removed entities: present in `old` but absent in `new`. Without these
+    // the receiver (which starts from a clone of the base) would keep
+    // despawned entities forever.
+    let new_ids: HashSet<u32> = new.entities.iter().map(|e| e.id).collect();
+    for old_ent in &old.entities {
+        if !new_ids.contains(&old_ent.id) {
+            entries.extend_from_slice(&old_ent.id.to_le_bytes());
+            entries.push(0x40); // "removed entity" flag, no field data
+            count += 1;
+        }
+    }
+
     let mut buf = Vec::with_capacity(8 + entries.len());
     buf.extend_from_slice(&new.tick.to_le_bytes());
     buf.extend_from_slice(&count.to_le_bytes());
@@ -198,6 +211,12 @@ pub fn apply_diff(base: &Snapshot, diff: &[u8]) -> crate::Result<Snapshot> {
         let id = u32::from_le_bytes([diff[offset], diff[offset + 1], diff[offset + 2], diff[offset + 3]]);
         let flags = diff[offset + 4];
         offset += 5;
+
+        if flags & 0x40 != 0 {
+            // Removed entity — no field data follows.
+            entities.retain(|e| e.id != id);
+            continue;
+        }
 
         if flags & 0x80 != 0 {
             // New entity — full state
@@ -378,6 +397,61 @@ mod tests {
         assert_eq!(result.entities[0].position, [1.0, 1.0, 1.0]);
         assert_eq!(result.entities[0].rotation, [2.0, 2.0, 2.0]);
         assert_eq!(result.entities[0].velocity, [3.0, 3.0, 3.0]);
+    }
+
+    #[test]
+    fn test_diff_removed_entity_propagates() {
+        // Entity 2 exists in `old` but is despawned in `new`. Applying the
+        // delta to `old` must reproduce `new` exactly — i.e. entity 2 must be
+        // removed on the receiver, not linger forever.
+        let old = Snapshot {
+            tick: 10,
+            entities: vec![make_entity(1, 0.0, 0.0, 0.0), make_entity(2, 5.0, 6.0, 7.0)],
+        };
+        let new = Snapshot {
+            tick: 11,
+            entities: vec![make_entity(1, 0.0, 0.0, 0.0)],
+        };
+
+        let diff = diff_snapshots(&old, &new);
+        let result = apply_diff(&old, &diff).expect("apply_diff failed");
+
+        assert_eq!(result.tick, 11);
+        assert_eq!(result.entities.len(), 1, "removed entity must not linger");
+        assert_eq!(result.entities[0].id, 1);
+        assert!(
+            !result.entities.iter().any(|e| e.id == 2),
+            "despawned entity 2 should be gone after the delta"
+        );
+    }
+
+    #[test]
+    fn test_diff_removal_and_change_together() {
+        // One entity moves, another is removed, in the same delta.
+        let old = Snapshot {
+            tick: 1,
+            entities: vec![
+                make_entity(1, 0.0, 0.0, 0.0),
+                make_entity(2, 1.0, 1.0, 1.0),
+                make_entity(3, 2.0, 2.0, 2.0),
+            ],
+        };
+        let new = Snapshot {
+            tick: 2,
+            entities: vec![
+                make_entity(1, 9.0, 9.0, 9.0), // moved
+                make_entity(3, 2.0, 2.0, 2.0), // unchanged; entity 2 removed
+            ],
+        };
+
+        let result = apply_diff(&old, &diff_snapshots(&old, &new)).unwrap();
+        // Compare as id->position maps (order is not guaranteed).
+        use std::collections::HashMap;
+        let got: HashMap<u32, [f32; 3]> =
+            result.entities.iter().map(|e| (e.id, e.position)).collect();
+        let want: HashMap<u32, [f32; 3]> =
+            new.entities.iter().map(|e| (e.id, e.position)).collect();
+        assert_eq!(got, want);
     }
 
     #[test]

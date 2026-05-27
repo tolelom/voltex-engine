@@ -131,7 +131,7 @@
 
 ## Phase 8-2
 
-- ~~**상태 동기화 (스냅샷)**~~ ✅ Snapshot + delta 압축 완료.
+- ~~**상태 동기화 (스냅샷)**~~ ✅ Snapshot + delta 압축 완료. **v1.0.55 버그 fix**: `diff_snapshots`/`apply_diff` 가 삭제된 엔티티(old 엔 있고 new 엔 없는)를 전파하지 않아 클라이언트에 despawn 된 엔티티가 영구 잔존하던 버그 — 0x40 "removed" 플래그 추가로 fix. +2 회귀 테스트.
 - ~~**보간 / 예측**~~ ✅ InterpolationBuffer 완료.
 - ~~**지연 보상**~~ ✅ LagCompensation (history rewind + interpolation) 완료.
 - ~~**신뢰성 계층**~~ ✅ ReliableChannel + OrderedChannel 완료.
