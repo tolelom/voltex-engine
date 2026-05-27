@@ -55,10 +55,29 @@ GPU: NVIDIA GeForce RTX 4080 SUPER (Vulkan).
   surfaces reflect a flat gray IBL environment and look desaturated. Consistent
   across pbr_grid and shadow_scene; matches the simplified-IBL design.
 
+## Runtime-verified on real hardware (no offscreen PNG)
+
+The windowed demos were each run for ~6 s on the RTX 4080 (Vulkan) under
+`RUST_LOG=warn` and produced **no panics and no wgpu validation errors**
+(only benign Vulkan loader instance warnings):
+
+- `deferred_demo` — the full deferred stack: G-buffer MRT → SSGI → RT-shadow
+  compute → deferred lighting → bloom → ACES tonemap. This exercises ray-tracing
+  **feature acquisition + BLAS build + a 9-entry lighting bind group** on real
+  hardware — coverage neither CI (headless, no RT) nor the offscreen harness
+  reaches.
+- `ibl_demo`, `shadow_demo` — initialise and render clean.
+
+Full *offscreen pixel* capture of the deferred path is deferred to v1.1: the
+lighting pass samples SSGI and RT-shadow textures that are only meaningful once
+those passes run (which need RT features + a BLAS), so a passes-skipped offscreen
+replica would read uninitialised inputs. The deferred lighting BRDF is the same
+Cook-Torrance already pixel-verified by `pbr_grid` / `multi_light`.
+
 ## Not yet captured
 
-- Deferred G-buffer + post-processing (`deferred_demo`, 1500-line setup).
-- IBL standalone, the flagship game runtime, actual mouse/gizmo interaction.
+- Deferred offscreen pixel capture (see above — runtime-verified instead).
+- The flagship game runtime, actual mouse/gizmo drag interaction.
 
 The reference PNGs here are downscaled (≤240px) and uncompressed (the encoder
 emits stored deflate blocks). They are a point-in-time record; regenerate with
