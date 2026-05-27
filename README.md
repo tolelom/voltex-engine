@@ -5,16 +5,34 @@
 > 스크립팅, 멀티 OS 빌드 파이프라인까지 제공한다. 자세한 카운트와 정책은
 > 아래 "의존성 정책" 섹션 참고.
 
-![status: v1.0.38](https://img.shields.io/badge/status-v1.0.38-brightgreen)
+![status: v1.0.55](https://img.shields.io/badge/status-v1.0.55-brightgreen)
 ![clippy: 0 warnings](https://img.shields.io/badge/clippy-0%20warnings-brightgreen)
 ![audit: 0 vulnerabilities](https://img.shields.io/badge/cargo--audit-0%20vulnerabilities-brightgreen)
 ![coverage: 82%](https://img.shields.io/badge/coverage-82%25%20lib-brightgreen)
 ![licenses: permissive only](https://img.shields.io/badge/licenses-permissive%20only-brightgreen)
 ![parser fuzz: 0 panics](https://img.shields.io/badge/parser%20fuzz-0%20panics-brightgreen)
+![rendering: visually verified](https://img.shields.io/badge/rendering-visually%20verified-brightgreen)
 ![runtime: Windows verified](https://img.shields.io/badge/runtime-Windows%20verified-green)
 ![runtime: Linux/macOS unverified](https://img.shields.io/badge/runtime-Linux%2FmacOS%20unverified-orange)
 ![rust: stable](https://img.shields.io/badge/rust-stable-orange)
 ![license: MIT OR Apache--2.0](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-green)
+
+---
+
+## 스크린샷
+
+엔진의 실제 렌더 출력 (헤드리스 오프스크린 캡처, `voltex_capture`). 재현·세부는
+[`docs/visual/`](docs/visual/README.md).
+
+| PBR (Cook-Torrance) | Directional shadows | Multi-light |
+|---|---|---|
+| ![PBR sphere grid](docs/visual/pbr_grid.png) | ![Shadow scene](docs/visual/shadow_scene.png) | ![Multi-light](docs/visual/multi_light.png) |
+| **7×7 metallic/roughness + IBL** | **2-pass shadow map** | **컬러 point/spot lights** |
+
+| Gizmos | Editor UI |
+|---|---|
+| ![Translate gizmo](docs/visual/gizmo_translate.png) | ![Editor UI](docs/visual/editor_ui.png) |
+| **translate / rotate / scale 핸들** | **IMGUI + 폰트 아틀라스** |
 
 ---
 
