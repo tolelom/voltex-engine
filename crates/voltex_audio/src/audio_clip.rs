@@ -13,18 +13,24 @@ pub struct AudioClip {
 
 impl AudioClip {
     /// Create a new AudioClip from raw f32 samples.
+    ///
+    /// `channels` is clamped to a minimum of 1: a zero-channel clip is
+    /// meaningless and would make [`frame_count`](Self::frame_count) /
+    /// [`duration`](Self::duration) divide by zero. The engine's WAV and
+    /// Vorbis decoders already reject zero-channel input; this guards direct
+    /// callers of the public constructor.
     pub fn new(samples: Vec<f32>, sample_rate: u32, channels: u16) -> Self {
         Self {
             samples,
             sample_rate,
-            channels,
+            channels: channels.max(1),
         }
     }
 
     /// Total number of multi-channel frames.
     /// A frame contains one sample per channel.
     pub fn frame_count(&self) -> usize {
-        self.samples.len() / self.channels as usize
+        self.samples.len() / self.channels.max(1) as usize
     }
 
     /// Duration in seconds.
@@ -44,6 +50,17 @@ mod tests {
         let clip = AudioClip::new(samples, 44100, 1);
         assert_eq!(clip.frame_count(), 44100);
         assert!((clip.duration() - 1.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn zero_channels_does_not_divide_by_zero() {
+        // AudioClip::new is public; a caller (or a future decoder path) passing
+        // channels=0 must not make frame_count/duration panic with an integer
+        // divide-by-zero. Channels are clamped to >= 1.
+        let clip = AudioClip::new(vec![0.1, 0.2, 0.3], 44100, 0);
+        assert_eq!(clip.channels, 1, "zero channels clamped to mono");
+        assert_eq!(clip.frame_count(), 3); // no panic
+        assert!(clip.duration().is_finite());
     }
 
     #[test]
