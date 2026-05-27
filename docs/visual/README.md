@@ -67,6 +67,9 @@ The windowed demos were each run for ~6 s on the RTX 4080 (Vulkan) under
   hardware — coverage neither CI (headless, no RT) nor the offscreen harness
   reaches.
 - `ibl_demo`, `shadow_demo` — initialise and render clean.
+- `voltex_survivor` (flagship), `runtime_demo`, `survivor_game` — the full
+  `RuntimeApp` bootstrap (window + ECS + systems + scheduler + audio + Lua
+  script + render loop) runs clean for ~6 s.
 
 Full *offscreen pixel* capture of the deferred path is deferred to v1.1: the
 lighting pass samples SSGI and RT-shadow textures that are only meaningful once
@@ -77,7 +80,7 @@ Cook-Torrance already pixel-verified by `pbr_grid` / `multi_light`.
 ## Not yet captured
 
 - Deferred offscreen pixel capture (see above — runtime-verified instead).
-- The flagship game runtime, actual mouse/gizmo drag interaction.
+- Actual mouse/gizmo drag interaction (needs synthetic input injection).
 
 The reference PNGs here are downscaled (≤240px) and uncompressed (the encoder
 emits stored deflate blocks). They are a point-in-time record; regenerate with
