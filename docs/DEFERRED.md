@@ -134,7 +134,7 @@
 - ~~**상태 동기화 (스냅샷)**~~ ✅ Snapshot + delta 압축 완료. **v1.0.55 버그 fix**: `diff_snapshots`/`apply_diff` 가 삭제된 엔티티(old 엔 있고 new 엔 없는)를 전파하지 않아 클라이언트에 despawn 된 엔티티가 영구 잔존하던 버그 — 0x40 "removed" 플래그 추가로 fix. +2 회귀 테스트.
 - ~~**보간 / 예측**~~ ✅ InterpolationBuffer 완료.
 - ~~**지연 보상**~~ ✅ LagCompensation (history rewind + interpolation) 완료.
-- ~~**신뢰성 계층**~~ ✅ ReliableChannel + OrderedChannel 완료.
+- ~~**신뢰성 계층**~~ ✅ ReliableChannel + OrderedChannel 완료. **v1.0.55 버그 fix**: 수신 dedup 이 `HashSet<u16>` 에 모든 시퀀스를 영구 보관 → u16 시퀀스 wrap(~65536패킷, 60/s 면 ~18분) 후 새 패킷이 옛 seq 를 재사용하면 "중복"으로 거부되어 데이터 손실 + OrderedChannel 영구 stall. `DEDUP_WINDOW=1024` sliding-window (slot = seq % WINDOW) 로 교체 — window 밖 시퀀스는 새 패킷 취급해 wrap 안전. 한계: 1024 시퀀스 넘게 지연된 재전송 중복은 재전달될 수 있음 (재전송은 2×RTT 내 도착하므로 비현실적). +3 회귀 테스트.
 - ~~**암호화 / 인증**~~ ✅ PacketCipher (XOR + anti-replay) + AuthToken 완료.
 
 ## Phase 8-3

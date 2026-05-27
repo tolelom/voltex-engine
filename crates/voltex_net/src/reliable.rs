@@ -1,8 +1,15 @@
 //! Reliable + ordered channels built on top of UDP packets. Adds sequence
 //! numbers, ACKs, retransmission and (optionally) in-order delivery.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::time::{Duration, Instant};
+
+/// Size of the receiver's sliding de-duplication window (number of recent
+/// sequence numbers tracked). Duplicates are detected within this window;
+/// sequences older than it are treated as new, which is what lets the u16
+/// sequence space wrap safely in a long session. Generous vs. realistic
+/// in-flight/reorder depth (retransmits arrive within a few sequences).
+const DEDUP_WINDOW: usize = 1024;
 
 /// A channel that provides reliable delivery over unreliable transport.
 ///
@@ -11,7 +18,11 @@ use std::time::{Duration, Instant};
 pub struct ReliableChannel {
     next_sequence: u16,
     pending_acks: HashMap<u16, (Instant, Vec<u8>)>,
-    received_seqs: HashSet<u16>,
+    /// Sliding de-dup window: slot `seq % DEDUP_WINDOW` holds the sequence that
+    /// currently occupies it. A packet is a duplicate iff its slot already
+    /// holds its own sequence. Replaces an unbounded `HashSet<u16>` that grew
+    /// forever and wrongly rejected post-wrap sequences as duplicates.
+    recv_window: Vec<Option<u16>>,
     rtt: Duration,
     /// Outgoing ACK packets that need to be sent by the caller.
     outgoing_acks: Vec<u16>,
@@ -29,7 +40,7 @@ impl ReliableChannel {
         ReliableChannel {
             next_sequence: 0,
             pending_acks: HashMap::new(),
-            received_seqs: HashSet::new(),
+            recv_window: vec![None; DEDUP_WINDOW],
             rtt: Duration::from_millis(100), // initial estimate
             outgoing_acks: Vec::new(),
         }
@@ -67,11 +78,12 @@ impl ReliableChannel {
         // Always queue an ACK, even for duplicates
         self.outgoing_acks.push(sequence);
 
-        if self.received_seqs.contains(&sequence) {
-            return None; // duplicate
+        let slot = (sequence as usize) % DEDUP_WINDOW;
+        if self.recv_window[slot] == Some(sequence) {
+            return None; // duplicate within the recent window
         }
 
-        self.received_seqs.insert(sequence);
+        self.recv_window[slot] = Some(sequence);
         Some(data.to_vec())
     }
 
@@ -279,6 +291,50 @@ mod tests {
 
         let (s2, _) = channel.send_reliable(b"b");
         assert_eq!(s2, 0); // wrapped
+    }
+
+    #[test]
+    fn test_wrapped_sequence_not_rejected_as_duplicate() {
+        // The receiver de-dups within a sliding window, not for all time. After
+        // the u16 sequence space wraps (a long session, ~65k reliable packets),
+        // a genuinely-new packet reusing an old sequence number must still be
+        // delivered — not dropped as a "duplicate". (Old impl kept every seq in
+        // a HashSet forever, so the wrapped seq was wrongly rejected → data loss
+        // and an OrderedChannel stall.)
+        let mut r = ReliableChannel::new();
+        assert!(r.receive_and_ack(0, b"a").is_some(), "first seq 0 is new");
+        // Reuse seq 0's dedup slot by receiving a sequence a full window later.
+        assert!(r.receive_and_ack(DEDUP_WINDOW as u16, b"b").is_some());
+        // Now seq 0 again represents a NEW post-wrap packet.
+        assert!(
+            r.receive_and_ack(0, b"c").is_some(),
+            "wrapped-new seq 0 must be accepted, not rejected as a duplicate"
+        );
+    }
+
+    #[test]
+    fn test_recent_duplicate_within_window_rejected() {
+        // De-dup must still reject genuine recent duplicates (retransmits).
+        let mut r = ReliableChannel::new();
+        assert!(r.receive_and_ack(100, b"x").is_some());
+        assert!(r.receive_and_ack(101, b"y").is_some());
+        assert!(
+            r.receive_and_ack(100, b"x").is_none(),
+            "a recent duplicate within the window must be rejected"
+        );
+    }
+
+    #[test]
+    fn test_ordered_channel_survives_sequence_wrap() {
+        // OrderedChannel must keep delivering across the u16 wrap. Deliver the
+        // last few sequences before the wrap, then 0,1 after it.
+        let mut ch = OrderedChannel::new();
+        ch.next_deliver = u16::MAX - 1;
+        assert_eq!(ch.receive(u16::MAX - 1, b"a"), vec![b"a".to_vec()]);
+        assert_eq!(ch.receive(u16::MAX, b"b"), vec![b"b".to_vec()]);
+        // next_deliver has wrapped to 0; the post-wrap packets must deliver.
+        assert_eq!(ch.receive(0, b"c"), vec![b"c".to_vec()]);
+        assert_eq!(ch.receive(1, b"d"), vec![b"d".to_vec()]);
     }
 
     // ---- OrderedChannel tests ----
