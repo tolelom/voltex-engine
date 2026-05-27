@@ -153,8 +153,21 @@ fn cross_xz(a: Vec3, b: Vec3, c: Vec3) -> f32 {
 
 /// Simple Stupid Funnel (SSF) algorithm for string-pulling a triangle corridor path.
 ///
-/// Given the sequence of triangle indices from A*, produces an optimal path with
+/// Given the sequence of triangle indices from A*, produces a path with
 /// waypoints at portal edge corners where the path turns.
+///
+/// # Known limitation (tracked in `docs/DEFERRED.md`)
+///
+/// When the funnel inverts and a new apex is set, this implementation
+/// `continue`s from the *current* portal index instead of restarting the scan
+/// from `apex_idx + 1` as Mikko Mononen's canonical SSF does. For straight or
+/// single-turn corridors the result is identical, but in a zig-zag corridor
+/// (two tight turns in opposite directions) the skipped portals can yield a
+/// sub-optimal path that cuts an interior corner. The engine's own
+/// [`find_path`] does **not** use this — it returns triangle centroids — so
+/// the limitation only affects callers that invoke `funnel_smooth` directly.
+/// A correct fix needs the while-loop restart form plus a zig-zag regression
+/// test built with visual verification.
 pub fn funnel_smooth(path_triangles: &[usize], navmesh: &NavMesh, start: Vec3, end: Vec3) -> Vec<Vec3> {
     // Trivial cases
     if path_triangles.is_empty() {

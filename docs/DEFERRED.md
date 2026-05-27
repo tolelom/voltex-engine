@@ -124,7 +124,7 @@
 ## Phase 8-1
 
 - ~~**자동 내비메시 생성**~~ ✅ 복셀화 기반 NavMeshBuilder 완료.
-- ~~**String Pulling (Funnel)**~~ ✅ SSF 알고리즘 완료.
+- ~~**String Pulling (Funnel)**~~ ✅ SSF 알고리즘 완료. 🟡 **알려진 한계 (v1.0.55 감사)**: apex 갱신 시 정석 SSF (Mononen) 는 `i = apex_idx` 로 스캔을 재시작하지만 현 구현은 현재 인덱스에서 `continue` 만 함 → 지그재그(반대 방향 2연속 턴) corridor 에서 내부 코너를 절단한 sub-optimal path 가능. 메인 진입점 `find_path` 는 centroid 경로라 영향 없음 — `funnel_smooth` 직접 호출자만 해당. while-loop restart 형 + 지그재그 회귀 테스트(시각 검증 필요)로 fix 예정. 기존 funnel 테스트는 endpoint/len 만 검증해 waypoint 정확성 미보장.
 - ~~**동적 장애물 회피**~~ ✅ velocity obstacle 기반 완료.
 - ~~**ECS 통합**~~ ✅ NavAgent 컴포넌트 완료. nav_agent_system 미구현.
 - ~~**내비메시 직렬화**~~ ✅ VNAV 바이너리 포맷 serialize/deserialize 완료.
