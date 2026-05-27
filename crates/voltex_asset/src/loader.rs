@@ -45,7 +45,6 @@ struct PendingEntry {
     state: PendingState,
     handle_id: u32,
     handle_gen: u32,
-    type_id: TypeId,
     /// Type-erased inserter: takes (assets, boxed_any) and inserts the asset,
     /// returning the actual handle (id, gen) that was assigned.
     inserter: Option<InserterFn>,
@@ -140,7 +139,6 @@ impl AssetLoader {
                 state: PendingState::Loading,
                 handle_id,
                 handle_gen,
-                type_id,
                 inserter: Some(inserter),
             },
         );
