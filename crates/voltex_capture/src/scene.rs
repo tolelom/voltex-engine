@@ -21,7 +21,7 @@ fn align_up(size: u32, alignment: u32) -> u32 {
 }
 
 /// Build a unit cube mesh (24 verts, 36 indices, outward normals).
-fn unit_cube(device: &wgpu::Device) -> Mesh {
+pub(crate) fn unit_cube(device: &wgpu::Device) -> Mesh {
     let s = 0.5;
     let faces: [( [f32; 3], [[f32; 3]; 4]); 6] = [
         ([1.0, 0.0, 0.0], [[s, -s, -s], [s, -s, s], [s, s, s], [s, s, -s]]),
@@ -332,7 +332,7 @@ pub fn render_pbr_grid(gpu: &HeadlessGpu, width: u32, height: u32) -> Vec<u8> {
     target.read_rgba8(device, queue)
 }
 
-fn camera_light_bgl(device: &wgpu::Device) -> wgpu::BindGroupLayout {
+pub(crate) fn camera_light_bgl(device: &wgpu::Device) -> wgpu::BindGroupLayout {
     device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
         label: Some("Camera+Light BGL"),
         entries: &[
