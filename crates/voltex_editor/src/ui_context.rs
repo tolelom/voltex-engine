@@ -145,6 +145,16 @@ impl UiContext {
         self.id_counter
     }
 
+    /// Place the next widget on the same line as the previous one, immediately
+    /// to its right, instead of on a new line. Call this *between* two widgets
+    /// (e.g. `ui.button("A"); ui.same_line(); ui.button("B");`). Without it,
+    /// every widget advances to a new line — so a row of buttons (a toolbar)
+    /// would otherwise stack vertically and overlap the content below.
+    pub fn same_line(&mut self) {
+        self.layout.cursor_x = self.layout.prev_end_x;
+        self.layout.cursor_y = self.layout.prev_y;
+    }
+
     /// Check if the mouse cursor is inside the given rectangle.
     pub fn mouse_in_rect(&self, x: f32, y: f32, w: f32, h: f32) -> bool {
         self.mouse_x >= x

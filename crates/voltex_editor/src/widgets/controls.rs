@@ -27,6 +27,8 @@ impl UiContext {
             cx += gw;
         }
 
+        let text_w = text.chars().count() as f32 * gw;
+        self.layout.record(x, y, text_w);
         self.layout.advance_line();
     }
 
@@ -75,6 +77,7 @@ impl UiContext {
             cx += gw;
         }
 
+        self.layout.record(x, y, btn_w);
         self.layout.advance_line();
 
         // Return true if mouse was released over this button while it was active
@@ -143,6 +146,8 @@ impl UiContext {
             cx += gw;
         }
 
+        let total_w = slider_w + padding + label.chars().count() as f32 * gw;
+        self.layout.record(x, y, total_w);
         self.layout.advance_line();
 
         new_value
@@ -195,8 +200,59 @@ impl UiContext {
             cx += gw;
         }
 
+        let total_w = box_size + padding + label.chars().count() as f32 * gw;
+        self.layout.record(x, y, total_w);
         self.layout.advance_line();
 
         new_checked
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::ui_context::UiContext;
+
+    #[test]
+    fn buttons_stack_vertically_by_default() {
+        let mut ui = UiContext::new(800.0, 600.0);
+        ui.begin_frame(0.0, 0.0, false);
+        ui.layout.cursor_x = 10.0;
+        ui.layout.cursor_y = 10.0;
+        let _ = ui.button("A");
+        // Without same_line the next widget is on a new line below.
+        assert_eq!(ui.layout.cursor_x, ui.layout.indent);
+        assert!(ui.layout.cursor_y > 10.0, "cursor should advance down");
+    }
+
+    #[test]
+    fn same_line_places_next_widget_to_the_right() {
+        let mut ui = UiContext::new(800.0, 600.0);
+        ui.begin_frame(0.0, 0.0, false);
+        ui.layout.cursor_x = 10.0;
+        ui.layout.cursor_y = 10.0;
+        let _ = ui.button("A");
+        ui.same_line();
+        // Same row as A, advanced to the right of it.
+        assert_eq!(ui.layout.cursor_y, 10.0, "same line keeps the original y");
+        assert!(ui.layout.cursor_x > 10.0, "cursor should move right past button A");
+    }
+
+    #[test]
+    fn toolbar_row_stays_within_its_height() {
+        // Four buttons with same_line between them must not overflow a 32px
+        // toolbar (the editor_demo toolbar bug this fixes).
+        let mut ui = UiContext::new(1280.0, 720.0);
+        ui.begin_frame(0.0, 0.0, false);
+        ui.layout.cursor_x = 0.0;
+        ui.layout.cursor_y = 0.0;
+        let labels = ["Play", "Spawn", "Save", "Load"];
+        for (i, l) in labels.iter().enumerate() {
+            if i > 0 {
+                ui.same_line();
+            }
+            let _ = ui.button(l);
+        }
+        // All four drew on the same row (y stayed at 0 via same_line).
+        assert_eq!(ui.layout.prev_y, 0.0, "all toolbar buttons share one row");
     }
 }

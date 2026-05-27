@@ -10,6 +10,7 @@ voltex_ecs.workspace = true
 voltex_asset.workspace = true
 voltex_renderer.workspace = true
 voltex_renderer_ecs.workspace = true
+voltex_editor.workspace = true
 wgpu.workspace = true
 bytemuck.workspace = true
 pollster.workspace = true

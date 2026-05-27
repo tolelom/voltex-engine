@@ -114,6 +114,7 @@ impl UiContext {
             self.draw_list.add_rect(cursor_x, text_y, 1.0, gh, COLOR_CURSOR);
         }
 
+        self.layout.record(x, y, width);
         self.layout.advance_line();
         changed
     }

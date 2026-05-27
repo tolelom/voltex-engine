@@ -9,6 +9,11 @@ pub struct LayoutState {
     pub indent: f32,
     pub line_height: f32,
     pub padding: f32,
+    /// Y origin of the most recently placed widget (for `same_line`).
+    pub prev_y: f32,
+    /// X just past the most recently placed widget, including padding
+    /// (where `same_line` puts the next widget).
+    pub prev_end_x: f32,
 }
 
 impl LayoutState {
@@ -20,7 +25,17 @@ impl LayoutState {
             indent: x,
             line_height: 12.0,
             padding: 4.0,
+            prev_y: y,
+            prev_end_x: x,
         }
+    }
+
+    /// Record the rect a widget just occupied so a following [`same_line`]
+    /// (on `UiContext`) can place the next widget to its right. Call this
+    /// immediately before [`advance_line`](Self::advance_line).
+    pub fn record(&mut self, x: f32, y: f32, width: f32) {
+        self.prev_y = y;
+        self.prev_end_x = x + width + self.padding;
     }
 
     /// Advance to the next line: cursor_y += line_height + padding, cursor_x = indent.

@@ -19,6 +19,7 @@
 mod headless;
 mod png_encode;
 pub mod scene;
+pub mod scene_ui;
 mod target;
 
 pub use headless::HeadlessGpu;

@@ -405,6 +405,7 @@ impl ApplicationHandler for EditorDemoApp {
                     if state.ui.button("Play") {
                         state.session.set_mode(EditorMode::Play);
                     }
+                    state.ui.same_line();
                     if state.ui.button("Spawn") {
                         if let Ok(e) = state.session.dispatch(EditorCommand::Spawn) {
                             let _ = state.session.dispatch(EditorCommand::SetTransform {
@@ -418,19 +419,26 @@ impl ApplicationHandler for EditorDemoApp {
                             state.session.selected = Some(e);
                         }
                     }
+                    state.ui.same_line();
                     if state.ui.button("Save") {
                         let path = state.session.scene_path.clone();
                         let _ = state.session.dispatch(EditorCommand::SaveScene { path });
                     }
+                    state.ui.same_line();
                     if state.ui.button("Load") {
                         let path = state.session.scene_path.clone();
                         let _ = state.session.dispatch(EditorCommand::LoadScene { path });
                         state.session.selected = None;
                     }
+                    state.ui.same_line();
                     if state.ui.button("Undo") { state.session.undo(); }
+                    state.ui.same_line();
                     if state.ui.button("Redo") { state.session.redo(); }
+                    state.ui.same_line();
                     if state.ui.button("Move") { state.gizmo_state.set_mode(GizmoMode::Translate); }
+                    state.ui.same_line();
                     if state.ui.button("Rotate") { state.gizmo_state.set_mode(GizmoMode::Rotate); }
+                    state.ui.same_line();
                     if state.ui.button("Scale") { state.gizmo_state.set_mode(GizmoMode::Scale); }
                 }
                 state.ui.end_panel();
