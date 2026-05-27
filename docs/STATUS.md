@@ -182,23 +182,31 @@ P0 confidence. v1.0.40~54 는 정적 감사 기반 robustness 였고 빌드/테�
 - `OffscreenTarget` — color(Rgba8UnormSrgb, COPY_SRC) + depth + 256B-row 정렬 readback
 - `encode_rgba8` — 외부 의존 0 PNG 인코더 (zlib stored block + CRC32/Adler32), `voltex_renderer::parse_png` 로 라운드트립 검증
 - `ImageStats` — blank/단색 프레임 자동 탐지
-- `scene` / `scene_shadow` / `scene_ui` — 실제 파이프라인으로 데모 씬 렌더
+- `scene` / `scene_shadow` / `scene_lights` / `scene_gizmo` / `scene_ui` — 실제 파이프라인으로 데모 씬 렌더
 - bin `capture` — 모든 씬을 PNG 로 저장 (썸네일 크기 옵션)
 
-**검증됨 (NVIDIA RTX 4080 SUPER / Vulkan, `docs/visual/`)**:
+**오프스크린 픽셀 검증됨 (NVIDIA RTX 4080 SUPER / Vulkan, `docs/visual/`)**:
 - BasicRenderer (Blinn-Phong, ECS/runtime/editor 뷰포트 경로) — 면별 음영 정상
 - PBR (Cook-Torrance) 7×7 metallic/roughness 그리드 — BRDF 그라데이션 + IBL ambient 정상 (4000+ 색)
 - 2-패스 directional shadow map — 라이트 방향에 맞는 그림자 정상
+- multi-light (point·spot·directional, 4 컬러 point) — 거리감쇠 + 컬러 조명 정상 (7000+ 색)
+- gizmo translate/rotate/scale — 3축 핸들 정확 (화살표/링/박스)
 - editor UI (IMGUI + 폰트 아틀라스 + 알파) — 텍스트/위젯 또렷
+
+**실 하드웨어 런타임 검증됨 (panic/validation 0, ~6s run)**:
+- deferred_demo (G-buffer→SSGI→RT shadow→lighting→bloom→tonemap, RT 기능획득+BLAS+9-entry bind group), ibl_demo, shadow_demo
+- flagship voltex_survivor / runtime_demo / survivor_game (RuntimeApp 풀 부트스트랩)
+- **CLI 빌드 파이프라인 E2E**: `voltex new`→`voltex build`(release ~30s)→산출 exe 가 게임 구동 (DoD 헤드라인 워크플로)
 
 **발견 & 수정한 실버그**: immediate-mode UI 에 가로 레이아웃이 없어 (`button()` 이 항상 `advance_line()`) `editor_demo` 툴바의 버튼들이 세로로 쌓여 뷰포트와 겹침. `UiContext::same_line()` 추가 + 위젯이 placed rect 를 기록 (`LayoutState::record`). 기본 동작(세로 적층)은 불변 — same_line 은 opt-in 이라 hierarchy/inspector 패널 영향 없음.
 
 **검증**:
-- voltex_capture 8 lib 테스트 (PNG 라운드트립 + stats) + 4 GPU-gated `#[ignore]` 씬 테스트
-- voltex_editor 170 → 173 (+3 same_line)
+- voltex_capture 8 lib 테스트 (PNG 라운드트립 + stats) + 6 GPU-gated `#[ignore]` 씬 테스트
+- voltex_editor 170 → 174 (+3 same_line, +1 end-to-end gizmo translate drag 통합 테스트 — 카메라→unprojection→gizmo 체인 회귀 가드)
 - 워크스페이스 clippy 0 워닝
+- README 스크린샷 갤러리 (실제 렌더 출력) + 상태 배지 v1.0.55
 
-**남은 미검증** (v1.1+): deferred G-buffer + post-processing, multi-light, gizmo overlay, 게임 런타임 화면, viewport/gizmo 마우스 인터랙션.
+**남은 미검증** (v1.1+): deferred 오프스크린 픽셀 캡처 (런타임 검증으로 대체, 9-entry bind group 의 미초기화 SSGI/RT 입력 때문), viewport/gizmo 실제 마우스 드래그 인터랙션 (synthetic input 필요).
 
 ### v1.0.54 (2026-05-22) — Sphere generator degenerate-input clamp
 

@@ -171,7 +171,7 @@
 
 ## v1.0 / v1.0.1 / v1.0.2 / v1.0.3 / v1.0.4 / v1.0.5 / v1.0.6 / v1.0.7 / v1.0.8 추가 한계
 
-- **3 OS exe artifact 검증** — Windows host 빌드 + runtime 검증만. Linux + macOS 실 머신 검증 v1.1 사용자 PR.
+- **3 OS exe artifact 검증** — Windows host 빌드 + runtime 검증 완료. v1.0.55 에서 **CLI 빌드 파이프라인 end-to-end 풀 실행 검증**: `voltex new` → `voltex build` (release, ~30s) → 산출 `dist/<name>.exe` (+ scene/assets/scripts + LICENSE×3 번들) 가 실제 RTX 4080 에서 panic/validation 0 으로 게임 구동. 즉 "게임 빌드 → 단일 exe 배포" DoD 헤드라인 워크플로가 실 하드웨어에서 작동 확인. Linux + macOS 실 머신 검증은 v1.1 사용자 PR.
 - **Lua input API** — 입력은 Rust `add_input_system` 만. Lua 측 `input.is_key_pressed(...)` v1.1 후속.
 - **voltex_cli editor 모드** — `voltex new/build/run` 만. `voltex editor` 서브커맨드 v1.1.
 - **HUD 통합** — 런타임 UiContext 정식 API 없음. 점수 등 표시는 콘솔 print 만.
