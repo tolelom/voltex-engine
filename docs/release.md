@@ -72,6 +72,27 @@ Before tagging:
       (heavy ~60s; the nightly cron also runs this, but a manual run before
       a release tag is cheap insurance).
 
+### GPU-host visual verification (run on a machine with a GPU + display)
+
+CI is headless, so it can verify *no panic* but never *correct pixels* or the
+RT/windowed paths. Before a release, run these on a real GPU host (added
+v1.0.55 — see [`docs/visual/README.md`](visual/README.md)):
+
+- [ ] `cargo run -p voltex_capture --bin capture` — renders every pipeline
+      (BasicRenderer / PBR / shadows / multi-light / gizmos / editor UI) to
+      `target/captures/*.png`. Exits non-zero if any frame is blank. **Eyeball
+      the PNGs** — blank-detection can't catch subtly-wrong output.
+- [ ] `cargo test -p voltex_capture -- --ignored` — GPU-gated scene tests pass.
+- [ ] Smoke-run the windowed demos for ~6s each with no panic / wgpu validation
+      error (only benign Vulkan loader warnings are expected):
+      `RUST_LOG=warn <timeout 6> cargo run -p deferred_demo` (also `ibl_demo`,
+      `shadow_demo`, `runtime_demo`, `voltex_survivor`). `deferred_demo` is the
+      one that exercises ray-tracing feature acquisition + BLAS.
+- [ ] Full CLI build→run: `voltex new <dir> && cd <dir> &&
+      voltex build --engine-path <repo>` then launch `dist/<name>.exe` — the
+      produced game must run without panic (validates the DoD headline
+      "build → single exe" workflow end to end).
+
 ## Manually triggering a release build
 
 For testing the workflow without cutting a real tag, use the
