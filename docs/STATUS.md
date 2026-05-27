@@ -173,6 +173,33 @@
 
 v1.0.9 부터는 **서비스 배포 완성도** 로드맵 (`docs/superpowers/specs/2026-05-21-service-readiness-roadmap.md`) 기준으로 진행.
 
+### v1.0.55 (2026-05-28) — Visual verification harness + editor toolbar fix
+
+P0 confidence. v1.0.40~54 는 정적 감사 기반 robustness 였고 빌드/테스트/clippy 는 전부 그린이지만, **엔진이 실제로 화면에 올바르게 렌더링되는지는 한 번도 검증된 적이 없었다** (DEFERRED 의 "GUI 시각 검증 0건"). 윈도우 앱은 자동화로 관찰 불가하고 6초 smoke-test 는 panic 부재만 보장.
+
+**신규 crate `voltex_capture`** (도구):
+- `HeadlessGpu` — surface 없는 wgpu device/queue (`compatible_surface: None`)
+- `OffscreenTarget` — color(Rgba8UnormSrgb, COPY_SRC) + depth + 256B-row 정렬 readback
+- `encode_rgba8` — 외부 의존 0 PNG 인코더 (zlib stored block + CRC32/Adler32), `voltex_renderer::parse_png` 로 라운드트립 검증
+- `ImageStats` — blank/단색 프레임 자동 탐지
+- `scene` / `scene_shadow` / `scene_ui` — 실제 파이프라인으로 데모 씬 렌더
+- bin `capture` — 모든 씬을 PNG 로 저장 (썸네일 크기 옵션)
+
+**검증됨 (NVIDIA RTX 4080 SUPER / Vulkan, `docs/visual/`)**:
+- BasicRenderer (Blinn-Phong, ECS/runtime/editor 뷰포트 경로) — 면별 음영 정상
+- PBR (Cook-Torrance) 7×7 metallic/roughness 그리드 — BRDF 그라데이션 + IBL ambient 정상 (4000+ 색)
+- 2-패스 directional shadow map — 라이트 방향에 맞는 그림자 정상
+- editor UI (IMGUI + 폰트 아틀라스 + 알파) — 텍스트/위젯 또렷
+
+**발견 & 수정한 실버그**: immediate-mode UI 에 가로 레이아웃이 없어 (`button()` 이 항상 `advance_line()`) `editor_demo` 툴바의 버튼들이 세로로 쌓여 뷰포트와 겹침. `UiContext::same_line()` 추가 + 위젯이 placed rect 를 기록 (`LayoutState::record`). 기본 동작(세로 적층)은 불변 — same_line 은 opt-in 이라 hierarchy/inspector 패널 영향 없음.
+
+**검증**:
+- voltex_capture 8 lib 테스트 (PNG 라운드트립 + stats) + 4 GPU-gated `#[ignore]` 씬 테스트
+- voltex_editor 170 → 173 (+3 same_line)
+- 워크스페이스 clippy 0 워닝
+
+**남은 미검증** (v1.1+): deferred G-buffer + post-processing, multi-light, gizmo overlay, 게임 런타임 화면, viewport/gizmo 마우스 인터랙션.
+
 ### v1.0.54 (2026-05-22) — Sphere generator degenerate-input clamp
 
 P2 robustness. `generate_sphere(radius, sectors, stacks)` 가 sectors=0/stacks=0/radius=0 에서 div-by-zero → NaN 가득 vertex buffer. 비현실적이지만 PBR demo / IBL 미리보기에서 사용자가 sliders 0 까지 끌면 발생.

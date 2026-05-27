@@ -10,6 +10,9 @@ type Shot = (&'static str, fn(&HeadlessGpu, u32, u32) -> Vec<u8>, u32, u32);
 
 fn main() {
     let out_dir = std::env::args().nth(1).unwrap_or_else(|| "target/captures".to_string());
+    // Optional second arg: cap the longest dimension (downscale the requested
+    // sizes proportionally) to produce small reference thumbnails.
+    let cap: Option<u32> = std::env::args().nth(2).and_then(|s| s.parse().ok());
     std::fs::create_dir_all(&out_dir).expect("create out dir");
 
     let gpu = match HeadlessGpu::new() {
@@ -30,11 +33,18 @@ fn main() {
     ];
 
     let mut failures = 0;
-    for (name, f, w, h) in shots {
-        let rgba = f(&gpu, *w, *h);
+    for (name, f, w0, h0) in shots {
+        let (w, h) = match cap {
+            Some(c) if *w0.max(h0) > c => {
+                let s = c as f32 / *w0.max(h0) as f32;
+                (((*w0 as f32 * s) as u32).max(1), ((*h0 as f32 * s) as u32).max(1))
+            }
+            _ => (*w0, *h0),
+        };
+        let rgba = f(&gpu, w, h);
         let stats = ImageStats::analyze(&rgba);
         let path = format!("{out_dir}/{name}.png");
-        save_png(&path, *w, *h, &rgba).expect("save png");
+        save_png(&path, w, h, &rgba).expect("save png");
         let flag = if stats.looks_blank() { " [BLANK!]" } else { "" };
         println!(
             "{path}: {w}x{h} luminance={:.3} black={:.1}% colors={}{flag}",

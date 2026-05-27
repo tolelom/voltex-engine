@@ -185,7 +185,7 @@
 - **`cargo audit` 0 vulnerabilities** ✅ v1.0.5 검증. 1 advisory (paste 1.0.15 unmaintained, transitive via wgpu/metal) — 통제 불가, 모니터링만.
 - **CI 워크플로 (.github/workflows/ci.yml)** ✅ v1.0.5 추가. 단, **실제 GitHub runner 첫 green run 은 mirror 필요** — git.tolelom.xyz 가 GitHub Actions 실행 환경 미보유 시 inert. self-hosted gitea/forgejo runner 또는 GitHub mirror push 가 v1.1 후속.
 - **`cargo audit` CI 통합** — cargo-audit binary install step 추가 필요. v1.1 후속.
-- **GUI 시각 검증** — viewport / gizmo / editor / 게임 화면 실제 동작 0건 확인. 6초 smoke-test 는 panic 없음만 보장.
+- ~~**GUI 시각 검증**~~ 🟡 부분 완료 v1.0.55 — `voltex_capture` 헤드리스 오프스크린 render-to-PNG 하니스로 BasicRenderer(Blinn-Phong) / PBR(Cook-Torrance) / 2-패스 directional shadow / editor UI(IMGUI+폰트) 4개 경로가 실제로 올바르게 렌더됨을 PNG 로 확인 (`docs/visual/`). 이 과정에서 발견한 에디터 툴바 세로 적층 버그 fix (`UiContext::same_line`). **남은 미검증**: deferred G-buffer+post, multi-light, gizmo overlay, 게임 런타임 화면. viewport/gizmo 실제 마우스 인터랙션은 여전히 미검증.
 - **coverage 측정** ✅ v1.0.6 — baseline 82.06% functions / 82.74% lines (cargo llvm-cov --workspace --lib). 80% 목표 평균 달성.
 - **CLI 친화 메시지 (engine-path)** ✅ v1.0.6 — 1-line → 7-line help block (bash + PowerShell 양쪽 안내).
 - **GPU/winit 의존 4 crate (renderer 66 / runtime 61 / renderer_ecs 54 / platform 46%) 의 coverage 보완** — headless GPU adapter + event-loop stub 필요. v1.1+.

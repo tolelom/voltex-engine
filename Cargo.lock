@@ -2141,6 +2141,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "voltex_capture"
+version = "0.1.0"
+dependencies = [
+ "bytemuck",
+ "pollster",
+ "voltex_asset",
+ "voltex_ecs",
+ "voltex_editor",
+ "voltex_math",
+ "voltex_renderer",
+ "voltex_renderer_ecs",
+ "wgpu",
+]
+
+[[package]]
 name = "voltex_cli"
 version = "0.1.0"
 dependencies = [
