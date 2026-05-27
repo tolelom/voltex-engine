@@ -36,13 +36,15 @@ GPU: NVIDIA GeForce RTX 4080 SUPER (Vulkan).
 | `cube_grid` | `voltex_renderer_ecs::BasicRenderer` (Blinn-Phong, ECS-driven — the runtime/editor viewport path) | ✅ per-face shading correct |
 | `pbr_grid` | `create_pbr_pipeline` (Cook-Torrance) + `IblResources` — 7×7 metallic×roughness grid | ✅ correct BRDF gradient + IBL ambient (4135+ colors) |
 | `shadow_scene` | two-pass directional shadow map (`create_shadow_pipeline` depth pass → PBR pass) | ✅ shadows correctly placed for the light direction |
+| `multi_light` | PBR + `LightsUniform` (dim directional + 4 colored point lights + spot) | ✅ distinct colored illumination with distance attenuation (7000+ colors) |
+| `gizmo_{translate,rotate,scale}` | `voltex_editor::GizmoRenderer` line overlay over a cube | ✅ all three handle sets (arrows / rings / boxes) at the right origin with correct per-axis R/G/B colors |
 | `editor_ui` | `voltex_editor::UiRenderer` (immediate-mode UI + bitmap font atlas + alpha) | ✅ text + widgets render legibly |
 
 ### Findings
 
-- **BasicRenderer / PBR / shadows / editor UI all render correctly.** This is
-  the first confirmation that the engine produces correct images, not just
-  non-panicking frames.
+- **BasicRenderer / PBR / shadows / multi-light / gizmos / editor UI all render
+  correctly.** This is the first confirmation that the engine produces correct
+  images, not just non-panicking frames.
 - **Bug found & fixed:** the immediate-mode UI had no horizontal layout, so the
   `editor_demo` toolbar's buttons stacked vertically and overlapped the
   viewport. Added `UiContext::same_line()` (see the `fix(editor)` commit).
@@ -56,7 +58,7 @@ GPU: NVIDIA GeForce RTX 4080 SUPER (Vulkan).
 ## Not yet captured
 
 - Deferred G-buffer + post-processing (`deferred_demo`, 1500-line setup).
-- Multi-light, IBL standalone, gizmo overlays, the flagship game runtime.
+- IBL standalone, the flagship game runtime, actual mouse/gizmo interaction.
 
 The reference PNGs here are downscaled (≤240px) and uncompressed (the encoder
 emits stored deflate blocks). They are a point-in-time record; regenerate with

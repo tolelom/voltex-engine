@@ -4,7 +4,7 @@
 //! (default out_dir: `target/captures`).
 
 use voltex_capture::{
-    save_png, scene, scene_lights, scene_shadow, scene_ui, HeadlessGpu, ImageStats,
+    save_png, scene, scene_gizmo, scene_lights, scene_shadow, scene_ui, HeadlessGpu, ImageStats,
 };
 
 /// (name, render fn, width, height) for one capture.
@@ -32,6 +32,9 @@ fn main() {
         ("pbr_grid", scene::render_pbr_grid, 768, 768),
         ("shadow_scene", scene_shadow::render_shadow_scene, 800, 600),
         ("multi_light", scene_lights::render_multi_light, 800, 600),
+        ("gizmo_translate", scene_gizmo::render_gizmo_translate, 480, 480),
+        ("gizmo_rotate", scene_gizmo::render_gizmo_rotate, 480, 480),
+        ("gizmo_scale", scene_gizmo::render_gizmo_scale, 480, 480),
         ("editor_ui", scene_ui::render_editor_ui, 640, 400),
     ];
 
