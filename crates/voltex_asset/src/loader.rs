@@ -99,16 +99,17 @@ impl AssetLoader {
         }
     }
 
-    /// Queue a file for background loading. Returns a handle immediately.
+    /// Queue a file for background loading. Returns a *ticket* handle immediately.
     ///
-    /// The handle becomes valid (pointing to real data) after `process_loaded`
-    /// inserts the completed asset into Assets. Until then, `state()` returns
-    /// `LoadState::Loading`.
+    /// The returned handle is a **ticket**, not a usable `Assets` handle: its
+    /// id/generation come from a global load counter, whereas `Assets::insert`
+    /// (run later, in `process_loaded`) assigns a per-type slot that generally
+    /// differs. Use the ticket to poll [`state`](Self::state), and once it is
+    /// [`LoadState::Ready`] call [`resolved_handle`](Self::resolved_handle) to
+    /// get the real `Handle<T>` you pass to `Assets::get`.
     ///
-    /// **Important:** The returned handle's id/generation are provisional.
-    /// After `process_loaded`, the handle is updated internally to match the
-    /// actual slot in Assets. Since we pre-allocate using the load id, the
-    /// actual handle assigned by `Assets::insert` may differ. We remap it.
+    /// (Only when loading into a fresh, single-type `Assets` do the ticket and
+    /// real handle coincide — don't rely on that.)
     pub fn load<T, F>(&mut self, path: PathBuf, parse_fn: F) -> Handle<T>
     where
         T: Send + 'static,
@@ -180,6 +181,26 @@ impl AssetLoader {
         LoadState::Loading
     }
 
+    /// The real [`Handle<T>`] the asset was assigned in [`Assets`], once its
+    /// load has reached [`LoadState::Ready`].
+    ///
+    /// The handle returned by [`load`](Self::load) is only a *ticket*: its
+    /// id/generation come from a global load counter and generally do **not**
+    /// match the per-type slot `Assets::insert` assigns. Pass the ticket here
+    /// after the load is `Ready` to get the handle you actually use with
+    /// `Assets::get`. Returns `None` if the ticket is unknown or not yet ready.
+    pub fn resolved_handle<T: 'static>(&self, ticket: &Handle<T>) -> Option<Handle<T>> {
+        let type_id = TypeId::of::<T>();
+        let load_id = *self
+            .handle_to_load
+            .get(&(type_id, ticket.id, ticket.generation))?;
+        let entry = self.pending.get(&load_id)?;
+        match entry.state {
+            PendingState::Ready => Some(Handle::new(entry.handle_id, entry.handle_gen)),
+            _ => None,
+        }
+    }
+
     /// Drain completed loads from the worker thread and insert them into Assets.
     ///
     /// Call this once per frame on the main thread.
@@ -194,21 +215,18 @@ impl AssetLoader {
             if let Some(entry) = self.pending.get_mut(&result.id) {
                 match result.result {
                     Ok(boxed_asset) => {
-                        // Take the inserter out and use it to insert into Assets
+                        // Take the inserter out and use it to insert into Assets.
                         if let Some(inserter) = entry.inserter.take() {
                             let (real_id, real_gen) = inserter(assets, boxed_asset);
-
-                            // Update the handle mapping if the real handle differs
-                            let old_key =
-                                (entry.type_id, entry.handle_id, entry.handle_gen);
-                            if real_id != entry.handle_id || real_gen != entry.handle_gen {
-                                // Remove old mapping, add new one
-                                self.handle_to_load.remove(&old_key);
-                                entry.handle_id = real_id;
-                                entry.handle_gen = real_gen;
-                                self.handle_to_load
-                                    .insert((entry.type_id, real_id, real_gen), result.id);
-                            }
+                            // Record the real Assets handle so `resolved_handle`
+                            // can return it. Crucially we do NOT touch
+                            // `handle_to_load`: it stays keyed by the stable
+                            // ticket (the id/gen `load` handed the caller), so
+                            // `state` and `resolved_handle` keep working even
+                            // when the real per-type slot differs from the
+                            // global-counter ticket id.
+                            entry.handle_id = real_id;
+                            entry.handle_gen = real_gen;
                         }
                         entry.state = PendingState::Ready;
                     }
@@ -292,6 +310,44 @@ mod tests {
         // But our provisional handle is also (0, 0), so it should match.
         let val = assets.get(handle).unwrap();
         assert_eq!(val, "content123");
+
+        let _ = fs::remove_dir_all(&dir);
+        loader.shutdown();
+    }
+
+    #[test]
+    fn state_and_handle_correct_when_real_differs_from_ticket() {
+        // The ticket from load() uses a global load counter, while Assets
+        // assigns a per-type slot. When the two differ (here: a pre-existing
+        // asset pushes the loaded one to slot 1, but the ticket is slot 0),
+        // state() must still report Ready and resolved_handle() must return the
+        // real handle that actually addresses the loaded asset.
+        let mut loader = AssetLoader::new();
+        let dir = std::env::temp_dir().join("voltex_loader_test_remap");
+        let _ = fs::create_dir_all(&dir);
+        let path = dir.join("data.txt");
+        fs::write(&path, "loaded-content").unwrap();
+
+        let mut assets = Assets::new();
+        let _pre = assets.insert("pre-existing".to_string()); // occupies slot 0
+
+        let ticket: Handle<String> =
+            loader.load(path, |data| Ok(String::from_utf8_lossy(data).to_string()));
+
+        std::thread::sleep(Duration::from_millis(200));
+        loader.process_loaded(&mut assets);
+
+        // state() keyed by the stable ticket must report Ready.
+        assert!(
+            matches!(loader.state::<String>(&ticket), LoadState::Ready),
+            "state() must report Ready for the ticket even when the real slot differs"
+        );
+
+        // resolved_handle() returns the handle that actually addresses the asset.
+        let real = loader
+            .resolved_handle::<String>(&ticket)
+            .expect("resolved_handle should be Some once Ready");
+        assert_eq!(assets.get(real).unwrap(), "loaded-content");
 
         let _ = fs::remove_dir_all(&dir);
         loader.shutdown();
