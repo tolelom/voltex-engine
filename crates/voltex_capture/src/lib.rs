@@ -19,6 +19,7 @@
 mod headless;
 mod png_encode;
 pub mod scene;
+pub mod scene_lights;
 pub mod scene_shadow;
 pub mod scene_ui;
 mod target;
