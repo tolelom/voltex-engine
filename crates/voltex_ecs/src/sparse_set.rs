@@ -143,7 +143,9 @@ impl<T> SparseSet<T> {
     /// Check if an entity's component was changed this tick.
     pub fn is_changed(&self, entity: Entity) -> bool {
         if let Some(&index) = self.sparse.get(entity.id as usize).and_then(|o| o.as_ref()) {
-            self.ticks[index] == self.current_tick
+            // Verify the slot actually holds this entity (generation safety,
+            // matching get/contains/remove) before trusting its tick.
+            self.dense_entities[index] == entity && self.ticks[index] == self.current_tick
         } else {
             false
         }
@@ -360,6 +362,25 @@ mod tests {
         let _ = set.get_mut(e2);
         set.remove(e1);
         assert!(set.is_changed(e2));
+    }
+
+    #[test]
+    fn is_changed_respects_generation() {
+        // A stale handle to a slot that has been reused at a newer generation
+        // must NOT be reported as changed — consistent with get/contains/remove,
+        // which all reject a generation mismatch. (is_changed used to consult
+        // the sparse slot's tick without verifying the stored entity matches.)
+        let mut set = SparseSet::<u32>::new();
+        let e = make_entity(5, 0);
+        set.insert(e, 42);
+        assert!(set.is_changed(e), "freshly inserted entity is changed");
+
+        let stale = make_entity(5, 1); // same slot, different generation
+        assert!(set.get(stale).is_none(), "get already guards generation");
+        assert!(
+            !set.is_changed(stale),
+            "is_changed must reject a generation mismatch like get does"
+        );
     }
 
     #[test]
