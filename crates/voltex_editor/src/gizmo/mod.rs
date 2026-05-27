@@ -261,6 +261,48 @@ mod tests {
     }
 
     #[test]
+    fn end_to_end_translate_drag_moves_along_axis() {
+        // Guards the full camera→unprojection→gizmo chain (view_proj.inverse →
+        // ndc_from_viewport → ray_from_ndc → axis hit → drag delta). This path
+        // had a silent Mat4::inverse bug historically (Phase 8-7).
+        use voltex_math::Vec4;
+
+        let mut world = World::new();
+        let e = world.spawn();
+        world.add(e, Transform::new()); // at origin
+        let mut g = GizmoState::new(); // Translate mode
+
+        let cam_pos = Vec3::new(0.0, 1.5, 5.0);
+        let view = Mat4::look_at(cam_pos, Vec3::ZERO, Vec3::Y);
+        let proj = Mat4::perspective(60f32.to_radians(), 1.0, 0.1, 100.0);
+        let view_proj = proj * view;
+        let rect = (0.0f32, 0.0f32, 800.0f32, 800.0f32);
+
+        // Project a world point to a mouse pixel (inverse of ndc_from_viewport).
+        let to_mouse = |p: Vec3| -> (f32, f32) {
+            let clip = view_proj.mul_vec4(Vec4::new(p.x, p.y, p.z, 1.0));
+            let ndc_x = clip.x / clip.w;
+            let ndc_y = clip.y / clip.w;
+            let rx = (ndc_x + 1.0) * 0.5;
+            let ry = (1.0 - ndc_y) * 0.5;
+            (rx * rect.2 + rect.0, ry * rect.3 + rect.1)
+        };
+
+        // Begin a drag on a point on the +X arrow (within [0.15, 1.5]).
+        let begin_mouse = to_mouse(Vec3::new(0.8, 0.0, 0.0));
+        let hit = g.try_begin_drag(&mut world, e, &view_proj, cam_pos, rect, begin_mouse);
+        assert!(hit, "ray through the projected X-axis point should hit the X gizmo");
+        assert_eq!(g.active_axis(), Some(GizmoAxis::X));
+
+        // Drag to a point 0.4 further along +X (same drag plane) → +0.4 move.
+        let drag_mouse = to_mouse(Vec3::new(1.2, 0.0, 0.0));
+        g.update_drag(&mut world, e, &view_proj, cam_pos, rect, drag_mouse);
+        let pos = world.get::<Transform>(e).unwrap().position;
+        assert!((pos.x - 0.4).abs() < 0.05, "expected x≈0.4, got {}", pos.x);
+        assert!(pos.y.abs() < 0.05 && pos.z.abs() < 0.05, "off-axis drift: {pos:?}");
+    }
+
+    #[test]
     fn set_mode_ignored_while_dragging() {
         let mut g = GizmoState::new();
         g.drag = Some(DragState {
