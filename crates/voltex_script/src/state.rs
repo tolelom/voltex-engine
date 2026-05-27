@@ -226,18 +226,26 @@ impl LuaState {
 
             let tx = ffi::lua_getfield(self.state, abs_idx, cx.as_ptr());
             if tx == ffi::LUA_TNUMBER {
-                let mut isnum = 0;
-                let x = ffi::lua_tonumberx(self.state, -1, &mut isnum) as f32;
+                let mut isnum_x = 0;
+                let x = ffi::lua_tonumberx(self.state, -1, &mut isnum_x) as f32;
                 ffi::lua_pop(self.state, 1);
 
+                // y and z must also be numbers — otherwise a missing/non-numeric
+                // field would silently coerce to 0.0. Pop each pushed value
+                // before any early return so the stack stays balanced.
                 ffi::lua_getfield(self.state, abs_idx, cy.as_ptr());
-                let y = ffi::lua_tonumberx(self.state, -1, &mut isnum) as f32;
+                let mut isnum_y = 0;
+                let y = ffi::lua_tonumberx(self.state, -1, &mut isnum_y) as f32;
                 ffi::lua_pop(self.state, 1);
 
                 ffi::lua_getfield(self.state, abs_idx, cz.as_ptr());
-                let z = ffi::lua_tonumberx(self.state, -1, &mut isnum) as f32;
+                let mut isnum_z = 0;
+                let z = ffi::lua_tonumberx(self.state, -1, &mut isnum_z) as f32;
                 ffi::lua_pop(self.state, 1);
 
+                if isnum_x == 0 || isnum_y == 0 || isnum_z == 0 {
+                    return Err("vec3 named field x/y/z is not a number".into());
+                }
                 return Ok([x, y, z]);
             }
             ffi::lua_pop(self.state, 1);
@@ -489,6 +497,51 @@ mod tests {
             crate::ffi::lua_pop(lua.state, 1);
             assert_eq!(v, [10.0, 20.0, 30.0]);
         }
+    }
+
+    #[test]
+    fn test_vec3_named_missing_field_is_error() {
+        // x present but y/z missing → malformed vec3. The named path must not
+        // silently coerce the missing fields to 0.0 (the array path already
+        // rejects non-numeric elements; the named path was inconsistent).
+        let lua = LuaState::new();
+        lua.exec("v = { x = 1.0 }").unwrap();
+        unsafe {
+            crate::ffi::lua_getglobal(lua.state, c"v".as_ptr());
+            let result = lua.read_vec3(-1);
+            crate::ffi::lua_pop(lua.state, 1);
+            assert!(result.is_err(), "vec3 missing y/z must error, got {result:?}");
+        }
+    }
+
+    #[test]
+    fn test_vec3_named_non_numeric_field_is_error() {
+        let lua = LuaState::new();
+        lua.exec("v = { x = 1.0, y = 'foo', z = 3.0 }").unwrap();
+        unsafe {
+            crate::ffi::lua_getglobal(lua.state, c"v".as_ptr());
+            let result = lua.read_vec3(-1);
+            crate::ffi::lua_pop(lua.state, 1);
+            assert!(result.is_err(), "vec3 with non-numeric y must error, got {result:?}");
+        }
+    }
+
+    #[test]
+    fn test_vec3_named_error_leaves_stack_balanced() {
+        // A malformed-vec3 read must not leak Lua stack slots — repeated reads
+        // would otherwise overflow the stack over time.
+        let lua = LuaState::new();
+        lua.exec("v = { x = 1.0 }").unwrap();
+        let before = unsafe { crate::ffi::lua_gettop(lua.state) };
+        for _ in 0..50 {
+            unsafe {
+                crate::ffi::lua_getglobal(lua.state, c"v".as_ptr());
+                let _ = lua.read_vec3(-1);
+                crate::ffi::lua_pop(lua.state, 1);
+            }
+        }
+        let after = unsafe { crate::ffi::lua_gettop(lua.state) };
+        assert_eq!(before, after, "read_vec3 error path leaked stack slots");
     }
 
     #[test]
