@@ -63,11 +63,7 @@ impl SsgiResources {
         // Flatten [f32; 4] array to bytes.
         let kernel_bytes: Vec<u8> = kernel_data
             .iter()
-            .flat_map(|v| {
-                v.iter()
-                    .flat_map(|f| f.to_ne_bytes())
-                    .collect::<Vec<u8>>()
-            })
+            .flat_map(|v| v.iter().flat_map(|f| f.to_ne_bytes()).collect::<Vec<u8>>())
             .collect();
         let kernel_buffer = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("SSGI Kernel Buffer"),
@@ -277,10 +273,8 @@ mod tests {
             // w component is always 0 (padding).
             assert_eq!(sample[3], 0.0);
             // Sample must be within the unit sphere (scale <= 1).
-            let len = (sample[0] * sample[0]
-                + sample[1] * sample[1]
-                + sample[2] * sample[2])
-                .sqrt();
+            let len =
+                (sample[0] * sample[0] + sample[1] * sample[1] + sample[2] * sample[2]).sqrt();
             assert!(len <= 1.0 + 1e-5, "sample length {} > 1.0", len);
         }
     }
@@ -292,11 +286,7 @@ mod tests {
         for entry in &noise {
             // xy should form a unit vector (cos²+sin²=1).
             let len = (entry[0] * entry[0] + entry[1] * entry[1]).sqrt();
-            assert!(
-                (len - 1.0).abs() < 1e-5,
-                "noise xy length {} != 1.0",
-                len
-            );
+            assert!((len - 1.0).abs() < 1e-5, "noise xy length {} != 1.0", len);
             // z and w are always 0.
             assert_eq!(entry[2], 0.0);
             assert_eq!(entry[3], 0.0);
@@ -347,8 +337,16 @@ mod tests {
                 assert!(c.is_finite(), "noise component {c} is not finite");
             }
             // cos/sin are bounded to [-1, 1].
-            assert!((-1.0..=1.0).contains(&entry[0]), "cos out of range: {}", entry[0]);
-            assert!((-1.0..=1.0).contains(&entry[1]), "sin out of range: {}", entry[1]);
+            assert!(
+                (-1.0..=1.0).contains(&entry[0]),
+                "cos out of range: {}",
+                entry[0]
+            );
+            assert!(
+                (-1.0..=1.0).contains(&entry[1]),
+                "sin out of range: {}",
+                entry[1]
+            );
             // (cos, sin) is a unit vector.
             let len = (entry[0] * entry[0] + entry[1] * entry[1]).sqrt();
             assert!((len - 1.0).abs() < 1e-5, "xy length {len} != 1.0");

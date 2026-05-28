@@ -40,7 +40,13 @@ impl RtShadowResources {
             mapped_at_creation: false,
         });
 
-        Self { shadow_texture, shadow_view, uniform_buffer, width, height }
+        Self {
+            shadow_texture,
+            shadow_view,
+            uniform_buffer,
+            width,
+            height,
+        }
     }
 
     /// Recreate the shadow texture when the window is resized.

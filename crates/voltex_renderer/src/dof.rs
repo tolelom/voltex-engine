@@ -19,7 +19,12 @@ impl Default for DofParams {
 
 impl DofParams {
     pub fn new() -> Self {
-        DofParams { focus_distance: 5.0, focus_range: 3.0, max_blur: 5.0, _pad: 0.0 }
+        DofParams {
+            focus_distance: 5.0,
+            focus_range: 3.0,
+            max_blur: 5.0,
+            _pad: 0.0,
+        }
     }
 }
 
@@ -41,36 +46,61 @@ impl DepthOfField {
             label: Some("DOF BGL"),
             entries: &[
                 wgpu::BindGroupLayoutEntry {
-                    binding: 0, visibility: wgpu::ShaderStages::COMPUTE,
-                    ty: wgpu::BindingType::Texture { multisampled: false, view_dimension: wgpu::TextureViewDimension::D2, sample_type: wgpu::TextureSampleType::Float { filterable: false } },
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::COMPUTE,
+                    ty: wgpu::BindingType::Texture {
+                        multisampled: false,
+                        view_dimension: wgpu::TextureViewDimension::D2,
+                        sample_type: wgpu::TextureSampleType::Float { filterable: false },
+                    },
                     count: None,
                 },
                 wgpu::BindGroupLayoutEntry {
-                    binding: 1, visibility: wgpu::ShaderStages::COMPUTE,
-                    ty: wgpu::BindingType::Texture { multisampled: false, view_dimension: wgpu::TextureViewDimension::D2, sample_type: wgpu::TextureSampleType::Depth },
+                    binding: 1,
+                    visibility: wgpu::ShaderStages::COMPUTE,
+                    ty: wgpu::BindingType::Texture {
+                        multisampled: false,
+                        view_dimension: wgpu::TextureViewDimension::D2,
+                        sample_type: wgpu::TextureSampleType::Depth,
+                    },
                     count: None,
                 },
                 wgpu::BindGroupLayoutEntry {
-                    binding: 2, visibility: wgpu::ShaderStages::COMPUTE,
-                    ty: wgpu::BindingType::StorageTexture { access: wgpu::StorageTextureAccess::WriteOnly, format: wgpu::TextureFormat::Rgba16Float, view_dimension: wgpu::TextureViewDimension::D2 },
+                    binding: 2,
+                    visibility: wgpu::ShaderStages::COMPUTE,
+                    ty: wgpu::BindingType::StorageTexture {
+                        access: wgpu::StorageTextureAccess::WriteOnly,
+                        format: wgpu::TextureFormat::Rgba16Float,
+                        view_dimension: wgpu::TextureViewDimension::D2,
+                    },
                     count: None,
                 },
                 wgpu::BindGroupLayoutEntry {
-                    binding: 3, visibility: wgpu::ShaderStages::COMPUTE,
-                    ty: wgpu::BindingType::Buffer { ty: wgpu::BufferBindingType::Uniform, has_dynamic_offset: false, min_binding_size: None },
+                    binding: 3,
+                    visibility: wgpu::ShaderStages::COMPUTE,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
                     count: None,
                 },
             ],
         });
 
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label: Some("DOF PL"), bind_group_layouts: &[&bind_group_layout], immediate_size: 0,
+            label: Some("DOF PL"),
+            bind_group_layouts: &[&bind_group_layout],
+            immediate_size: 0,
         });
 
         let pipeline = device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
-            label: Some("DOF Pipeline"), layout: Some(&pipeline_layout),
-            module: &shader, entry_point: Some("main"),
-            compilation_options: wgpu::PipelineCompilationOptions::default(), cache: None,
+            label: Some("DOF Pipeline"),
+            layout: Some(&pipeline_layout),
+            module: &shader,
+            entry_point: Some("main"),
+            compilation_options: wgpu::PipelineCompilationOptions::default(),
+            cache: None,
         });
 
         let params_buffer = device.create_buffer(&wgpu::BufferDescriptor {
@@ -80,26 +110,54 @@ impl DepthOfField {
             mapped_at_creation: false,
         });
 
-        DepthOfField { pipeline, bind_group_layout, params_buffer, enabled: true }
+        DepthOfField {
+            pipeline,
+            bind_group_layout,
+            params_buffer,
+            enabled: true,
+        }
     }
 
     #[allow(clippy::too_many_arguments)]
     pub fn dispatch(
-        &self, device: &wgpu::Device, queue: &wgpu::Queue, encoder: &mut wgpu::CommandEncoder,
-        color_view: &wgpu::TextureView, depth_view: &wgpu::TextureView,
-        output_view: &wgpu::TextureView, params: &DofParams, width: u32, height: u32,
+        &self,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        encoder: &mut wgpu::CommandEncoder,
+        color_view: &wgpu::TextureView,
+        depth_view: &wgpu::TextureView,
+        output_view: &wgpu::TextureView,
+        params: &DofParams,
+        width: u32,
+        height: u32,
     ) {
         queue.write_buffer(&self.params_buffer, 0, bytemuck::cast_slice(&[*params]));
         let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("DOF BG"), layout: &self.bind_group_layout,
+            label: Some("DOF BG"),
+            layout: &self.bind_group_layout,
             entries: &[
-                wgpu::BindGroupEntry { binding: 0, resource: wgpu::BindingResource::TextureView(color_view) },
-                wgpu::BindGroupEntry { binding: 1, resource: wgpu::BindingResource::TextureView(depth_view) },
-                wgpu::BindGroupEntry { binding: 2, resource: wgpu::BindingResource::TextureView(output_view) },
-                wgpu::BindGroupEntry { binding: 3, resource: self.params_buffer.as_entire_binding() },
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: wgpu::BindingResource::TextureView(color_view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::TextureView(depth_view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 2,
+                    resource: wgpu::BindingResource::TextureView(output_view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 3,
+                    resource: self.params_buffer.as_entire_binding(),
+                },
             ],
         });
-        let mut cpass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor { label: Some("DOF Pass"), timestamp_writes: None });
+        let mut cpass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
+            label: Some("DOF Pass"),
+            timestamp_writes: None,
+        });
         cpass.set_pipeline(&self.pipeline);
         cpass.set_bind_group(0, &bind_group, &[]);
         cpass.dispatch_workgroups(width.div_ceil(16), height.div_ceil(16), 1);
@@ -107,7 +165,12 @@ impl DepthOfField {
 }
 
 /// CPU circle-of-confusion calculation (for testing).
-pub fn circle_of_confusion(depth: f32, focus_distance: f32, focus_range: f32, max_blur: f32) -> f32 {
+pub fn circle_of_confusion(
+    depth: f32,
+    focus_distance: f32,
+    focus_range: f32,
+    max_blur: f32,
+) -> f32 {
     let diff = (depth - focus_distance).abs();
     (diff / focus_range).clamp(0.0, 1.0) * max_blur
 }

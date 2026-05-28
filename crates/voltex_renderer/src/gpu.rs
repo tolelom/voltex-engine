@@ -11,7 +11,11 @@ pub const DEPTH_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth32Float;
 fn create_depth_texture(device: &wgpu::Device, width: u32, height: u32) -> wgpu::TextureView {
     let texture = device.create_texture(&wgpu::TextureDescriptor {
         label: Some("Depth Texture"),
-        size: wgpu::Extent3d { width, height, depth_or_array_layers: 1 },
+        size: wgpu::Extent3d {
+            width,
+            height,
+            depth_or_array_layers: 1,
+        },
         mip_level_count: 1,
         sample_count: 1,
         dimension: wgpu::TextureDimension::D2,
@@ -76,9 +80,7 @@ impl GpuContext {
                 force_fallback_adapter: false,
             })
             .await
-            .map_err(|e| {
-                RendererError::GpuInit(format!("no suitable GPU adapter found: {e}"))
-            })?;
+            .map_err(|e| RendererError::GpuInit(format!("no suitable GPU adapter found: {e}")))?;
 
         // When extra features are requested (e.g. ray tracing), use adapter limits
         // so RT-specific limits (max_acceleration_structures_per_shader_stage, etc.) are satisfied.

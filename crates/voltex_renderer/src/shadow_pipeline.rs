@@ -1,25 +1,23 @@
 #![allow(missing_docs)]
 
-use crate::vertex::MeshVertex;
-use crate::shadow::{SHADOW_FORMAT, ShadowPassUniform};
+use crate::shadow::{ShadowPassUniform, SHADOW_FORMAT};
+use crate::vertex::MESH_VERTEX_LAYOUT;
 
 pub fn shadow_pass_bind_group_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
     device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
         label: Some("Shadow Pass Bind Group Layout"),
-        entries: &[
-            wgpu::BindGroupLayoutEntry {
-                binding: 0,
-                visibility: wgpu::ShaderStages::VERTEX,
-                ty: wgpu::BindingType::Buffer {
-                    ty: wgpu::BufferBindingType::Uniform,
-                    has_dynamic_offset: true,
-                    min_binding_size: wgpu::BufferSize::new(
-                        std::mem::size_of::<ShadowPassUniform>() as u64,
-                    ),
-                },
-                count: None,
+        entries: &[wgpu::BindGroupLayoutEntry {
+            binding: 0,
+            visibility: wgpu::ShaderStages::VERTEX,
+            ty: wgpu::BindingType::Buffer {
+                ty: wgpu::BufferBindingType::Uniform,
+                has_dynamic_offset: true,
+                min_binding_size: wgpu::BufferSize::new(
+                    std::mem::size_of::<ShadowPassUniform>() as u64
+                ),
             },
-        ],
+            count: None,
+        }],
     })
 }
 
@@ -44,7 +42,7 @@ pub fn create_shadow_pipeline(
         vertex: wgpu::VertexState {
             module: &shader,
             entry_point: Some("vs_main"),
-            buffers: &[MeshVertex::LAYOUT],
+            buffers: &[MESH_VERTEX_LAYOUT],
             compilation_options: wgpu::PipelineCompilationOptions::default(),
         },
         fragment: None,

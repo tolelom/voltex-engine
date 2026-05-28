@@ -1,7 +1,7 @@
 #![allow(missing_docs)]
 
-use voltex_math::{Mat4, Vec3};
 use crate::shadow::{SHADOW_FORMAT, SHADOW_MAP_SIZE};
+use voltex_math::{Mat4, Vec3};
 
 /// Shadow map for a single spot light. Reuses the same texture format and
 /// resolution as the directional `ShadowMap`.
@@ -42,7 +42,11 @@ impl SpotShadowMap {
             ..Default::default()
         });
 
-        Self { texture, view, sampler }
+        Self {
+            texture,
+            view,
+            sampler,
+        }
     }
 }
 
@@ -101,9 +105,17 @@ mod tests {
         let ndc_x = clip.x / clip.w;
         let ndc_y = clip.y / clip.w;
 
-        assert!(approx_eq(ndc_x, 0.0), "Center point should have NDC x~0, got {}", ndc_x);
+        assert!(
+            approx_eq(ndc_x, 0.0),
+            "Center point should have NDC x~0, got {}",
+            ndc_x
+        );
         // y may not be exactly 0 due to the look_at up vector choice, but should be close
-        assert!(ndc_y.abs() < 0.5, "Center point should be near NDC center, got y={}", ndc_y);
+        assert!(
+            ndc_y.abs() < 0.5,
+            "Center point should be near NDC center, got y={}",
+            ndc_y
+        );
     }
 
     #[test]
@@ -119,15 +131,21 @@ mod tests {
         let near_point = Vec4::new(0.0, 0.0, -0.1, 1.0);
         let clip_near = vp.mul_vec4(near_point);
         let ndc_z_near = clip_near.z / clip_near.w;
-        assert!((-0.1..=0.2).contains(&ndc_z_near),
-            "Near point NDC z should be ~0, got {}", ndc_z_near);
+        assert!(
+            (-0.1..=0.2).contains(&ndc_z_near),
+            "Near point NDC z should be ~0, got {}",
+            ndc_z_near
+        );
 
         // A point at far distance should have NDC z ~ 1
         let far_point = Vec4::new(0.0, 0.0, -50.0, 1.0);
         let clip_far = vp.mul_vec4(far_point);
         let ndc_z_far = clip_far.z / clip_far.w;
-        assert!(ndc_z_far > 0.9 && ndc_z_far <= 1.01,
-            "Far point NDC z should be ~1, got {}", ndc_z_far);
+        assert!(
+            ndc_z_far > 0.9 && ndc_z_far <= 1.01,
+            "Far point NDC z should be ~1, got {}",
+            ndc_z_far
+        );
     }
 
     #[test]

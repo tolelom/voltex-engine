@@ -39,11 +39,7 @@ pub fn integrate_brdf(n_dot_v: f32, roughness: f32) -> (f32, f32) {
     const NUM_SAMPLES: u32 = 1024;
 
     // View vector in tangent space where N = (0,0,1).
-    let v = [
-        (1.0 - n_dot_v * n_dot_v).max(0.0).sqrt(),
-        0.0_f32,
-        n_dot_v,
-    ];
+    let v = [(1.0 - n_dot_v * n_dot_v).max(0.0).sqrt(), 0.0_f32, n_dot_v];
 
     let mut scale = 0.0_f32;
     let mut bias = 0.0_f32;
@@ -137,11 +133,23 @@ mod tests {
         // 0 -> 0.0
         assert_eq!(radical_inverse_vdc(0), 0.0);
         // 1 (…0001) reversed -> 0x80000000 / 2^32 = 0.5
-        assert!((radical_inverse_vdc(1) - 0.5).abs() < 1e-6, "vdc(1)={}", radical_inverse_vdc(1));
+        assert!(
+            (radical_inverse_vdc(1) - 0.5).abs() < 1e-6,
+            "vdc(1)={}",
+            radical_inverse_vdc(1)
+        );
         // 2 (…0010) reversed -> 0x40000000 / 2^32 = 0.25
-        assert!((radical_inverse_vdc(2) - 0.25).abs() < 1e-6, "vdc(2)={}", radical_inverse_vdc(2));
+        assert!(
+            (radical_inverse_vdc(2) - 0.25).abs() < 1e-6,
+            "vdc(2)={}",
+            radical_inverse_vdc(2)
+        );
         // 3 (…0011) reversed -> 0xC0000000 / 2^32 = 0.75
-        assert!((radical_inverse_vdc(3) - 0.75).abs() < 1e-6, "vdc(3)={}", radical_inverse_vdc(3));
+        assert!(
+            (radical_inverse_vdc(3) - 0.75).abs() < 1e-6,
+            "vdc(3)={}",
+            radical_inverse_vdc(3)
+        );
     }
 
     #[test]
@@ -169,7 +177,13 @@ mod tests {
             for &xi in &[[0.0, 0.0], [0.3, 0.6], [0.9, 0.1], [0.5, 0.999]] {
                 let h = importance_sample_ggx(xi, rough);
                 let len = (h[0] * h[0] + h[1] * h[1] + h[2] * h[2]).sqrt();
-                assert!((len - 1.0).abs() < 1e-4, "len={} for rough={} xi={:?}", len, rough, xi);
+                assert!(
+                    (len - 1.0).abs() < 1e-4,
+                    "len={} for rough={} xi={:?}",
+                    len,
+                    rough,
+                    xi
+                );
             }
         }
     }
@@ -186,14 +200,29 @@ mod tests {
         // Always within [0, 1].
         for &rough in &[0.0_f32, 0.25, 0.5, 0.75, 1.0] {
             let g = geometry_smith_ibl(0.7, 0.7, rough);
-            assert!((0.0..=1.0).contains(&g), "g={} out of [0,1] for rough={}", g, rough);
+            assert!(
+                (0.0..=1.0).contains(&g),
+                "g={} out of [0,1] for rough={}",
+                g,
+                rough
+            );
         }
         // Monotonically decreases (more occlusion) as roughness grows.
         let g_low = geometry_smith_ibl(0.5, 0.5, 0.1);
         let g_mid = geometry_smith_ibl(0.5, 0.5, 0.5);
         let g_high = geometry_smith_ibl(0.5, 0.5, 0.9);
-        assert!(g_low > g_mid, "g_low {} should exceed g_mid {}", g_low, g_mid);
-        assert!(g_mid > g_high, "g_mid {} should exceed g_high {}", g_mid, g_high);
+        assert!(
+            g_low > g_mid,
+            "g_low {} should exceed g_mid {}",
+            g_low,
+            g_mid
+        );
+        assert!(
+            g_mid > g_high,
+            "g_mid {} should exceed g_high {}",
+            g_mid,
+            g_high
+        );
     }
 
     #[test]
@@ -212,7 +241,11 @@ mod tests {
             let (scale, bias) = integrate_brdf(1e-4, rough);
             assert!(scale.is_finite(), "scale not finite for rough={}", rough);
             assert!(bias.is_finite(), "bias not finite for rough={}", rough);
-            assert!(scale >= 0.0 && bias >= 0.0, "negative result rough={}", rough);
+            assert!(
+                scale >= 0.0 && bias >= 0.0,
+                "negative result rough={}",
+                rough
+            );
         }
     }
 }

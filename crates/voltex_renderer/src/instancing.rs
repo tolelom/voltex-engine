@@ -1,8 +1,8 @@
 #![allow(missing_docs)]
 
-use bytemuck::{Pod, Zeroable};
-use crate::vertex::MeshVertex;
 use crate::gpu::DEPTH_FORMAT;
+use crate::vertex::MESH_VERTEX_LAYOUT;
+use bytemuck::{Pod, Zeroable};
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug, Pod, Zeroable)]
@@ -16,11 +16,31 @@ impl InstanceData {
         array_stride: std::mem::size_of::<InstanceData>() as u64,
         step_mode: wgpu::VertexStepMode::Instance,
         attributes: &[
-            wgpu::VertexAttribute { offset: 0, shader_location: 4, format: wgpu::VertexFormat::Float32x4 },
-            wgpu::VertexAttribute { offset: 16, shader_location: 5, format: wgpu::VertexFormat::Float32x4 },
-            wgpu::VertexAttribute { offset: 32, shader_location: 6, format: wgpu::VertexFormat::Float32x4 },
-            wgpu::VertexAttribute { offset: 48, shader_location: 7, format: wgpu::VertexFormat::Float32x4 },
-            wgpu::VertexAttribute { offset: 64, shader_location: 8, format: wgpu::VertexFormat::Float32x4 },
+            wgpu::VertexAttribute {
+                offset: 0,
+                shader_location: 4,
+                format: wgpu::VertexFormat::Float32x4,
+            },
+            wgpu::VertexAttribute {
+                offset: 16,
+                shader_location: 5,
+                format: wgpu::VertexFormat::Float32x4,
+            },
+            wgpu::VertexAttribute {
+                offset: 32,
+                shader_location: 6,
+                format: wgpu::VertexFormat::Float32x4,
+            },
+            wgpu::VertexAttribute {
+                offset: 48,
+                shader_location: 7,
+                format: wgpu::VertexFormat::Float32x4,
+            },
+            wgpu::VertexAttribute {
+                offset: 64,
+                shader_location: 8,
+                format: wgpu::VertexFormat::Float32x4,
+            },
         ],
     };
 }
@@ -39,12 +59,23 @@ impl InstanceBuffer {
             usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
-        InstanceBuffer { buffer, capacity, count: 0 }
+        InstanceBuffer {
+            buffer,
+            capacity,
+            count: 0,
+        }
     }
 
-    pub fn update(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, instances: &[InstanceData]) {
+    pub fn update(
+        &mut self,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        instances: &[InstanceData],
+    ) {
         self.count = instances.len();
-        if instances.is_empty() { return; }
+        if instances.is_empty() {
+            return;
+        }
 
         if instances.len() > self.capacity {
             self.capacity = instances.len().next_power_of_two();
@@ -83,7 +114,7 @@ pub fn create_instanced_pipeline(
         vertex: wgpu::VertexState {
             module: &shader,
             entry_point: Some("vs_main"),
-            buffers: &[MeshVertex::LAYOUT, InstanceData::LAYOUT],
+            buffers: &[MESH_VERTEX_LAYOUT, InstanceData::LAYOUT],
             compilation_options: wgpu::PipelineCompilationOptions::default(),
         },
         fragment: Some(wgpu::FragmentState {
@@ -112,7 +143,11 @@ pub fn create_instanced_pipeline(
             stencil: wgpu::StencilState::default(),
             bias: wgpu::DepthBiasState::default(),
         }),
-        multisample: wgpu::MultisampleState { count: 1, mask: !0, alpha_to_coverage_enabled: false },
+        multisample: wgpu::MultisampleState {
+            count: 1,
+            mask: !0,
+            alpha_to_coverage_enabled: false,
+        },
         multiview_mask: None,
         cache: None,
     })
@@ -131,7 +166,10 @@ mod tests {
     fn test_instance_data_layout_attributes() {
         assert_eq!(InstanceData::LAYOUT.attributes.len(), 5);
         assert_eq!(InstanceData::LAYOUT.array_stride, 80);
-        assert_eq!(InstanceData::LAYOUT.step_mode, wgpu::VertexStepMode::Instance);
+        assert_eq!(
+            InstanceData::LAYOUT.step_mode,
+            wgpu::VertexStepMode::Instance
+        );
     }
 
     #[test]
@@ -157,7 +195,12 @@ mod tests {
     #[test]
     fn test_instance_data_pod() {
         let data = InstanceData {
-            model: [[1.0,0.0,0.0,0.0],[0.0,1.0,0.0,0.0],[0.0,0.0,1.0,0.0],[0.0,0.0,0.0,1.0]],
+            model: [
+                [1.0, 0.0, 0.0, 0.0],
+                [0.0, 1.0, 0.0, 0.0],
+                [0.0, 0.0, 1.0, 0.0],
+                [0.0, 0.0, 0.0, 1.0],
+            ],
             color: [1.0, 1.0, 1.0, 1.0],
         };
         let bytes: &[u8] = bytemuck::bytes_of(&data);

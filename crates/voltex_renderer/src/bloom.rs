@@ -1,7 +1,7 @@
 #![allow(missing_docs)]
 
-use bytemuck::{Pod, Zeroable};
 use crate::hdr::HDR_FORMAT;
+use bytemuck::{Pod, Zeroable};
 
 /// Number of bloom mip levels (downsample + upsample chain).
 pub const BLOOM_MIP_COUNT: usize = 5;

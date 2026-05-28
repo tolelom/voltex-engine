@@ -49,7 +49,7 @@ pub fn tonemap_bind_group_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout
                     ty: wgpu::BufferBindingType::Uniform,
                     has_dynamic_offset: false,
                     min_binding_size: wgpu::BufferSize::new(
-                        std::mem::size_of::<TonemapUniform>() as u64,
+                        std::mem::size_of::<TonemapUniform>() as u64
                     ),
                 },
                 count: None,

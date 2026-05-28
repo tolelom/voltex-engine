@@ -129,15 +129,31 @@ mod tests {
         let test_point = Vec4::new(1.0, 0.0, 0.0, 1.0);
         let in_view = views[0].mul_vec4(test_point);
         // z should be negative (in front of camera)
-        assert!(in_view.z < 0.0, "+X face: point at +X should be in front, got z={}", in_view.z);
+        assert!(
+            in_view.z < 0.0,
+            "+X face: point at +X should be in front, got z={}",
+            in_view.z
+        );
         // x and y should be near 0 (centered)
-        assert!(approx_eq(in_view.x, 0.0), "+X face: expected x~0, got {}", in_view.x);
-        assert!(approx_eq(in_view.y, 0.0), "+X face: expected y~0, got {}", in_view.y);
+        assert!(
+            approx_eq(in_view.x, 0.0),
+            "+X face: expected x~0, got {}",
+            in_view.x
+        );
+        assert!(
+            approx_eq(in_view.y, 0.0),
+            "+X face: expected y~0, got {}",
+            in_view.y
+        );
 
         // For the -X face, a point at (-1, 0, 0) should be in front
         let test_neg_x = Vec4::new(-1.0, 0.0, 0.0, 1.0);
         let in_view_neg = views[1].mul_vec4(test_neg_x);
-        assert!(in_view_neg.z < 0.0, "-X face: point at -X should be in front, got z={}", in_view_neg.z);
+        assert!(
+            in_view_neg.z < 0.0,
+            "-X face: point at -X should be in front, got z={}",
+            in_view_neg.z
+        );
     }
 
     #[test]
@@ -149,9 +165,24 @@ mod tests {
         let origin = Vec4::from_vec3(pos, 1.0);
         for (i, view) in views.iter().enumerate() {
             let v = view.mul_vec4(origin);
-            assert!(approx_eq(v.x, 0.0), "Face {}: origin x should be 0, got {}", i, v.x);
-            assert!(approx_eq(v.y, 0.0), "Face {}: origin y should be 0, got {}", i, v.y);
-            assert!(approx_eq(v.z, 0.0), "Face {}: origin z should be 0, got {}", i, v.z);
+            assert!(
+                approx_eq(v.x, 0.0),
+                "Face {}: origin x should be 0, got {}",
+                i,
+                v.x
+            );
+            assert!(
+                approx_eq(v.y, 0.0),
+                "Face {}: origin y should be 0, got {}",
+                i,
+                v.y
+            );
+            assert!(
+                approx_eq(v.z, 0.0),
+                "Face {}: origin z should be 0, got {}",
+                i,
+                v.z
+            );
         }
     }
 
@@ -175,6 +206,10 @@ mod tests {
         let p = Vec4::new(0.0, 0.0, -0.1, 1.0);
         let clip = proj.mul_vec4(p);
         let ndc_z = clip.z / clip.w;
-        assert!(approx_eq(ndc_z, 0.0), "Near plane should map to NDC z=0, got {}", ndc_z);
+        assert!(
+            approx_eq(ndc_z, 0.0),
+            "Near plane should map to NDC z=0, got {}",
+            ndc_z
+        );
     }
 }

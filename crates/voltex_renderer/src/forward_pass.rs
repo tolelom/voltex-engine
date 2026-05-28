@@ -1,9 +1,9 @@
 #![allow(missing_docs)]
 
-use crate::vertex::MeshVertex;
-use crate::hdr::HDR_FORMAT;
 use crate::gpu::DEPTH_FORMAT;
+use crate::hdr::HDR_FORMAT;
 use crate::mesh::Mesh;
+use crate::vertex::MESH_VERTEX_LAYOUT;
 
 pub struct ForwardPass {
     pipeline: wgpu::RenderPipeline,
@@ -32,7 +32,7 @@ impl ForwardPass {
             vertex: wgpu::VertexState {
                 module: &shader,
                 entry_point: Some("vs_main"),
-                buffers: &[MeshVertex::LAYOUT],
+                buffers: &[MESH_VERTEX_LAYOUT],
                 compilation_options: wgpu::PipelineCompilationOptions::default(),
             },
             fragment: Some(wgpu::FragmentState {

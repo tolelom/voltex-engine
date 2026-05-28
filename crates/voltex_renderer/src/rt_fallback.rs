@@ -17,22 +17,28 @@ impl RtCapabilities {
         }
     }
 
-    pub fn can_use_rt(&self) -> bool { self.supports_compute && self.supports_storage_textures }
+    pub fn can_use_rt(&self) -> bool {
+        self.supports_compute && self.supports_storage_textures
+    }
 }
 
 /// Fallback rendering mode when RT is not available.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum RenderMode {
-    Full,           // All RT features
-    NoRtShadows,    // Use shadow maps instead
-    NoRtReflections,// Use SSR instead
-    Minimal,        // Shadow maps + no reflections
+    Full,            // All RT features
+    NoRtShadows,     // Use shadow maps instead
+    NoRtReflections, // Use SSR instead
+    Minimal,         // Shadow maps + no reflections
 }
 
 pub fn select_render_mode(caps: &RtCapabilities) -> RenderMode {
-    if caps.can_use_rt() { RenderMode::Full }
-    else if caps.supports_compute { RenderMode::NoRtShadows }
-    else { RenderMode::Minimal }
+    if caps.can_use_rt() {
+        RenderMode::Full
+    } else if caps.supports_compute {
+        RenderMode::NoRtShadows
+    } else {
+        RenderMode::Minimal
+    }
 }
 
 #[cfg(test)]

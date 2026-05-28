@@ -16,7 +16,11 @@ fn create_rt(
 ) -> wgpu::TextureView {
     let texture = device.create_texture(&wgpu::TextureDescriptor {
         label: Some(label),
-        size: wgpu::Extent3d { width: w, height: h, depth_or_array_layers: 1 },
+        size: wgpu::Extent3d {
+            width: w,
+            height: h,
+            depth_or_array_layers: 1,
+        },
         mip_level_count: 1,
         sample_count: 1,
         dimension: wgpu::TextureDimension::D2,
@@ -30,7 +34,11 @@ fn create_rt(
 fn create_depth(device: &wgpu::Device, w: u32, h: u32) -> wgpu::TextureView {
     let texture = device.create_texture(&wgpu::TextureDescriptor {
         label: Some("GBuffer Depth Texture"),
-        size: wgpu::Extent3d { width: w, height: h, depth_or_array_layers: 1 },
+        size: wgpu::Extent3d {
+            width: w,
+            height: h,
+            depth_or_array_layers: 1,
+        },
         mip_level_count: 1,
         sample_count: 1,
         dimension: wgpu::TextureDimension::D2,
@@ -51,10 +59,34 @@ pub struct GBuffer {
 
 impl GBuffer {
     pub fn new(device: &wgpu::Device, width: u32, height: u32) -> Self {
-        let position_view = create_rt(device, width, height, GBUFFER_POSITION_FORMAT, "GBuffer Position");
-        let normal_view = create_rt(device, width, height, GBUFFER_NORMAL_FORMAT, "GBuffer Normal");
-        let albedo_view = create_rt(device, width, height, GBUFFER_ALBEDO_FORMAT, "GBuffer Albedo");
-        let material_view = create_rt(device, width, height, GBUFFER_MATERIAL_FORMAT, "GBuffer Material");
+        let position_view = create_rt(
+            device,
+            width,
+            height,
+            GBUFFER_POSITION_FORMAT,
+            "GBuffer Position",
+        );
+        let normal_view = create_rt(
+            device,
+            width,
+            height,
+            GBUFFER_NORMAL_FORMAT,
+            "GBuffer Normal",
+        );
+        let albedo_view = create_rt(
+            device,
+            width,
+            height,
+            GBUFFER_ALBEDO_FORMAT,
+            "GBuffer Albedo",
+        );
+        let material_view = create_rt(
+            device,
+            width,
+            height,
+            GBUFFER_MATERIAL_FORMAT,
+            "GBuffer Material",
+        );
         let depth_view = create_depth(device, width, height);
 
         Self {

@@ -28,7 +28,8 @@ impl CascadedShadowMap {
                 sample_count: 1,
                 dimension: wgpu::TextureDimension::D2,
                 format: CSM_FORMAT,
-                usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
+                usage: wgpu::TextureUsages::RENDER_ATTACHMENT
+                    | wgpu::TextureUsages::TEXTURE_BINDING,
                 view_formats: &[],
             });
             let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
@@ -63,7 +64,7 @@ impl CascadedShadowMap {
 #[derive(Copy, Clone, Debug, Pod, Zeroable)]
 pub struct CsmUniform {
     pub light_view_proj: [[[f32; 4]; 4]; CSM_CASCADE_COUNT], // 128 bytes
-    pub cascade_split: f32,  // view-space depth where cascade 0 ends and cascade 1 begins
+    pub cascade_split: f32, // view-space depth where cascade 0 ends and cascade 1 begins
     pub shadow_map_size: f32,
     pub shadow_bias: f32,
     pub _padding: f32, // 16 bytes total for last row
@@ -75,14 +76,14 @@ fn frustum_corners_world(inv_vp: &Mat4, z_near_ndc: f32, z_far_ndc: f32) -> [Vec
     let ndc_corners = [
         // Near plane corners
         Vec4::new(-1.0, -1.0, z_near_ndc, 1.0),
-        Vec4::new( 1.0, -1.0, z_near_ndc, 1.0),
-        Vec4::new( 1.0,  1.0, z_near_ndc, 1.0),
-        Vec4::new(-1.0,  1.0, z_near_ndc, 1.0),
+        Vec4::new(1.0, -1.0, z_near_ndc, 1.0),
+        Vec4::new(1.0, 1.0, z_near_ndc, 1.0),
+        Vec4::new(-1.0, 1.0, z_near_ndc, 1.0),
         // Far plane corners
         Vec4::new(-1.0, -1.0, z_far_ndc, 1.0),
-        Vec4::new( 1.0, -1.0, z_far_ndc, 1.0),
-        Vec4::new( 1.0,  1.0, z_far_ndc, 1.0),
-        Vec4::new(-1.0,  1.0, z_far_ndc, 1.0),
+        Vec4::new(1.0, -1.0, z_far_ndc, 1.0),
+        Vec4::new(1.0, 1.0, z_far_ndc, 1.0),
+        Vec4::new(-1.0, 1.0, z_far_ndc, 1.0),
     ];
 
     let mut world_corners = [Vec3::ZERO; 8];
@@ -198,8 +199,12 @@ mod tests {
     #[test]
     fn test_csm_uniform_size() {
         // Must be multiple of 16 for WGSL uniform alignment
-        assert_eq!(mem::size_of::<CsmUniform>() % 16, 0,
-            "CsmUniform must be 16-byte aligned, got {} bytes", mem::size_of::<CsmUniform>());
+        assert_eq!(
+            mem::size_of::<CsmUniform>() % 16,
+            0,
+            "CsmUniform must be 16-byte aligned, got {} bytes",
+            mem::size_of::<CsmUniform>()
+        );
     }
 
     #[test]
@@ -211,8 +216,16 @@ mod tests {
         let matrices = compute_cascade_matrices(light_dir, &view, &proj, 0.1, 100.0, 20.0);
 
         // Both matrices should not be identity (they should be actual projections)
-        assert_ne!(matrices[0].cols, Mat4::IDENTITY.cols, "Cascade 0 should not be identity");
-        assert_ne!(matrices[1].cols, Mat4::IDENTITY.cols, "Cascade 1 should not be identity");
+        assert_ne!(
+            matrices[0].cols,
+            Mat4::IDENTITY.cols,
+            "Cascade 0 should not be identity"
+        );
+        assert_ne!(
+            matrices[1].cols,
+            Mat4::IDENTITY.cols,
+            "Cascade 1 should not be identity"
+        );
     }
 
     #[test]
@@ -226,12 +239,15 @@ mod tests {
         let matrices = compute_cascade_matrices(light_dir, &view, &proj, 1.0, 50.0, split);
 
         // Both matrices should be different (covering different frustum regions)
-        let differ = matrices[0].cols.iter()
+        let differ = matrices[0]
+            .cols
+            .iter()
             .zip(matrices[1].cols.iter())
-            .any(|(a, b)| {
-                a.iter().zip(b.iter()).any(|(x, y)| (x - y).abs() > 1e-3)
-            });
-        assert!(differ, "Cascade matrices should differ for different frustum regions");
+            .any(|(a, b)| a.iter().zip(b.iter()).any(|(x, y)| (x - y).abs() > 1e-3));
+        assert!(
+            differ,
+            "Cascade matrices should differ for different frustum regions"
+        );
     }
 
     #[test]

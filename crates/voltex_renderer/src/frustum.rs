@@ -1,7 +1,7 @@
 #![allow(missing_docs)]
 
-use voltex_math::Vec3;
 use crate::light::{LightsUniform, LIGHT_DIRECTIONAL, LIGHT_POINT};
+use voltex_math::Vec3;
 
 /// A plane in 3D space: normal.dot(point) + d = 0
 #[derive(Debug, Clone, Copy)]
@@ -18,7 +18,11 @@ impl Plane {
             return *self;
         }
         Self {
-            normal: Vec3::new(self.normal.x / len, self.normal.y / len, self.normal.z / len),
+            normal: Vec3::new(
+                self.normal.x / len,
+                self.normal.y / len,
+                self.normal.z / len,
+            ),
             d: self.d / len,
         }
     }
@@ -46,9 +50,7 @@ pub fn extract_frustum(view_proj: &voltex_math::Mat4) -> Frustum {
     //   row[r] = (cols[0][r], cols[1][r], cols[2][r], cols[3][r])
     let m = &view_proj.cols;
 
-    let row = |r: usize| -> [f32; 4] {
-        [m[0][r], m[1][r], m[2][r], m[3][r]]
-    };
+    let row = |r: usize| -> [f32; 4] { [m[0][r], m[1][r], m[2][r], m[3][r]] };
 
     let r0 = row(0);
     let r1 = row(1);
@@ -59,37 +61,43 @@ pub fn extract_frustum(view_proj: &voltex_math::Mat4) -> Frustum {
     let left = Plane {
         normal: Vec3::new(r3[0] + r0[0], r3[1] + r0[1], r3[2] + r0[2]),
         d: r3[3] + r0[3],
-    }.normalize();
+    }
+    .normalize();
 
     // Right:  row3 - row0
     let right = Plane {
         normal: Vec3::new(r3[0] - r0[0], r3[1] - r0[1], r3[2] - r0[2]),
         d: r3[3] - r0[3],
-    }.normalize();
+    }
+    .normalize();
 
     // Bottom: row3 + row1
     let bottom = Plane {
         normal: Vec3::new(r3[0] + r1[0], r3[1] + r1[1], r3[2] + r1[2]),
         d: r3[3] + r1[3],
-    }.normalize();
+    }
+    .normalize();
 
     // Top:    row3 - row1
     let top = Plane {
         normal: Vec3::new(r3[0] - r1[0], r3[1] - r1[1], r3[2] - r1[2]),
         d: r3[3] - r1[3],
-    }.normalize();
+    }
+    .normalize();
 
     // Near:   row2 (wgpu NDC z in [0,1], so near = row2 directly)
     let near = Plane {
         normal: Vec3::new(r2[0], r2[1], r2[2]),
         d: r2[3],
-    }.normalize();
+    }
+    .normalize();
 
     // Far:    row3 - row2
     let far = Plane {
         normal: Vec3::new(r3[0] - r2[0], r3[1] - r2[1], r3[2] - r2[2]),
         d: r3[3] - r2[3],
-    }.normalize();
+    }
+    .normalize();
 
     Frustum {
         planes: [left, right, bottom, top, near, far],
@@ -141,8 +149,8 @@ pub fn cull_lights(frustum: &Frustum, lights: &LightsUniform) -> Vec<usize> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use voltex_math::Mat4;
     use crate::light::{LightData, LightsUniform};
+    use voltex_math::Mat4;
 
     fn approx_eq(a: f32, b: f32, eps: f32) -> bool {
         (a - b).abs() < eps
@@ -151,7 +159,11 @@ mod tests {
     #[test]
     fn test_plane_normalize_scales_normal_and_d() {
         // |normal| = 3, so dividing by 3: normal -> [0,1,0], d 6 -> 2.
-        let p = Plane { normal: Vec3::new(0.0, 3.0, 0.0), d: 6.0 }.normalize();
+        let p = Plane {
+            normal: Vec3::new(0.0, 3.0, 0.0),
+            d: 6.0,
+        }
+        .normalize();
         assert!(approx_eq(p.normal.x, 0.0, 1e-6));
         assert!(approx_eq(p.normal.y, 1.0, 1e-6));
         assert!(approx_eq(p.normal.z, 0.0, 1e-6));
@@ -162,7 +174,11 @@ mod tests {
     #[test]
     fn test_plane_distance_signed() {
         // Normalized plane y=1, d=2. distance(point) = normal·point + d.
-        let p = Plane { normal: Vec3::new(0.0, 3.0, 0.0), d: 6.0 }.normalize();
+        let p = Plane {
+            normal: Vec3::new(0.0, 3.0, 0.0),
+            d: 6.0,
+        }
+        .normalize();
         // point (0,5,0): 1*5 + 2 = 7.
         assert!(approx_eq(p.distance(Vec3::new(0.0, 5.0, 0.0)), 7.0, 1e-6));
         // point on the plane (0,-2,0): 1*-2 + 2 = 0.
@@ -174,7 +190,10 @@ mod tests {
     #[test]
     fn test_plane_normalize_zero_normal_unchanged() {
         // The len < 1e-10 guard returns the plane untouched (no div-by-zero).
-        let p = Plane { normal: Vec3::new(0.0, 0.0, 0.0), d: 5.0 };
+        let p = Plane {
+            normal: Vec3::new(0.0, 0.0, 0.0),
+            d: 5.0,
+        };
         let n = p.normalize();
         assert_eq!(n.normal.x, 0.0);
         assert_eq!(n.normal.y, 0.0);
@@ -191,7 +210,12 @@ mod tests {
         // All 6 planes should be normalized (length ~1)
         for (i, plane) in frustum.planes.iter().enumerate() {
             let len = plane.normal.length();
-            assert!(approx_eq(len, 1.0, 1e-4), "Plane {} normal length = {}", i, len);
+            assert!(
+                approx_eq(len, 1.0, 1e-4),
+                "Plane {} normal length = {}",
+                i,
+                len
+            );
         }
     }
 
@@ -203,17 +227,15 @@ mod tests {
             0.1,
             100.0,
         );
-        let view = Mat4::look_at(
-            Vec3::new(0.0, 0.0, 5.0),
-            Vec3::ZERO,
-            Vec3::Y,
-        );
+        let view = Mat4::look_at(Vec3::new(0.0, 0.0, 5.0), Vec3::ZERO, Vec3::Y);
         let vp = proj.mul_mat4(&view);
         let frustum = extract_frustum(&vp);
 
         // Origin (0,0,0) should be inside the frustum (it's 5 units in front of camera)
-        assert!(sphere_vs_frustum(Vec3::ZERO, 0.0, &frustum),
-            "Origin should be inside frustum");
+        assert!(
+            sphere_vs_frustum(Vec3::ZERO, 0.0, &frustum),
+            "Origin should be inside frustum"
+        );
     }
 
     #[test]
@@ -235,12 +257,16 @@ mod tests {
         let frustum = extract_frustum(&vp);
 
         // Sphere far behind the camera
-        assert!(!sphere_vs_frustum(Vec3::new(0.0, 0.0, 200.0), 1.0, &frustum),
-            "Sphere far behind camera should be outside");
+        assert!(
+            !sphere_vs_frustum(Vec3::new(0.0, 0.0, 200.0), 1.0, &frustum),
+            "Sphere far behind camera should be outside"
+        );
 
         // Sphere far to the side
-        assert!(!sphere_vs_frustum(Vec3::new(500.0, 0.0, 0.0), 1.0, &frustum),
-            "Sphere far to the side should be outside");
+        assert!(
+            !sphere_vs_frustum(Vec3::new(500.0, 0.0, 0.0), 1.0, &frustum),
+            "Sphere far to the side should be outside"
+        );
     }
 
     #[test]
@@ -262,15 +288,30 @@ mod tests {
         let frustum = extract_frustum(&vp);
 
         let mut lights = LightsUniform::new();
-        lights.add_light(LightData::directional([0.0, -1.0, 0.0], [1.0, 1.0, 1.0], 1.0));
+        lights.add_light(LightData::directional(
+            [0.0, -1.0, 0.0],
+            [1.0, 1.0, 1.0],
+            1.0,
+        ));
         lights.add_light(LightData::point([0.0, 0.0, 0.0], [1.0, 0.0, 0.0], 2.0, 5.0));
         // Point light far away — should be culled
-        lights.add_light(LightData::point([500.0, 500.0, 500.0], [0.0, 1.0, 0.0], 2.0, 1.0));
+        lights.add_light(LightData::point(
+            [500.0, 500.0, 500.0],
+            [0.0, 1.0, 0.0],
+            2.0,
+            1.0,
+        ));
 
         let visible = cull_lights(&frustum, &lights);
         // Directional (0) always included, point at origin (1) inside, far point (2) culled
-        assert!(visible.contains(&0), "Directional light must always be included");
-        assert!(visible.contains(&1), "Point light at origin should be visible");
+        assert!(
+            visible.contains(&0),
+            "Directional light must always be included"
+        );
+        assert!(
+            visible.contains(&1),
+            "Point light at origin should be visible"
+        );
         assert!(!visible.contains(&2), "Far point light should be culled");
     }
 
@@ -284,11 +325,23 @@ mod tests {
         let mut lights = LightsUniform::new();
         // Spot light inside frustum
         lights.add_light(LightData::spot(
-            [0.0, 2.0, 0.0], [0.0, -1.0, 0.0], [1.0, 1.0, 1.0], 3.0, 10.0, 15.0, 30.0,
+            [0.0, 2.0, 0.0],
+            [0.0, -1.0, 0.0],
+            [1.0, 1.0, 1.0],
+            3.0,
+            10.0,
+            15.0,
+            30.0,
         ));
         // Spot light far away
         lights.add_light(LightData::spot(
-            [300.0, 300.0, 300.0], [0.0, -1.0, 0.0], [1.0, 1.0, 1.0], 3.0, 5.0, 15.0, 30.0,
+            [300.0, 300.0, 300.0],
+            [0.0, -1.0, 0.0],
+            [1.0, 1.0, 1.0],
+            3.0,
+            5.0,
+            15.0,
+            30.0,
         ));
 
         let visible = cull_lights(&frustum, &lights);

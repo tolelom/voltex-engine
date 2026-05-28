@@ -17,6 +17,10 @@ pub enum RendererError {
     /// IO 에러.
     #[error(transparent)]
     Io(#[from] std::io::Error),
+
+    /// 이미지/메시 디코더(voltex_image) 에러.
+    #[error(transparent)]
+    Image(#[from] voltex_image::ImageError),
 }
 
 impl From<String> for RendererError {

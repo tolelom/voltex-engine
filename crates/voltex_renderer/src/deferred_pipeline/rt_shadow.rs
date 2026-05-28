@@ -44,7 +44,9 @@ pub fn rt_shadow_data_bind_group_layout(device: &wgpu::Device) -> wgpu::BindGrou
             wgpu::BindGroupLayoutEntry {
                 binding: 0,
                 visibility: wgpu::ShaderStages::COMPUTE,
-                ty: wgpu::BindingType::AccelerationStructure { vertex_return: false },
+                ty: wgpu::BindingType::AccelerationStructure {
+                    vertex_return: false,
+                },
                 count: None,
             },
             // binding 1: shadow output texture (R32Float, write-only storage)
@@ -66,7 +68,7 @@ pub fn rt_shadow_data_bind_group_layout(device: &wgpu::Device) -> wgpu::BindGrou
                     ty: wgpu::BufferBindingType::Uniform,
                     has_dynamic_offset: false,
                     min_binding_size: wgpu::BufferSize::new(
-                        std::mem::size_of::<RtShadowUniform>() as u64,
+                        std::mem::size_of::<RtShadowUniform>() as u64
                     ),
                 },
                 count: None,

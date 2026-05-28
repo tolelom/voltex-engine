@@ -59,7 +59,7 @@ impl MaterialUniform {
                     ty: wgpu::BufferBindingType::Uniform,
                     has_dynamic_offset: true,
                     min_binding_size: wgpu::BufferSize::new(
-                        std::mem::size_of::<MaterialUniform>() as u64,
+                        std::mem::size_of::<MaterialUniform>() as u64
                     ),
                 },
                 count: None,

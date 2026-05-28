@@ -145,9 +145,7 @@ impl RtAccel {
 /// - Row 2: `m\[2\], m\[6\], m\[10\], m\[14\]`
 pub fn mat4_to_tlas_transform(m: &[f32; 16]) -> [f32; 12] {
     [
-        m[0], m[4], m[8],  m[12],
-        m[1], m[5], m[9],  m[13],
-        m[2], m[6], m[10], m[14],
+        m[0], m[4], m[8], m[12], m[1], m[5], m[9], m[13], m[2], m[6], m[10], m[14],
     ]
 }
 
@@ -168,11 +166,7 @@ mod tests {
         ];
         let result = mat4_to_tlas_transform(&identity);
         // Row 0: [1,0,0,0], Row 1: [0,1,0,0], Row 2: [0,0,1,0]
-        let expected: [f32; 12] = [
-            1.0, 0.0, 0.0, 0.0,
-            0.0, 1.0, 0.0, 0.0,
-            0.0, 0.0, 1.0, 0.0,
-        ];
+        let expected: [f32; 12] = [1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0];
         assert_eq!(result, expected);
     }
 
@@ -189,11 +183,7 @@ mod tests {
         ];
         let result = mat4_to_tlas_transform(&mat);
         // Row-major 3x4: rotation part identity, translation in last column
-        let expected: [f32; 12] = [
-            1.0, 0.0, 0.0, 1.0,
-            0.0, 1.0, 0.0, 2.0,
-            0.0, 0.0, 1.0, 3.0,
-        ];
+        let expected: [f32; 12] = [1.0, 0.0, 0.0, 1.0, 0.0, 1.0, 0.0, 2.0, 0.0, 0.0, 1.0, 3.0];
         assert_eq!(result, expected);
     }
 }

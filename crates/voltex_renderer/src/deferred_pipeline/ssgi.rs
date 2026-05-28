@@ -68,7 +68,7 @@ pub fn ssgi_data_bind_group_layout(device: &wgpu::Device) -> wgpu::BindGroupLayo
                     ty: wgpu::BufferBindingType::Uniform,
                     has_dynamic_offset: false,
                     min_binding_size: wgpu::BufferSize::new(
-                        std::mem::size_of::<SsgiUniform>() as u64,
+                        std::mem::size_of::<SsgiUniform>() as u64
                     ),
                 },
                 count: None,

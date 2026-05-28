@@ -1,6 +1,6 @@
 //! Free-flying first-person camera + WASD/mouse controller.
 
-use voltex_math::{Vec3, Mat4};
+use voltex_math::{Mat4, Vec3};
 
 /// First-person camera — position + yaw + pitch + projection params.
 pub struct Camera {
@@ -54,7 +54,11 @@ impl Camera {
     pub fn right(&self) -> Vec3 {
         let r = self.forward().cross(Vec3::Y);
         let n = r.normalize_or_zero();
-        if n == Vec3::ZERO { Vec3::X } else { n }
+        if n == Vec3::ZERO {
+            Vec3::X
+        } else {
+            n
+        }
     }
 
     /// View matrix from eye looking along [`forward`](Self::forward).
@@ -91,14 +95,21 @@ impl Default for FpsController {
 impl FpsController {
     /// New controller with sensible defaults (5 units/s, 0.003 mouse).
     pub fn new() -> Self {
-        Self { speed: 5.0, mouse_sensitivity: 0.003 }
+        Self {
+            speed: 5.0,
+            mouse_sensitivity: 0.003,
+        }
     }
 
     /// Translates the camera by the per-frame `(forward, right, up)` input
     /// (in the camera's local frame), scaled by speed and `dt`.
     pub fn process_movement(
-        &self, camera: &mut Camera,
-        forward: f32, right: f32, up: f32, dt: f32,
+        &self,
+        camera: &mut Camera,
+        forward: f32,
+        right: f32,
+        up: f32,
+        dt: f32,
     ) {
         let cam_forward = camera.forward();
         let cam_right = camera.right();
@@ -140,7 +151,9 @@ mod tests {
         assert!(
             vec3_approx_eq(fwd, Vec3::new(0.0, 0.0, -1.0)),
             "Expected (0, 0, -1), got ({}, {}, {})",
-            fwd.x, fwd.y, fwd.z
+            fwd.x,
+            fwd.y,
+            fwd.z
         );
     }
 
@@ -153,7 +166,9 @@ mod tests {
         assert!(
             vec3_approx_eq(fwd, Vec3::new(1.0, 0.0, 0.0)),
             "Expected (1, 0, 0), got ({}, {}, {})",
-            fwd.x, fwd.y, fwd.z
+            fwd.x,
+            fwd.y,
+            fwd.z
         );
     }
 
@@ -171,7 +186,11 @@ mod tests {
         // No NaN anywhere.
         assert!(!r.x.is_nan() && !r.y.is_nan() && !r.z.is_nan());
         // Result is unit-length along the X axis (sign depends on f32 noise).
-        assert!((r.length() - 1.0).abs() < 1e-4, "right() must be unit length, got {:?}", r);
+        assert!(
+            (r.length() - 1.0).abs() < 1e-4,
+            "right() must be unit length, got {:?}",
+            r
+        );
         assert!(r.y.abs() < 1e-4);
         assert!(r.z.abs() < 1e-4);
         assert!(r.x.abs() > 0.99);

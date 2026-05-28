@@ -1,9 +1,9 @@
-use crate::vertex::MeshVertex;
-use crate::gpu::DEPTH_FORMAT;
 use crate::gbuffer::{
-    GBUFFER_POSITION_FORMAT, GBUFFER_NORMAL_FORMAT, GBUFFER_ALBEDO_FORMAT, GBUFFER_MATERIAL_FORMAT,
+    GBUFFER_ALBEDO_FORMAT, GBUFFER_MATERIAL_FORMAT, GBUFFER_NORMAL_FORMAT, GBUFFER_POSITION_FORMAT,
 };
+use crate::gpu::DEPTH_FORMAT;
 use crate::light::CameraUniform;
+use crate::vertex::MESH_VERTEX_LAYOUT;
 
 /// Bind group layout for the G-Buffer pass camera uniform (dynamic offset, group 0).
 pub fn gbuffer_camera_bind_group_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
@@ -50,7 +50,7 @@ pub fn create_gbuffer_pipeline(
         vertex: wgpu::VertexState {
             module: &shader,
             entry_point: Some("vs_main"),
-            buffers: &[MeshVertex::LAYOUT],
+            buffers: &[MESH_VERTEX_LAYOUT],
             compilation_options: wgpu::PipelineCompilationOptions::default(),
         },
         fragment: Some(wgpu::FragmentState {

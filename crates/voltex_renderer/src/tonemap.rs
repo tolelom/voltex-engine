@@ -41,7 +41,11 @@ mod tests {
     #[test]
     fn aces_zero() {
         // aces(0) should be ≈ 0
-        assert!(aces_tonemap(0.0).abs() < 1e-5, "aces(0) = {}", aces_tonemap(0.0));
+        assert!(
+            aces_tonemap(0.0).abs() < 1e-5,
+            "aces(0) = {}",
+            aces_tonemap(0.0)
+        );
     }
 
     #[test]

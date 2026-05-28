@@ -1,7 +1,7 @@
 #![allow(missing_docs)]
 
-use crate::vertex::{Vertex, MeshVertex};
 use crate::gpu::DEPTH_FORMAT;
+use crate::vertex::{Vertex, MESH_VERTEX_LAYOUT};
 
 pub fn create_render_pipeline(
     device: &wgpu::Device,
@@ -80,7 +80,7 @@ pub fn create_mesh_pipeline(
         vertex: wgpu::VertexState {
             module: &shader,
             entry_point: Some("vs_main"),
-            buffers: &[MeshVertex::LAYOUT],
+            buffers: &[MESH_VERTEX_LAYOUT],
             compilation_options: wgpu::PipelineCompilationOptions::default(),
         },
         fragment: Some(wgpu::FragmentState {
@@ -109,7 +109,11 @@ pub fn create_mesh_pipeline(
             stencil: wgpu::StencilState::default(),
             bias: wgpu::DepthBiasState::default(),
         }),
-        multisample: wgpu::MultisampleState { count: 1, mask: !0, alpha_to_coverage_enabled: false },
+        multisample: wgpu::MultisampleState {
+            count: 1,
+            mask: !0,
+            alpha_to_coverage_enabled: false,
+        },
         multiview_mask: None,
         cache: None,
     })

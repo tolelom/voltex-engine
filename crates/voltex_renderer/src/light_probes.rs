@@ -7,11 +7,18 @@ pub struct LightProbe {
 
 impl LightProbe {
     pub fn new(position: [f32; 3]) -> Self {
-        LightProbe { position, sh_coefficients: [[0.0; 3]; 9] }
+        LightProbe {
+            position,
+            sh_coefficients: [[0.0; 3]; 9],
+        }
     }
     pub fn evaluate_irradiance(&self, normal: [f32; 3]) -> [f32; 3] {
         // L0
-        let mut result = [self.sh_coefficients[0][0], self.sh_coefficients[0][1], self.sh_coefficients[0][2]];
+        let mut result = [
+            self.sh_coefficients[0][0],
+            self.sh_coefficients[0][1],
+            self.sh_coefficients[0][2],
+        ];
         // L1
         let (nx, ny, nz) = (normal[0], normal[1], normal[2]);
         for (c, slot) in result.iter_mut().enumerate() {
@@ -34,8 +41,12 @@ impl Default for LightProbeGrid {
 }
 
 impl LightProbeGrid {
-    pub fn new() -> Self { LightProbeGrid { probes: Vec::new() } }
-    pub fn add(&mut self, probe: LightProbe) { self.probes.push(probe); }
+    pub fn new() -> Self {
+        LightProbeGrid { probes: Vec::new() }
+    }
+    pub fn add(&mut self, probe: LightProbe) {
+        self.probes.push(probe);
+    }
     pub fn nearest(&self, pos: [f32; 3]) -> Option<&LightProbe> {
         self.probes.iter().min_by(|a, b| {
             let da = dist_sq(a.position, pos);
@@ -43,12 +54,19 @@ impl LightProbeGrid {
             da.partial_cmp(&db).unwrap_or(std::cmp::Ordering::Equal)
         })
     }
-    pub fn len(&self) -> usize { self.probes.len() }
-    pub fn is_empty(&self) -> bool { self.probes.is_empty() }
+    pub fn len(&self) -> usize {
+        self.probes.len()
+    }
+    pub fn is_empty(&self) -> bool {
+        self.probes.is_empty()
+    }
 }
 
 fn dist_sq(a: [f32; 3], b: [f32; 3]) -> f32 {
-    let dx = a[0]-b[0]; let dy = a[1]-b[1]; let dz = a[2]-b[2]; dx*dx+dy*dy+dz*dz
+    let dx = a[0] - b[0];
+    let dy = a[1] - b[1];
+    let dz = a[2] - b[2];
+    dx * dx + dy * dy + dz * dz
 }
 
 #[cfg(test)]

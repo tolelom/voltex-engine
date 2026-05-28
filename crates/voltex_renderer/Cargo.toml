@@ -7,6 +7,7 @@ license.workspace = true
 [dependencies]
 voltex_math.workspace = true
 voltex_platform.workspace = true
+voltex_image.workspace = true
 wgpu.workspace = true
 winit.workspace = true
 bytemuck.workspace = true

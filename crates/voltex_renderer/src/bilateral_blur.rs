@@ -73,7 +73,10 @@ impl BilateralBlur {
             cache: None,
         });
 
-        BilateralBlur { pipeline, bind_group_layout }
+        BilateralBlur {
+            pipeline,
+            bind_group_layout,
+        }
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -92,10 +95,22 @@ impl BilateralBlur {
             label: Some("Bilateral Blur BG"),
             layout: &self.bind_group_layout,
             entries: &[
-                wgpu::BindGroupEntry { binding: 0, resource: wgpu::BindingResource::TextureView(input_view) },
-                wgpu::BindGroupEntry { binding: 1, resource: wgpu::BindingResource::TextureView(depth_view) },
-                wgpu::BindGroupEntry { binding: 2, resource: wgpu::BindingResource::TextureView(normal_view) },
-                wgpu::BindGroupEntry { binding: 3, resource: wgpu::BindingResource::TextureView(output_view) },
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: wgpu::BindingResource::TextureView(input_view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::TextureView(depth_view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 2,
+                    resource: wgpu::BindingResource::TextureView(normal_view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 3,
+                    resource: wgpu::BindingResource::TextureView(output_view),
+                },
             ],
         });
 
@@ -146,7 +161,11 @@ mod tests {
     fn test_bilateral_weight_normal_edge() {
         // Perpendicular normals -> low weight
         let w = bilateral_weight(0.0, 0.0, 0.0, 2.0, 0.1, 16.0);
-        assert!(w < 0.01, "perpendicular normals should give low weight: {}", w);
+        assert!(
+            w < 0.01,
+            "perpendicular normals should give low weight: {}",
+            w
+        );
     }
 
     #[test]

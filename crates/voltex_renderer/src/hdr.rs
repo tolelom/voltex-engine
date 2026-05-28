@@ -13,7 +13,11 @@ pub struct HdrTarget {
 impl HdrTarget {
     pub fn new(device: &wgpu::Device, width: u32, height: u32) -> Self {
         let view = create_hdr_view(device, width, height);
-        Self { view, width, height }
+        Self {
+            view,
+            width,
+            height,
+        }
     }
 
     /// Recreate the HDR texture when the window is resized.

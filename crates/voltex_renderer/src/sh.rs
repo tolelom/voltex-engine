@@ -8,15 +8,15 @@ use std::f32::consts::PI;
 /// Returns array of 9 basis values.
 fn sh_basis(x: f32, y: f32, z: f32) -> [f32; 9] {
     [
-        0.282095,                           // Y00:  L=0 M=0
-        0.488603 * y,                       // Y1-1: L=1 M=-1
-        0.488603 * z,                       // Y10:  L=1 M=0
-        0.488603 * x,                       // Y1+1: L=1 M=+1
-        1.092548 * x * y,                   // Y2-2: L=2 M=-2
-        1.092548 * y * z,                   // Y2-1: L=2 M=-1
-        0.315392 * (3.0 * z * z - 1.0),    // Y20:  L=2 M=0
-        1.092548 * x * z,                   // Y2+1: L=2 M=+1
-        0.546274 * (x * x - y * y),         // Y2+2: L=2 M=+2
+        0.282095,                       // Y00:  L=0 M=0
+        0.488603 * y,                   // Y1-1: L=1 M=-1
+        0.488603 * z,                   // Y10:  L=1 M=0
+        0.488603 * x,                   // Y1+1: L=1 M=+1
+        1.092548 * x * y,               // Y2-2: L=2 M=-2
+        1.092548 * y * z,               // Y2-1: L=2 M=-1
+        0.315392 * (3.0 * z * z - 1.0), // Y20:  L=2 M=0
+        1.092548 * x * z,               // Y2+1: L=2 M=+1
+        0.546274 * (x * x - y * y),     // Y2+2: L=2 M=+2
     ]
 }
 
@@ -164,7 +164,12 @@ pub fn pack_sh_coefficients(coeffs: &[[f32; 3]; 9]) -> [[f32; 4]; 7] {
 
     let mut packed = [[0.0f32; 4]; 7];
     for i in 0..7 {
-        packed[i] = [flat[i * 4], flat[i * 4 + 1], flat[i * 4 + 2], flat[i * 4 + 3]];
+        packed[i] = [
+            flat[i * 4],
+            flat[i * 4 + 1],
+            flat[i * 4 + 2],
+            flat[i * 4 + 3],
+        ];
     }
     packed
 }
@@ -229,15 +234,21 @@ mod tests {
         let expected_c0 = 0.282095 * 4.0 * PI;
         assert!(
             (coeffs[0][0] - expected_c0).abs() < 0.05,
-            "c0.r = {} expected ~{}", coeffs[0][0], expected_c0
+            "c0.r = {} expected ~{}",
+            coeffs[0][0],
+            expected_c0
         );
         assert!(
             (coeffs[0][1] - expected_c0).abs() < 0.05,
-            "c0.g = {} expected ~{}", coeffs[0][1], expected_c0
+            "c0.g = {} expected ~{}",
+            coeffs[0][1],
+            expected_c0
         );
         assert!(
             (coeffs[0][2] - expected_c0).abs() < 0.05,
-            "c0.b = {} expected ~{}", coeffs[0][2], expected_c0
+            "c0.b = {} expected ~{}",
+            coeffs[0][2],
+            expected_c0
         );
 
         // All higher-order coefficients should be ~0.
@@ -247,7 +258,10 @@ mod tests {
             for ch in 0..3 {
                 assert!(
                     coeffs[k][ch].abs() < 0.05,
-                    "c{}[{}] = {} should be ~0", k, ch, coeffs[k][ch]
+                    "c{}[{}] = {} should be ~0",
+                    k,
+                    ch,
+                    coeffs[k][ch]
                 );
             }
         }
@@ -290,31 +304,33 @@ mod tests {
         // L0 (index 0) should also be non-zero (DC component)
         assert!(
             coeffs[0][0] > 0.01,
-            "L0 coefficient should be positive for directional light: {}", coeffs[0][0]
+            "L0 coefficient should be positive for directional light: {}",
+            coeffs[0][0]
         );
         assert!(
             coeffs[1][0] > 0.01,
-            "L1(-1) Y-direction coefficient should be positive: {}", coeffs[1][0]
+            "L1(-1) Y-direction coefficient should be positive: {}",
+            coeffs[1][0]
         );
 
         // The L1 Y-component should be the largest L1 component (light is along +Y)
         assert!(
             coeffs[1][0].abs() > coeffs[2][0].abs(),
-            "L1(-1) Y should dominate over L1(0) Z: {} vs {}", coeffs[1][0], coeffs[2][0]
+            "L1(-1) Y should dominate over L1(0) Z: {} vs {}",
+            coeffs[1][0],
+            coeffs[2][0]
         );
         assert!(
             coeffs[1][0].abs() > coeffs[3][0].abs(),
-            "L1(-1) Y should dominate over L1(+1) X: {} vs {}", coeffs[1][0], coeffs[3][0]
+            "L1(-1) Y should dominate over L1(+1) X: {} vs {}",
+            coeffs[1][0],
+            coeffs[3][0]
         );
     }
 
     #[test]
     fn test_sh_procedural_sky_coefficients() {
-        let coeffs = compute_sh_coefficients(
-            [0.5, -0.7, 0.5],
-            [1.0, 1.0, 1.0],
-            3.0,
-        );
+        let coeffs = compute_sh_coefficients([0.5, -0.7, 0.5], [1.0, 1.0, 1.0], 3.0);
 
         // L0 should be positive (sky has positive radiance)
         assert!(coeffs[0][0] > 0.0, "L0 R should be positive");
@@ -328,7 +344,10 @@ mod tests {
             for ch in 0..3 {
                 assert!(
                     coeffs[k][ch].is_finite(),
-                    "SH coefficient c{}[{}] = {} is not finite", k, ch, coeffs[k][ch]
+                    "SH coefficient c{}[{}] = {} is not finite",
+                    k,
+                    ch,
+                    coeffs[k][ch]
                 );
             }
         }
@@ -345,35 +364,33 @@ mod tests {
         let packed = pack_sh_coefficients(&coeffs);
 
         // Verify flat layout: c0.r, c0.g, c0.b, c1.r, c1.g, c1.b, ...
-        assert_eq!(packed[0], [0.0, 1.0, 2.0, 3.0]);   // c0.rgb, c1.r
-        assert_eq!(packed[1], [4.0, 5.0, 6.0, 7.0]);   // c1.gb, c2.rg
+        assert_eq!(packed[0], [0.0, 1.0, 2.0, 3.0]); // c0.rgb, c1.r
+        assert_eq!(packed[1], [4.0, 5.0, 6.0, 7.0]); // c1.gb, c2.rg
         assert_eq!(packed[6][0], 24.0); // c8.r
         assert_eq!(packed[6][1], 25.0); // c8.g
         assert_eq!(packed[6][2], 26.0); // c8.b
-        assert_eq!(packed[6][3], 0.0);  // padding
+        assert_eq!(packed[6][3], 0.0); // padding
     }
 
     #[test]
     fn test_evaluate_sh_cpu_positive() {
-        let coeffs = compute_sh_coefficients(
-            [0.5, -0.7, 0.5],
-            [1.0, 1.0, 1.0],
-            3.0,
-        );
+        let coeffs = compute_sh_coefficients([0.5, -0.7, 0.5], [1.0, 1.0, 1.0], 3.0);
 
         // Evaluate at several directions — should be non-negative
         let dirs = [
-            [0.0, 1.0, 0.0],   // up
-            [0.0, -1.0, 0.0],  // down
-            [1.0, 0.0, 0.0],   // right
-            [0.0, 0.0, 1.0],   // forward
+            [0.0, 1.0, 0.0],  // up
+            [0.0, -1.0, 0.0], // down
+            [1.0, 0.0, 0.0],  // right
+            [0.0, 0.0, 1.0],  // forward
         ];
 
         for dir in &dirs {
             let result = evaluate_sh_cpu(*dir, &coeffs);
             assert!(
                 result[0] >= 0.0 && result[1] >= 0.0 && result[2] >= 0.0,
-                "SH evaluation at {:?} should be non-negative: {:?}", dir, result
+                "SH evaluation at {:?} should be non-negative: {:?}",
+                dir,
+                result
             );
         }
     }

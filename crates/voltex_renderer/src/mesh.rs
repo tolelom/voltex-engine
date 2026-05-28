@@ -26,7 +26,11 @@ impl Mesh {
             contents: bytemuck::cast_slice(indices),
             usage: wgpu::BufferUsages::INDEX,
         });
-        Self { vertex_buffer, index_buffer, num_indices: indices.len() as u32 }
+        Self {
+            vertex_buffer,
+            index_buffer,
+            num_indices: indices.len() as u32,
+        }
     }
 
     /// Create a mesh with additional buffer usage flags (e.g. `BLAS_INPUT` for ray tracing).
@@ -46,6 +50,10 @@ impl Mesh {
             contents: bytemuck::cast_slice(indices),
             usage: wgpu::BufferUsages::INDEX | extra_usage,
         });
-        Self { vertex_buffer, index_buffer, num_indices: indices.len() as u32 }
+        Self {
+            vertex_buffer,
+            index_buffer,
+            num_indices: indices.len() as u32,
+        }
     }
 }

@@ -51,48 +51,78 @@ impl Taa {
             label: Some("TAA BGL"),
             entries: &[
                 wgpu::BindGroupLayoutEntry {
-                    binding: 0, visibility: wgpu::ShaderStages::COMPUTE,
-                    ty: wgpu::BindingType::Texture { multisampled: false, view_dimension: wgpu::TextureViewDimension::D2, sample_type: wgpu::TextureSampleType::Float { filterable: false } },
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::COMPUTE,
+                    ty: wgpu::BindingType::Texture {
+                        multisampled: false,
+                        view_dimension: wgpu::TextureViewDimension::D2,
+                        sample_type: wgpu::TextureSampleType::Float { filterable: false },
+                    },
                     count: None,
                 },
                 wgpu::BindGroupLayoutEntry {
-                    binding: 1, visibility: wgpu::ShaderStages::COMPUTE,
-                    ty: wgpu::BindingType::Texture { multisampled: false, view_dimension: wgpu::TextureViewDimension::D2, sample_type: wgpu::TextureSampleType::Float { filterable: false } },
+                    binding: 1,
+                    visibility: wgpu::ShaderStages::COMPUTE,
+                    ty: wgpu::BindingType::Texture {
+                        multisampled: false,
+                        view_dimension: wgpu::TextureViewDimension::D2,
+                        sample_type: wgpu::TextureSampleType::Float { filterable: false },
+                    },
                     count: None,
                 },
                 wgpu::BindGroupLayoutEntry {
-                    binding: 2, visibility: wgpu::ShaderStages::COMPUTE,
-                    ty: wgpu::BindingType::StorageTexture { access: wgpu::StorageTextureAccess::WriteOnly, format: wgpu::TextureFormat::Rgba16Float, view_dimension: wgpu::TextureViewDimension::D2 },
+                    binding: 2,
+                    visibility: wgpu::ShaderStages::COMPUTE,
+                    ty: wgpu::BindingType::StorageTexture {
+                        access: wgpu::StorageTextureAccess::WriteOnly,
+                        format: wgpu::TextureFormat::Rgba16Float,
+                        view_dimension: wgpu::TextureViewDimension::D2,
+                    },
                     count: None,
                 },
                 wgpu::BindGroupLayoutEntry {
-                    binding: 3, visibility: wgpu::ShaderStages::COMPUTE,
-                    ty: wgpu::BindingType::Buffer { ty: wgpu::BufferBindingType::Uniform, has_dynamic_offset: false, min_binding_size: None },
+                    binding: 3,
+                    visibility: wgpu::ShaderStages::COMPUTE,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
                     count: None,
                 },
             ],
         });
 
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label: Some("TAA PL"), bind_group_layouts: &[&bind_group_layout], immediate_size: 0,
+            label: Some("TAA PL"),
+            bind_group_layouts: &[&bind_group_layout],
+            immediate_size: 0,
         });
 
         let pipeline = device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
-            label: Some("TAA Pipeline"), layout: Some(&pipeline_layout),
-            module: &shader, entry_point: Some("main"),
-            compilation_options: wgpu::PipelineCompilationOptions::default(), cache: None,
+            label: Some("TAA Pipeline"),
+            layout: Some(&pipeline_layout),
+            module: &shader,
+            entry_point: Some("main"),
+            compilation_options: wgpu::PipelineCompilationOptions::default(),
+            cache: None,
         });
 
         let params_buffer = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("TAA Params"), size: std::mem::size_of::<TaaParams>() as u64,
+            label: Some("TAA Params"),
+            size: std::mem::size_of::<TaaParams>() as u64,
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
 
         Taa {
-            pipeline, bind_group_layout, params_buffer,
-            jitter_index: 0, prev_jitter: [0.0; 2],
-            blend_factor: 0.1, enabled: true,
+            pipeline,
+            bind_group_layout,
+            params_buffer,
+            jitter_index: 0,
+            prev_jitter: [0.0; 2],
+            blend_factor: 0.1,
+            enabled: true,
         }
     }
 
@@ -100,7 +130,7 @@ impl Taa {
     pub fn next_jitter(&mut self) -> [f32; 2] {
         self.prev_jitter = jitter_offset(self.jitter_index);
         self.jitter_index += 1;
-        
+
         jitter_offset(self.jitter_index)
     }
 
@@ -119,23 +149,42 @@ impl Taa {
     ) {
         let params = TaaParams {
             jitter: [jitter[0] / width as f32, jitter[1] / height as f32],
-            prev_jitter: [self.prev_jitter[0] / width as f32, self.prev_jitter[1] / height as f32],
+            prev_jitter: [
+                self.prev_jitter[0] / width as f32,
+                self.prev_jitter[1] / height as f32,
+            ],
             blend_factor: self.blend_factor,
             _pad: [0.0; 3],
         };
         queue.write_buffer(&self.params_buffer, 0, bytemuck::cast_slice(&[params]));
 
         let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("TAA BG"), layout: &self.bind_group_layout,
+            label: Some("TAA BG"),
+            layout: &self.bind_group_layout,
             entries: &[
-                wgpu::BindGroupEntry { binding: 0, resource: wgpu::BindingResource::TextureView(current_view) },
-                wgpu::BindGroupEntry { binding: 1, resource: wgpu::BindingResource::TextureView(history_view) },
-                wgpu::BindGroupEntry { binding: 2, resource: wgpu::BindingResource::TextureView(output_view) },
-                wgpu::BindGroupEntry { binding: 3, resource: self.params_buffer.as_entire_binding() },
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: wgpu::BindingResource::TextureView(current_view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::TextureView(history_view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 2,
+                    resource: wgpu::BindingResource::TextureView(output_view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 3,
+                    resource: self.params_buffer.as_entire_binding(),
+                },
             ],
         });
 
-        let mut cpass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor { label: Some("TAA Pass"), timestamp_writes: None });
+        let mut cpass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
+            label: Some("TAA Pass"),
+            timestamp_writes: None,
+        });
         cpass.set_pipeline(&self.pipeline);
         cpass.set_bind_group(0, &bind_group, &[]);
         cpass.dispatch_workgroups(width.div_ceil(16), height.div_ceil(16), 1);
@@ -155,16 +204,24 @@ mod tests {
 
     #[test]
     fn test_halton_base3() {
-        assert!((halton(1, 3) - 1.0/3.0).abs() < 1e-6);
-        assert!((halton(2, 3) - 2.0/3.0).abs() < 1e-6);
+        assert!((halton(1, 3) - 1.0 / 3.0).abs() < 1e-6);
+        assert!((halton(2, 3) - 2.0 / 3.0).abs() < 1e-6);
     }
 
     #[test]
     fn test_jitter_offset_centered() {
         for i in 0..16 {
             let j = jitter_offset(i);
-            assert!(j[0] >= -0.5 && j[0] <= 0.5, "jitter x out of range: {}", j[0]);
-            assert!(j[1] >= -0.5 && j[1] <= 0.5, "jitter y out of range: {}", j[1]);
+            assert!(
+                j[0] >= -0.5 && j[0] <= 0.5,
+                "jitter x out of range: {}",
+                j[0]
+            );
+            assert!(
+                j[1] >= -0.5 && j[1] <= 0.5,
+                "jitter y out of range: {}",
+                j[1]
+            );
         }
     }
 

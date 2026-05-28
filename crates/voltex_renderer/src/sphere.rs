@@ -41,10 +41,7 @@ pub fn generate_sphere(radius: f32, sectors: u32, stacks: u32) -> (Vec<MeshVerte
 
             let position = [x, y, z];
             let normal = [x / radius, y / radius, z / radius];
-            let uv = [
-                j as f32 / sectors as f32,
-                i as f32 / stacks as f32,
-            ];
+            let uv = [j as f32 / sectors as f32, i as f32 / stacks as f32];
 
             // Tangent follows the longitude direction (increasing sector angle) in XZ plane
             let tangent_x = -sector_angle.sin();
@@ -124,9 +121,15 @@ mod tests {
         assert!(!vertices.is_empty());
         assert!(!indices.is_empty());
         for v in &vertices {
-            for &c in &v.position { assert!(c.is_finite(), "position has non-finite component"); }
-            for &c in &v.normal   { assert!(c.is_finite(), "normal has non-finite component"); }
-            for &c in &v.uv       { assert!(c.is_finite(), "uv has non-finite component"); }
+            for &c in &v.position {
+                assert!(c.is_finite(), "position has non-finite component");
+            }
+            for &c in &v.normal {
+                assert!(c.is_finite(), "normal has non-finite component");
+            }
+            for &c in &v.uv {
+                assert!(c.is_finite(), "uv has non-finite component");
+            }
         }
     }
 
@@ -136,7 +139,9 @@ mod tests {
         // NaN normals. Clamped to a sensible positive minimum.
         let (vertices, _) = generate_sphere(f32::NAN, 12, 8);
         for v in &vertices {
-            for &c in &v.normal { assert!(c.is_finite()); }
+            for &c in &v.normal {
+                assert!(c.is_finite());
+            }
         }
     }
 }

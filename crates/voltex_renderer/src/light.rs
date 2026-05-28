@@ -22,8 +22,18 @@ impl Default for CameraUniform {
 impl CameraUniform {
     pub fn new() -> Self {
         Self {
-            view_proj: [[1.0,0.0,0.0,0.0],[0.0,1.0,0.0,0.0],[0.0,0.0,1.0,0.0],[0.0,0.0,0.0,1.0]],
-            model: [[1.0,0.0,0.0,0.0],[0.0,1.0,0.0,0.0],[0.0,0.0,1.0,0.0],[0.0,0.0,0.0,1.0]],
+            view_proj: [
+                [1.0, 0.0, 0.0, 0.0],
+                [0.0, 1.0, 0.0, 0.0],
+                [0.0, 0.0, 1.0, 0.0],
+                [0.0, 0.0, 0.0, 1.0],
+            ],
+            model: [
+                [1.0, 0.0, 0.0, 0.0],
+                [0.0, 1.0, 0.0, 0.0],
+                [0.0, 0.0, 1.0, 0.0],
+                [0.0, 0.0, 0.0, 1.0],
+            ],
             camera_pos: [0.0; 3],
             _padding: 0.0,
         }
@@ -67,14 +77,14 @@ pub const LIGHT_SPOT: u32 = 2;
 #[derive(Copy, Clone, Debug, Pod, Zeroable)]
 pub struct LightData {
     pub position: [f32; 3],
-    pub light_type: u32,       // 16 bytes
+    pub light_type: u32, // 16 bytes
     pub direction: [f32; 3],
-    pub range: f32,            // 32 bytes
+    pub range: f32, // 32 bytes
     pub color: [f32; 3],
-    pub intensity: f32,        // 48 bytes
+    pub intensity: f32, // 48 bytes
     pub inner_cone: f32,
     pub outer_cone: f32,
-    pub _padding: [f32; 2],   // 64 bytes
+    pub _padding: [f32; 2], // 64 bytes
 }
 
 impl LightData {
@@ -133,11 +143,11 @@ impl LightData {
 #[repr(C)]
 #[derive(Copy, Clone, Debug, Pod, Zeroable)]
 pub struct LightsUniform {
-    pub lights: [LightData; MAX_LIGHTS],  // 1024 bytes
-    pub count: u32,                        // 4 bytes
-    pub _pad_count: [f32; 3],              // 12 bytes (align ambient_color to 16-byte for WGSL vec3)
-    pub ambient_color: [f32; 3],           // 12 bytes at offset 1040
-    pub _pad_end: f32,                     // 4 bytes → total 1056 (matches WGSL)
+    pub lights: [LightData; MAX_LIGHTS], // 1024 bytes
+    pub count: u32,                      // 4 bytes
+    pub _pad_count: [f32; 3],            // 12 bytes (align ambient_color to 16-byte for WGSL vec3)
+    pub ambient_color: [f32; 3],         // 12 bytes at offset 1040
+    pub _pad_end: f32,                   // 4 bytes → total 1056 (matches WGSL)
 }
 
 impl Default for LightsUniform {
@@ -176,17 +186,32 @@ mod tests {
 
     #[test]
     fn test_light_data_size() {
-        assert_eq!(mem::size_of::<LightData>() % 16, 0,
-            "LightData must be a multiple of 16 bytes for WGSL array alignment");
-        assert_eq!(mem::size_of::<LightData>(), 64,
-            "LightData must be exactly 64 bytes");
+        assert_eq!(
+            mem::size_of::<LightData>() % 16,
+            0,
+            "LightData must be a multiple of 16 bytes for WGSL array alignment"
+        );
+        assert_eq!(
+            mem::size_of::<LightData>(),
+            64,
+            "LightData must be exactly 64 bytes"
+        );
     }
 
     #[test]
     fn test_lights_uniform_add() {
         let mut u = LightsUniform::new();
-        u.add_light(LightData::directional([0.0, -1.0, 0.0], [1.0, 1.0, 1.0], 1.0));
-        u.add_light(LightData::point([0.0, 5.0, 0.0], [1.0, 0.0, 0.0], 2.0, 10.0));
+        u.add_light(LightData::directional(
+            [0.0, -1.0, 0.0],
+            [1.0, 1.0, 1.0],
+            1.0,
+        ));
+        u.add_light(LightData::point(
+            [0.0, 5.0, 0.0],
+            [1.0, 0.0, 0.0],
+            2.0,
+            10.0,
+        ));
         assert_eq!(u.count, 2);
     }
 
@@ -194,10 +219,16 @@ mod tests {
     fn test_lights_uniform_max() {
         let mut u = LightsUniform::new();
         for _ in 0..20 {
-            u.add_light(LightData::directional([0.0, -1.0, 0.0], [1.0, 1.0, 1.0], 1.0));
+            u.add_light(LightData::directional(
+                [0.0, -1.0, 0.0],
+                [1.0, 1.0, 1.0],
+                1.0,
+            ));
         }
-        assert_eq!(u.count, MAX_LIGHTS as u32,
-            "count must be capped at MAX_LIGHTS (16)");
+        assert_eq!(
+            u.count, MAX_LIGHTS as u32,
+            "count must be capped at MAX_LIGHTS (16)"
+        );
     }
 
     #[test]
@@ -213,9 +244,13 @@ mod tests {
         );
         let expected_inner = 15.0_f32.to_radians().cos();
         let expected_outer = 30.0_f32.to_radians().cos();
-        assert!((light.inner_cone - expected_inner).abs() < 1e-6,
-            "inner_cone should be cos(15°)");
-        assert!((light.outer_cone - expected_outer).abs() < 1e-6,
-            "outer_cone should be cos(30°)");
+        assert!(
+            (light.inner_cone - expected_inner).abs() < 1e-6,
+            "inner_cone should be cos(15°)"
+        );
+        assert!(
+            (light.outer_cone - expected_outer).abs() < 1e-6,
+            "outer_cone should be cos(30°)"
+        );
     }
 }

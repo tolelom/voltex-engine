@@ -36,7 +36,11 @@ pub fn parse_bmp(data: &[u8]) -> crate::Result<BmpImage> {
         return Err(format!("Unsupported BMP bpp: {} (only 24 and 32 supported)", bpp).into());
     }
     if compression != 0 {
-        return Err(format!("Unsupported BMP compression: {} (only 0/uncompressed supported)", compression).into());
+        return Err(format!(
+            "Unsupported BMP compression: {} (only 0/uncompressed supported)",
+            compression
+        )
+        .into());
     }
 
     let width = width_raw.unsigned_abs();
@@ -50,7 +54,8 @@ pub fn parse_bmp(data: &[u8]) -> crate::Result<BmpImage> {
         return Err(format!(
             "BMP exceeds max dimension {}: {}x{}",
             BMP_MAX_DIMENSION, width, height
-        ).into());
+        )
+        .into());
     }
 
     let bytes_per_pixel = (bpp as usize) / 8;
@@ -72,7 +77,8 @@ pub fn parse_bmp(data: &[u8]) -> crate::Result<BmpImage> {
             "BMP data too small: need {} bytes, got {}",
             required_data_size,
             data.len()
-        ).into());
+        )
+        .into());
     }
 
     let dst_size = (width as usize)
@@ -82,7 +88,11 @@ pub fn parse_bmp(data: &[u8]) -> crate::Result<BmpImage> {
     let mut pixels = vec![0u8; dst_size];
 
     for row in 0..height as usize {
-        let src_row = if bottom_up { height as usize - 1 - row } else { row };
+        let src_row = if bottom_up {
+            height as usize - 1 - row
+        } else {
+            row
+        };
         let row_start = pixel_offset + src_row * row_size;
 
         for col in 0..width as usize {
@@ -93,7 +103,11 @@ pub fn parse_bmp(data: &[u8]) -> crate::Result<BmpImage> {
             let b = data[src_offset];
             let g = data[src_offset + 1];
             let r = data[src_offset + 2];
-            let a = if bytes_per_pixel == 4 { data[src_offset + 3] } else { 255 };
+            let a = if bytes_per_pixel == 4 {
+                data[src_offset + 3]
+            } else {
+                255
+            };
 
             pixels[dst_offset] = r;
             pixels[dst_offset + 1] = g;
@@ -102,7 +116,11 @@ pub fn parse_bmp(data: &[u8]) -> crate::Result<BmpImage> {
         }
     }
 
-    Ok(BmpImage { width, height, pixels })
+    Ok(BmpImage {
+        width,
+        height,
+        pixels,
+    })
 }
 
 pub struct GpuTexture {
@@ -182,7 +200,12 @@ impl GpuTexture {
             ],
         });
 
-        Self { texture, view, sampler, bind_group }
+        Self {
+            texture,
+            view,
+            sampler,
+            bind_group,
+        }
     }
 
     pub fn white_1x1(
@@ -533,8 +556,8 @@ mod tests {
         let img = parse_bmp(&bmp).unwrap();
         assert_eq!(img.width, 2);
         assert_eq!(img.height, 2);
-        assert_eq!(img.pixels[0], 0);   // R
-        assert_eq!(img.pixels[1], 0);   // G
+        assert_eq!(img.pixels[0], 0); // R
+        assert_eq!(img.pixels[1], 0); // G
         assert_eq!(img.pixels[2], 255); // B
         assert_eq!(img.pixels[3], 255); // A
     }

@@ -27,11 +27,7 @@ pub fn decode_octahedral(oct: [f32; 2]) -> [f32; 3] {
 }
 
 /// Reconstruct world position from depth + UV + inverse view-projection matrix.
-pub fn reconstruct_position(
-    uv: [f32; 2],
-    depth: f32,
-    inv_view_proj: &[[f32; 4]; 4],
-) -> [f32; 3] {
+pub fn reconstruct_position(uv: [f32; 2], depth: f32, inv_view_proj: &[[f32; 4]; 4]) -> [f32; 3] {
     let ndc_x = uv[0] * 2.0 - 1.0;
     let ndc_y = 1.0 - uv[1] * 2.0;
     let clip = [ndc_x, ndc_y, depth, 1.0];

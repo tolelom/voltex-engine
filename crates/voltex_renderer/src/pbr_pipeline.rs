@@ -1,7 +1,7 @@
 #![allow(missing_docs)]
 
-use crate::vertex::MeshVertex;
 use crate::gpu::DEPTH_FORMAT;
+use crate::vertex::MESH_VERTEX_LAYOUT;
 
 pub fn create_pbr_pipeline(
     device: &wgpu::Device,
@@ -18,7 +18,12 @@ pub fn create_pbr_pipeline(
 
     let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
         label: Some("PBR Pipeline Layout"),
-        bind_group_layouts: &[camera_light_layout, texture_layout, material_layout, shadow_layout],
+        bind_group_layouts: &[
+            camera_light_layout,
+            texture_layout,
+            material_layout,
+            shadow_layout,
+        ],
         immediate_size: 0,
     });
 
@@ -28,7 +33,7 @@ pub fn create_pbr_pipeline(
         vertex: wgpu::VertexState {
             module: &shader,
             entry_point: Some("vs_main"),
-            buffers: &[MeshVertex::LAYOUT],
+            buffers: &[MESH_VERTEX_LAYOUT],
             compilation_options: wgpu::PipelineCompilationOptions::default(),
         },
         fragment: Some(wgpu::FragmentState {

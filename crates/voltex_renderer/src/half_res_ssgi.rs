@@ -17,7 +17,11 @@ pub fn bilinear_weights(frac_x: f32, frac_y: f32) -> [f32; 4] {
 
 /// Depth-aware upscale: reject samples with large depth discontinuity.
 pub fn depth_aware_weight(center_depth: f32, sample_depth: f32, threshold: f32) -> f32 {
-    if (center_depth - sample_depth).abs() > threshold { 0.0 } else { 1.0 }
+    if (center_depth - sample_depth).abs() > threshold {
+        0.0
+    } else {
+        1.0
+    }
 }
 
 #[cfg(test)]
@@ -34,7 +38,9 @@ mod tests {
     #[test]
     fn test_bilinear_weights_center() {
         let w = bilinear_weights(0.5, 0.5);
-        for &wi in &w { assert!((wi - 0.25).abs() < 1e-6); }
+        for &wi in &w {
+            assert!((wi - 0.25).abs() < 1e-6);
+        }
     }
 
     #[test]

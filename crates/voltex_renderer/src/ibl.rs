@@ -61,8 +61,7 @@ impl IblResources {
             extent,
         );
 
-        let brdf_lut_view =
-            brdf_lut_texture.create_view(&wgpu::TextureViewDescriptor::default());
+        let brdf_lut_view = brdf_lut_texture.create_view(&wgpu::TextureViewDescriptor::default());
 
         let brdf_lut_sampler = device.create_sampler(&wgpu::SamplerDescriptor {
             label: Some("BrdfLutSampler"),
@@ -105,48 +104,42 @@ impl IblResources {
             view_formats: &[],
         });
 
-        let storage_view =
-            brdf_lut_texture.create_view(&wgpu::TextureViewDescriptor::default());
+        let storage_view = brdf_lut_texture.create_view(&wgpu::TextureViewDescriptor::default());
 
         // Create compute pipeline
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("BRDF LUT Compute Shader"),
-            source: wgpu::ShaderSource::Wgsl(
-                include_str!("brdf_lut_compute.wgsl").into(),
-            ),
+            source: wgpu::ShaderSource::Wgsl(include_str!("brdf_lut_compute.wgsl").into()),
         });
 
-        let bind_group_layout =
-            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-                label: Some("BRDF LUT Compute BGL"),
-                entries: &[wgpu::BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: wgpu::ShaderStages::COMPUTE,
-                    ty: wgpu::BindingType::StorageTexture {
-                        access: wgpu::StorageTextureAccess::WriteOnly,
-                        format: wgpu::TextureFormat::Rg16Float,
-                        view_dimension: wgpu::TextureViewDimension::D2,
-                    },
-                    count: None,
-                }],
-            });
+        let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: Some("BRDF LUT Compute BGL"),
+            entries: &[wgpu::BindGroupLayoutEntry {
+                binding: 0,
+                visibility: wgpu::ShaderStages::COMPUTE,
+                ty: wgpu::BindingType::StorageTexture {
+                    access: wgpu::StorageTextureAccess::WriteOnly,
+                    format: wgpu::TextureFormat::Rg16Float,
+                    view_dimension: wgpu::TextureViewDimension::D2,
+                },
+                count: None,
+            }],
+        });
 
-        let pipeline_layout =
-            device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-                label: Some("BRDF LUT Compute Pipeline Layout"),
-                bind_group_layouts: &[&bind_group_layout],
-                immediate_size: 0,
-            });
+        let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            label: Some("BRDF LUT Compute Pipeline Layout"),
+            bind_group_layouts: &[&bind_group_layout],
+            immediate_size: 0,
+        });
 
-        let pipeline =
-            device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
-                label: Some("BRDF LUT Compute Pipeline"),
-                layout: Some(&pipeline_layout),
-                module: &shader,
-                entry_point: Some("main"),
-                compilation_options: wgpu::PipelineCompilationOptions::default(),
-                cache: None,
-            });
+        let pipeline = device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
+            label: Some("BRDF LUT Compute Pipeline"),
+            layout: Some(&pipeline_layout),
+            module: &shader,
+            entry_point: Some("main"),
+            compilation_options: wgpu::PipelineCompilationOptions::default(),
+            cache: None,
+        });
 
         let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("BRDF LUT Compute Bind Group"),
@@ -158,10 +151,9 @@ impl IblResources {
         });
 
         // Dispatch compute shader
-        let mut encoder =
-            device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                label: Some("BRDF LUT Compute Encoder"),
-            });
+        let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+            label: Some("BRDF LUT Compute Encoder"),
+        });
 
         {
             let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
@@ -178,8 +170,7 @@ impl IblResources {
 
         queue.submit(std::iter::once(encoder.finish()));
 
-        let brdf_lut_view =
-            brdf_lut_texture.create_view(&wgpu::TextureViewDescriptor::default());
+        let brdf_lut_view = brdf_lut_texture.create_view(&wgpu::TextureViewDescriptor::default());
 
         let brdf_lut_sampler = device.create_sampler(&wgpu::SamplerDescriptor {
             label: Some("BrdfLutSampler"),

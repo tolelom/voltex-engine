@@ -53,45 +53,75 @@ impl Ssr {
             entries: &[
                 // binding 0: position texture
                 wgpu::BindGroupLayoutEntry {
-                    binding: 0, visibility: wgpu::ShaderStages::COMPUTE,
-                    ty: wgpu::BindingType::Texture { multisampled: false, view_dimension: wgpu::TextureViewDimension::D2, sample_type: wgpu::TextureSampleType::Float { filterable: false } },
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::COMPUTE,
+                    ty: wgpu::BindingType::Texture {
+                        multisampled: false,
+                        view_dimension: wgpu::TextureViewDimension::D2,
+                        sample_type: wgpu::TextureSampleType::Float { filterable: false },
+                    },
                     count: None,
                 },
                 // binding 1: normal texture
                 wgpu::BindGroupLayoutEntry {
-                    binding: 1, visibility: wgpu::ShaderStages::COMPUTE,
-                    ty: wgpu::BindingType::Texture { multisampled: false, view_dimension: wgpu::TextureViewDimension::D2, sample_type: wgpu::TextureSampleType::Float { filterable: false } },
+                    binding: 1,
+                    visibility: wgpu::ShaderStages::COMPUTE,
+                    ty: wgpu::BindingType::Texture {
+                        multisampled: false,
+                        view_dimension: wgpu::TextureViewDimension::D2,
+                        sample_type: wgpu::TextureSampleType::Float { filterable: false },
+                    },
                     count: None,
                 },
                 // binding 2: color texture (lit scene)
                 wgpu::BindGroupLayoutEntry {
-                    binding: 2, visibility: wgpu::ShaderStages::COMPUTE,
-                    ty: wgpu::BindingType::Texture { multisampled: false, view_dimension: wgpu::TextureViewDimension::D2, sample_type: wgpu::TextureSampleType::Float { filterable: false } },
+                    binding: 2,
+                    visibility: wgpu::ShaderStages::COMPUTE,
+                    ty: wgpu::BindingType::Texture {
+                        multisampled: false,
+                        view_dimension: wgpu::TextureViewDimension::D2,
+                        sample_type: wgpu::TextureSampleType::Float { filterable: false },
+                    },
                     count: None,
                 },
                 // binding 3: output
                 wgpu::BindGroupLayoutEntry {
-                    binding: 3, visibility: wgpu::ShaderStages::COMPUTE,
-                    ty: wgpu::BindingType::StorageTexture { access: wgpu::StorageTextureAccess::WriteOnly, format: wgpu::TextureFormat::Rgba16Float, view_dimension: wgpu::TextureViewDimension::D2 },
+                    binding: 3,
+                    visibility: wgpu::ShaderStages::COMPUTE,
+                    ty: wgpu::BindingType::StorageTexture {
+                        access: wgpu::StorageTextureAccess::WriteOnly,
+                        format: wgpu::TextureFormat::Rgba16Float,
+                        view_dimension: wgpu::TextureViewDimension::D2,
+                    },
                     count: None,
                 },
                 // binding 4: params uniform
                 wgpu::BindGroupLayoutEntry {
-                    binding: 4, visibility: wgpu::ShaderStages::COMPUTE,
-                    ty: wgpu::BindingType::Buffer { ty: wgpu::BufferBindingType::Uniform, has_dynamic_offset: false, min_binding_size: None },
+                    binding: 4,
+                    visibility: wgpu::ShaderStages::COMPUTE,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
                     count: None,
                 },
             ],
         });
 
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label: Some("SSR PL"), bind_group_layouts: &[&bind_group_layout], immediate_size: 0,
+            label: Some("SSR PL"),
+            bind_group_layouts: &[&bind_group_layout],
+            immediate_size: 0,
         });
 
         let pipeline = device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
-            label: Some("SSR Pipeline"), layout: Some(&pipeline_layout),
-            module: &shader, entry_point: Some("main"),
-            compilation_options: wgpu::PipelineCompilationOptions::default(), cache: None,
+            label: Some("SSR Pipeline"),
+            layout: Some(&pipeline_layout),
+            module: &shader,
+            entry_point: Some("main"),
+            compilation_options: wgpu::PipelineCompilationOptions::default(),
+            cache: None,
         });
 
         let params_buffer = device.create_buffer(&wgpu::BufferDescriptor {
@@ -101,7 +131,12 @@ impl Ssr {
             mapped_at_creation: false,
         });
 
-        Ssr { pipeline, bind_group_layout, params_buffer, enabled: true }
+        Ssr {
+            pipeline,
+            bind_group_layout,
+            params_buffer,
+            enabled: true,
+        }
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -121,17 +156,36 @@ impl Ssr {
         queue.write_buffer(&self.params_buffer, 0, bytemuck::cast_slice(&[*params]));
 
         let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("SSR BG"), layout: &self.bind_group_layout,
+            label: Some("SSR BG"),
+            layout: &self.bind_group_layout,
             entries: &[
-                wgpu::BindGroupEntry { binding: 0, resource: wgpu::BindingResource::TextureView(position_view) },
-                wgpu::BindGroupEntry { binding: 1, resource: wgpu::BindingResource::TextureView(normal_view) },
-                wgpu::BindGroupEntry { binding: 2, resource: wgpu::BindingResource::TextureView(color_view) },
-                wgpu::BindGroupEntry { binding: 3, resource: wgpu::BindingResource::TextureView(output_view) },
-                wgpu::BindGroupEntry { binding: 4, resource: self.params_buffer.as_entire_binding() },
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: wgpu::BindingResource::TextureView(position_view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::TextureView(normal_view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 2,
+                    resource: wgpu::BindingResource::TextureView(color_view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 3,
+                    resource: wgpu::BindingResource::TextureView(output_view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 4,
+                    resource: self.params_buffer.as_entire_binding(),
+                },
             ],
         });
 
-        let mut cpass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor { label: Some("SSR Pass"), timestamp_writes: None });
+        let mut cpass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
+            label: Some("SSR Pass"),
+            timestamp_writes: None,
+        });
         cpass.set_pipeline(&self.pipeline);
         cpass.set_bind_group(0, &bind_group, &[]);
         cpass.dispatch_workgroups(width.div_ceil(16), height.div_ceil(16), 1);
@@ -140,7 +194,7 @@ impl Ssr {
 
 /// Reflect a vector about a normal (CPU version for testing).
 pub fn reflect(incident: [f32; 3], normal: [f32; 3]) -> [f32; 3] {
-    let d = 2.0 * (incident[0]*normal[0] + incident[1]*normal[1] + incident[2]*normal[2]);
+    let d = 2.0 * (incident[0] * normal[0] + incident[1] * normal[1] + incident[2] * normal[2]);
     [
         incident[0] - d * normal[0],
         incident[1] - d * normal[1],
@@ -181,6 +235,11 @@ mod tests {
     fn test_ssr_params_size() {
         // Must be aligned for uniform buffer
         let size = std::mem::size_of::<SsrParams>();
-        assert_eq!(size % 16, 0, "SsrParams size must be 16-byte aligned, got {}", size);
+        assert_eq!(
+            size % 16,
+            0,
+            "SsrParams size must be 16-byte aligned, got {}",
+            size
+        );
     }
 }

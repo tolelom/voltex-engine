@@ -6,12 +6,12 @@ use bytemuck::{Pod, Zeroable};
 #[repr(C)]
 #[derive(Copy, Clone, Debug, Pod, Zeroable)]
 pub struct SkinnedMeshVertex {
-    pub position: [f32; 3],    // 12
-    pub normal: [f32; 3],      // 12
-    pub uv: [f32; 2],          // 8
-    pub tangent: [f32; 4],     // 16
-    pub joints: [u32; 4],      // 16 (u32 for shader compatibility, actual values are u16 range)
-    pub weights: [f32; 4],     // 16
+    pub position: [f32; 3], // 12
+    pub normal: [f32; 3],   // 12
+    pub uv: [f32; 2],       // 8
+    pub tangent: [f32; 4],  // 16
+    pub joints: [u32; 4],   // 16 (u32 for shader compatibility, actual values are u16 range)
+    pub weights: [f32; 4],  // 16
 }
 // Total: 80 bytes
 
@@ -20,12 +20,36 @@ impl SkinnedMeshVertex {
         array_stride: std::mem::size_of::<SkinnedMeshVertex>() as u64,
         step_mode: wgpu::VertexStepMode::Vertex,
         attributes: &[
-            wgpu::VertexAttribute { offset: 0,  shader_location: 0, format: wgpu::VertexFormat::Float32x3 },  // position
-            wgpu::VertexAttribute { offset: 12, shader_location: 1, format: wgpu::VertexFormat::Float32x3 },  // normal
-            wgpu::VertexAttribute { offset: 24, shader_location: 2, format: wgpu::VertexFormat::Float32x2 },  // uv
-            wgpu::VertexAttribute { offset: 32, shader_location: 3, format: wgpu::VertexFormat::Float32x4 },  // tangent
-            wgpu::VertexAttribute { offset: 48, shader_location: 4, format: wgpu::VertexFormat::Uint32x4 },   // joints
-            wgpu::VertexAttribute { offset: 64, shader_location: 5, format: wgpu::VertexFormat::Float32x4 },  // weights
+            wgpu::VertexAttribute {
+                offset: 0,
+                shader_location: 0,
+                format: wgpu::VertexFormat::Float32x3,
+            }, // position
+            wgpu::VertexAttribute {
+                offset: 12,
+                shader_location: 1,
+                format: wgpu::VertexFormat::Float32x3,
+            }, // normal
+            wgpu::VertexAttribute {
+                offset: 24,
+                shader_location: 2,
+                format: wgpu::VertexFormat::Float32x2,
+            }, // uv
+            wgpu::VertexAttribute {
+                offset: 32,
+                shader_location: 3,
+                format: wgpu::VertexFormat::Float32x4,
+            }, // tangent
+            wgpu::VertexAttribute {
+                offset: 48,
+                shader_location: 4,
+                format: wgpu::VertexFormat::Uint32x4,
+            }, // joints
+            wgpu::VertexAttribute {
+                offset: 64,
+                shader_location: 5,
+                format: wgpu::VertexFormat::Float32x4,
+            }, // weights
         ],
     };
 }
@@ -48,12 +72,21 @@ impl Default for BonePalette {
 
 impl BonePalette {
     pub fn new() -> Self {
-        let identity = [[1.0,0.0,0.0,0.0],[0.0,1.0,0.0,0.0],[0.0,0.0,1.0,0.0],[0.0,0.0,0.0,1.0]];
-        BonePalette { matrices: [identity; MAX_BONES] }
+        let identity = [
+            [1.0, 0.0, 0.0, 0.0],
+            [0.0, 1.0, 0.0, 0.0],
+            [0.0, 0.0, 1.0, 0.0],
+            [0.0, 0.0, 0.0, 1.0],
+        ];
+        BonePalette {
+            matrices: [identity; MAX_BONES],
+        }
     }
 
     pub fn set_bone(&mut self, index: usize, matrix: [[f32; 4]; 4]) {
-        if index < MAX_BONES { self.matrices[index] = matrix; }
+        if index < MAX_BONES {
+            self.matrices[index] = matrix;
+        }
     }
 }
 
@@ -86,7 +119,12 @@ mod tests {
     #[test]
     fn test_bone_palette_set() {
         let mut palette = BonePalette::new();
-        let custom = [[2.0,0.0,0.0,0.0],[0.0,2.0,0.0,0.0],[0.0,0.0,2.0,0.0],[0.0,0.0,0.0,1.0]];
+        let custom = [
+            [2.0, 0.0, 0.0, 0.0],
+            [0.0, 2.0, 0.0, 0.0],
+            [0.0, 0.0, 2.0, 0.0],
+            [0.0, 0.0, 0.0, 1.0],
+        ];
         palette.set_bone(5, custom);
         assert!((palette.matrices[5][0][0] - 2.0).abs() < 1e-6);
     }
@@ -96,7 +134,12 @@ mod tests {
         // index == MAX_BONES is out of range; set_bone silently drops it
         // (no panic, no mutation). The last in-range slot is MAX_BONES - 1.
         let mut palette = BonePalette::new();
-        let custom = [[7.0,0.0,0.0,0.0],[0.0,7.0,0.0,0.0],[0.0,0.0,7.0,0.0],[0.0,0.0,0.0,1.0]];
+        let custom = [
+            [7.0, 0.0, 0.0, 0.0],
+            [0.0, 7.0, 0.0, 0.0],
+            [0.0, 0.0, 7.0, 0.0],
+            [0.0, 0.0, 0.0, 1.0],
+        ];
 
         // Out-of-bounds write is a no-op: last valid slot stays identity.
         palette.set_bone(MAX_BONES, custom);
@@ -117,8 +160,12 @@ mod tests {
     #[test]
     fn test_skinned_vertex_pod() {
         let v = SkinnedMeshVertex {
-            position: [0.0; 3], normal: [0.0, 1.0, 0.0], uv: [0.0; 2],
-            tangent: [1.0, 0.0, 0.0, 1.0], joints: [0, 1, 0, 0], weights: [0.5, 0.5, 0.0, 0.0],
+            position: [0.0; 3],
+            normal: [0.0, 1.0, 0.0],
+            uv: [0.0; 2],
+            tangent: [1.0, 0.0, 0.0, 1.0],
+            joints: [0, 1, 0, 0],
+            weights: [0.5, 0.5, 0.0, 0.0],
         };
         let bytes: &[u8] = bytemuck::bytes_of(&v);
         assert_eq!(bytes.len(), 80);
