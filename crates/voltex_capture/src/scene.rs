@@ -23,13 +23,31 @@ fn align_up(size: u32, alignment: u32) -> u32 {
 /// Build a unit cube mesh (24 verts, 36 indices, outward normals).
 pub(crate) fn unit_cube(device: &wgpu::Device) -> Mesh {
     let s = 0.5;
-    let faces: [( [f32; 3], [[f32; 3]; 4]); 6] = [
-        ([1.0, 0.0, 0.0], [[s, -s, -s], [s, -s, s], [s, s, s], [s, s, -s]]),
-        ([-1.0, 0.0, 0.0], [[-s, -s, s], [-s, -s, -s], [-s, s, -s], [-s, s, s]]),
-        ([0.0, 1.0, 0.0], [[-s, s, -s], [s, s, -s], [s, s, s], [-s, s, s]]),
-        ([0.0, -1.0, 0.0], [[-s, -s, s], [s, -s, s], [s, -s, -s], [-s, -s, -s]]),
-        ([0.0, 0.0, 1.0], [[s, -s, s], [-s, -s, s], [-s, s, s], [s, s, s]]),
-        ([0.0, 0.0, -1.0], [[-s, -s, -s], [s, -s, -s], [s, s, -s], [-s, s, -s]]),
+    let faces: [([f32; 3], [[f32; 3]; 4]); 6] = [
+        (
+            [1.0, 0.0, 0.0],
+            [[s, -s, -s], [s, -s, s], [s, s, s], [s, s, -s]],
+        ),
+        (
+            [-1.0, 0.0, 0.0],
+            [[-s, -s, s], [-s, -s, -s], [-s, s, -s], [-s, s, s]],
+        ),
+        (
+            [0.0, 1.0, 0.0],
+            [[-s, s, -s], [s, s, -s], [s, s, s], [-s, s, s]],
+        ),
+        (
+            [0.0, -1.0, 0.0],
+            [[-s, -s, s], [s, -s, s], [s, -s, -s], [-s, -s, -s]],
+        ),
+        (
+            [0.0, 0.0, 1.0],
+            [[s, -s, s], [-s, -s, s], [-s, s, s], [s, s, s]],
+        ),
+        (
+            [0.0, 0.0, -1.0],
+            [[-s, -s, -s], [s, -s, -s], [s, s, -s], [-s, s, -s]],
+        ),
     ];
     let uvs = [[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]];
     let mut verts = Vec::with_capacity(24);
@@ -60,13 +78,19 @@ pub fn render_cube_grid(gpu: &HeadlessGpu, width: u32, height: u32) -> Vec<u8> {
     let mut assets = RenderAssets::new();
     let mesh_h = assets.add_mesh(unit_cube(&gpu.device));
     let mat_h = assets.add_material(MaterialUniform::new());
-    let bounds = Bounds(AABB::new(Vec3::new(-0.5, -0.5, -0.5), Vec3::new(0.5, 0.5, 0.5)));
+    let bounds = Bounds(AABB::new(
+        Vec3::new(-0.5, -0.5, -0.5),
+        Vec3::new(0.5, 0.5, 0.5),
+    ));
 
     let mut world = World::new();
     for gx in -1..=1 {
         for gz in -1..=1 {
             let e = world.spawn();
-            world.add(e, Transform::from_position(Vec3::new(gx as f32 * 2.0, 0.0, gz as f32 * 2.0)));
+            world.add(
+                e,
+                Transform::from_position(Vec3::new(gx as f32 * 2.0, 0.0, gz as f32 * 2.0)),
+            );
             world.add(e, MeshHandle(mesh_h.0));
             world.add(e, MaterialHandle(mat_h.0));
             world.add(e, bounds);
@@ -79,15 +103,22 @@ pub fn render_cube_grid(gpu: &HeadlessGpu, width: u32, height: u32) -> Vec<u8> {
     let view_proj = camera.view_projection();
     let light = LightUniform::new();
 
-    let mut encoder = gpu.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-        label: Some("capture cube_grid"),
-    });
+    let mut encoder = gpu
+        .device
+        .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+            label: Some("capture cube_grid"),
+        });
     renderer.render(
         &gpu.queue,
         &mut encoder,
         &target.color_view,
         &target.depth_view,
-        wgpu::Color { r: 0.1, g: 0.12, b: 0.18, a: 1.0 },
+        wgpu::Color {
+            r: 0.1,
+            g: 0.12,
+            b: 0.18,
+            a: 1.0,
+        },
         &mut world,
         &assets,
         view_proj,
@@ -129,15 +160,22 @@ pub fn render_single_cube(gpu: &HeadlessGpu, width: u32, height: u32) -> Vec<u8>
     let mut light = LightUniform::new();
     light.direction = [-0.4, -1.0, -0.6];
 
-    let mut encoder = gpu.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-        label: Some("capture single_cube"),
-    });
+    let mut encoder = gpu
+        .device
+        .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+            label: Some("capture single_cube"),
+        });
     renderer.render(
         &gpu.queue,
         &mut encoder,
         &target.color_view,
         &target.depth_view,
-        wgpu::Color { r: 0.05, g: 0.05, b: 0.08, a: 1.0 },
+        wgpu::Color {
+            r: 0.05,
+            g: 0.05,
+            b: 0.08,
+            a: 1.0,
+        },
         &mut world,
         &assets,
         view_proj,
@@ -174,7 +212,11 @@ pub fn render_pbr_grid(gpu: &HeadlessGpu, width: u32, height: u32) -> Vec<u8> {
     let cam_pos = [camera.position.x, camera.position.y, camera.position.z];
 
     let mut lights = LightsUniform::new();
-    lights.add_light(LightData::directional([-1.0, -1.0, -1.0], [1.0, 1.0, 1.0], 1.0));
+    lights.add_light(LightData::directional(
+        [-1.0, -1.0, -1.0],
+        [1.0, 1.0, 1.0],
+        1.0,
+    ));
 
     let camera_buffer = device.create_buffer(&wgpu::BufferDescriptor {
         label: Some("PBR Camera UBO"),
@@ -210,7 +252,10 @@ pub fn render_pbr_grid(gpu: &HeadlessGpu, width: u32, height: u32) -> Vec<u8> {
                     size: wgpu::BufferSize::new(std::mem::size_of::<CameraUniform>() as u64),
                 }),
             },
-            wgpu::BindGroupEntry { binding: 1, resource: light_buffer.as_entire_binding() },
+            wgpu::BindGroupEntry {
+                binding: 1,
+                resource: light_buffer.as_entire_binding(),
+            },
         ],
     });
 
@@ -220,8 +265,16 @@ pub fn render_pbr_grid(gpu: &HeadlessGpu, width: u32, height: u32) -> Vec<u8> {
     let orm = GpuTexture::white_1x1(device, queue, &old_tex_layout);
     let emissive = GpuTexture::black_1x1(device, queue, &old_tex_layout);
     let pbr_texture_bind_group = create_pbr_full_texture_bind_group(
-        device, &pbr_tex_layout, &albedo.view, &albedo.sampler, &normal.1, &normal.2,
-        &orm.view, &orm.sampler, &emissive.view, &emissive.sampler,
+        device,
+        &pbr_tex_layout,
+        &albedo.view,
+        &albedo.sampler,
+        &normal.1,
+        &normal.2,
+        &orm.view,
+        &orm.sampler,
+        &emissive.view,
+        &emissive.sampler,
     );
 
     let ibl = IblResources::new(device, queue);
@@ -256,11 +309,20 @@ pub fn render_pbr_grid(gpu: &HeadlessGpu, width: u32, height: u32) -> Vec<u8> {
         usage: wgpu::BufferUsages::UNIFORM,
     });
     let shadow_bind_group = shadow_map.create_bind_group(
-        device, &shadow_layout, &shadow_uniform_buffer, &ibl.brdf_lut_view, &ibl.brdf_lut_sampler,
+        device,
+        &shadow_layout,
+        &shadow_uniform_buffer,
+        &ibl.brdf_lut_view,
+        &ibl.brdf_lut_sampler,
     );
 
     let pipeline = create_pbr_pipeline(
-        device, CAPTURE_FORMAT, &cl_layout, &pbr_tex_layout, &mat_layout, &shadow_layout,
+        device,
+        CAPTURE_FORMAT,
+        &cl_layout,
+        &pbr_tex_layout,
+        &mat_layout,
+        &shadow_layout,
     );
 
     // Per-sphere camera + material staging.
@@ -284,7 +346,8 @@ pub fn render_pbr_grid(gpu: &HeadlessGpu, width: u32, height: u32) -> Vec<u8> {
 
             let metallic = col as f32 / (GRID as f32 - 1.0);
             let roughness = 0.05 + row as f32 * (0.95 / (GRID as f32 - 1.0));
-            let mat_uniform = MaterialUniform::with_params([0.8, 0.2, 0.2, 1.0], metallic, roughness);
+            let mat_uniform =
+                MaterialUniform::with_params([0.8, 0.2, 0.2, 1.0], metallic, roughness);
             let o = i * mat_aligned as usize;
             mat_staging[o..o + std::mem::size_of::<MaterialUniform>()]
                 .copy_from_slice(bytemuck::bytes_of(&mat_uniform));
@@ -293,8 +356,9 @@ pub fn render_pbr_grid(gpu: &HeadlessGpu, width: u32, height: u32) -> Vec<u8> {
     queue.write_buffer(&camera_buffer, 0, &cam_staging);
     queue.write_buffer(&material_buffer, 0, &mat_staging);
 
-    let mut encoder =
-        device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("PBR capture") });
+    let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+        label: Some("PBR capture"),
+    });
     {
         let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: Some("PBR Pass"),
@@ -303,13 +367,21 @@ pub fn render_pbr_grid(gpu: &HeadlessGpu, width: u32, height: u32) -> Vec<u8> {
                 resolve_target: None,
                 depth_slice: None,
                 ops: wgpu::Operations {
-                    load: wgpu::LoadOp::Clear(wgpu::Color { r: 0.1, g: 0.1, b: 0.15, a: 1.0 }),
+                    load: wgpu::LoadOp::Clear(wgpu::Color {
+                        r: 0.1,
+                        g: 0.1,
+                        b: 0.15,
+                        a: 1.0,
+                    }),
                     store: wgpu::StoreOp::Store,
                 },
             })],
             depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
                 view: &target.depth_view,
-                depth_ops: Some(wgpu::Operations { load: wgpu::LoadOp::Clear(1.0), store: wgpu::StoreOp::Store }),
+                depth_ops: Some(wgpu::Operations {
+                    load: wgpu::LoadOp::Clear(1.0),
+                    store: wgpu::StoreOp::Store,
+                }),
                 stencil_ops: None,
             }),
             occlusion_query_set: None,
@@ -342,7 +414,9 @@ pub(crate) fn camera_light_bgl(device: &wgpu::Device) -> wgpu::BindGroupLayout {
                 ty: wgpu::BindingType::Buffer {
                     ty: wgpu::BufferBindingType::Uniform,
                     has_dynamic_offset: true,
-                    min_binding_size: wgpu::BufferSize::new(std::mem::size_of::<CameraUniform>() as u64),
+                    min_binding_size: wgpu::BufferSize::new(
+                        std::mem::size_of::<CameraUniform>() as u64
+                    ),
                 },
                 count: None,
             },
@@ -379,7 +453,10 @@ mod tests {
         };
         let rgba = render_single_cube(&gpu, 256, 256);
         let stats = ImageStats::analyze(&rgba);
-        assert!(!stats.looks_blank(), "single cube frame is blank: {stats:?}");
+        assert!(
+            !stats.looks_blank(),
+            "single cube frame is blank: {stats:?}"
+        );
         assert!(stats.mean_luminance > 0.01, "frame too dark: {stats:?}");
     }
 

@@ -7,9 +7,9 @@
 use voltex_math::{Mat4, Vec3};
 use voltex_renderer::{
     create_pbr_full_texture_bind_group, create_pbr_pipeline, create_shadow_pipeline,
-    generate_sphere, pbr_full_texture_bind_group_layout, CameraUniform, Camera, GpuTexture,
-    IblResources, LightData, LightsUniform, MaterialUniform, Mesh, ShadowMap, ShadowPassUniform,
-    ShadowUniform, SHADOW_MAP_SIZE, shadow_pass_bind_group_layout,
+    generate_sphere, pbr_full_texture_bind_group_layout, shadow_pass_bind_group_layout, Camera,
+    CameraUniform, GpuTexture, IblResources, LightData, LightsUniform, MaterialUniform, Mesh,
+    ShadowMap, ShadowPassUniform, ShadowUniform, SHADOW_MAP_SIZE,
 };
 use wgpu::util::DeviceExt;
 
@@ -75,7 +75,11 @@ pub fn render_shadow_scene(gpu: &HeadlessGpu, width: u32, height: u32) -> Vec<u8
 
     let mut lights = LightsUniform::new();
     lights.ambient_color = [0.05, 0.05, 0.05];
-    lights.add_light(LightData::directional([-1.0, -2.0, -1.0], [1.0, 1.0, 1.0], 2.0));
+    lights.add_light(LightData::directional(
+        [-1.0, -2.0, -1.0],
+        [1.0, 1.0, 1.0],
+        2.0,
+    ));
 
     let camera_buffer = device.create_buffer(&wgpu::BufferDescriptor {
         label: Some("Shadow Camera UBO"),
@@ -111,7 +115,10 @@ pub fn render_shadow_scene(gpu: &HeadlessGpu, width: u32, height: u32) -> Vec<u8
                     size: wgpu::BufferSize::new(std::mem::size_of::<CameraUniform>() as u64),
                 }),
             },
-            wgpu::BindGroupEntry { binding: 1, resource: light_buffer.as_entire_binding() },
+            wgpu::BindGroupEntry {
+                binding: 1,
+                resource: light_buffer.as_entire_binding(),
+            },
         ],
     });
 
@@ -121,8 +128,16 @@ pub fn render_shadow_scene(gpu: &HeadlessGpu, width: u32, height: u32) -> Vec<u8
     let orm = GpuTexture::white_1x1(device, queue, &old_tex_layout);
     let emissive = GpuTexture::black_1x1(device, queue, &old_tex_layout);
     let pbr_texture_bind_group = create_pbr_full_texture_bind_group(
-        device, &pbr_tex_layout, &albedo.view, &albedo.sampler, &normal.1, &normal.2,
-        &orm.view, &orm.sampler, &emissive.view, &emissive.sampler,
+        device,
+        &pbr_tex_layout,
+        &albedo.view,
+        &albedo.sampler,
+        &normal.1,
+        &normal.2,
+        &orm.view,
+        &orm.sampler,
+        &emissive.view,
+        &emissive.sampler,
     );
 
     let ibl = IblResources::new(device, queue);
@@ -164,7 +179,11 @@ pub fn render_shadow_scene(gpu: &HeadlessGpu, width: u32, height: u32) -> Vec<u8
         usage: wgpu::BufferUsages::UNIFORM,
     });
     let shadow_bind_group = shadow_map.create_bind_group(
-        device, &shadow_layout, &shadow_uniform_buffer, &ibl.brdf_lut_view, &ibl.brdf_lut_sampler,
+        device,
+        &shadow_layout,
+        &shadow_uniform_buffer,
+        &ibl.brdf_lut_view,
+        &ibl.brdf_lut_sampler,
     );
 
     let sp_layout = shadow_pass_bind_group_layout(device);
@@ -189,7 +208,12 @@ pub fn render_shadow_scene(gpu: &HeadlessGpu, width: u32, height: u32) -> Vec<u8
 
     let shadow_pipeline = create_shadow_pipeline(device, &sp_layout);
     let pbr_pipeline = create_pbr_pipeline(
-        device, CAPTURE_FORMAT, &cl_layout, &pbr_tex_layout, &mat_layout, &shadow_layout,
+        device,
+        CAPTURE_FORMAT,
+        &cl_layout,
+        &pbr_tex_layout,
+        &mat_layout,
+        &shadow_layout,
     );
 
     // Staging.
@@ -199,7 +223,9 @@ pub fn render_shadow_scene(gpu: &HeadlessGpu, width: u32, height: u32) -> Vec<u8
     let mut cam_staging = vec![0u8; cam_aligned as usize * NUM_OBJECTS];
     let mut mat_staging = vec![0u8; mat_aligned as usize * NUM_OBJECTS];
     for i in 0..NUM_OBJECTS {
-        let sp = ShadowPassUniform { light_vp_model: (light_vp * models[i]).cols };
+        let sp = ShadowPassUniform {
+            light_vp_model: (light_vp * models[i]).cols,
+        };
         let o = i * sp_aligned as usize;
         sp_staging[o..o + std::mem::size_of::<ShadowPassUniform>()]
             .copy_from_slice(bytemuck::bytes_of(&sp));
@@ -235,7 +261,10 @@ pub fn render_shadow_scene(gpu: &HeadlessGpu, width: u32, height: u32) -> Vec<u8
             color_attachments: &[],
             depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
                 view: &shadow_map.view,
-                depth_ops: Some(wgpu::Operations { load: wgpu::LoadOp::Clear(1.0), store: wgpu::StoreOp::Store }),
+                depth_ops: Some(wgpu::Operations {
+                    load: wgpu::LoadOp::Clear(1.0),
+                    store: wgpu::StoreOp::Store,
+                }),
                 stencil_ops: None,
             }),
             occlusion_query_set: None,
@@ -261,13 +290,21 @@ pub fn render_shadow_scene(gpu: &HeadlessGpu, width: u32, height: u32) -> Vec<u8
                 resolve_target: None,
                 depth_slice: None,
                 ops: wgpu::Operations {
-                    load: wgpu::LoadOp::Clear(wgpu::Color { r: 0.1, g: 0.1, b: 0.15, a: 1.0 }),
+                    load: wgpu::LoadOp::Clear(wgpu::Color {
+                        r: 0.1,
+                        g: 0.1,
+                        b: 0.15,
+                        a: 1.0,
+                    }),
                     store: wgpu::StoreOp::Store,
                 },
             })],
             depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
                 view: &target.depth_view,
-                depth_ops: Some(wgpu::Operations { load: wgpu::LoadOp::Clear(1.0), store: wgpu::StoreOp::Store }),
+                depth_ops: Some(wgpu::Operations {
+                    load: wgpu::LoadOp::Clear(1.0),
+                    store: wgpu::StoreOp::Store,
+                }),
                 stencil_ops: None,
             }),
             occlusion_query_set: None,

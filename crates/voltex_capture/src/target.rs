@@ -31,7 +31,11 @@ impl OffscreenTarget {
     pub fn new(device: &wgpu::Device, width: u32, height: u32) -> Self {
         let color = device.create_texture(&wgpu::TextureDescriptor {
             label: Some("Capture Color"),
-            size: wgpu::Extent3d { width, height, depth_or_array_layers: 1 },
+            size: wgpu::Extent3d {
+                width,
+                height,
+                depth_or_array_layers: 1,
+            },
             mip_level_count: 1,
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
@@ -43,7 +47,11 @@ impl OffscreenTarget {
 
         let depth = device.create_texture(&wgpu::TextureDescriptor {
             label: Some("Capture Depth"),
-            size: wgpu::Extent3d { width, height, depth_or_array_layers: 1 },
+            size: wgpu::Extent3d {
+                width,
+                height,
+                depth_or_array_layers: 1,
+            },
             mip_level_count: 1,
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
@@ -53,7 +61,13 @@ impl OffscreenTarget {
         });
         let depth_view = depth.create_view(&wgpu::TextureViewDescriptor::default());
 
-        Self { color, color_view, depth_view, width, height }
+        Self {
+            color,
+            color_view,
+            depth_view,
+            width,
+            height,
+        }
     }
 
     /// Copy the color texture back to CPU memory as tightly-packed RGBA8
@@ -100,7 +114,9 @@ impl OffscreenTarget {
 
         let slice = readback.slice(..);
         slice.map_async(wgpu::MapMode::Read, |_| {});
-        device.poll(wgpu::PollType::wait_indefinitely()).expect("device poll");
+        device
+            .poll(wgpu::PollType::wait_indefinitely())
+            .expect("device poll");
 
         let mapped = slice.get_mapped_range();
         let mut out = Vec::with_capacity((unpadded_bytes_per_row * self.height) as usize);

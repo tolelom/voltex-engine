@@ -40,7 +40,11 @@ fn render_with_mode(gpu: &HeadlessGpu, width: u32, height: u32, mode: GizmoMode)
     world.add(e, MeshHandle(mesh_h.0));
     world.add(e, MaterialHandle(mat_h.0));
 
-    let camera = look_at_camera(Vec3::new(2.5, 2.0, 3.5), Vec3::ZERO, width as f32 / height as f32);
+    let camera = look_at_camera(
+        Vec3::new(2.5, 2.0, 3.5),
+        Vec3::ZERO,
+        width as f32 / height as f32,
+    );
     let view_proj = camera.view_projection();
 
     let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
@@ -52,7 +56,12 @@ fn render_with_mode(gpu: &HeadlessGpu, width: u32, height: u32, mode: GizmoMode)
         &mut encoder,
         &target.color_view,
         &target.depth_view,
-        wgpu::Color { r: 0.08, g: 0.09, b: 0.12, a: 1.0 },
+        wgpu::Color {
+            r: 0.08,
+            g: 0.09,
+            b: 0.12,
+            a: 1.0,
+        },
         &mut world,
         &assets,
         view_proj,
@@ -109,6 +118,9 @@ mod tests {
         // colors the plain cube scene lacks.
         let plain = ImageStats::analyze(&render_with_mode(&gpu, 400, 400, GizmoMode::Translate));
         assert!(!plain.looks_blank(), "gizmo scene blank: {plain:?}");
-        assert!(plain.distinct_colors > 3, "no gizmo handles drawn: {plain:?}");
+        assert!(
+            plain.distinct_colors > 3,
+            "no gizmo handles drawn: {plain:?}"
+        );
     }
 }

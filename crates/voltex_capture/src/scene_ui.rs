@@ -60,7 +60,12 @@ pub fn render_editor_ui(gpu: &HeadlessGpu, width: u32, height: u32) -> Vec<u8> {
                 resolve_target: None,
                 depth_slice: None,
                 ops: wgpu::Operations {
-                    load: wgpu::LoadOp::Clear(wgpu::Color { r: 0.13, g: 0.14, b: 0.17, a: 1.0 }),
+                    load: wgpu::LoadOp::Clear(wgpu::Color {
+                        r: 0.13,
+                        g: 0.14,
+                        b: 0.17,
+                        a: 1.0,
+                    }),
                     store: wgpu::StoreOp::Store,
                 },
             })],
@@ -103,6 +108,9 @@ mod tests {
         let stats = ImageStats::analyze(&rgba);
         // Text + widgets should produce many distinct colors over the flat bg.
         assert!(!stats.looks_blank(), "UI frame is blank: {stats:?}");
-        assert!(stats.distinct_colors > 3, "no widgets/text drawn: {stats:?}");
+        assert!(
+            stats.distinct_colors > 3,
+            "no widgets/text drawn: {stats:?}"
+        );
     }
 }

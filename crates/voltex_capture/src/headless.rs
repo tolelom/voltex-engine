@@ -52,6 +52,10 @@ impl HeadlessGpu {
             .await
             .map_err(|e| format!("request_device failed: {e}"))?;
 
-        Ok(Self { device, queue, adapter_name })
+        Ok(Self {
+            device,
+            queue,
+            adapter_name,
+        })
     }
 }

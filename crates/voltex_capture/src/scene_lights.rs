@@ -55,13 +55,43 @@ pub fn render_multi_light(gpu: &HeadlessGpu, width: u32, height: u32) -> Vec<u8>
 
     let mut lights = LightsUniform::new();
     lights.ambient_color = [0.02, 0.02, 0.02];
-    lights.add_light(LightData::directional([0.0, -1.0, -0.5], [1.0, 1.0, 1.0], 0.3));
-    lights.add_light(LightData::point([5.0, 2.0, 0.0], [1.0, 0.0, 0.0], 15.0, 15.0));
-    lights.add_light(LightData::point([0.0, 2.0, 5.0], [0.0, 1.0, 0.0], 15.0, 15.0));
-    lights.add_light(LightData::point([-5.0, 2.0, 0.0], [0.0, 0.0, 1.0], 15.0, 15.0));
-    lights.add_light(LightData::point([0.0, 2.0, -5.0], [1.0, 1.0, 0.0], 15.0, 15.0));
+    lights.add_light(LightData::directional(
+        [0.0, -1.0, -0.5],
+        [1.0, 1.0, 1.0],
+        0.3,
+    ));
+    lights.add_light(LightData::point(
+        [5.0, 2.0, 0.0],
+        [1.0, 0.0, 0.0],
+        15.0,
+        15.0,
+    ));
+    lights.add_light(LightData::point(
+        [0.0, 2.0, 5.0],
+        [0.0, 1.0, 0.0],
+        15.0,
+        15.0,
+    ));
+    lights.add_light(LightData::point(
+        [-5.0, 2.0, 0.0],
+        [0.0, 0.0, 1.0],
+        15.0,
+        15.0,
+    ));
+    lights.add_light(LightData::point(
+        [0.0, 2.0, -5.0],
+        [1.0, 1.0, 0.0],
+        15.0,
+        15.0,
+    ));
     lights.add_light(LightData::spot(
-        [0.0, 6.0, 0.0], [0.0, -1.0, 0.0], [1.0, 1.0, 1.0], 20.0, 12.0, 20.0, 35.0,
+        [0.0, 6.0, 0.0],
+        [0.0, -1.0, 0.0],
+        [1.0, 1.0, 1.0],
+        20.0,
+        12.0,
+        20.0,
+        35.0,
     ));
 
     let camera_buffer = device.create_buffer(&wgpu::BufferDescriptor {
@@ -98,7 +128,10 @@ pub fn render_multi_light(gpu: &HeadlessGpu, width: u32, height: u32) -> Vec<u8>
                     size: wgpu::BufferSize::new(std::mem::size_of::<CameraUniform>() as u64),
                 }),
             },
-            wgpu::BindGroupEntry { binding: 1, resource: light_buffer.as_entire_binding() },
+            wgpu::BindGroupEntry {
+                binding: 1,
+                resource: light_buffer.as_entire_binding(),
+            },
         ],
     });
 
@@ -108,8 +141,16 @@ pub fn render_multi_light(gpu: &HeadlessGpu, width: u32, height: u32) -> Vec<u8>
     let orm = GpuTexture::white_1x1(device, queue, &old_tex_layout);
     let emissive = GpuTexture::black_1x1(device, queue, &old_tex_layout);
     let pbr_texture_bind_group = create_pbr_full_texture_bind_group(
-        device, &pbr_tex_layout, &albedo.view, &albedo.sampler, &normal.1, &normal.2,
-        &orm.view, &orm.sampler, &emissive.view, &emissive.sampler,
+        device,
+        &pbr_tex_layout,
+        &albedo.view,
+        &albedo.sampler,
+        &normal.1,
+        &normal.2,
+        &orm.view,
+        &orm.sampler,
+        &emissive.view,
+        &emissive.sampler,
     );
 
     let ibl = IblResources::new(device, queue);
@@ -145,11 +186,20 @@ pub fn render_multi_light(gpu: &HeadlessGpu, width: u32, height: u32) -> Vec<u8>
         usage: wgpu::BufferUsages::UNIFORM,
     });
     let shadow_bind_group = shadow_map.create_bind_group(
-        device, &shadow_layout, &shadow_uniform_buffer, &ibl.brdf_lut_view, &ibl.brdf_lut_sampler,
+        device,
+        &shadow_layout,
+        &shadow_uniform_buffer,
+        &ibl.brdf_lut_view,
+        &ibl.brdf_lut_sampler,
     );
 
     let pipeline = create_pbr_pipeline(
-        device, CAPTURE_FORMAT, &cl_layout, &pbr_tex_layout, &mat_layout, &shadow_layout,
+        device,
+        CAPTURE_FORMAT,
+        &cl_layout,
+        &pbr_tex_layout,
+        &mat_layout,
+        &shadow_layout,
     );
 
     // Neutral mid-gray, fairly rough dielectric so colored lights read clearly.
@@ -186,13 +236,21 @@ pub fn render_multi_light(gpu: &HeadlessGpu, width: u32, height: u32) -> Vec<u8>
                 resolve_target: None,
                 depth_slice: None,
                 ops: wgpu::Operations {
-                    load: wgpu::LoadOp::Clear(wgpu::Color { r: 0.02, g: 0.02, b: 0.03, a: 1.0 }),
+                    load: wgpu::LoadOp::Clear(wgpu::Color {
+                        r: 0.02,
+                        g: 0.02,
+                        b: 0.03,
+                        a: 1.0,
+                    }),
                     store: wgpu::StoreOp::Store,
                 },
             })],
             depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
                 view: &target.depth_view,
-                depth_ops: Some(wgpu::Operations { load: wgpu::LoadOp::Clear(1.0), store: wgpu::StoreOp::Store }),
+                depth_ops: Some(wgpu::Operations {
+                    load: wgpu::LoadOp::Clear(1.0),
+                    store: wgpu::StoreOp::Store,
+                }),
                 stencil_ops: None,
             }),
             occlusion_query_set: None,
