@@ -2,8 +2,8 @@
 //! `remove_child`, `despawn_recursive`, `roots`).
 
 use crate::entity::Entity;
-use crate::world::World;
 use crate::transform::Transform;
+use crate::world::World;
 
 /// Component pointing at the entity's parent in the hierarchy.
 #[derive(Debug, Clone, Copy)]
@@ -128,6 +128,90 @@ pub fn roots(world: &World) -> Vec<Entity> {
         .collect()
 }
 
+/// Maximum ancestor-walk depth tolerated by [`validate_hierarchy`]. Mirrors
+/// `MAX_HIERARCHY_DEPTH` used by transform propagation so a hierarchy that
+/// the validator accepts is one the propagator can also walk safely.
+const VALIDATION_MAX_DEPTH: usize = 1024;
+
+/// Scan every `Parent` edge for cycles or pathologically deep chains and
+/// break them by removing the offending entity's `Parent` component.
+///
+/// `add_child` already refuses to introduce a cycle, but raw `world.add(e,
+/// Parent(p))` writes — used by `ComponentRegistry`-driven scene
+/// deserialization for arbitrary user components, by hand-edited save
+/// files, or by adversarial input — can land cycles in the world without
+/// the helper's guard ever running. Without this pass, downstream walkers
+/// (`despawn_recursive`, transform propagation, editor selection) rely on
+/// internal depth caps to avoid hangs but the world itself stays
+/// corrupted.
+///
+/// The pass walks each entity's ancestor chain. Returns the list of
+/// entities whose `Parent` was stripped — callers can log them as a
+/// "scene was repaired" warning. After this call:
+/// - No entity has a `Parent` component that participates in a cycle.
+/// - No entity has a `Parent` chain deeper than [`VALIDATION_MAX_DEPTH`].
+/// - The matching parent's `Children` list (if present) is also cleaned
+///   so the bidirectional view stays consistent.
+///
+/// Call this from scene deserializers after all `add_child` writes, or
+/// after any custom load path that bypasses [`add_child`].
+pub fn validate_hierarchy(world: &mut World) -> Vec<Entity> {
+    // Snapshot entities with a Parent. We may mutate Parent storage during
+    // the walk, so we can't hold a borrow into it.
+    let with_parent: Vec<Entity> = world.query::<Parent>().map(|(entity, _)| entity).collect();
+
+    let mut repaired = Vec::new();
+    let mut visited: std::collections::HashSet<Entity> = std::collections::HashSet::new();
+
+    for start in with_parent {
+        // If a previous iteration already stripped this entity's Parent
+        // (because it was the cycle entry point of another walk), skip.
+        if world.get::<Parent>(start).is_none() {
+            continue;
+        }
+
+        visited.clear();
+        visited.insert(start);
+
+        let mut current = start;
+        let mut steps = 0usize;
+        let bad = loop {
+            let next = match world.get::<Parent>(current) {
+                Some(p) => p.0,
+                None => break false, // reached a root — chain is clean
+            };
+            if !visited.insert(next) {
+                // Revisited an entity → cycle.
+                break true;
+            }
+            current = next;
+            steps += 1;
+            if steps > VALIDATION_MAX_DEPTH {
+                // Chain too deep — treat as cycle / corruption.
+                break true;
+            }
+        };
+
+        if bad {
+            // Break the cycle by stripping `start`'s Parent and removing
+            // it from the (immediate) parent's Children list. This is the
+            // minimal incision that restores a DAG — we don't try to be
+            // clever about which edge is "wrong" because all edges in a
+            // cycle are equally to blame.
+            let parent_of_start = world.get::<Parent>(start).map(|p| p.0);
+            world.remove::<Parent>(start);
+            if let Some(p) = parent_of_start {
+                if let Some(children) = world.get_mut::<Children>(p) {
+                    children.0.retain(|&e| e != start);
+                }
+            }
+            repaired.push(start);
+        }
+    }
+
+    repaired
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -141,11 +225,15 @@ mod tests {
         add_child(&mut world, parent, child);
 
         // Parent component set on child
-        let p = world.get::<Parent>(child).expect("child should have Parent");
+        let p = world
+            .get::<Parent>(child)
+            .expect("child should have Parent");
         assert_eq!(p.0, parent);
 
         // Children component on parent contains child
-        let c = world.get::<Children>(parent).expect("parent should have Children");
+        let c = world
+            .get::<Children>(parent)
+            .expect("parent should have Children");
         assert!(c.0.contains(&child));
     }
 
@@ -159,7 +247,9 @@ mod tests {
         add_child(&mut world, parent, child1);
         add_child(&mut world, parent, child2);
 
-        let c = world.get::<Children>(parent).expect("parent should have Children");
+        let c = world
+            .get::<Children>(parent)
+            .expect("parent should have Children");
         assert_eq!(c.0.len(), 2);
         assert!(c.0.contains(&child1));
         assert!(c.0.contains(&child2));
@@ -175,11 +265,19 @@ mod tests {
         remove_child(&mut world, parent, child);
 
         // Child should no longer have a Parent
-        assert!(world.get::<Parent>(child).is_none(), "child should have no Parent after removal");
+        assert!(
+            world.get::<Parent>(child).is_none(),
+            "child should have no Parent after removal"
+        );
 
         // Parent's Children list should be empty
-        let c = world.get::<Children>(parent).expect("parent should still have Children component");
-        assert!(c.0.is_empty(), "Children list should be empty after removal");
+        let c = world
+            .get::<Children>(parent)
+            .expect("parent should still have Children component");
+        assert!(
+            c.0.is_empty(),
+            "Children list should be empty after removal"
+        );
     }
 
     #[test]
@@ -201,7 +299,10 @@ mod tests {
 
         assert!(!world.is_alive(root), "root should be despawned");
         assert!(!world.is_alive(child), "child should be despawned");
-        assert!(!world.is_alive(grandchild), "grandchild should be despawned");
+        assert!(
+            !world.is_alive(grandchild),
+            "grandchild should be despawned"
+        );
     }
 
     #[test]
@@ -233,7 +334,9 @@ mod tests {
         add_child(&mut world, parent, child);
         add_child(&mut world, parent, child); // add same child again
 
-        let c = world.get::<Children>(parent).expect("parent should have Children");
+        let c = world
+            .get::<Children>(parent)
+            .expect("parent should have Children");
         assert_eq!(c.0.len(), 1, "Children should not contain duplicates");
     }
 
@@ -245,8 +348,14 @@ mod tests {
         let mut world = World::new();
         let e = world.spawn();
         add_child(&mut world, e, e);
-        assert!(world.get::<Parent>(e).is_none(), "self-parent must not assign Parent");
-        assert!(world.get::<Children>(e).is_none(), "self-parent must not assign Children");
+        assert!(
+            world.get::<Parent>(e).is_none(),
+            "self-parent must not assign Parent"
+        );
+        assert!(
+            world.get::<Children>(e).is_none(),
+            "self-parent must not assign Children"
+        );
     }
 
     #[test]
@@ -259,7 +368,10 @@ mod tests {
         // This second add_child would create a cycle A↔B.
         add_child(&mut world, b, a);
         // A's parent must still be None (the cycle was refused).
-        assert!(world.get::<Parent>(a).is_none(), "cycle-creating add must be refused");
+        assert!(
+            world.get::<Parent>(a).is_none(),
+            "cycle-creating add must be refused"
+        );
         // B's parent is still A.
         let bp = world.get::<Parent>(b).expect("b still has parent");
         assert_eq!(bp.0, a);
@@ -275,7 +387,10 @@ mod tests {
         add_child(&mut world, a, b);
         add_child(&mut world, b, c);
         add_child(&mut world, c, a); // would form A↔B↔C↔A
-        assert!(world.get::<Parent>(a).is_none(), "deep cycle must be refused");
+        assert!(
+            world.get::<Parent>(a).is_none(),
+            "deep cycle must be refused"
+        );
     }
 
     #[test]
@@ -294,11 +409,18 @@ mod tests {
         assert_eq!(p.0, new_parent);
 
         // Old parent's Children list must no longer contain `child`.
-        let old_children = world.get::<Children>(old_parent).expect("old still has Children comp");
-        assert!(!old_children.0.contains(&child), "stale entry in old parent's Children");
+        let old_children = world
+            .get::<Children>(old_parent)
+            .expect("old still has Children comp");
+        assert!(
+            !old_children.0.contains(&child),
+            "stale entry in old parent's Children"
+        );
 
         // New parent's Children contains child exactly once.
-        let new_children = world.get::<Children>(new_parent).expect("new has Children comp");
+        let new_children = world
+            .get::<Children>(new_parent)
+            .expect("new has Children comp");
         assert_eq!(new_children.0, vec![child]);
     }
 
@@ -320,5 +442,93 @@ mod tests {
         despawn_recursive(&mut world, root);
         assert!(!world.is_alive(root));
         assert!(!world.is_alive(prev));
+    }
+
+    #[test]
+    fn validate_hierarchy_breaks_raw_two_cycle() {
+        // Bypass add_child entirely: write the cyclic Parent components
+        // directly the way a registry-driven deserializer would for a
+        // user-registered Parent component. validate_hierarchy must repair.
+        let mut world = World::new();
+        let a = world.spawn();
+        let b = world.spawn();
+        // A→B (B's parent is A) and B→A (A's parent is B) — a 2-cycle.
+        world.add(a, Parent(b));
+        world.add(b, Parent(a));
+
+        let repaired = validate_hierarchy(&mut world);
+        // Exactly one entity's Parent gets stripped (whichever the walk
+        // hits first); the other survives as a root.
+        assert_eq!(repaired.len(), 1, "exactly one edge must be broken");
+        let only_root_remains = world.get::<Parent>(a).is_none() ^ world.get::<Parent>(b).is_none();
+        assert!(
+            only_root_remains,
+            "after repair exactly one of {{A,B}} is root"
+        );
+    }
+
+    #[test]
+    fn validate_hierarchy_keeps_clean_dag_intact() {
+        let mut world = World::new();
+        let root = world.spawn();
+        let child = world.spawn();
+        let grandchild = world.spawn();
+        add_child(&mut world, root, child);
+        add_child(&mut world, child, grandchild);
+
+        let repaired = validate_hierarchy(&mut world);
+        assert!(repaired.is_empty(), "no repair needed on a clean DAG");
+        // Edges preserved.
+        assert_eq!(world.get::<Parent>(child).unwrap().0, root);
+        assert_eq!(world.get::<Parent>(grandchild).unwrap().0, child);
+    }
+
+    #[test]
+    fn validate_hierarchy_breaks_three_cycle_and_keeps_unrelated_dag() {
+        // A→B→C→A is a 3-cycle written raw. Plus an unrelated D→E chain.
+        let mut world = World::new();
+        let a = world.spawn();
+        let b = world.spawn();
+        let c = world.spawn();
+        let d = world.spawn();
+        let e = world.spawn();
+        world.add(a, Parent(c)); // a's parent = c
+        world.add(b, Parent(a)); // b's parent = a
+        world.add(c, Parent(b)); // c's parent = b  → cycle a→c→b→a
+        add_child(&mut world, d, e); // clean DAG e→d (e's parent = d)
+
+        let repaired = validate_hierarchy(&mut world);
+        assert!(!repaired.is_empty(), "cycle in {{A,B,C}} must be repaired");
+        // The unrelated DAG survives.
+        assert_eq!(world.get::<Parent>(e).unwrap().0, d);
+        // The cycle is broken (one node lost its Parent).
+        let cycle_parents_present = [a, b, c]
+            .iter()
+            .filter(|&&n| world.get::<Parent>(n).is_some())
+            .count();
+        assert!(
+            cycle_parents_present < 3,
+            "at least one Parent in the cycle must be removed"
+        );
+    }
+
+    #[test]
+    fn validate_hierarchy_caps_pathologically_deep_chain() {
+        // A linear chain longer than VALIDATION_MAX_DEPTH is treated as
+        // corruption — we don't want propagate_transforms to ever see one.
+        let mut world = World::new();
+        let mut prev = world.spawn();
+        let leaf = prev;
+        for _ in 0..(VALIDATION_MAX_DEPTH + 50) {
+            let next = world.spawn();
+            // Raw Parent write — add_child would also walk and bail, but we
+            // want to land the chain unguarded.
+            world.add(prev, Parent(next));
+            prev = next;
+        }
+        let repaired = validate_hierarchy(&mut world);
+        // The validator strips Parent from `leaf` (the first start whose
+        // walk runs over the cap) — at minimum that one is repaired.
+        assert!(repaired.contains(&leaf), "deep-chain leaf must be repaired");
     }
 }

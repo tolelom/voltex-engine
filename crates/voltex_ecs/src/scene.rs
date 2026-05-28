@@ -3,7 +3,7 @@
 
 use crate::component_registry::ComponentRegistry;
 use crate::entity::Entity;
-use crate::hierarchy::{add_child, Parent};
+use crate::hierarchy::{add_child, validate_hierarchy, Parent};
 use crate::json::{self, JsonVal};
 use crate::transform::Transform;
 use crate::world::World;
@@ -368,6 +368,11 @@ pub(crate) fn deserialize_scene_json_with_cap(
             }
         }
     }
+
+    // Defense-in-depth: a user-registered Parent component would have been
+    // written directly via the ComponentRegistry path above, bypassing
+    // `add_child`'s cycle guard. Strip any cycles before returning.
+    let _ = validate_hierarchy(world);
 
     Ok(created)
 }

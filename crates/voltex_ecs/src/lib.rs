@@ -19,35 +19,39 @@
 
 #![warn(missing_docs)]
 
-pub mod error;
+pub mod archetype;
+pub mod binary_scene;
+pub mod component_registry;
+pub mod dependency_scheduler;
 pub mod entity;
-pub mod sparse_set;
-pub mod world;
-pub mod transform;
+pub mod error;
 pub mod hierarchy;
-pub mod world_transform;
+pub mod json;
+pub mod render_components;
 pub mod scene;
 pub mod scheduler;
-pub mod json;
-pub mod component_registry;
-pub mod binary_scene;
-pub mod archetype;
-pub mod dependency_scheduler;
-pub mod render_components;
 pub mod script_component;
+pub mod sparse_set;
+pub mod transform;
+pub mod world;
+pub mod world_transform;
 
-pub use error::{EcsError, Result};
-pub use entity::{Entity, EntityAllocator};
-pub use sparse_set::SparseSet;
-pub use world::World;
-pub use transform::Transform;
-pub use hierarchy::{Parent, Children, add_child, remove_child, despawn_recursive, roots};
-pub use world_transform::{WorldTransform, propagate_transforms};
-pub use scene::{Tag, serialize_scene, deserialize_scene, serialize_scene_json, deserialize_scene_json};
-pub use scheduler::{Scheduler, System};
+pub use archetype::{Archetype, ArchetypeRegistry, ArchetypeSignature};
+pub use binary_scene::{deserialize_scene_binary, serialize_scene_binary};
 pub use component_registry::{Component, ComponentRegistry};
-pub use binary_scene::{serialize_scene_binary, deserialize_scene_binary};
-pub use archetype::{ArchetypeSignature, Archetype, ArchetypeRegistry};
-pub use dependency_scheduler::{SystemAccess, DependencyScheduler};
-pub use render_components::{MeshAsset, MaterialAsset, MeshHandle, MaterialHandle, Bounds};
+pub use dependency_scheduler::{DependencyScheduler, SystemAccess};
+pub use entity::{Entity, EntityAllocator};
+pub use error::{EcsError, Result};
+pub use hierarchy::{
+    add_child, despawn_recursive, remove_child, roots, validate_hierarchy, Children, Parent,
+};
+pub use render_components::{Bounds, MaterialAsset, MaterialHandle, MeshAsset, MeshHandle};
+pub use scene::{
+    deserialize_scene, deserialize_scene_json, serialize_scene, serialize_scene_json, Tag,
+};
+pub use scheduler::{Scheduler, System};
 pub use script_component::ScriptComponent;
+pub use sparse_set::SparseSet;
+pub use transform::Transform;
+pub use world::World;
+pub use world_transform::{propagate_transforms, WorldTransform};

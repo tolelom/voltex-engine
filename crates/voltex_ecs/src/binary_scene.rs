@@ -9,12 +9,12 @@
 //!       name_len u16 LE + name bytes
 //!       data_len u32 LE + data bytes
 
-use std::collections::HashMap;
-use crate::entity::Entity;
-use crate::world::World;
-use crate::transform::Transform;
-use crate::hierarchy::{add_child, Parent};
 use crate::component_registry::ComponentRegistry;
+use crate::entity::Entity;
+use crate::hierarchy::{add_child, validate_hierarchy, Parent};
+use crate::transform::Transform;
+use crate::world::World;
+use std::collections::HashMap;
 
 const MAGIC: &[u8; 4] = b"VSCN";
 const VERSION: u32 = 1;
@@ -27,10 +27,8 @@ const MAX_SCENE_ENTITIES: usize = 1_000_000;
 
 /// Serialize all entities with a Transform to the binary scene format.
 pub fn serialize_scene_binary(world: &World, registry: &ComponentRegistry) -> Vec<u8> {
-    let entities_with_transform: Vec<(Entity, Transform)> = world
-        .query::<Transform>()
-        .map(|(e, t)| (e, *t))
-        .collect();
+    let entities_with_transform: Vec<(Entity, Transform)> =
+        world.query::<Transform>().map(|(e, t)| (e, *t)).collect();
 
     let entity_to_index: HashMap<Entity, usize> = entities_with_transform
         .iter()
@@ -50,7 +48,8 @@ pub fn serialize_scene_binary(world: &World, registry: &ComponentRegistry) -> Ve
     for (entity, _) in &entities_with_transform {
         // Parent index
         let parent_idx: i32 = if let Some(parent_comp) = world.get::<Parent>(*entity) {
-            entity_to_index.get(&parent_comp.0)
+            entity_to_index
+                .get(&parent_comp.0)
                 .map(|&i| i as i32)
                 .unwrap_or(-1)
         } else {
@@ -106,7 +105,8 @@ pub fn deserialize_scene_binary(
         return Err(format!(
             "Binary scene entity count {} exceeds limit {}",
             entity_count, MAX_SCENE_ENTITIES
-        ).into());
+        )
+        .into());
     }
     let mut pos = 12;
 
@@ -118,14 +118,16 @@ pub fn deserialize_scene_binary(
         if pos + 4 > data.len() {
             return Err("Unexpected end of data reading parent index".into());
         }
-        let parent_idx = i32::from_le_bytes([data[pos], data[pos + 1], data[pos + 2], data[pos + 3]]);
+        let parent_idx =
+            i32::from_le_bytes([data[pos], data[pos + 1], data[pos + 2], data[pos + 3]]);
         pos += 4;
 
         // Component count
         if pos + 4 > data.len() {
             return Err("Unexpected end of data reading component count".into());
         }
-        let comp_count = u32::from_le_bytes([data[pos], data[pos + 1], data[pos + 2], data[pos + 3]]) as usize;
+        let comp_count =
+            u32::from_le_bytes([data[pos], data[pos + 1], data[pos + 2], data[pos + 3]]) as usize;
         pos += 4;
 
         let entity = world.spawn();
@@ -150,7 +152,9 @@ pub fn deserialize_scene_binary(
             if pos + 4 > data.len() {
                 return Err("Unexpected end of data reading data length".into());
             }
-            let data_len = u32::from_le_bytes([data[pos], data[pos + 1], data[pos + 2], data[pos + 3]]) as usize;
+            let data_len =
+                u32::from_le_bytes([data[pos], data[pos + 1], data[pos + 2], data[pos + 3]])
+                    as usize;
             pos += 4;
 
             // Data
@@ -181,6 +185,11 @@ pub fn deserialize_scene_binary(
             }
         }
     }
+
+    // Defense-in-depth: scan for cycles a custom-registered Parent component
+    // (deserialized via the ComponentRegistry path, bypassing `add_child`)
+    // could have introduced. No-op for well-formed scenes.
+    let _ = validate_hierarchy(world);
 
     Ok(created)
 }
