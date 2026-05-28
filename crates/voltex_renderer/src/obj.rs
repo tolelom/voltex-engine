@@ -319,6 +319,42 @@ f 1//1 3//1 2//1
     }
 
     #[test]
+    fn test_compute_tangents_xy_triangle() {
+        // Triangle in the XY plane, normal +Z, with axis-aligned UVs.
+        // U increases along +X, so the tangent must point along +X.
+        let mut verts = vec![
+            MeshVertex { position: [0.0, 0.0, 0.0], normal: [0.0, 0.0, 1.0], uv: [0.0, 0.0], tangent: [0.0; 4] },
+            MeshVertex { position: [1.0, 0.0, 0.0], normal: [0.0, 0.0, 1.0], uv: [1.0, 0.0], tangent: [0.0; 4] },
+            MeshVertex { position: [0.0, 1.0, 0.0], normal: [0.0, 0.0, 1.0], uv: [0.0, 1.0], tangent: [0.0; 4] },
+        ];
+        compute_tangents(&mut verts, &[0, 1, 2]);
+        for v in &verts {
+            assert!((v.tangent[0] - 1.0).abs() < 1e-5, "tangent.x={}", v.tangent[0]);
+            assert!(v.tangent[1].abs() < 1e-5, "tangent.y={}", v.tangent[1]);
+            assert!(v.tangent[2].abs() < 1e-5, "tangent.z={}", v.tangent[2]);
+            assert!((v.tangent[3].abs() - 1.0).abs() < 1e-5, "handedness w={}", v.tangent[3]);
+            // Tangent must be orthogonal to the normal.
+            let dot = v.tangent[0] * v.normal[0] + v.tangent[1] * v.normal[1] + v.tangent[2] * v.normal[2];
+            assert!(dot.abs() < 1e-5, "dot(T,N)={}", dot);
+        }
+    }
+
+    #[test]
+    fn test_compute_tangents_degenerate_uv_fallback() {
+        // All UVs identical -> duv det ≈ 0 -> triangle skipped -> tangent stays
+        // zero -> Gram-Schmidt length ≈ 0 -> documented fallback [1,0,0,1].
+        let mut verts = vec![
+            MeshVertex { position: [0.0, 0.0, 0.0], normal: [0.0, 0.0, 1.0], uv: [0.5, 0.5], tangent: [0.0; 4] },
+            MeshVertex { position: [1.0, 0.0, 0.0], normal: [0.0, 0.0, 1.0], uv: [0.5, 0.5], tangent: [0.0; 4] },
+            MeshVertex { position: [0.0, 1.0, 0.0], normal: [0.0, 0.0, 1.0], uv: [0.5, 0.5], tangent: [0.0; 4] },
+        ];
+        compute_tangents(&mut verts, &[0, 1, 2]);
+        for v in &verts {
+            assert_eq!(v.tangent, [1.0, 0.0, 0.0, 1.0], "expected fallback tangent");
+        }
+    }
+
+    #[test]
     fn fuzz_parse_obj_no_panic_on_empty() {
         let _ = parse_obj("");
     }

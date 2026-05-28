@@ -87,3 +87,42 @@ pub fn parse_interpolation(s: &str) -> Interpolation {
         _ => Interpolation::Linear,
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_animation_path_known() {
+        assert_eq!(parse_animation_path("translation"), AnimationPath::Translation);
+        assert_eq!(parse_animation_path("rotation"), AnimationPath::Rotation);
+        assert_eq!(parse_animation_path("scale"), AnimationPath::Scale);
+    }
+
+    #[test]
+    fn test_parse_animation_path_unknown_defaults_to_translation() {
+        // Documented silent-coercion: unknown/empty/mis-cased strings fall back
+        // to Translation. Pinned so any future change is intentional.
+        assert_eq!(parse_animation_path(""), AnimationPath::Translation);
+        assert_eq!(parse_animation_path("weights"), AnimationPath::Translation);
+        assert_eq!(parse_animation_path("Translation"), AnimationPath::Translation); // case-sensitive
+        assert_eq!(parse_animation_path("ROTATION"), AnimationPath::Translation);
+    }
+
+    #[test]
+    fn test_parse_interpolation_known() {
+        assert_eq!(parse_interpolation("LINEAR"), Interpolation::Linear);
+        assert_eq!(parse_interpolation("STEP"), Interpolation::Step);
+        assert_eq!(parse_interpolation("CUBICSPLINE"), Interpolation::CubicSpline);
+    }
+
+    #[test]
+    fn test_parse_interpolation_unknown_defaults_to_linear() {
+        // Documented silent-coercion: unknown/empty/mis-cased strings fall back
+        // to Linear. Pinned so any future change is intentional.
+        assert_eq!(parse_interpolation(""), Interpolation::Linear);
+        assert_eq!(parse_interpolation("linear"), Interpolation::Linear); // case-sensitive
+        assert_eq!(parse_interpolation("CATMULLROM"), Interpolation::Linear);
+        assert_eq!(parse_interpolation("Step"), Interpolation::Linear);
+    }
+}

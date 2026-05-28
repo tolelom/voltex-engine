@@ -183,7 +183,7 @@ mod tests {
     #[test]
     fn test_length() {
         let v = Vec3::new(3.0, 4.0, 0.0);
-        assert!((v.length() - 5.0).abs() < f32::EPSILON);
+        assert!((v.length() - 5.0).abs() < 1e-5);
     }
 
     #[test]

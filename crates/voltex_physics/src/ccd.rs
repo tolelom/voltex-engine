@@ -92,7 +92,10 @@ mod tests {
         let t = swept_sphere_vs_aabb(start, end, radius, &aabb);
         assert!(t.is_some(), "should detect tunneling through thin wall");
         let t = t.unwrap();
-        assert!(t > 0.0 && t < 1.0);
+        // Expanded AABB min.x = -0.05 - radius(0.1) = -0.15.
+        // start.x = -100, sweep direction = +200.
+        // First contact at parametric t = (-0.15 - (-100)) / 200 = 99.85 / 200 = 0.499250.
+        assert!(approx(t, 0.499_25), "expected TOI ~0.49925, got {t}");
     }
 
     #[test]

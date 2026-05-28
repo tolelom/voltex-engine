@@ -149,6 +149,40 @@ mod tests {
     }
 
     #[test]
+    fn test_plane_normalize_scales_normal_and_d() {
+        // |normal| = 3, so dividing by 3: normal -> [0,1,0], d 6 -> 2.
+        let p = Plane { normal: Vec3::new(0.0, 3.0, 0.0), d: 6.0 }.normalize();
+        assert!(approx_eq(p.normal.x, 0.0, 1e-6));
+        assert!(approx_eq(p.normal.y, 1.0, 1e-6));
+        assert!(approx_eq(p.normal.z, 0.0, 1e-6));
+        assert!(approx_eq(p.d, 2.0, 1e-6), "d = {}", p.d);
+        assert!(approx_eq(p.normal.length(), 1.0, 1e-6));
+    }
+
+    #[test]
+    fn test_plane_distance_signed() {
+        // Normalized plane y=1, d=2. distance(point) = normal·point + d.
+        let p = Plane { normal: Vec3::new(0.0, 3.0, 0.0), d: 6.0 }.normalize();
+        // point (0,5,0): 1*5 + 2 = 7.
+        assert!(approx_eq(p.distance(Vec3::new(0.0, 5.0, 0.0)), 7.0, 1e-6));
+        // point on the plane (0,-2,0): 1*-2 + 2 = 0.
+        assert!(approx_eq(p.distance(Vec3::new(0.0, -2.0, 0.0)), 0.0, 1e-6));
+        // point behind: (0,-5,0): -5 + 2 = -3 (negative = outside).
+        assert!(approx_eq(p.distance(Vec3::new(0.0, -5.0, 0.0)), -3.0, 1e-6));
+    }
+
+    #[test]
+    fn test_plane_normalize_zero_normal_unchanged() {
+        // The len < 1e-10 guard returns the plane untouched (no div-by-zero).
+        let p = Plane { normal: Vec3::new(0.0, 0.0, 0.0), d: 5.0 };
+        let n = p.normalize();
+        assert_eq!(n.normal.x, 0.0);
+        assert_eq!(n.normal.y, 0.0);
+        assert_eq!(n.normal.z, 0.0);
+        assert_eq!(n.d, 5.0);
+    }
+
+    #[test]
     fn test_frustum_extraction_identity() {
         // Identity VP means clip space = NDC directly.
         // For wgpu: x,y in [-1,1], z in [0,1].

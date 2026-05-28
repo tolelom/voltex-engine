@@ -130,4 +130,89 @@ mod tests {
         let sample = hammersley(0, n);
         assert_eq!(sample[0], 0.0, "hammersley(0, N).x should be 0");
     }
+
+    #[test]
+    fn test_radical_inverse_vdc_known_values() {
+        // vdc bit-reverses the integer into the fractional bits and divides by 2^32.
+        // 0 -> 0.0
+        assert_eq!(radical_inverse_vdc(0), 0.0);
+        // 1 (…0001) reversed -> 0x80000000 / 2^32 = 0.5
+        assert!((radical_inverse_vdc(1) - 0.5).abs() < 1e-6, "vdc(1)={}", radical_inverse_vdc(1));
+        // 2 (…0010) reversed -> 0x40000000 / 2^32 = 0.25
+        assert!((radical_inverse_vdc(2) - 0.25).abs() < 1e-6, "vdc(2)={}", radical_inverse_vdc(2));
+        // 3 (…0011) reversed -> 0xC0000000 / 2^32 = 0.75
+        assert!((radical_inverse_vdc(3) - 0.75).abs() < 1e-6, "vdc(3)={}", radical_inverse_vdc(3));
+    }
+
+    #[test]
+    fn test_radical_inverse_vdc_range() {
+        // Sweep: every output must lie in [0, 1).
+        for i in 0..4096u32 {
+            let v = radical_inverse_vdc(i);
+            assert!((0.0..1.0).contains(&v), "vdc({}) = {} out of [0,1)", i, v);
+        }
+    }
+
+    #[test]
+    fn test_importance_sample_ggx_zero_roughness() {
+        // roughness=0, xi=[0,0]: a=0, phi=0, cos_theta=sqrt(1/1)=1, sin_theta=0 -> (0,0,1).
+        let h = importance_sample_ggx([0.0, 0.0], 0.0);
+        assert!((h[0] - 0.0).abs() < 1e-6, "h.x={}", h[0]);
+        assert!((h[1] - 0.0).abs() < 1e-6, "h.y={}", h[1]);
+        assert!((h[2] - 1.0).abs() < 1e-6, "h.z={}", h[2]);
+    }
+
+    #[test]
+    fn test_importance_sample_ggx_unit_length() {
+        // The half vector must always be unit length regardless of inputs.
+        for &rough in &[0.0_f32, 0.25, 0.5, 0.75, 1.0] {
+            for &xi in &[[0.0, 0.0], [0.3, 0.6], [0.9, 0.1], [0.5, 0.999]] {
+                let h = importance_sample_ggx(xi, rough);
+                let len = (h[0] * h[0] + h[1] * h[1] + h[2] * h[2]).sqrt();
+                assert!((len - 1.0).abs() < 1e-4, "len={} for rough={} xi={:?}", len, rough, xi);
+            }
+        }
+    }
+
+    #[test]
+    fn test_geometry_smith_ibl_zero_roughness_is_one() {
+        // roughness=0 -> k=0 -> ggx_v = ggx_l = 1 -> product 1.0.
+        let g = geometry_smith_ibl(1.0, 1.0, 0.0);
+        assert!((g - 1.0).abs() < 1e-6, "g={}", g);
+    }
+
+    #[test]
+    fn test_geometry_smith_ibl_in_range_and_decreases() {
+        // Always within [0, 1].
+        for &rough in &[0.0_f32, 0.25, 0.5, 0.75, 1.0] {
+            let g = geometry_smith_ibl(0.7, 0.7, rough);
+            assert!((0.0..=1.0).contains(&g), "g={} out of [0,1] for rough={}", g, rough);
+        }
+        // Monotonically decreases (more occlusion) as roughness grows.
+        let g_low = geometry_smith_ibl(0.5, 0.5, 0.1);
+        let g_mid = geometry_smith_ibl(0.5, 0.5, 0.5);
+        let g_high = geometry_smith_ibl(0.5, 0.5, 0.9);
+        assert!(g_low > g_mid, "g_low {} should exceed g_mid {}", g_low, g_mid);
+        assert!(g_mid > g_high, "g_mid {} should exceed g_high {}", g_mid, g_high);
+    }
+
+    #[test]
+    fn test_integrate_brdf_smooth_full_facing() {
+        // roughness=0 + NdotV=1: perfect mirror facing the viewer.
+        // F_env = F0*scale + bias should reduce to F0, i.e. scale≈1, bias≈0.
+        let (scale, bias) = integrate_brdf(1.0, 0.0);
+        assert!((scale - 1.0).abs() < 1e-3, "scale={}", scale);
+        assert!(bias.abs() < 1e-3, "bias={}", bias);
+    }
+
+    #[test]
+    fn test_integrate_brdf_finite_at_grazing() {
+        // n_dot_v near 0 must not divide-by-zero or produce NaN/Inf.
+        for &rough in &[0.0_f32, 0.5, 1.0] {
+            let (scale, bias) = integrate_brdf(1e-4, rough);
+            assert!(scale.is_finite(), "scale not finite for rough={}", rough);
+            assert!(bias.is_finite(), "bias not finite for rough={}", rough);
+            assert!(scale >= 0.0 && bias >= 0.0, "negative result rough={}", rough);
+        }
+    }
 }

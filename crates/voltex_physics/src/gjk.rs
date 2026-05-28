@@ -439,6 +439,22 @@ mod tests {
     }
 
     #[test]
+    fn test_gjk_spheres_boundary() {
+        // Combined radius = 1.0 + 1.0 = 2.0.
+        let a = Collider::Sphere { radius: 1.0 };
+        let b = Collider::Sphere { radius: 1.0 };
+        let pos_a = Vec3::ZERO;
+
+        // Just-touching (slightly overlapping): centers 1.99 apart → overlap.
+        let touching = gjk(&a, pos_a, &b, Vec3::new(2.0 - 0.01, 0.0, 0.0));
+        assert!(touching.is_some(), "just-touching spheres should overlap");
+
+        // Just-separated: centers 2.01 apart → no overlap.
+        let separated = gjk(&a, pos_a, &b, Vec3::new(2.0 + 0.01, 0.0, 0.0));
+        assert!(separated.is_none(), "just-separated spheres should not overlap");
+    }
+
+    #[test]
     fn test_gjk_capsule_vs_sphere_overlap() {
         let a = Collider::Capsule { radius: 0.5, half_height: 1.0 };
         let b = Collider::Sphere { radius: 1.0 };
@@ -447,8 +463,11 @@ mod tests {
 
         let result = gjk_epa(&a, pos_a, &b, pos_b);
         assert!(result.is_some());
-        let (_normal, depth, _pa, _pb) = result.unwrap();
-        assert!(depth > 0.0);
+        let (normal, depth, _pa, _pb) = result.unwrap();
+        // Capsule cylinder radius 0.5 (X-axis), sphere radius 1.0, centers 1.0 apart.
+        // Penetration depth = (0.5 + 1.0) - 1.0 = 0.5, separating axis = X.
+        assert!(approx(depth, 0.5, 0.05), "expected depth ~0.5, got {depth}");
+        assert!(normal.x.abs() > 0.9, "normal should be along X, got {normal:?}");
     }
 
     #[test]
@@ -463,6 +482,20 @@ mod tests {
     }
 
     #[test]
+    fn test_gjk_capsule_vs_sphere_boundary() {
+        // Capsule cylinder radius 0.5 + sphere radius 0.5 = combined 1.0 along X.
+        let a = Collider::Capsule { radius: 0.5, half_height: 1.0 };
+        let b = Collider::Sphere { radius: 0.5 };
+        let pos_a = Vec3::ZERO;
+
+        let touching = gjk(&a, pos_a, &b, Vec3::new(1.0 - 0.01, 0.0, 0.0));
+        assert!(touching.is_some(), "just-touching should overlap");
+
+        let separated = gjk(&a, pos_a, &b, Vec3::new(1.0 + 0.01, 0.0, 0.0));
+        assert!(separated.is_none(), "just-separated should not overlap");
+    }
+
+    #[test]
     fn test_gjk_capsule_vs_box_overlap() {
         let a = Collider::Capsule { radius: 0.5, half_height: 1.0 };
         let b = Collider::Box { half_extents: Vec3::ONE };
@@ -471,8 +504,11 @@ mod tests {
 
         let result = gjk_epa(&a, pos_a, &b, pos_b);
         assert!(result.is_some());
-        let (_normal, depth, _pa, _pb) = result.unwrap();
-        assert!(depth > 0.0);
+        let (normal, depth, _pa, _pb) = result.unwrap();
+        // Capsule cylinder radius 0.5 (X-axis), box half_extent.x 1.0, centers 1.0 apart.
+        // Penetration depth = (0.5 + 1.0) - 1.0 = 0.5, separating axis = X.
+        assert!(approx(depth, 0.5, 0.05), "expected depth ~0.5, got {depth}");
+        assert!(normal.x.abs() > 0.9, "normal should be along X, got {normal:?}");
     }
 
     #[test]
@@ -484,8 +520,11 @@ mod tests {
 
         let result = gjk_epa(&a, pos_a, &b, pos_b);
         assert!(result.is_some());
-        let (_normal, depth, _pa, _pb) = result.unwrap();
-        assert!(depth > 0.0);
+        let (normal, depth, _pa, _pb) = result.unwrap();
+        // Both capsules cylinder radius 0.5 (X-axis), centers 0.5 apart.
+        // Penetration depth = (0.5 + 0.5) - 0.5 = 0.5, separating axis = X.
+        assert!(approx(depth, 0.5, 0.05), "expected depth ~0.5, got {depth}");
+        assert!(normal.x.abs() > 0.9, "normal should be along X, got {normal:?}");
     }
 
     #[test]
@@ -497,6 +536,20 @@ mod tests {
 
         let result = gjk(&a, pos_a, &b, pos_b);
         assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_gjk_capsule_vs_capsule_boundary() {
+        // Both capsules cylinder radius 0.5 → combined 1.0 along X.
+        let a = Collider::Capsule { radius: 0.5, half_height: 1.0 };
+        let b = Collider::Capsule { radius: 0.5, half_height: 1.0 };
+        let pos_a = Vec3::ZERO;
+
+        let touching = gjk(&a, pos_a, &b, Vec3::new(1.0 - 0.01, 0.0, 0.0));
+        assert!(touching.is_some(), "just-touching should overlap");
+
+        let separated = gjk(&a, pos_a, &b, Vec3::new(1.0 + 0.01, 0.0, 0.0));
+        assert!(separated.is_none(), "just-separated should not overlap");
     }
 
     #[test]

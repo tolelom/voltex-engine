@@ -124,6 +124,9 @@ mod tests {
         let emitter = Vec3::new(10.0, 0.0, 0.0);
         let (left, right) = stereo_pan(&listener, emitter);
         assert!(right > left, "expected right > left for +X emitter, got left={left}, right={right}");
+        // Equal-power law: left^2 + right^2 == 1 (constant acoustic power across pan).
+        assert!((left * left + right * right - 1.0).abs() < 1e-3,
+            "equal-power law violated: left={left}, right={right}, sum_sq={}", left * left + right * right);
     }
 
     #[test]
@@ -133,6 +136,9 @@ mod tests {
         let emitter = Vec3::new(-10.0, 0.0, 0.0);
         let (left, right) = stereo_pan(&listener, emitter);
         assert!(left > right, "expected left > right for -X emitter, got left={left}, right={right}");
+        // Equal-power law holds on the opposite side too.
+        assert!((left * left + right * right - 1.0).abs() < 1e-3,
+            "equal-power law violated: left={left}, right={right}, sum_sq={}", left * left + right * right);
     }
 
     #[test]
@@ -142,6 +148,9 @@ mod tests {
         let emitter = Vec3::new(0.0, 0.0, -10.0);
         let (left, right) = stereo_pan(&listener, emitter);
         assert!((left - right).abs() < 0.01, "expected roughly equal for front emitter, got left={left}, right={right}");
+        // Center pan: each channel ~= 1/sqrt(2), and equal-power law holds.
+        assert!((left * left + right * right - 1.0).abs() < 1e-3,
+            "equal-power law violated: left={left}, right={right}, sum_sq={}", left * left + right * right);
     }
 
     #[test]

@@ -401,13 +401,19 @@ mod tests {
 
         let config = PhysicsConfig::default();
 
-        for _ in 0..10 {
+        // Run long enough to fall ~4.5 units and settle onto the floor.
+        for _ in 0..300 {
             physics_step(&mut world, &config);
         }
 
         let t = world.get::<Transform>(ball).unwrap();
-        assert!(t.position.y < 5.0);
-        assert!(t.position.y > -1.0);
+        // Floor box center y=-1.0, half_extent.y=1.0 → floor top at y=0.0.
+        // Ball radius 0.5 → resting center y ≈ 0.5 (within position slop).
+        // Solver leaves the body penetrated by up to POSITION_SLOP, so rest is
+        // marginally below 0.5 (observed ~0.487).
+        let rest_y = 0.5;
+        assert!((t.position.y - rest_y).abs() < POSITION_SLOP + 0.05,
+            "ball should rest at y~{rest_y}, got {}", t.position.y);
     }
 
     #[test]
@@ -431,9 +437,8 @@ mod tests {
         world.add(floor, floor_rb);
 
         let contacts = detect_collisions(&world);
-        if !contacts.is_empty() {
-            resolve_collisions(&mut world, &contacts, 1);
-        }
+        assert!(!contacts.is_empty(), "ball should be in contact with floor");
+        resolve_collisions(&mut world, &contacts, 1);
 
         let ball_v = world.get::<RigidBody>(ball).unwrap().velocity;
         assert!(ball_v.x < 5.0, "friction should slow horizontal velocity: {}", ball_v.x);
@@ -495,9 +500,16 @@ mod tests {
         let rb_a_after = world.get::<RigidBody>(a).unwrap();
         let rb_b_after = world.get::<RigidBody>(b).unwrap();
 
-        // At least one body should have non-zero angular velocity after off-center collision
-        let total_angular = rb_a_after.angular_velocity.length() + rb_b_after.angular_velocity.length();
-        assert!(total_angular > 1e-4, "off-center hit should produce angular velocity, got {}", total_angular);
+        // The collision lies entirely in the XY plane, so the induced spin must be
+        // about the Z axis only (X/Y angular components stay ~0).
+        let wa = rb_a_after.angular_velocity;
+        let wb = rb_b_after.angular_velocity;
+        assert!(wa.x.abs() < 1e-4 && wa.y.abs() < 1e-4, "A spin should be Z-only, got {wa:?}");
+        assert!(wb.x.abs() < 1e-4 && wb.y.abs() < 1e-4, "B spin should be Z-only, got {wb:?}");
+        // A approaches B from the upper-left along +X; the off-center contact
+        // (normal A->B = (1,-1,0)/sqrt2) torques both bodies clockwise about -Z.
+        assert!(wa.z < -1e-4, "A should spin about -Z, got {}", wa.z);
+        assert!(wb.z < -1e-4, "B should spin about -Z, got {}", wb.z);
     }
 
     // --- Sequential impulse tests ---
@@ -539,7 +551,7 @@ mod tests {
         for (i, e) in boxes.iter().enumerate() {
             let t = world.get::<Transform>(*e).unwrap();
             let expected_y = 0.5 + i as f32 * 1.0;
-            assert!((t.position.y - expected_y).abs() < 1.0,
+            assert!((t.position.y - expected_y).abs() < 0.1,
                 "box {} moved too much: expected y~{}, got {}", i, expected_y, t.position.y);
         }
     }
