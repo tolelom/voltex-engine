@@ -3,7 +3,7 @@
 
 /// JSON value variants understood by this mini parser/writer.
 #[derive(Debug, Clone, PartialEq)]
-pub enum JsonVal {
+pub(crate) enum JsonVal {
     /// `null`.
     Null,
     /// `true` / `false`.
@@ -21,12 +21,12 @@ pub enum JsonVal {
 // ── Writer helpers ──────────────────────────────────────────────────
 
 /// Serialises `null`.
-pub fn json_write_null() -> String {
+pub(crate) fn json_write_null() -> String {
     "null".to_string()
 }
 
 /// Serialises an `f32` (integer form when fractional == 0).
-pub fn json_write_f32(v: f32) -> String {
+pub(crate) fn json_write_f32(v: f32) -> String {
     // Emit integer form when the value has no fractional part
     if v.fract() == 0.0 && v.abs() < 1e15 {
         format!("{}", v as i64)
@@ -36,7 +36,7 @@ pub fn json_write_f32(v: f32) -> String {
 }
 
 /// Serialises a JSON string (escapes `"`, `\\`, `\n`, `\r`, `\t`).
-pub fn json_write_string(s: &str) -> String {
+pub(crate) fn json_write_string(s: &str) -> String {
     let mut out = String::with_capacity(s.len() + 2);
     out.push('"');
     for c in s.chars() {
@@ -54,7 +54,7 @@ pub fn json_write_string(s: &str) -> String {
 }
 
 /// Builds a JSON array literal from pre-formatted element strings.
-pub fn json_write_array(elements: &[&str]) -> String {
+pub(crate) fn json_write_array(elements: &[&str]) -> String {
     let mut out = String::from("[");
     for (i, elem) in elements.iter().enumerate() {
         if i > 0 {
@@ -67,7 +67,7 @@ pub fn json_write_array(elements: &[&str]) -> String {
 }
 
 /// Builds a JSON object literal from `(key, pre-formatted-value)` pairs.
-pub fn json_write_object(pairs: &[(&str, &str)]) -> String {
+pub(crate) fn json_write_object(pairs: &[(&str, &str)]) -> String {
     let mut out = String::from("{");
     for (i, (key, val)) in pairs.iter().enumerate() {
         if i > 0 {
@@ -137,7 +137,7 @@ impl JsonVal {
 
 /// Parses a complete JSON document from `input`. Returns `Err` on any
 /// trailing garbage or malformed token.
-pub fn json_parse(input: &str) -> crate::Result<JsonVal> {
+pub(crate) fn json_parse(input: &str) -> crate::Result<JsonVal> {
     let bytes = input.as_bytes();
     let (val, pos) = parse_value(bytes, skip_ws(bytes, 0))?;
     let pos = skip_ws(bytes, pos);

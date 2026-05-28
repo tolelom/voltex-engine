@@ -62,7 +62,7 @@ pub struct DependencyScheduler {
 
 /// A group of systems that can execute in parallel (indices into
 /// [`DependencyScheduler::add`]'s insertion order).
-pub type ParallelGroup = Vec<usize>;
+pub(crate) type ParallelGroup = Vec<usize>;
 
 impl Default for DependencyScheduler {
     fn default() -> Self {
