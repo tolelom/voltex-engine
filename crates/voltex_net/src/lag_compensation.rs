@@ -6,7 +6,7 @@ use std::collections::VecDeque;
 
 /// A timestamped snapshot of entity positions for lag compensation.
 #[derive(Debug, Clone)]
-pub struct HistoryEntry {
+pub(crate) struct HistoryEntry {
     /// Server tick this snapshot was taken on.
     pub tick: u64,
     /// Wall-clock timestamp in seconds (server local).
