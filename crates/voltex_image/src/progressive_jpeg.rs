@@ -1,14 +1,18 @@
 //! Progressive JPEG support (SOF2 — successive scans).
-#![allow(missing_docs)]
 
 /// Progressive JPEG scan parameters.
 #[derive(Debug, Clone)]
 pub struct ScanParams {
-    pub ss: u8,              // spectral selection start
-    pub se: u8,              // spectral selection end
-    pub ah: u8,              // successive approximation high
-    pub al: u8,              // successive approximation low
-    pub components: Vec<u8>, // component indices in this scan
+    /// Spectral selection start (DCT coefficient index).
+    pub ss: u8,
+    /// Spectral selection end (DCT coefficient index).
+    pub se: u8,
+    /// Successive approximation bit position high.
+    pub ah: u8,
+    /// Successive approximation bit position low.
+    pub al: u8,
+    /// Component indices included in this scan.
+    pub components: Vec<u8>,
 }
 
 /// Detect if a JPEG is progressive (SOF2 marker present).

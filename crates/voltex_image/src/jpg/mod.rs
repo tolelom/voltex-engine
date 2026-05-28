@@ -2,7 +2,6 @@
 //! Returns RGBA pixel data like parse_png.
 //! Supports grayscale (1-component) and YCbCr (3-component) with
 //! chroma subsampling (4:4:4, 4:2:2, 4:2:0).
-#![allow(missing_docs)]
 
 mod bit_reader;
 mod decoder;
@@ -18,6 +17,10 @@ use headers::{parse_dht, parse_dqt, parse_sof, HuffTable, JpegComponent};
 /// SOF segments from triggering huge allocations.
 const JPG_MAX_DIMENSION: u32 = 16_384;
 
+/// Decode a baseline JPEG file from raw bytes.
+///
+/// Returns `(rgba_pixels, width, height)` with a packed RGBA8 buffer.
+/// Supports SOF0 grayscale and YCbCr with 4:4:4, 4:2:2, and 4:2:0 subsampling.
 pub fn parse_jpg(data: &[u8]) -> crate::Result<(Vec<u8>, u32, u32)> {
     if data.len() < 2 || data[0] != 0xFF || data[1] != 0xD8 {
         return Err("Invalid JPEG: missing SOI marker".into());

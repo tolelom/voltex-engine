@@ -7,6 +7,11 @@ const GLB_VERSION: u32 = 2;
 const CHUNK_JSON: u32 = 0x4E4F534A;
 const CHUNK_BIN: u32 = 0x004E4942;
 
+/// Decode a glTF 2.0 asset from raw bytes (GLB or embedded-JSON format).
+///
+/// Returns a [`GltfData`] containing all meshes, scene nodes, skins, and
+/// animations. Both binary GLB containers and JSON-only glTF files are
+/// accepted; the format is detected from the first four bytes.
 pub fn parse_gltf(data: &[u8]) -> crate::Result<GltfData> {
     if data.len() < 4 {
         return Err("Data too short".into());

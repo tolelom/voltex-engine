@@ -1,6 +1,5 @@
 //! PNG decoder that uses the self-contained deflate decompressor.
 //! Supports 8-bit RGB (color_type=2) and RGBA (color_type=6) images.
-#![allow(missing_docs)]
 
 use crate::deflate;
 
@@ -10,6 +9,11 @@ use crate::deflate;
 /// computation.
 const PNG_MAX_DIMENSION: u32 = 16_384;
 
+/// Decode a PNG file from raw bytes.
+///
+/// Returns `(rgba_pixels, width, height)` where `rgba_pixels` is a packed
+/// RGBA8 byte buffer. Only 8-bit RGB and RGBA images are supported; indexed,
+/// grayscale, and bit depths other than 8 return an error.
 pub fn parse_png(data: &[u8]) -> crate::Result<(Vec<u8>, u32, u32)> {
     // 1. Verify PNG signature
     let signature: [u8; 8] = [137, 80, 78, 71, 13, 10, 26, 10];

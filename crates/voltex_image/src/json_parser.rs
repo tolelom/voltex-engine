@@ -1,61 +1,76 @@
 //! Minimal JSON parser for glTF. No external dependencies.
-#![allow(missing_docs)]
 
+/// A JSON value produced by [`parse_json`].
 #[derive(Debug, Clone, PartialEq)]
 pub enum JsonValue {
+    /// JSON `null`.
     Null,
+    /// JSON boolean.
     Bool(bool),
+    /// JSON number (stored as `f64`).
     Number(f64),
+    /// JSON string.
     String(String),
+    /// JSON array.
     Array(Vec<JsonValue>),
-    Object(Vec<(String, JsonValue)>), // preserve order
+    /// JSON object; key-insertion order is preserved.
+    Object(Vec<(String, JsonValue)>),
 }
 
 impl JsonValue {
+    /// Return the key-value pairs if this is an object, otherwise `None`.
     pub fn as_object(&self) -> Option<&[(String, JsonValue)]> {
         match self {
             JsonValue::Object(v) => Some(v),
             _ => None,
         }
     }
+    /// Return the element slice if this is an array, otherwise `None`.
     pub fn as_array(&self) -> Option<&[JsonValue]> {
         match self {
             JsonValue::Array(v) => Some(v),
             _ => None,
         }
     }
+    /// Return the string slice if this is a string, otherwise `None`.
     pub fn as_str(&self) -> Option<&str> {
         match self {
             JsonValue::String(s) => Some(s),
             _ => None,
         }
     }
+    /// Return the `f64` value if this is a number, otherwise `None`.
     pub fn as_f64(&self) -> Option<f64> {
         match self {
             JsonValue::Number(n) => Some(*n),
             _ => None,
         }
     }
+    /// Return the value truncated to `u32` if this is a number, otherwise `None`.
     pub fn as_u32(&self) -> Option<u32> {
         self.as_f64().map(|n| n as u32)
     }
+    /// Return the boolean if this is a bool, otherwise `None`.
     pub fn as_bool(&self) -> Option<bool> {
         match self {
             JsonValue::Bool(b) => Some(*b),
             _ => None,
         }
     }
+    /// Look up `key` in an object by name; returns `None` if not an object or key absent.
     pub fn get(&self, key: &str) -> Option<&JsonValue> {
         self.as_object()?
             .iter()
             .find(|(k, _)| k == key)
             .map(|(_, v)| v)
     }
+    /// Index into an array by position; returns `None` if not an array or out of bounds.
     pub fn index(&self, i: usize) -> Option<&JsonValue> {
         self.as_array()?.get(i)
     }
 }
 
+/// Parse a JSON string into a [`JsonValue`] tree.
 pub fn parse_json(input: &str) -> crate::Result<JsonValue> {
     let mut parser = JsonParser::new(input);
     let val = parser.parse_value()?;

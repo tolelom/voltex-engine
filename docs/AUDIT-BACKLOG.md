@@ -48,7 +48,7 @@
 - [ ] **F6** Linux/macOS 오디오 백엔드 실 머신 검증
 - [ ] **F7** CI 첫 green run (GitHub mirror/self-hosted runner)
 - [ ] **F8** `pub(crate)` 다운그레이드 audit 실행
-- [ ] **F9** `voltex_image` 의 moved 디코더 파일들에 남아있는 `#![allow(missing_docs)]` 점진 제거 — copy 단계에서 인계된 suppressions, 점진적으로 doc 작성 후 제거 (저리스크)
+- [x] **F9** `voltex_image` 의 moved 디코더 파일들에 남아있는 `#![allow(missing_docs)]` 제거 — 7개 파일 doc 작성 + gltf/types.rs·parser.rs pub 항목 doc 추가. (이번 커밋)
 
 ## P3 — 보류 (저가치)
 

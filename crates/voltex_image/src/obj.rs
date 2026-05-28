@@ -1,15 +1,23 @@
 //! Wavefront OBJ parser — vertices + indices + texture coords + normals.
-#![allow(missing_docs)]
 
 use std::collections::HashMap;
 
 use crate::vertex::MeshVertex;
 
+/// Geometry produced by [`parse_obj`].
 pub struct ObjData {
+    /// Deduplicated vertices with position, normal, UV, and tangent filled.
     pub vertices: Vec<MeshVertex>,
+    /// Triangle list indices into `vertices`.
     pub indices: Vec<u32>,
 }
 
+/// Parse a Wavefront OBJ text file.
+///
+/// Supports `v`, `vn`, `vt`, and `f` directives. Polygonal faces are
+/// triangulated using a fan method. Missing normals or UVs fall back to
+/// `[0,1,0]` and `[0,0]` respectively. Tangents are computed via
+/// [`compute_tangents`] after the vertex list is built.
 pub fn parse_obj(source: &str) -> ObjData {
     let mut positions: Vec<[f32; 3]> = Vec::new();
     let mut normals: Vec<[f32; 3]> = Vec::new();
@@ -134,6 +142,11 @@ pub fn parse_obj(source: &str) -> ObjData {
     ObjData { vertices, indices }
 }
 
+/// Compute and write tangent vectors (xyz + handedness w) into each vertex.
+///
+/// Uses Gram-Schmidt orthogonalization per-triangle, accumulated over the mesh.
+/// Degenerate UV triangles (determinant < 1e-8) are skipped; vertices with a
+/// near-zero tangent length after accumulation fall back to `[1, 0, 0, 1]`.
 pub fn compute_tangents(vertices: &mut [MeshVertex], indices: &[u32]) {
     // Accumulate tangent per vertex from triangles
     let mut tangents = vec![[0.0f32; 3]; vertices.len()];
