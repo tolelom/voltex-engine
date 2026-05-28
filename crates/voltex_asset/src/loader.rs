@@ -20,7 +20,7 @@ type ParseFn = Box<dyn FnOnce(&[u8]) -> Result<Box<dyn Any + Send>> + Send>;
 type InserterFn = Box<dyn FnOnce(&mut Assets, Box<dyn Any + Send>) -> (u32, u32)>;
 
 /// Current state of an in-flight load.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum LoadState {
     /// Worker has not yet finished reading + parsing.
     Loading,
@@ -42,18 +42,12 @@ struct LoadResult {
 }
 
 struct PendingEntry {
-    state: PendingState,
+    state: LoadState,
     handle_id: u32,
     handle_gen: u32,
     /// Type-erased inserter: takes (assets, boxed_any) and inserts the asset,
     /// returning the actual handle (id, gen) that was assigned.
     inserter: Option<InserterFn>,
-}
-
-enum PendingState {
-    Loading,
-    Failed(String),
-    Ready,
 }
 
 /// Background worker thread + per-load tracking. Owns a single worker that
@@ -136,7 +130,7 @@ impl AssetLoader {
         self.pending.insert(
             id,
             PendingEntry {
-                state: PendingState::Loading,
+                state: LoadState::Loading,
                 handle_id,
                 handle_gen,
                 inserter: Some(inserter),
@@ -169,11 +163,7 @@ impl AssetLoader {
                 .get(&(type_id, handle.id, handle.generation))
         {
             if let Some(entry) = self.pending.get(&load_id) {
-                return match &entry.state {
-                    PendingState::Loading => LoadState::Loading,
-                    PendingState::Failed(e) => LoadState::Failed(e.clone()),
-                    PendingState::Ready => LoadState::Ready,
-                };
+                return entry.state.clone();
             }
         }
         LoadState::Loading
@@ -194,7 +184,7 @@ impl AssetLoader {
             .get(&(type_id, ticket.id, ticket.generation))?;
         let entry = self.pending.get(&load_id)?;
         match entry.state {
-            PendingState::Ready => Some(Handle::new(entry.handle_id, entry.handle_gen)),
+            LoadState::Ready => Some(Handle::new(entry.handle_id, entry.handle_gen)),
             _ => None,
         }
     }
@@ -226,10 +216,10 @@ impl AssetLoader {
                             entry.handle_id = real_id;
                             entry.handle_gen = real_gen;
                         }
-                        entry.state = PendingState::Ready;
+                        entry.state = LoadState::Ready;
                     }
                     Err(e) => {
-                        entry.state = PendingState::Failed(e.to_string());
+                        entry.state = LoadState::Failed(e.to_string());
                     }
                 }
             }

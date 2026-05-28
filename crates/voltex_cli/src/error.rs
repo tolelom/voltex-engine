@@ -10,8 +10,6 @@ pub enum CliError {
     ManifestParse { line: usize, msg: String },
     MissingField { section: &'static str, field: &'static str },
     InvalidValue { field: String, got: String },
-    #[allow(dead_code)] // reserved for VFS work in B2
-    SceneNotFound(PathBuf),
     NewTargetExists(PathBuf),
     CargoMissing,
     CargoBuildFailed(i32),
@@ -70,9 +68,6 @@ impl fmt::Display for CliError {
             }
             CliError::InvalidValue { field, got } => {
                 write!(f, "invalid value for `{}`: got `{}`", field, got)
-            }
-            CliError::SceneNotFound(path) => {
-                write!(f, "scene file not found: {}", path.display())
             }
             CliError::NewTargetExists(path) => {
                 write!(

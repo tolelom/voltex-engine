@@ -15,15 +15,15 @@
 
 ## B. 데드코드 정리 (YAGNI)
 
-- [ ] **B1** `DependencyScheduler`/`SystemAccess`/`build_schedule` — 소비자 0, 실행 불가. `#[doc(hidden)]`/feature-gate/Scheduler 통합 결정. (`voltex_ecs/dependency_scheduler.rs`)
-- [ ] **B2** `net::OrderedChannel` — export됐지만 소비자 0, CODEMAP에도 없음. 제거 또는 문서화+예제. (`voltex_net/reliable.rs`)
-- [ ] **B3** `CliError::SceneNotFound` 데드 variant (`#[allow(dead_code)]`). (`voltex_cli/error.rs`)
+- [~] **B1** `DependencyScheduler`/`SystemAccess`/`build_schedule` — 소비자 0, 실행 불가. **보류**: CLAUDE.md 용어집에 "의존성 기반 병렬 = future work" 로 이미 명시 + missing_docs 통과(문서 있음) → churn 회피, 실 병렬 실행 구현 시 재방문.
+- [x] **B2** `net::OrderedChannel` — **CODEMAP 문서화** (제거 X — in-order delivery 는 정당한 공개 네트워킹 primitive, 라이브러리 공개 API 는 내부 소비자 0 정상). (커밋 후속)
+- [x] **B3** `CliError::SceneNotFound` 데드 variant 제거 + Display arm 제거. (커밋 후속)
 
 ## C. 중복 제거 (DRY)
 
 - [ ] **C1** CRC32/Adler32/stored-deflate 가 renderer 와 capture 에 각각 구현. (`capture/png_encode.rs` ↔ `renderer/deflate.rs`)
-- [ ] **C2** `LoadState` vs `PendingState` 동일 상태공간 이중 정의. (`voltex_asset/loader.rs`)
-- [ ] **C3** `SparseSet::increment_tick` inherent/trait 메서드 본문 중복. (`voltex_ecs/sparse_set.rs`)
+- [x] **C2** `LoadState` vs `PendingState` 동일 상태공간 이중 정의 → `PendingState` 제거, `LoadState`(+Clone) 단일화. (커밋 후속)
+- [x] **C3** `SparseSet::increment_tick` trait impl 이 inherent 메서드로 위임. (커밋 후속)
 - [ ] **C4** LE-f32 직렬화 헬퍼가 ecs/net/audio 에 재발명. (3 crate)
 
 ## D. 남은 테스트 / 커버리지 갭

@@ -201,7 +201,8 @@ impl<T: 'static> ComponentStorage for SparseSet<T> {
         self.dense_data.len()
     }
     fn increment_tick(&mut self) {
-        self.current_tick += 1;
+        // Delegate to the inherent method so the tick-bump logic lives in one place.
+        SparseSet::increment_tick(self);
     }
 }
 

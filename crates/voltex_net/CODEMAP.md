@@ -8,6 +8,7 @@ UDP 기반 게임 네트워킹 — 신뢰성/순서/암호화/스냅샷/예측 �
 - `NetClient` — UDP 클라이언트 (src/client.rs)
 - `Packet` — 패킷 프로토콜 (src/packet.rs)
 - `ReliableChannel` — sequence + ACK + 재전송 + RTT (src/reliable.rs)
+- `OrderedChannel` — in-order 전달 보장 (수신 버퍼 + 시퀀스 재정렬) (src/reliable.rs). 공개 primitive — 엔진 내부 소비자는 없고 게임 코드가 직접 사용.
 - `Snapshot` — 상태 직렬화 + delta 압축 (src/snapshot.rs)
 - `InterpolationBuffer` — 클라이언트 보간 (src/interpolation.rs)
 - `PacketCipher`, `AuthToken` — XOR 암호화 + anti-replay + 토큰 (src/encryption.rs)
