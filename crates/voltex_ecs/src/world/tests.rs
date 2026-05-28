@@ -1,10 +1,16 @@
 use super::*;
 
 #[derive(Debug, PartialEq)]
-struct Position { x: f32, y: f32 }
+struct Position {
+    x: f32,
+    y: f32,
+}
 
 #[derive(Debug, PartialEq)]
-struct Velocity { dx: f32, dy: f32 }
+struct Velocity {
+    dx: f32,
+    dy: f32,
+}
 
 #[test]
 fn clear_drops_all_entities_and_components() {
@@ -49,7 +55,10 @@ fn test_spawn_and_add() {
 #[test]
 fn test_get_missing() {
     let world = World::new();
-    let e = Entity { id: 0, generation: 0 };
+    let e = Entity {
+        id: 0,
+        generation: 0,
+    };
     assert!(world.get::<Position>(e).is_none());
 }
 
@@ -115,7 +124,7 @@ fn test_query2() {
     world.add(e1, Velocity { dx: 2.0, dy: 0.0 });
     world.add(e2, Position { x: 3.0, y: 0.0 });
 
-    let results = world.query2::<Position, Velocity>();
+    let results: Vec<_> = world.query2::<Position, Velocity>().collect();
     assert_eq!(results.len(), 2);
     let entities: Vec<Entity> = results.iter().map(|(e, _, _)| *e).collect();
     assert!(entities.contains(&e0));
@@ -139,7 +148,7 @@ fn test_query3() {
     world.add(e1, Velocity { dx: 2.0, dy: 0.0 });
     // e1 has no Health
 
-    let results = world.query3::<Position, Velocity, Health>();
+    let results: Vec<_> = world.query3::<Position, Velocity, Health>().collect();
     assert_eq!(results.len(), 1);
     assert_eq!(results[0].0, e0);
 }
@@ -171,7 +180,7 @@ fn test_query4() {
     world.add(e2, Tag(2));
     // e2 has no Health
 
-    let results = world.query4::<Position, Velocity, Health, Tag>();
+    let results: Vec<_> = world.query4::<Position, Velocity, Health, Tag>().collect();
     assert_eq!(results.len(), 1);
     assert_eq!(results[0].0, e0);
 }

@@ -1,3 +1,11 @@
+use voltex_asset::{Assets, Handle};
+use voltex_ecs::{propagate_transforms, Entity, Transform, World, WorldTransform};
+use voltex_math::Vec3;
+use voltex_platform::{GameTimer, InputState, VoltexWindow, WindowConfig};
+use voltex_renderer::{
+    obj, pipeline, Camera, CameraUniform, FpsController, GpuContext, GpuTexture, LightUniform, Mesh,
+};
+use wgpu::util::DeviceExt;
 use winit::{
     application::ApplicationHandler,
     event::WindowEvent,
@@ -5,14 +13,6 @@ use winit::{
     keyboard::{KeyCode, PhysicalKey},
     window::WindowId,
 };
-use voltex_math::Vec3;
-use voltex_platform::{VoltexWindow, WindowConfig, InputState, GameTimer};
-use voltex_renderer::{
-    GpuContext, Camera, FpsController, CameraUniform, LightUniform, Mesh, GpuTexture, pipeline, obj,
-};
-use voltex_ecs::{World, Entity, Transform, propagate_transforms, WorldTransform};
-use voltex_asset::{Assets, Handle};
-use wgpu::util::DeviceExt;
 
 /// Component: a handle into the asset system pointing at a Mesh.
 struct MeshRef(#[allow(dead_code)] Handle<Mesh>);
@@ -84,7 +84,8 @@ impl ApplicationHandler for AssetDemoApp {
             ..Default::default()
         };
         let window = VoltexWindow::new(event_loop, &config);
-        let gpu = GpuContext::new(window.handle.clone()).expect("voltex: GPU initialization failed");
+        let gpu =
+            GpuContext::new(window.handle.clone()).expect("voltex: GPU initialization failed");
 
         // Dynamic uniform buffer alignment
         let uniform_alignment = gpu.device.limits().min_uniform_buffer_offset_alignment;
@@ -119,11 +120,13 @@ impl ApplicationHandler for AssetDemoApp {
             mapped_at_creation: false,
         });
 
-        let light_buffer = gpu.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Light Uniform Buffer"),
-            contents: bytemuck::cast_slice(&[light_uniform]),
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-        });
+        let light_buffer = gpu
+            .device
+            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some("Light Uniform Buffer"),
+                contents: bytemuck::cast_slice(&[light_uniform]),
+                usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+            });
 
         // Bind group layouts
         let cl_layout = camera_light_bind_group_layout(&gpu.device);
@@ -210,11 +213,12 @@ impl ApplicationHandler for AssetDemoApp {
             WindowEvent::CloseRequested => event_loop.exit(),
 
             WindowEvent::KeyboardInput {
-                event: winit::event::KeyEvent {
-                    physical_key: PhysicalKey::Code(key_code),
-                    state: key_state,
-                    ..
-                },
+                event:
+                    winit::event::KeyEvent {
+                        physical_key: PhysicalKey::Code(key_code),
+                        state: key_state,
+                        ..
+                    },
                 ..
             } => {
                 let pressed = key_state == winit::event::ElementState::Pressed;
@@ -235,7 +239,11 @@ impl ApplicationHandler for AssetDemoApp {
                 state.input.process_mouse_move(position.x, position.y);
             }
 
-            WindowEvent::MouseInput { state: btn_state, button, .. } => {
+            WindowEvent::MouseInput {
+                state: btn_state,
+                button,
+                ..
+            } => {
                 let pressed = btn_state == winit::event::ElementState::Pressed;
                 state.input.process_mouse_button(button, pressed);
             }
@@ -253,27 +261,47 @@ impl ApplicationHandler for AssetDemoApp {
                 let dt = state.timer.frame_dt();
 
                 // Camera input
-                if state.input.is_mouse_button_pressed(winit::event::MouseButton::Right) {
+                if state
+                    .input
+                    .is_mouse_button_pressed(winit::event::MouseButton::Right)
+                {
                     let (dx, dy) = state.input.mouse_delta();
-                    state.fps_controller.process_mouse(&mut state.camera, dx, dy);
+                    state
+                        .fps_controller
+                        .process_mouse(&mut state.camera, dx, dy);
                 }
                 let mut forward = 0.0f32;
                 let mut right = 0.0f32;
                 let mut up = 0.0f32;
-                if state.input.is_key_pressed(KeyCode::KeyW) { forward += 1.0; }
-                if state.input.is_key_pressed(KeyCode::KeyS) { forward -= 1.0; }
-                if state.input.is_key_pressed(KeyCode::KeyD) { right += 1.0; }
-                if state.input.is_key_pressed(KeyCode::KeyA) { right -= 1.0; }
-                if state.input.is_key_pressed(KeyCode::Space) { up += 1.0; }
-                if state.input.is_key_pressed(KeyCode::ShiftLeft) { up -= 1.0; }
-                state.fps_controller.process_movement(&mut state.camera, forward, right, up, dt);
+                if state.input.is_key_pressed(KeyCode::KeyW) {
+                    forward += 1.0;
+                }
+                if state.input.is_key_pressed(KeyCode::KeyS) {
+                    forward -= 1.0;
+                }
+                if state.input.is_key_pressed(KeyCode::KeyD) {
+                    right += 1.0;
+                }
+                if state.input.is_key_pressed(KeyCode::KeyA) {
+                    right -= 1.0;
+                }
+                if state.input.is_key_pressed(KeyCode::Space) {
+                    up += 1.0;
+                }
+                if state.input.is_key_pressed(KeyCode::ShiftLeft) {
+                    up -= 1.0;
+                }
+                state
+                    .fps_controller
+                    .process_movement(&mut state.camera, forward, right, up, dt);
 
                 // R key: remove 10 random entities (on press, not hold)
                 let r_pressed = state.input.is_key_pressed(KeyCode::KeyR);
                 if r_pressed && !state.r_was_pressed {
-                    let entities: Vec<Entity> = state.world.query2::<Transform, MeshRef>()
-                        .iter()
-                        .map(|(e, _, _)| *e)
+                    let entities: Vec<Entity> = state
+                        .world
+                        .query2::<Transform, MeshRef>()
+                        .map(|(e, _, _)| e)
                         .collect();
                     let remove_count = entities.len().min(10);
                     for &entity in entities.iter().take(remove_count) {
@@ -295,8 +323,7 @@ impl ApplicationHandler for AssetDemoApp {
                 propagate_transforms(&mut state.world);
 
                 // Update window title with entity and asset counts
-                let entity_count = state.world.query2::<WorldTransform, MeshRef>()
-                    .len();
+                let entity_count = state.world.query2::<WorldTransform, MeshRef>().count();
                 let mesh_count = state.assets.count::<Mesh>();
                 state.window.handle.set_title(&format!(
                     "Voltex - Asset Demo | Entities: {}, Mesh assets: {}",
@@ -311,7 +338,10 @@ impl ApplicationHandler for AssetDemoApp {
                     state.camera.position.z,
                 ];
 
-                let entities = state.world.query2::<WorldTransform, MeshRef>();
+                // Collect once: both .len() (sizing the staging buffer) and
+                // iteration (writing per-entity uniforms + dispatching draws)
+                // need a materialised list.
+                let entities: Vec<_> = state.world.query2::<WorldTransform, MeshRef>().collect();
                 let aligned = state.uniform_alignment as usize;
 
                 // Build staging data: one CameraUniform per entity, padded to alignment
@@ -329,7 +359,10 @@ impl ApplicationHandler for AssetDemoApp {
                     staging[offset..offset + bytes.len()].copy_from_slice(bytes);
                 }
 
-                state.gpu.queue.write_buffer(&state.camera_buffer, 0, &staging);
+                state
+                    .gpu
+                    .queue
+                    .write_buffer(&state.camera_buffer, 0, &staging);
 
                 // Write light uniform
                 state.gpu.queue.write_buffer(
@@ -359,10 +392,16 @@ impl ApplicationHandler for AssetDemoApp {
                     Err(_) => return,
                 };
 
-                let view = output.texture.create_view(&wgpu::TextureViewDescriptor::default());
-                let mut encoder = state.gpu.device.create_command_encoder(
-                    &wgpu::CommandEncoderDescriptor { label: Some("Render Encoder") },
-                );
+                let view = output
+                    .texture
+                    .create_view(&wgpu::TextureViewDescriptor::default());
+                let mut encoder =
+                    state
+                        .gpu
+                        .device
+                        .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                            label: Some("Render Encoder"),
+                        });
 
                 {
                     let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
@@ -373,7 +412,10 @@ impl ApplicationHandler for AssetDemoApp {
                             depth_slice: None,
                             ops: wgpu::Operations {
                                 load: wgpu::LoadOp::Clear(wgpu::Color {
-                                    r: 0.1, g: 0.1, b: 0.15, a: 1.0,
+                                    r: 0.1,
+                                    g: 0.1,
+                                    b: 0.15,
+                                    a: 1.0,
                                 }),
                                 store: wgpu::StoreOp::Store,
                             },
@@ -394,10 +436,8 @@ impl ApplicationHandler for AssetDemoApp {
                     render_pass.set_pipeline(&state.pipeline);
                     render_pass.set_bind_group(1, &state._texture.bind_group, &[]);
                     render_pass.set_vertex_buffer(0, mesh.vertex_buffer.slice(..));
-                    render_pass.set_index_buffer(
-                        mesh.index_buffer.slice(..),
-                        wgpu::IndexFormat::Uint32,
-                    );
+                    render_pass
+                        .set_index_buffer(mesh.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
 
                     // Draw each entity with its dynamic offset
                     for (i, _) in entities.iter().enumerate() {

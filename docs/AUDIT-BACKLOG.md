@@ -35,7 +35,7 @@
 ## E. 대형 리팩터링 (영향 큼, 신중)
 
 - [x] **E1** `voltex_image` crate 분리 — renderer 의 PNG/JPG/deflate/glTF/OBJ/json_parser 는 wgpu 무의존 → God-crate(~120 export) 해소, L0 신규 crate. 역호환 `pub use` 재export 유지. (커밋 202afea + 7ee76f4 + f3684ae + b0c2d63 + 1856ef1 + 이번 커밋)
-- [ ] **E2** `query2/3/4` 가 `Vec` 반환(매 프레임 할당) → iterator화 + min-selection 로직 추출. (borrow 제약 검토)
+- [x] **E2** `query2/3/4` 가 `Vec` 반환(매 프레임 할당) → `impl Iterator<...> + '_` 로 변경 (zero-alloc, `Either2/3/4` enum 으로 stack-allocated tagged union, `argmin3/4` 헬퍼로 min-selection 추출). 콜러 6곳(physics 단순 iter는 무수정, asset_demo/many_cubes는 `.len()`+iter 둘다 쓰는 곳만 `.collect::<Vec<_>>()` 1회). (이번 커밋)
 - [ ] **E3** `Transform`/snapshot 회전이 Euler `Vec3` → quaternion 저장 검토. (광범위)
 
 ## F. 기존 v1.1 백로그 (DEFERRED 출처)

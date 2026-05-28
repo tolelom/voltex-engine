@@ -1,9 +1,9 @@
 //! `World` — owns the entity allocator + every type-erased component storage.
 
+use crate::entity::{Entity, EntityAllocator};
+use crate::sparse_set::{ComponentStorage, SparseSet};
 use std::any::TypeId;
 use std::collections::HashMap;
-use crate::entity::{Entity, EntityAllocator};
-use crate::sparse_set::{SparseSet, ComponentStorage};
 
 /// The container that owns every entity and every component storage.
 ///
@@ -84,7 +84,8 @@ impl World {
     /// underlying storage is created lazily on first call per type.
     pub fn add<T: 'static>(&mut self, entity: Entity, component: T) {
         let type_id = TypeId::of::<T>();
-        let storage = self.storages
+        let storage = self
+            .storages
             .entry(type_id)
             .or_insert_with(|| Box::new(SparseSet::<T>::new()));
         let set = storage.as_any_mut().downcast_mut::<SparseSet<T>>().unwrap();
@@ -132,155 +133,102 @@ impl World {
 
     /// Iterates `(entity, &T)` for every entity that has component `T`.
     pub fn query<T: 'static>(&self) -> impl Iterator<Item = (Entity, &T)> {
-        self.storage::<T>()
-            .map(|s| s.iter())
-            .into_iter()
-            .flatten()
+        self.storage::<T>().map(|s| s.iter()).into_iter().flatten()
     }
+
+    // ----- query2/3/4 helpers ---------------------------------------
+    //
+    // The joins below dispatch at runtime to whichever storage is
+    // smallest. To keep the return type `impl Iterator` (zero allocation)
+    // we wrap the per-branch iterators in `Either{2,3,4}` enums that
+    // implement `Iterator` themselves — a stack-allocated tagged union
+    // instead of `Box<dyn Iterator>` (one alloc per call) or `Vec<…>`
+    // (one alloc per call sized by the join result).
 
     /// Joins every entity that has both `A` and `B`. Iterates the smaller
-    /// storage and looks up in the larger.
-    pub fn query2<A: 'static, B: 'static>(&self) -> Vec<(Entity, &A, &B)> {
-        let a_storage = match self.storage::<A>() {
-            Some(s) => s,
-            None => return Vec::new(),
-        };
-        let b_storage = match self.storage::<B>() {
-            Some(s) => s,
-            None => return Vec::new(),
-        };
-
-        // Iterate the smaller set, look up in the larger
-        let mut result = Vec::new();
-        if a_storage.len() <= b_storage.len() {
-            for (entity, a) in a_storage.iter() {
-                if let Some(b) = b_storage.get(entity) {
-                    result.push((entity, a, b));
-                }
+    /// storage and looks up in the larger — returns a borrow-tied iterator
+    /// to avoid the per-frame Vec allocation the previous API forced.
+    pub fn query2<A: 'static, B: 'static>(&self) -> impl Iterator<Item = (Entity, &A, &B)> + '_ {
+        let pair = self.storage::<A>().zip(self.storage::<B>());
+        pair.into_iter().flat_map(|(a, b)| -> Either2<_, _> {
+            if a.len() <= b.len() {
+                Either2::A(
+                    a.iter()
+                        .filter_map(move |(e, av)| b.get(e).map(|bv| (e, av, bv))),
+                )
+            } else {
+                Either2::B(
+                    b.iter()
+                        .filter_map(move |(e, bv)| a.get(e).map(|av| (e, av, bv))),
+                )
             }
-        } else {
-            for (entity, b) in b_storage.iter() {
-                if let Some(a) = a_storage.get(entity) {
-                    result.push((entity, a, b));
-                }
-            }
-        }
-        result
+        })
     }
 
-    /// 3-way join — every entity that has `A` + `B` + `C`.
-    pub fn query3<A: 'static, B: 'static, C: 'static>(&self) -> Vec<(Entity, &A, &B, &C)> {
-        let a_storage = match self.storage::<A>() {
-            Some(s) => s,
-            None => return Vec::new(),
-        };
-        let b_storage = match self.storage::<B>() {
-            Some(s) => s,
-            None => return Vec::new(),
-        };
-        let c_storage = match self.storage::<C>() {
-            Some(s) => s,
-            None => return Vec::new(),
-        };
-
-        // Find the smallest storage to iterate
-        let a_len = a_storage.len();
-        let b_len = b_storage.len();
-        let c_len = c_storage.len();
-
-        let mut result = Vec::new();
-        if a_len <= b_len && a_len <= c_len {
-            for (entity, a) in a_storage.iter() {
-                if let (Some(b), Some(c)) = (b_storage.get(entity), c_storage.get(entity)) {
-                    result.push((entity, a, b, c));
-                }
+    /// 3-way join — every entity that has `A` + `B` + `C`. Iterator-returning
+    /// to avoid per-frame Vec allocation.
+    pub fn query3<A: 'static, B: 'static, C: 'static>(
+        &self,
+    ) -> impl Iterator<Item = (Entity, &A, &B, &C)> + '_ {
+        let trip = self
+            .storage::<A>()
+            .zip(self.storage::<B>())
+            .zip(self.storage::<C>())
+            .map(|((a, b), c)| (a, b, c));
+        trip.into_iter().flat_map(|(a, b, c)| -> Either3<_, _, _> {
+            match argmin3(a.len(), b.len(), c.len()) {
+                0 => Either3::A(
+                    a.iter()
+                        .filter_map(move |(e, av)| Some((e, av, b.get(e)?, c.get(e)?))),
+                ),
+                1 => Either3::B(
+                    b.iter()
+                        .filter_map(move |(e, bv)| Some((e, a.get(e)?, bv, c.get(e)?))),
+                ),
+                _ => Either3::C(
+                    c.iter()
+                        .filter_map(move |(e, cv)| Some((e, a.get(e)?, b.get(e)?, cv))),
+                ),
             }
-        } else if b_len <= a_len && b_len <= c_len {
-            for (entity, b) in b_storage.iter() {
-                if let (Some(a), Some(c)) = (a_storage.get(entity), c_storage.get(entity)) {
-                    result.push((entity, a, b, c));
-                }
-            }
-        } else {
-            for (entity, c) in c_storage.iter() {
-                if let (Some(a), Some(b)) = (a_storage.get(entity), b_storage.get(entity)) {
-                    result.push((entity, a, b, c));
-                }
-            }
-        }
-        result
+        })
     }
 
-    /// 4-way join — every entity that has `A` + `B` + `C` + `D`.
+    /// 4-way join — every entity that has `A` + `B` + `C` + `D`. Iterator-returning
+    /// to avoid per-frame Vec allocation.
     pub fn query4<A: 'static, B: 'static, C: 'static, D: 'static>(
         &self,
-    ) -> Vec<(Entity, &A, &B, &C, &D)> {
-        let a_storage = match self.storage::<A>() {
-            Some(s) => s,
-            None => return Vec::new(),
-        };
-        let b_storage = match self.storage::<B>() {
-            Some(s) => s,
-            None => return Vec::new(),
-        };
-        let c_storage = match self.storage::<C>() {
-            Some(s) => s,
-            None => return Vec::new(),
-        };
-        let d_storage = match self.storage::<D>() {
-            Some(s) => s,
-            None => return Vec::new(),
-        };
-
-        // Find the smallest storage to iterate
-        let a_len = a_storage.len();
-        let b_len = b_storage.len();
-        let c_len = c_storage.len();
-        let d_len = d_storage.len();
-
-        let mut result = Vec::new();
-        if a_len <= b_len && a_len <= c_len && a_len <= d_len {
-            for (entity, a) in a_storage.iter() {
-                if let (Some(b), Some(c), Some(d)) = (
-                    b_storage.get(entity),
-                    c_storage.get(entity),
-                    d_storage.get(entity),
-                ) {
-                    result.push((entity, a, b, c, d));
+    ) -> impl Iterator<Item = (Entity, &A, &B, &C, &D)> + '_ {
+        let quad = self
+            .storage::<A>()
+            .zip(self.storage::<B>())
+            .zip(self.storage::<C>())
+            .zip(self.storage::<D>())
+            .map(|(((a, b), c), d)| (a, b, c, d));
+        quad.into_iter()
+            .flat_map(|(a, b, c, d)| -> Either4<_, _, _, _> {
+                match argmin4(a.len(), b.len(), c.len(), d.len()) {
+                    0 => {
+                        Either4::A(a.iter().filter_map(move |(e, av)| {
+                            Some((e, av, b.get(e)?, c.get(e)?, d.get(e)?))
+                        }))
+                    }
+                    1 => {
+                        Either4::B(b.iter().filter_map(move |(e, bv)| {
+                            Some((e, a.get(e)?, bv, c.get(e)?, d.get(e)?))
+                        }))
+                    }
+                    2 => {
+                        Either4::C(c.iter().filter_map(move |(e, cv)| {
+                            Some((e, a.get(e)?, b.get(e)?, cv, d.get(e)?))
+                        }))
+                    }
+                    _ => {
+                        Either4::D(d.iter().filter_map(move |(e, dv)| {
+                            Some((e, a.get(e)?, b.get(e)?, c.get(e)?, dv))
+                        }))
+                    }
                 }
-            }
-        } else if b_len <= a_len && b_len <= c_len && b_len <= d_len {
-            for (entity, b) in b_storage.iter() {
-                if let (Some(a), Some(c), Some(d)) = (
-                    a_storage.get(entity),
-                    c_storage.get(entity),
-                    d_storage.get(entity),
-                ) {
-                    result.push((entity, a, b, c, d));
-                }
-            }
-        } else if c_len <= a_len && c_len <= b_len && c_len <= d_len {
-            for (entity, c) in c_storage.iter() {
-                if let (Some(a), Some(b), Some(d)) = (
-                    a_storage.get(entity),
-                    b_storage.get(entity),
-                    d_storage.get(entity),
-                ) {
-                    result.push((entity, a, b, c, d));
-                }
-            }
-        } else {
-            for (entity, d) in d_storage.iter() {
-                if let (Some(a), Some(b), Some(c)) = (
-                    a_storage.get(entity),
-                    b_storage.get(entity),
-                    c_storage.get(entity),
-                ) {
-                    result.push((entity, a, b, c, d));
-                }
-            }
-        }
-        result
+            })
     }
 
     /// Query entities whose component T was changed this tick.
@@ -337,16 +285,145 @@ impl World {
 
     /// Query entities with components A and B, that also have component W.
     pub fn query2_with<A: 'static, B: 'static, W: 'static>(&self) -> Vec<(Entity, &A, &B)> {
-        self.query2::<A, B>().into_iter()
+        self.query2::<A, B>()
             .filter(|(e, _, _)| self.has_component::<W>(*e))
             .collect()
     }
 
     /// Query entities with components A and B, that do NOT have component W.
     pub fn query2_without<A: 'static, B: 'static, W: 'static>(&self) -> Vec<(Entity, &A, &B)> {
-        self.query2::<A, B>().into_iter()
+        self.query2::<A, B>()
             .filter(|(e, _, _)| !self.has_component::<W>(*e))
             .collect()
+    }
+}
+
+// ---------- internal join machinery (see query2/3/4) ----------
+
+/// Returns the 0-based index of the smallest of three values (ties → leftmost).
+fn argmin3(a: usize, b: usize, c: usize) -> usize {
+    if a <= b && a <= c {
+        0
+    } else if b <= c {
+        1
+    } else {
+        2
+    }
+}
+
+/// Returns the 0-based index of the smallest of four values (ties → leftmost).
+fn argmin4(a: usize, b: usize, c: usize, d: usize) -> usize {
+    let mut min = a;
+    let mut idx = 0;
+    if b < min {
+        min = b;
+        idx = 1;
+    }
+    if c < min {
+        min = c;
+        idx = 2;
+    }
+    if d < min {
+        idx = 3;
+    }
+    idx
+}
+
+/// Stack-allocated tagged union of two iterators with the same item type.
+/// Lets `query2` return `impl Iterator` without `Box<dyn>`.
+enum Either2<A, B> {
+    A(A),
+    B(B),
+}
+
+impl<A, B, T> Iterator for Either2<A, B>
+where
+    A: Iterator<Item = T>,
+    B: Iterator<Item = T>,
+{
+    type Item = T;
+    fn next(&mut self) -> Option<T> {
+        match self {
+            Self::A(i) => i.next(),
+            Self::B(i) => i.next(),
+        }
+    }
+}
+
+/// 3-way tagged-union iterator (see [`Either2`]).
+enum Either3<A, B, C> {
+    A(A),
+    B(B),
+    C(C),
+}
+
+impl<A, B, C, T> Iterator for Either3<A, B, C>
+where
+    A: Iterator<Item = T>,
+    B: Iterator<Item = T>,
+    C: Iterator<Item = T>,
+{
+    type Item = T;
+    fn next(&mut self) -> Option<T> {
+        match self {
+            Self::A(i) => i.next(),
+            Self::B(i) => i.next(),
+            Self::C(i) => i.next(),
+        }
+    }
+}
+
+/// 4-way tagged-union iterator (see [`Either2`]).
+enum Either4<A, B, C, D> {
+    A(A),
+    B(B),
+    C(C),
+    D(D),
+}
+
+impl<A, B, C, D, T> Iterator for Either4<A, B, C, D>
+where
+    A: Iterator<Item = T>,
+    B: Iterator<Item = T>,
+    C: Iterator<Item = T>,
+    D: Iterator<Item = T>,
+{
+    type Item = T;
+    fn next(&mut self) -> Option<T> {
+        match self {
+            Self::A(i) => i.next(),
+            Self::B(i) => i.next(),
+            Self::C(i) => i.next(),
+            Self::D(i) => i.next(),
+        }
+    }
+}
+
+#[cfg(test)]
+mod join_helper_tests {
+    use super::{argmin3, argmin4};
+
+    #[test]
+    fn argmin3_picks_smallest_and_left_on_tie() {
+        assert_eq!(argmin3(1, 2, 3), 0);
+        assert_eq!(argmin3(3, 1, 2), 1);
+        assert_eq!(argmin3(3, 2, 1), 2);
+        // ties resolve to the leftmost
+        assert_eq!(argmin3(2, 2, 3), 0);
+        assert_eq!(argmin3(3, 2, 2), 1);
+        assert_eq!(argmin3(2, 2, 2), 0);
+    }
+
+    #[test]
+    fn argmin4_picks_smallest_and_left_on_tie() {
+        assert_eq!(argmin4(1, 2, 3, 4), 0);
+        assert_eq!(argmin4(4, 1, 2, 3), 1);
+        assert_eq!(argmin4(4, 3, 1, 2), 2);
+        assert_eq!(argmin4(4, 3, 2, 1), 3);
+        // ties resolve to the leftmost
+        assert_eq!(argmin4(2, 2, 3, 4), 0);
+        assert_eq!(argmin4(3, 2, 2, 4), 1);
+        assert_eq!(argmin4(4, 4, 2, 2), 2);
     }
 }
 
@@ -355,7 +432,6 @@ impl Default for World {
         Self::new()
     }
 }
-
 
 #[cfg(test)]
 mod tests;

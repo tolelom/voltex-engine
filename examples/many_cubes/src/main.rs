@@ -1,3 +1,10 @@
+use voltex_ecs::{Transform, World};
+use voltex_math::Vec3;
+use voltex_platform::{GameTimer, InputState, VoltexWindow, WindowConfig};
+use voltex_renderer::{
+    obj, pipeline, Camera, CameraUniform, FpsController, GpuContext, GpuTexture, LightUniform, Mesh,
+};
+use wgpu::util::DeviceExt;
 use winit::{
     application::ApplicationHandler,
     event::WindowEvent,
@@ -5,13 +12,6 @@ use winit::{
     keyboard::{KeyCode, PhysicalKey},
     window::WindowId,
 };
-use voltex_math::Vec3;
-use voltex_platform::{VoltexWindow, WindowConfig, InputState, GameTimer};
-use voltex_renderer::{
-    GpuContext, Camera, FpsController, CameraUniform, LightUniform, Mesh, GpuTexture, pipeline, obj,
-};
-use voltex_ecs::{World, Transform};
-use wgpu::util::DeviceExt;
 
 /// App-level component: index into the mesh list.
 struct MeshHandle(#[allow(dead_code)] u32);
@@ -81,7 +81,8 @@ impl ApplicationHandler for ManyCubesApp {
             ..Default::default()
         };
         let window = VoltexWindow::new(event_loop, &config);
-        let gpu = GpuContext::new(window.handle.clone()).expect("voltex: GPU initialization failed");
+        let gpu =
+            GpuContext::new(window.handle.clone()).expect("voltex: GPU initialization failed");
 
         // Dynamic uniform buffer alignment
         let uniform_alignment = gpu.device.limits().min_uniform_buffer_offset_alignment;
@@ -112,11 +113,13 @@ impl ApplicationHandler for ManyCubesApp {
             mapped_at_creation: false,
         });
 
-        let light_buffer = gpu.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Light Uniform Buffer"),
-            contents: bytemuck::cast_slice(&[light_uniform]),
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-        });
+        let light_buffer = gpu
+            .device
+            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some("Light Uniform Buffer"),
+                contents: bytemuck::cast_slice(&[light_uniform]),
+                usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+            });
 
         // Bind group layouts
         let cl_layout = camera_light_bind_group_layout(&gpu.device);
@@ -201,11 +204,12 @@ impl ApplicationHandler for ManyCubesApp {
             WindowEvent::CloseRequested => event_loop.exit(),
 
             WindowEvent::KeyboardInput {
-                event: winit::event::KeyEvent {
-                    physical_key: PhysicalKey::Code(key_code),
-                    state: key_state,
-                    ..
-                },
+                event:
+                    winit::event::KeyEvent {
+                        physical_key: PhysicalKey::Code(key_code),
+                        state: key_state,
+                        ..
+                    },
                 ..
             } => {
                 let pressed = key_state == winit::event::ElementState::Pressed;
@@ -226,7 +230,11 @@ impl ApplicationHandler for ManyCubesApp {
                 state.input.process_mouse_move(position.x, position.y);
             }
 
-            WindowEvent::MouseInput { state: btn_state, button, .. } => {
+            WindowEvent::MouseInput {
+                state: btn_state,
+                button,
+                ..
+            } => {
                 let pressed = btn_state == winit::event::ElementState::Pressed;
                 state.input.process_mouse_button(button, pressed);
             }
@@ -244,20 +252,39 @@ impl ApplicationHandler for ManyCubesApp {
                 let dt = state.timer.frame_dt();
 
                 // Input
-                if state.input.is_mouse_button_pressed(winit::event::MouseButton::Right) {
+                if state
+                    .input
+                    .is_mouse_button_pressed(winit::event::MouseButton::Right)
+                {
                     let (dx, dy) = state.input.mouse_delta();
-                    state.fps_controller.process_mouse(&mut state.camera, dx, dy);
+                    state
+                        .fps_controller
+                        .process_mouse(&mut state.camera, dx, dy);
                 }
                 let mut forward = 0.0f32;
                 let mut right = 0.0f32;
                 let mut up = 0.0f32;
-                if state.input.is_key_pressed(KeyCode::KeyW) { forward += 1.0; }
-                if state.input.is_key_pressed(KeyCode::KeyS) { forward -= 1.0; }
-                if state.input.is_key_pressed(KeyCode::KeyD) { right += 1.0; }
-                if state.input.is_key_pressed(KeyCode::KeyA) { right -= 1.0; }
-                if state.input.is_key_pressed(KeyCode::Space) { up += 1.0; }
-                if state.input.is_key_pressed(KeyCode::ShiftLeft) { up -= 1.0; }
-                state.fps_controller.process_movement(&mut state.camera, forward, right, up, dt);
+                if state.input.is_key_pressed(KeyCode::KeyW) {
+                    forward += 1.0;
+                }
+                if state.input.is_key_pressed(KeyCode::KeyS) {
+                    forward -= 1.0;
+                }
+                if state.input.is_key_pressed(KeyCode::KeyD) {
+                    right += 1.0;
+                }
+                if state.input.is_key_pressed(KeyCode::KeyA) {
+                    right -= 1.0;
+                }
+                if state.input.is_key_pressed(KeyCode::Space) {
+                    up += 1.0;
+                }
+                if state.input.is_key_pressed(KeyCode::ShiftLeft) {
+                    up -= 1.0;
+                }
+                state
+                    .fps_controller
+                    .process_movement(&mut state.camera, forward, right, up, dt);
                 state.input.begin_frame();
 
                 state.time += dt;
@@ -270,7 +297,8 @@ impl ApplicationHandler for ManyCubesApp {
                     state.camera.position.z,
                 ];
 
-                let entities = state.world.query2::<Transform, MeshHandle>();
+                // Collect once: both .len() and iteration are needed below.
+                let entities: Vec<_> = state.world.query2::<Transform, MeshHandle>().collect();
                 let aligned = state.uniform_alignment as usize;
 
                 // Build staging data: one CameraUniform per entity, padded to alignment
@@ -291,7 +319,10 @@ impl ApplicationHandler for ManyCubesApp {
                     staging[offset..offset + bytes.len()].copy_from_slice(bytes);
                 }
 
-                state.gpu.queue.write_buffer(&state.camera_buffer, 0, &staging);
+                state
+                    .gpu
+                    .queue
+                    .write_buffer(&state.camera_buffer, 0, &staging);
 
                 // Write light uniform
                 state.gpu.queue.write_buffer(
@@ -315,10 +346,16 @@ impl ApplicationHandler for ManyCubesApp {
                     Err(_) => return,
                 };
 
-                let view = output.texture.create_view(&wgpu::TextureViewDescriptor::default());
-                let mut encoder = state.gpu.device.create_command_encoder(
-                    &wgpu::CommandEncoderDescriptor { label: Some("Render Encoder") },
-                );
+                let view = output
+                    .texture
+                    .create_view(&wgpu::TextureViewDescriptor::default());
+                let mut encoder =
+                    state
+                        .gpu
+                        .device
+                        .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                            label: Some("Render Encoder"),
+                        });
 
                 {
                     let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
@@ -329,7 +366,10 @@ impl ApplicationHandler for ManyCubesApp {
                             depth_slice: None,
                             ops: wgpu::Operations {
                                 load: wgpu::LoadOp::Clear(wgpu::Color {
-                                    r: 0.1, g: 0.1, b: 0.15, a: 1.0,
+                                    r: 0.1,
+                                    g: 0.1,
+                                    b: 0.15,
+                                    a: 1.0,
                                 }),
                                 store: wgpu::StoreOp::Store,
                             },
