@@ -3,6 +3,8 @@
 use std::sync::Arc;
 use winit::window::Window;
 
+use crate::error::{RendererError, Result};
+
 /// Depth attachment format the renderer uses everywhere.
 pub const DEPTH_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth32Float;
 
@@ -40,16 +42,22 @@ pub struct GpuContext {
 impl GpuContext {
     /// Creates a default GpuContext (no extra features). Blocks on adapter +
     /// device acquisition via pollster.
-    pub fn new(window: Arc<Window>) -> Self {
+    ///
+    /// Returns [`RendererError::GpuInit`] instead of panicking when no surface,
+    /// adapter, or device can be acquired (headless CI, unsupported GPU), so
+    /// callers can decide how to handle GPU absence.
+    pub fn new(window: Arc<Window>) -> Result<Self> {
         pollster::block_on(Self::new_async(window, wgpu::Features::empty()))
     }
 
     /// Create a GpuContext requesting additional device features (e.g. ray tracing).
-    pub fn new_with_features(window: Arc<Window>, features: wgpu::Features) -> Self {
+    ///
+    /// Returns [`RendererError::GpuInit`] on failure — see [`new`](Self::new).
+    pub fn new_with_features(window: Arc<Window>, features: wgpu::Features) -> Result<Self> {
         pollster::block_on(Self::new_async(window, features))
     }
 
-    async fn new_async(window: Arc<Window>, extra_features: wgpu::Features) -> Self {
+    async fn new_async(window: Arc<Window>, extra_features: wgpu::Features) -> Result<Self> {
         let size = window.inner_size();
 
         let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor {
@@ -57,7 +65,9 @@ impl GpuContext {
             ..Default::default()
         });
 
-        let surface = instance.create_surface(window).expect("Failed to create surface");
+        let surface = instance
+            .create_surface(window)
+            .map_err(|e| RendererError::GpuInit(format!("failed to create surface: {e}")))?;
 
         let adapter = instance
             .request_adapter(&wgpu::RequestAdapterOptions {
@@ -66,7 +76,9 @@ impl GpuContext {
                 force_fallback_adapter: false,
             })
             .await
-            .expect("Failed to find a suitable GPU adapter");
+            .map_err(|e| {
+                RendererError::GpuInit(format!("no suitable GPU adapter found: {e}"))
+            })?;
 
         // When extra features are requested (e.g. ray tracing), use adapter limits
         // so RT-specific limits (max_acceleration_structures_per_shader_stage, etc.) are satisfied.
@@ -93,7 +105,7 @@ impl GpuContext {
                 ..Default::default()
             })
             .await
-            .expect("Failed to create device");
+            .map_err(|e| RendererError::GpuInit(format!("failed to create device: {e}")))?;
 
         let surface_caps = surface.get_capabilities(&adapter);
         let surface_format = surface_caps
@@ -117,14 +129,14 @@ impl GpuContext {
 
         let depth_view = create_depth_texture(&device, config.width, config.height);
 
-        Self {
+        Ok(Self {
             surface,
             device,
             queue,
             config,
             surface_format,
             depth_view,
-        }
+        })
     }
 
     /// Reconfigures the surface for a new window size and rebuilds the

@@ -37,7 +37,7 @@ impl ApplicationHandler for TriangleApp {
             ..Default::default()
         };
         let window = VoltexWindow::new(event_loop, &config);
-        let gpu = GpuContext::new(window.handle.clone());
+        let gpu = GpuContext::new(window.handle.clone()).expect("voltex: GPU initialization failed");
         let pipeline = pipeline::create_render_pipeline(&gpu.device, gpu.surface_format);
         let vertex_buffer = gpu.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Triangle Vertex Buffer"),

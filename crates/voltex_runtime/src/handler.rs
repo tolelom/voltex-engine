@@ -23,7 +23,17 @@ impl ApplicationHandler for RuntimeHandler {
             return;
         }
         let window = voltex_platform::VoltexWindow::new(event_loop, &app.config.window);
-        let gpu = GpuContext::new(window.handle.clone());
+        let gpu = match GpuContext::new(window.handle.clone()) {
+            Ok(gpu) => gpu,
+            Err(e) => {
+                // GPU acquisition failed (headless / unsupported GPU). Surface a
+                // clear message and exit the loop cleanly rather than panicking
+                // mid-`resumed`.
+                eprintln!("voltex_runtime: {e}");
+                event_loop.exit();
+                return;
+            }
+        };
         let renderer = BasicRenderer::new(&gpu.device, &gpu.queue, gpu.surface_format, 1024);
         let aspect = gpu.config.width as f32 / gpu.config.height as f32;
         let mut camera = Camera::new(Vec3::new(0.0, 10.0, 20.0), aspect);

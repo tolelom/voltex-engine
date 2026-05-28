@@ -193,7 +193,9 @@ v1.0.9 부터는 **서비스 배포 완성도** 로드맵 (`docs/superpowers/spe
 - CLAUDE.md: register_defaults 6개(2개 아님), 의존성 그래프에 runtime(L3.5)/cli/capture(tools) 추가, cli/capture/runtime 에러 예외 명기
 - CODEMAP 8개 drift fix: physics(BvhTree·integrate/physics_step), runtime(13 builders), facade(13 sub-crate), editor(viewport_shader), audio/asset/net(thiserror), platform(log)
 
-**검증**: 워크스페이스 build/clippy(`-D warnings`)/test 전부 그린. 테스트 ~1090 → ~1130. 미수정 잔여(의도적): `DependencyScheduler`/`net::OrderedChannel`/`CliError::SceneNotFound` 미사용 export 는 future-work/reserved 라 churn 회피. `GpuContext::new` panic→Result 는 전 예제 시그니처 영향 breaking 이라 v1.1 검토.
+**검증**: 워크스페이스 build/clippy(`-D warnings`)/test 전부 그린. 테스트 ~1090 → ~1130. 미수정 잔여(의도적): `DependencyScheduler`/`net::OrderedChannel`/`CliError::SceneNotFound` 미사용 export 는 future-work/reserved 라 churn 회피.
+
+**후속 (같은 사이클)**: `GpuContext::new`/`new_with_features` 가 `.expect()` panic 대신 `Result<Self, RendererError>` 반환하도록 변경 — surface/adapter/device 획득 실패를 `RendererError::GpuInit` 으로 매핑. 라이브러리는 더 이상 GPU 부재에 panic 하지 않고 호출자가 결정. `voltex_runtime` handler 는 에러 로그 + `event_loop.exit()` graceful 종료, 예제 12개는 경계에서 `.expect("voltex: GPU initialization failed")`. breaking change(전 예제 시그니처) 지만 워크스페이스 전체 그린 확인.
 
 ### v1.0.55 (2026-05-28) — Visual verification harness + editor toolbar fix
 

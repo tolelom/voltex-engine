@@ -144,7 +144,8 @@ impl ApplicationHandler for DeferredDemoApp {
         let gpu = GpuContext::new_with_features(
             window.handle.clone(),
             wgpu::Features::EXPERIMENTAL_RAY_QUERY,
-        );
+        )
+        .expect("voltex: GPU initialization failed");
 
         // Dynamic uniform buffer alignment
         let alignment = gpu.device.limits().min_uniform_buffer_offset_alignment;

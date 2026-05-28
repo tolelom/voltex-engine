@@ -133,7 +133,7 @@ impl ApplicationHandler for ShadowDemoApp {
             ..Default::default()
         };
         let window = VoltexWindow::new(event_loop, &config);
-        let gpu = GpuContext::new(window.handle.clone());
+        let gpu = GpuContext::new(window.handle.clone()).expect("voltex: GPU initialization failed");
 
         // Dynamic uniform buffer alignment
         let alignment = gpu.device.limits().min_uniform_buffer_offset_alignment;

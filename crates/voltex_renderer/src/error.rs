@@ -8,6 +8,12 @@ pub enum RendererError {
     #[error("{0}")]
     Generic(String),
 
+    /// GPU 초기화 실패 (surface/adapter/device 획득). 헤드리스 환경이나
+    /// wgpu 미지원 GPU 에서 발생 — 호출자가 graceful 하게 처리할 수 있도록
+    /// panic 대신 이 에러를 반환한다.
+    #[error("GPU initialization failed: {0}")]
+    GpuInit(String),
+
     /// IO 에러.
     #[error(transparent)]
     Io(#[from] std::io::Error),

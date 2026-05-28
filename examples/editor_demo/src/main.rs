@@ -117,7 +117,7 @@ impl ApplicationHandler for EditorDemoApp {
             ..Default::default()
         };
         let window = VoltexWindow::new(event_loop, &config);
-        let gpu = GpuContext::new(window.handle.clone());
+        let gpu = GpuContext::new(window.handle.clone()).expect("voltex: GPU initialization failed");
 
         let mut ui = UiContext::new(gpu.config.width as f32, gpu.config.height as f32);
         let ui_renderer = UiRenderer::new(&gpu.device, &gpu.queue, gpu.surface_format, &ui.font);
