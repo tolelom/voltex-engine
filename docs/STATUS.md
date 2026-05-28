@@ -173,6 +173,28 @@
 
 v1.0.9 부터는 **서비스 배포 완성도** 로드맵 (`docs/superpowers/specs/2026-05-21-service-readiness-roadmap.md`) 기준으로 진행.
 
+### v1.0.56 (2026-05-28) — 아키텍처/테스트 품질 심층 감사 (병렬 에이전트)
+
+이전 라운드(v1.0.40~55)가 robustness 버그 헌팅이었다면, 이번엔 **아키텍처/설계 + 테스트 품질** 두 축으로 4개 병렬 탐색 에이전트가 16 crate 를 정적 감사하고, 발견을 5개 병렬 fix 에이전트로 처리했다. **레이어링 위반 0건** 확인. 진짜 결함 3건 + 거짓-확신 테스트 다수 + 문서 drift 정리.
+
+**발견·수정한 실버그 3건**:
+- **SSF 펀넬 apex-restart** (`voltex_ai/pathfinding.rs`) — DEFERRED 에 의심만 적혀있던 것을 2M 코리도 randomized search + max-penetration oracle 로 재현 확정. `funnel_smooth` 가 apex 갱신 시 `i = apex_idx` 재시작(정석 Mononen) 대신 bare `continue` → 지그재그 corridor 에서 내부 코너 절단(코리도 0.41 unit 이탈). while-loop 재시작으로 fix. `find_path`(centroid) 무영향. 회귀 테스트가 가드.
+- **held-key just_pressed re-fire** (`voltex_platform/input.rs`) — `process_key` 가 held 키의 반복 Pressed(OS key-repeat, runtime handler 가 그대로 forward) 에서 `just_pressed` 를 안 지워 같은 프레임 내내 `is_key_just_pressed=true`. already-held 브랜치에서 클리어. +3 테스트.
+- **net Euler 회전 보간 long-way** (`voltex_net/interpolation.rs`) — `lerp_entity` 가 rotation(Euler 라디안)을 componentwise 선형 lerp → 350°↔10° wrap 에서 180° 통과. `lerp_angle`(shortest-arc, wire 포맷 불변) 도입, rotation 에만 적용. 가드 테스트 확인.
+
+**테스트 품질 강화 (거짓 확신 제거, ~40 테스트)**:
+- physics: CCD TOI 값, GJK/EPA penetration depth+normal, +boundary 케이스, solver 스택 tol 1.0→0.1, contacts non-empty 단언, spin 축·부호 검증
+- renderer: brdf_lut(vdc/ggx/smith/integrate), `Quat::to_mat4` 비-identity 90°, build_trs/mat4_mul, glTF parse-fallback silent coercion, compute_tangents, Plane — +23 테스트 (column-major M·v 규약 확인, 버그 없음)
+- ai: 펀넬/path 테스트가 endpoint/len 대신 정확한 triangle 시퀀스·waypoint 단언
+- audio: equal-power pan law(`left²+right²≈1`), math: vec3 tol f32::EPSILON→1e-5
+
+**아키텍처/문서 정리**:
+- `serialize_scene`/`deserialize_scene`(.vscn 텍스트)가 registry 무시하고 Mesh/Material/Script/커스텀 컴포넌트를 silently 누락하는 data-loss footgun — API 시그니처 불변, 한계를 docstring 에 명시 + JSON/binary 경로 안내 (truthful-doc, v1.0.41 방식)
+- CLAUDE.md: register_defaults 6개(2개 아님), 의존성 그래프에 runtime(L3.5)/cli/capture(tools) 추가, cli/capture/runtime 에러 예외 명기
+- CODEMAP 8개 drift fix: physics(BvhTree·integrate/physics_step), runtime(13 builders), facade(13 sub-crate), editor(viewport_shader), audio/asset/net(thiserror), platform(log)
+
+**검증**: 워크스페이스 build/clippy(`-D warnings`)/test 전부 그린. 테스트 ~1090 → ~1130. 미수정 잔여(의도적): `DependencyScheduler`/`net::OrderedChannel`/`CliError::SceneNotFound` 미사용 export 는 future-work/reserved 라 churn 회피. `GpuContext::new` panic→Result 는 전 예제 시그니처 영향 breaking 이라 v1.1 검토.
+
 ### v1.0.55 (2026-05-28) — Visual verification harness + editor toolbar fix
 
 P0 confidence. v1.0.40~54 는 정적 감사 기반 robustness 였고 빌드/테스트/clippy 는 전부 그린이지만, **엔진이 실제로 화면에 올바르게 렌더링되는지는 한 번도 검증된 적이 없었다** (DEFERRED 의 "GUI 시각 검증 0건"). 윈도우 앱은 자동화로 관찰 불가하고 6초 smoke-test 는 panic 부재만 보장.
