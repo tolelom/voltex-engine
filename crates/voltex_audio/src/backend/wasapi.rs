@@ -40,3 +40,35 @@ impl AudioBackend for WasapiBackend {
         // WasapiDevice's Drop releases COM resources on its own.
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Real-hardware smoke test (F6). Opens the default WASAPI output and
+    /// pushes 64 frames of silence. Skipped by default (`#[ignore]`) because
+    /// CI Windows runners may have no audio device; gracefully returns on
+    /// init failure.
+    ///
+    /// Run on a real Windows box with:
+    ///   cargo test -p voltex_audio --lib backend::wasapi -- --ignored --nocapture
+    #[test]
+    #[ignore]
+    fn wasapi_real_device_smoke() {
+        let mut backend = match WasapiBackend::new() {
+            Ok(b) => b,
+            Err(e) => {
+                eprintln!("skipping: no WASAPI device: {e}");
+                return;
+            }
+        };
+        let frames = backend.buffer_frames() as usize;
+        let channels = backend.channels() as usize;
+        let silence = vec![0.0_f32; frames * channels];
+        let written = backend
+            .write(&silence)
+            .expect("write to default WASAPI device");
+        assert!(written > 0, "WASAPI backend wrote 0 samples");
+        backend.shutdown();
+    }
+}

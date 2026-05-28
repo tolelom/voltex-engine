@@ -191,10 +191,41 @@ impl Drop for AlsaBackend {
 
 #[cfg(test)]
 mod tests {
-    // We cannot exercise the FFI without a real audio device + libasound, but
-    // we *can* assert the module compiled and basic types are sound.
+    use super::*;
+    use crate::backend::AudioBackend;
+
+    // We cannot exercise the FFI on every Linux CI runner (no device + no
+    // libasound on minimal images), but we *can* assert the module compiled
+    // and basic types are sound.
     #[test]
     fn alsa_module_compiles_on_linux() {
         let _ = super::SND_PCM_STREAM_PLAYBACK;
+    }
+
+    /// Real-hardware smoke test (F6). Opens the default ALSA device, pushes
+    /// 64 frames of silence, and tears down. Skipped by default (`#[ignore]`)
+    /// because most CI runners have no audio hardware; gracefully returns
+    /// instead of panicking when `AlsaBackend::new()` fails.
+    ///
+    /// Run on a real Linux box with:
+    ///   cargo test -p voltex_audio --lib backend::alsa -- --ignored --nocapture
+    #[test]
+    #[ignore]
+    fn alsa_real_device_smoke() {
+        let mut backend = match AlsaBackend::new() {
+            Ok(b) => b,
+            Err(e) => {
+                eprintln!("skipping: no ALSA device or libasound: {e}");
+                return;
+            }
+        };
+        let frames = backend.buffer_frames() as usize;
+        let channels = backend.channels() as usize;
+        let silence = vec![0.0_f32; frames * channels];
+        let written = backend
+            .write(&silence)
+            .expect("write to default ALSA device");
+        assert!(written > 0, "ALSA backend wrote 0 samples");
+        backend.shutdown();
     }
 }

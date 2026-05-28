@@ -379,4 +379,33 @@ mod tests {
         // Apple's AudioStreamBasicDescription is 40 bytes on all platforms.
         assert_eq!(std::mem::size_of::<AudioStreamBasicDescription>(), 40);
     }
+
+    /// Real-hardware smoke test (F6). Opens the default CoreAudio output via
+    /// AudioQueue, pushes 64 frames of silence, and tears down. Skipped by
+    /// default (`#[ignore]`) because CI macOS runners typically have no
+    /// audio device; gracefully returns instead of panicking on init
+    /// failure.
+    ///
+    /// Run on a real macOS box with:
+    ///   cargo test -p voltex_audio --lib backend::coreaudio -- --ignored --nocapture
+    #[test]
+    #[ignore]
+    fn coreaudio_real_device_smoke() {
+        use crate::backend::AudioBackend;
+        let mut backend = match CoreAudioBackend::new() {
+            Ok(b) => b,
+            Err(e) => {
+                eprintln!("skipping: no CoreAudio device: {e}");
+                return;
+            }
+        };
+        let frames = backend.buffer_frames() as usize;
+        let channels = backend.channels() as usize;
+        let silence = vec![0.0_f32; frames * channels];
+        let written = backend
+            .write(&silence)
+            .expect("write to default CoreAudio device");
+        assert!(written > 0, "CoreAudio backend wrote 0 samples");
+        backend.shutdown();
+    }
 }

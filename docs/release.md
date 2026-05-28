@@ -93,6 +93,37 @@ v1.0.55 — see [`docs/visual/README.md`](visual/README.md)):
       produced game must run without panic (validates the DoD headline
       "build → single exe" workflow end to end).
 
+### Real-hardware audio backend verification (F6)
+
+CI audio coverage stops at "the FFI module compiles" — the actual device
+open + write path needs real hardware. Before a release, run the
+`#[ignore]`'d real-device smoke test on each OS you support:
+
+- [ ] Windows: `cargo test -p voltex_audio --lib backend::wasapi -- --ignored`
+- [ ] Linux: `cargo test -p voltex_audio --lib backend::alsa -- --ignored`
+      (requires libasound2-dev + an actual audio device on the runner)
+- [ ] macOS: `cargo test -p voltex_audio --lib backend::coreaudio -- --ignored`
+
+Each smoke test opens the default output device, pushes 64 frames of
+silence, and tears down. They graceful-skip with `eprintln!("skipping:
+no <backend> device")` when the device is missing, so they are safe to
+run unattended in a script.
+
+### First green CI run on GitHub mirror (F7)
+
+`.github/workflows/ci.yml` has been ready since v1.0; the only remaining
+gate is "we have actually run it green on a GitHub mirror". To flip the
+switch:
+
+- [ ] Push `master` to a GitHub mirror (`git remote add github
+      https://github.com/<org>/voltex.git && git push github master`).
+- [ ] Watch the Actions tab; expect `build-and-test` (Linux + Windows) +
+      `coverage` (Linux, F5 gate at 78%) to go green. Advisory jobs
+      (`macos`, `semver-check`, `license-check`, `deny-check`) may stay
+      yellow.
+- [ ] Record the first green commit SHA in `docs/STATUS.md` and tick
+      `F7` in `docs/AUDIT-BACKLOG.md`.
+
 ## Manually triggering a release build
 
 For testing the workflow without cutting a real tag, use the
