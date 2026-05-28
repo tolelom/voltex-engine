@@ -50,7 +50,7 @@
 - [ ] **F5** GPU/winit 의존 4 crate headless 커버리지 + `--fail-under-lines 80` CI gate
 - [ ] **F6** Linux/macOS 오디오 백엔드 실 머신 검증
 - [ ] **F7** CI 첫 green run (GitHub mirror/self-hosted runner)
-- [ ] **F8** `pub(crate)` 다운그레이드 audit 실행
+- [x] **F8** `pub(crate)` 다운그레이드 audit 실행 — 5개 crate 총 63개 항목 downgrade (ai: 12개 커밋 6093bc6, script/ffi: 35개 커밋 7b16ead, image: 5개 커밋 346b83a, editor: 14개 커밋 a511a6c, renderer: 34개 커밋 8845676). voltex_runtime은 macro-exported API chain 이유로 변경 없음. 전 workspace build+174 tests 통과.
 - [x] **F9** `voltex_image` 의 moved 디코더 파일들에 남아있는 `#![allow(missing_docs)]` 제거 — 7개 파일 doc 작성 + gltf/types.rs·parser.rs pub 항목 doc 추가. (이번 커밋)
 
 ## P3 — 보류 (저가치)
