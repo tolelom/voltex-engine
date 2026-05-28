@@ -24,7 +24,9 @@ pub struct Scheduler {
 impl Scheduler {
     /// Creates an empty scheduler.
     pub fn new() -> Self {
-        Self { systems: Vec::new() }
+        Self {
+            systems: Vec::new(),
+        }
     }
 
     /// Add a system. Systems run in the order they are added.
@@ -119,9 +121,7 @@ mod tests {
     #[test]
     fn test_scheduler_add_chaining() {
         let mut scheduler = Scheduler::new();
-        scheduler
-            .add(|_: &mut World| {})
-            .add(|_: &mut World| {});
+        scheduler.add(|_: &mut World| {}).add(|_: &mut World| {});
         assert_eq!(scheduler.len(), 2);
     }
 }

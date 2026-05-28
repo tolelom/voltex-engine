@@ -19,23 +19,37 @@ pub struct SystemAccess {
 impl SystemAccess {
     /// Creates an access spec with the given name and empty read/write sets.
     pub fn new(name: &str) -> Self {
-        SystemAccess { name: name.to_string(), reads: HashSet::new(), writes: HashSet::new() }
+        SystemAccess {
+            name: name.to_string(),
+            reads: HashSet::new(),
+            writes: HashSet::new(),
+        }
     }
 
     /// Builder: declares a read on component `T`.
-    pub fn read<T: 'static>(mut self) -> Self { self.reads.insert(TypeId::of::<T>()); self }
+    pub fn read<T: 'static>(mut self) -> Self {
+        self.reads.insert(TypeId::of::<T>());
+        self
+    }
     /// Builder: declares a write on component `T`.
-    pub fn write<T: 'static>(mut self) -> Self { self.writes.insert(TypeId::of::<T>()); self }
+    pub fn write<T: 'static>(mut self) -> Self {
+        self.writes.insert(TypeId::of::<T>());
+        self
+    }
 
     /// Check if this system conflicts with another (write-read or write-write on same type).
     pub fn conflicts_with(&self, other: &SystemAccess) -> bool {
         // My writes vs their reads/writes
         for w in &self.writes {
-            if other.reads.contains(w) || other.writes.contains(w) { return true; }
+            if other.reads.contains(w) || other.writes.contains(w) {
+                return true;
+            }
         }
         // Their writes vs my reads
         for w in &other.writes {
-            if self.reads.contains(w) { return true; }
+            if self.reads.contains(w) {
+                return true;
+            }
         }
         false
     }
@@ -58,7 +72,11 @@ impl Default for DependencyScheduler {
 
 impl DependencyScheduler {
     /// Creates an empty scheduler.
-    pub fn new() -> Self { DependencyScheduler { systems: Vec::new() } }
+    pub fn new() -> Self {
+        DependencyScheduler {
+            systems: Vec::new(),
+        }
+    }
 
     /// Registers a system. Returns the system's index in the schedule.
     pub fn add(&mut self, access: SystemAccess) -> usize {
@@ -75,15 +93,21 @@ impl DependencyScheduler {
         loop {
             let mut group = Vec::new();
             for (i, slot) in placed.iter_mut().enumerate() {
-                if *slot { continue; }
+                if *slot {
+                    continue;
+                }
                 // Check if this system conflicts with any already in this group
-                let conflicts = group.iter().any(|&j: &usize| self.systems[i].conflicts_with(&self.systems[j]));
+                let conflicts = group
+                    .iter()
+                    .any(|&j: &usize| self.systems[i].conflicts_with(&self.systems[j]));
                 if !conflicts {
                     group.push(i);
                     *slot = true;
                 }
             }
-            if group.is_empty() { break; }
+            if group.is_empty() {
+                break;
+            }
             schedule.push(group);
         }
 
@@ -91,7 +115,9 @@ impl DependencyScheduler {
     }
 
     /// Number of registered systems.
-    pub fn system_count(&self) -> usize { self.systems.len() }
+    pub fn system_count(&self) -> usize {
+        self.systems.len()
+    }
 }
 
 #[cfg(test)]

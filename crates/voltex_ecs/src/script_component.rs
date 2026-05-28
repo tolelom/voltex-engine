@@ -54,7 +54,13 @@ impl Component for ScriptComponent {
         let script_path = std::str::from_utf8(&data[4..])
             .map_err(|_| crate::EcsError::from("Invalid UTF-8 in script path"))?
             .to_string();
-        world.add(entity, ScriptComponent { script_path, instance_id });
+        world.add(
+            entity,
+            ScriptComponent {
+                script_path,
+                instance_id,
+            },
+        );
         Ok(())
     }
 
@@ -86,10 +92,13 @@ mod tests {
     fn roundtrip_preserves_path_and_instance_id() {
         let mut world = World::new();
         let e = world.spawn();
-        world.add(e, ScriptComponent {
-            script_path: "scripts/spinner.lua".to_string(),
-            instance_id: 42,
-        });
+        world.add(
+            e,
+            ScriptComponent {
+                script_path: "scripts/spinner.lua".to_string(),
+                instance_id: 42,
+            },
+        );
 
         let data = <ScriptComponent as Component>::serialize(&world, e)
             .expect("serialize should return Some");
@@ -98,7 +107,9 @@ mod tests {
         let e2 = world2.spawn();
         <ScriptComponent as Component>::deserialize(&mut world2, e2, &data).unwrap();
 
-        let s = world2.get::<ScriptComponent>(e2).expect("ScriptComponent present");
+        let s = world2
+            .get::<ScriptComponent>(e2)
+            .expect("ScriptComponent present");
         assert_eq!(s.script_path, "scripts/spinner.lua");
         assert_eq!(s.instance_id, 42);
     }
@@ -149,7 +160,9 @@ mod tests {
         let mut world = World::new();
         let e = world.spawn();
         <ScriptComponent as Component>::deserialize(&mut world, e, &bytes).unwrap();
-        let s = world.get::<ScriptComponent>(e).expect("ScriptComponent attached");
+        let s = world
+            .get::<ScriptComponent>(e)
+            .expect("ScriptComponent attached");
         assert_eq!(s.instance_id, ScriptComponent::UNBOUND);
         assert_eq!(s.script_path, "scripts/spinner.lua");
     }

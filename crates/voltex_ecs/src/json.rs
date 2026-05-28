@@ -241,7 +241,9 @@ fn parse_number(b: &[u8], pos: usize) -> crate::Result<(JsonVal, usize)> {
         return Err(format!("Expected number at position {}", pos).into());
     }
     let s = std::str::from_utf8(&b[pos..i]).unwrap();
-    let n: f64 = s.parse().map_err(|e| format!("Invalid number '{}': {}", s, e))?;
+    let n: f64 = s
+        .parse()
+        .map_err(|e| format!("Invalid number '{}': {}", s, e))?;
     Ok((JsonVal::Number(n), i))
 }
 
@@ -416,7 +418,10 @@ mod tests {
 
     #[test]
     fn test_parse_string() {
-        assert_eq!(json_parse("\"hello\"").unwrap(), JsonVal::Str("hello".into()));
+        assert_eq!(
+            json_parse("\"hello\"").unwrap(),
+            JsonVal::Str("hello".into())
+        );
     }
 
     #[test]
@@ -483,11 +488,14 @@ mod tests {
         let val = JsonVal::Object(vec![
             ("name".into(), JsonVal::Str("test".into())),
             ("count".into(), JsonVal::Number(42.0)),
-            ("items".into(), JsonVal::Array(vec![
-                JsonVal::Number(1.0),
-                JsonVal::Null,
-                JsonVal::Bool(true),
-            ])),
+            (
+                "items".into(),
+                JsonVal::Array(vec![
+                    JsonVal::Number(1.0),
+                    JsonVal::Null,
+                    JsonVal::Bool(true),
+                ]),
+            ),
         ]);
         let s = val.to_json_string();
         let parsed = json_parse(&s).unwrap();

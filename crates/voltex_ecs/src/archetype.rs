@@ -1,8 +1,8 @@
 //! Archetype storage — groups entities sharing the same component set.
 
+use crate::entity::Entity;
 use std::any::TypeId;
 use std::collections::HashMap;
-use crate::entity::Entity;
 
 /// An archetype signature: sorted set of component TypeIds.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -45,7 +45,10 @@ pub struct Archetype {
 impl Archetype {
     /// Creates an empty archetype with the given signature.
     pub fn new(signature: ArchetypeSignature) -> Self {
-        Archetype { signature, entities: Vec::new() }
+        Archetype {
+            signature,
+            entities: Vec::new(),
+        }
     }
 
     /// Appends `entity` to this archetype.
@@ -64,9 +67,13 @@ impl Archetype {
     }
 
     /// Number of entities in this archetype.
-    pub fn len(&self) -> usize { self.entities.len() }
+    pub fn len(&self) -> usize {
+        self.entities.len()
+    }
     /// `true` if no entities are in this archetype.
-    pub fn is_empty(&self) -> bool { self.entities.is_empty() }
+    pub fn is_empty(&self) -> bool {
+        self.entities.is_empty()
+    }
 }
 
 /// Registry of archetypes.
@@ -84,12 +91,19 @@ impl Default for ArchetypeRegistry {
 impl ArchetypeRegistry {
     /// Creates an empty registry.
     pub fn new() -> Self {
-        ArchetypeRegistry { archetypes: Vec::new(), entity_archetype: HashMap::new() }
+        ArchetypeRegistry {
+            archetypes: Vec::new(),
+            entity_archetype: HashMap::new(),
+        }
     }
 
     /// Find or create archetype for the given signature.
     pub fn get_or_create(&mut self, signature: ArchetypeSignature) -> usize {
-        if let Some(idx) = self.archetypes.iter().position(|a| a.signature == signature) {
+        if let Some(idx) = self
+            .archetypes
+            .iter()
+            .position(|a| a.signature == signature)
+        {
             return idx;
         }
         let idx = self.archetypes.len();
@@ -110,14 +124,21 @@ impl ArchetypeRegistry {
 
     /// Find all archetypes that contain all required component types.
     pub fn matching_archetypes(&self, required: &[TypeId]) -> Vec<&Archetype> {
-        self.archetypes.iter().filter(|a| a.signature.matches_all(required)).collect()
+        self.archetypes
+            .iter()
+            .filter(|a| a.signature.matches_all(required))
+            .collect()
     }
 
     /// Number of distinct archetypes registered.
-    pub fn archetype_count(&self) -> usize { self.archetypes.len() }
+    pub fn archetype_count(&self) -> usize {
+        self.archetypes.len()
+    }
 
     /// Total number of entities tracked across all archetypes.
-    pub fn entity_count(&self) -> usize { self.entity_archetype.len() }
+    pub fn entity_count(&self) -> usize {
+        self.entity_archetype.len()
+    }
 }
 
 #[cfg(test)]
@@ -153,7 +174,10 @@ mod tests {
     #[test]
     fn test_assign_entity() {
         let mut reg = ArchetypeRegistry::new();
-        let e = Entity { id: 0, generation: 0 };
+        let e = Entity {
+            id: 0,
+            generation: 0,
+        };
         let sig = ArchetypeSignature::new(vec![TypeId::of::<u32>()]);
         reg.assign(e, sig);
         assert_eq!(reg.entity_count(), 1);
@@ -162,9 +186,18 @@ mod tests {
     #[test]
     fn test_matching_archetypes() {
         let mut reg = ArchetypeRegistry::new();
-        let e1 = Entity { id: 0, generation: 0 };
-        let e2 = Entity { id: 1, generation: 0 };
-        reg.assign(e1, ArchetypeSignature::new(vec![TypeId::of::<u32>(), TypeId::of::<f32>()]));
+        let e1 = Entity {
+            id: 0,
+            generation: 0,
+        };
+        let e2 = Entity {
+            id: 1,
+            generation: 0,
+        };
+        reg.assign(
+            e1,
+            ArchetypeSignature::new(vec![TypeId::of::<u32>(), TypeId::of::<f32>()]),
+        );
         reg.assign(e2, ArchetypeSignature::new(vec![TypeId::of::<u32>()]));
         let matches = reg.matching_archetypes(&[TypeId::of::<u32>()]);
         assert_eq!(matches.len(), 2); // both have u32
@@ -173,9 +206,15 @@ mod tests {
     #[test]
     fn test_reassign_entity() {
         let mut reg = ArchetypeRegistry::new();
-        let e = Entity { id: 0, generation: 0 };
+        let e = Entity {
+            id: 0,
+            generation: 0,
+        };
         reg.assign(e, ArchetypeSignature::new(vec![TypeId::of::<u32>()]));
-        reg.assign(e, ArchetypeSignature::new(vec![TypeId::of::<u32>(), TypeId::of::<f32>()]));
+        reg.assign(
+            e,
+            ArchetypeSignature::new(vec![TypeId::of::<u32>(), TypeId::of::<f32>()]),
+        );
         assert_eq!(reg.entity_count(), 1);
         assert_eq!(reg.archetype_count(), 2);
     }

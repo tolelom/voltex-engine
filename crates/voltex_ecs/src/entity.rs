@@ -125,7 +125,9 @@ impl EntityAllocator {
     /// Used by `EditorCommand::Despawn` undo to revive the exact same
     /// `Entity { id, generation }` handle the user had before despawn (E3).
     pub fn restore_at_generation(&mut self, id: u32, target_generation: u32) -> bool {
-        let Some(entry) = self.entries.get_mut(id as usize) else { return false; };
+        let Some(entry) = self.entries.get_mut(id as usize) else {
+            return false;
+        };
         if entry.alive {
             return false;
         }
@@ -217,8 +219,14 @@ mod tests {
         assert!(!alloc.is_alive(e));
 
         let restored = alloc.restore_at_generation(e.id, e.generation);
-        assert!(restored, "restore_at_generation should succeed on dead slot");
-        assert!(alloc.is_alive(e), "entity must be alive again at original generation");
+        assert!(
+            restored,
+            "restore_at_generation should succeed on dead slot"
+        );
+        assert!(
+            alloc.is_alive(e),
+            "entity must be alive again at original generation"
+        );
         assert_eq!(alloc.alive_count(), 1);
     }
 
@@ -235,12 +243,15 @@ mod tests {
     fn restore_at_generation_rejects_advanced_generation() {
         let mut alloc = EntityAllocator::new();
         let e0 = alloc.allocate(); // (0, 0)
-        alloc.deallocate(e0);      // entries[0] = (gen 1, dead)
+        alloc.deallocate(e0); // entries[0] = (gen 1, dead)
         let e1 = alloc.allocate(); // (0, 1) — reuses slot
-        alloc.deallocate(e1);      // entries[0] = (gen 2, dead)
-        // Try to restore the *original* (0, 0) — slot has moved past it.
+        alloc.deallocate(e1); // entries[0] = (gen 2, dead)
+                              // Try to restore the *original* (0, 0) — slot has moved past it.
         let restored = alloc.restore_at_generation(e0.id, e0.generation);
-        assert!(!restored, "restore must fail when slot has been alloc/dealloc'd in between");
+        assert!(
+            !restored,
+            "restore must fail when slot has been alloc/dealloc'd in between"
+        );
     }
 
     #[test]

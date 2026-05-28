@@ -100,8 +100,7 @@ impl Component for Bounds {
         let b = world.get::<Bounds>(entity)?;
         let mut data = Vec::with_capacity(24);
         for &v in &[
-            b.0.min.x, b.0.min.y, b.0.min.z,
-            b.0.max.x, b.0.max.y, b.0.max.z,
+            b.0.min.x, b.0.min.y, b.0.min.z, b.0.max.x, b.0.max.y, b.0.max.z,
         ] {
             data.extend_from_slice(&v.to_le_bytes());
         }
@@ -187,7 +186,9 @@ mod tests {
         let e2 = world2.spawn();
         <MaterialHandle as Component>::deserialize(&mut world2, e2, &data).unwrap();
 
-        let h = world2.get::<MaterialHandle>(e2).expect("MaterialHandle present");
+        let h = world2
+            .get::<MaterialHandle>(e2)
+            .expect("MaterialHandle present");
         assert_eq!(h.0.id(), 99);
         assert_eq!(h.0.generation(), 3);
     }

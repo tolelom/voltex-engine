@@ -1,6 +1,6 @@
 //! Engine built-in `Transform` component — position + Euler rotation + scale.
 
-use voltex_math::{Vec3, Mat4};
+use voltex_math::{Mat4, Vec3};
 
 /// 3D affine transform stored as position + Euler rotation (XYZ radians) + scale.
 #[derive(Debug, Clone, Copy)]
@@ -61,8 +61,8 @@ impl Default for Transform {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use voltex_math::Vec4;
     use std::f32::consts::FRAC_PI_2;
+    use voltex_math::Vec4;
 
     fn approx_eq(a: f32, b: f32) -> bool {
         (a - b).abs() < 1e-5

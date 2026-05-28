@@ -71,7 +71,9 @@ pub struct ComponentRegistry {
 impl ComponentRegistry {
     /// Creates an empty registry (no components registered yet).
     pub fn new() -> Self {
-        Self { entries: Vec::new() }
+        Self {
+            entries: Vec::new(),
+        }
     }
 
     /// 표준 경로: `Component` trait를 구현한 타입을 한 줄로 등록.
@@ -134,9 +136,15 @@ impl Component for crate::Transform {
         let t = world.get::<crate::Transform>(entity)?;
         let mut data = Vec::with_capacity(36);
         for &v in &[
-            t.position.x, t.position.y, t.position.z,
-            t.rotation.x, t.rotation.y, t.rotation.z,
-            t.scale.x, t.scale.y, t.scale.z,
+            t.position.x,
+            t.position.y,
+            t.position.z,
+            t.rotation.x,
+            t.rotation.y,
+            t.rotation.z,
+            t.scale.x,
+            t.scale.y,
+            t.scale.z,
         ] {
             data.extend_from_slice(&v.to_le_bytes());
         }
@@ -147,7 +155,9 @@ impl Component for crate::Transform {
         if data.len() < 36 {
             return Err("Transform data too short".into());
         }
-        let f = |off: usize| f32::from_le_bytes([data[off], data[off + 1], data[off + 2], data[off + 3]]);
+        let f = |off: usize| {
+            f32::from_le_bytes([data[off], data[off + 1], data[off + 2], data[off + 3]])
+        };
         let t = crate::Transform {
             position: voltex_math::Vec3::new(f(0), f(4), f(8)),
             rotation: voltex_math::Vec3::new(f(12), f(16), f(20)),
@@ -183,7 +193,8 @@ impl Component for crate::scene::Tag {
     }
 
     fn deserialize(world: &mut World, entity: Entity, data: &[u8]) -> crate::Result<()> {
-        let s = std::str::from_utf8(data).map_err(|_| crate::EcsError::from("Invalid UTF-8 in tag"))?;
+        let s =
+            std::str::from_utf8(data).map_err(|_| crate::EcsError::from("Invalid UTF-8 in tag"))?;
         world.add(entity, crate::scene::Tag(s.to_string()));
         Ok(())
     }
@@ -197,7 +208,7 @@ impl Component for crate::scene::Tag {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{World, Transform};
+    use crate::{Transform, World};
     use voltex_math::Vec3;
 
     #[test]
@@ -265,11 +276,14 @@ mod tests {
         registry.register_defaults();
         let mut world = World::new();
         let e = world.spawn();
-        world.add(e, Transform {
-            position: Vec3::new(1.0, 2.0, 3.0),
-            rotation: Vec3::new(0.1, 0.2, 0.3),
-            scale: Vec3::new(4.0, 5.0, 6.0),
-        });
+        world.add(
+            e,
+            Transform {
+                position: Vec3::new(1.0, 2.0, 3.0),
+                rotation: Vec3::new(0.1, 0.2, 0.3),
+                scale: Vec3::new(4.0, 5.0, 6.0),
+            },
+        );
 
         let entry = registry.find("transform").unwrap();
         let data = (entry.serialize)(&world, e).unwrap();
@@ -341,7 +355,9 @@ mod tests {
     fn test_generic_register_user_component() {
         let mut registry = ComponentRegistry::new();
         registry.register::<Health>();
-        let entry = registry.find("health").expect("health should be registered");
+        let entry = registry
+            .find("health")
+            .expect("health should be registered");
         assert_eq!(entry.name, "health");
     }
 
@@ -401,7 +417,10 @@ mod tests {
         let entry = registry.find("transform").unwrap();
         let removed = (entry.remove)(&mut world, e);
         assert!(removed);
-        assert!(world.get::<Transform>(e).is_none(), "Transform must be gone after remove fn");
+        assert!(
+            world.get::<Transform>(e).is_none(),
+            "Transform must be gone after remove fn"
+        );
 
         // Second remove is a no-op (returns false).
         let removed_again = (entry.remove)(&mut world, e);
@@ -419,8 +438,12 @@ mod tests {
 
     #[test]
     fn register_raw_default_bytes_is_empty_and_remove_is_noop() {
-        fn dummy_ser(_: &World, _: Entity) -> Option<Vec<u8>> { Some(vec![]) }
-        fn dummy_deser(_: &mut World, _: Entity, _: &[u8]) -> crate::Result<()> { Ok(()) }
+        fn dummy_ser(_: &World, _: Entity) -> Option<Vec<u8>> {
+            Some(vec![])
+        }
+        fn dummy_deser(_: &mut World, _: Entity, _: &[u8]) -> crate::Result<()> {
+            Ok(())
+        }
         let mut registry = ComponentRegistry::new();
         registry.register_raw("custom", dummy_ser, dummy_deser);
         let entry = registry.find("custom").unwrap();
@@ -433,8 +456,12 @@ mod tests {
     #[test]
     fn test_register_raw_still_works() {
         // Escape hatch가 여전히 동작하는지 검증.
-        fn dummy_ser(_: &World, _: Entity) -> Option<Vec<u8>> { Some(vec![]) }
-        fn dummy_deser(_: &mut World, _: Entity, _: &[u8]) -> crate::Result<()> { Ok(()) }
+        fn dummy_ser(_: &World, _: Entity) -> Option<Vec<u8>> {
+            Some(vec![])
+        }
+        fn dummy_deser(_: &mut World, _: Entity, _: &[u8]) -> crate::Result<()> {
+            Ok(())
+        }
 
         let mut registry = ComponentRegistry::new();
         registry.register_raw("custom", dummy_ser, dummy_deser);

@@ -2,8 +2,8 @@
 //! remove, lookup, and a packed dense iterator. Tracks per-component change
 //! ticks for filtering "changed this frame" queries.
 
-use std::any::Any;
 use crate::entity::Entity;
+use std::any::Any;
 
 /// Sparse set of `(Entity, T)` pairs with O(1) operations + change tracking.
 pub struct SparseSet<T> {
@@ -117,12 +117,18 @@ impl<T> SparseSet<T> {
 
     /// Packed iterator of `(entity, &component)` pairs.
     pub fn iter(&self) -> impl Iterator<Item = (Entity, &T)> {
-        self.dense_entities.iter().copied().zip(self.dense_data.iter())
+        self.dense_entities
+            .iter()
+            .copied()
+            .zip(self.dense_data.iter())
     }
 
     /// Packed iterator of `(entity, &mut component)` pairs.
     pub fn iter_mut(&mut self) -> impl Iterator<Item = (Entity, &mut T)> {
-        self.dense_entities.iter().copied().zip(self.dense_data.iter_mut())
+        self.dense_entities
+            .iter()
+            .copied()
+            .zip(self.dense_data.iter_mut())
     }
 
     /// Borrows the dense entity slice (parallel to [`data`](Self::data)).
@@ -158,7 +164,8 @@ impl<T> SparseSet<T> {
 
     /// Return entities changed this tick with their data.
     pub fn iter_changed(&self) -> impl Iterator<Item = (Entity, &T)> + '_ {
-        self.dense_entities.iter()
+        self.dense_entities
+            .iter()
             .zip(self.dense_data.iter())
             .zip(self.ticks.iter())
             .filter(move |((_, _), &tick)| tick == self.current_tick)
@@ -209,7 +216,6 @@ impl<T: 'static> ComponentStorage for SparseSet<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
-
 
     fn make_entity(id: u32, generation: u32) -> Entity {
         Entity { id, generation }
