@@ -165,7 +165,7 @@ impl DepthOfField {
 }
 
 /// CPU circle-of-confusion calculation (for testing).
-pub(crate) fn circle_of_confusion(
+pub fn circle_of_confusion(
     depth: f32,
     focus_distance: f32,
     focus_range: f32,

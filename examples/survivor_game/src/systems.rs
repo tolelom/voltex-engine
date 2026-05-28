@@ -23,7 +23,6 @@ pub fn player_input_system(world: &mut World, input: &InputState, dt: f32) {
     // Find the player entity (single query result expected).
     let player: Option<(Entity, MoveSpeed)> = world
         .query2::<PlayerTag, MoveSpeed>()
-        .into_iter()
         .map(|(e, _, s)| (e, *s))
         .next();
 
@@ -67,7 +66,6 @@ pub fn player_input_system(world: &mut World, input: &InputState, dt: f32) {
 pub fn enemy_chase_system(world: &mut World, player_pos: Vec3, dt: f32) {
     let updates: Vec<(Entity, Vec3)> = world
         .query2::<EnemyTag, MoveSpeed>()
-        .into_iter()
         .filter_map(|(e, _, speed)| {
             let t = world.get::<Transform>(e)?;
             let dir = Vec3::new(player_pos.x - t.position.x, 0.0, player_pos.z - t.position.z);
@@ -89,7 +87,6 @@ pub fn enemy_chase_system(world: &mut World, player_pos: Vec3, dt: f32) {
 pub fn projectile_motion_system(world: &mut World, dt: f32) {
     let updates: Vec<(Entity, Vec3)> = world
         .query2::<ProjectileTag, Velocity>()
-        .into_iter()
         .map(|(e, _, v)| (e, v.0 * dt))
         .collect();
 

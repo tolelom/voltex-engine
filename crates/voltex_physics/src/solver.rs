@@ -208,14 +208,12 @@ fn apply_ccd(world: &mut World, config: &PhysicsConfig) {
     // Gather fast-moving bodies and all collider AABBs
     let bodies: Vec<(Entity, Vec3, Vec3, Collider)> = world
         .query3::<Transform, RigidBody, Collider>()
-        .into_iter()
         .filter(|(_, _, rb, _)| !rb.is_static() && !rb.is_sleeping)
         .map(|(e, t, rb, c)| (e, t.position, rb.velocity, c.clone()))
         .collect();
 
     let all_colliders: Vec<(Entity, voltex_math::AABB)> = world
         .query2::<Transform, Collider>()
-        .into_iter()
         .map(|(e, t, c)| (e, c.aabb(t.position)))
         .collect();
 

@@ -5,15 +5,15 @@
 use crate::ttf_parser::GlyphOutline;
 
 /// Result of rasterizing a single glyph.
-pub(crate) struct RasterResult {
-    pub(crate) width: u32,
-    pub(crate) height: u32,
+pub struct RasterResult {
+    pub width: u32,
+    pub height: u32,
     /// R8 alpha bitmap, row-major.
-    pub(crate) bitmap: Vec<u8>,
+    pub bitmap: Vec<u8>,
     /// Left bearing in pixels.
-    pub(crate) offset_x: f32,
+    pub offset_x: f32,
     /// Distance from baseline to top of glyph bbox in pixels.
-    pub(crate) offset_y: f32,
+    pub offset_y: f32,
 }
 
 /// Recursively flatten a quadratic bezier into line segments.

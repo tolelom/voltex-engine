@@ -47,7 +47,7 @@ impl EffectChain {
 }
 
 /// Simple gain effect — multiplies the input by a fixed scalar.
-pub(crate) struct GainEffect {
+pub struct GainEffect {
     /// Linear gain scalar.
     pub gain: f32,
 }

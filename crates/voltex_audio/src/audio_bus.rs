@@ -10,7 +10,7 @@ pub struct AudioBus {
 
 /// Per-input entry on an [`AudioBus`].
 #[derive(Debug, Clone)]
-pub(crate) struct BusInput {
+pub struct BusInput {
     /// Identifier of the source signal (matched against the sample list).
     pub source_id: u32,
     /// Linear gain applied to this input before summing.

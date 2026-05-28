@@ -1,22 +1,28 @@
 //! Progressive JPEG support (SOF2 — successive scans).
+//!
+//! Currently unwired — the baseline JPEG decoder in `jpg/` handles SOF0
+//! only. These items are the planned API surface for progressive decoding
+//! and are intentionally `pub` so a future progressive decoder (in this
+//! crate or downstream) can wire them up without an API churn. F8 left
+//! them `pub` for the same reason — see audit note in `docs/AUDIT-BACKLOG.md`.
 
 /// Progressive JPEG scan parameters.
 #[derive(Debug, Clone)]
-pub(crate) struct ScanParams {
+pub struct ScanParams {
     /// Spectral selection start (DCT coefficient index).
-    pub(crate) ss: u8,
+    pub ss: u8,
     /// Spectral selection end (DCT coefficient index).
-    pub(crate) se: u8,
+    pub se: u8,
     /// Successive approximation bit position high.
-    pub(crate) ah: u8,
+    pub ah: u8,
     /// Successive approximation bit position low.
-    pub(crate) al: u8,
+    pub al: u8,
     /// Component indices included in this scan.
-    pub(crate) components: Vec<u8>,
+    pub components: Vec<u8>,
 }
 
 /// Detect if a JPEG is progressive (SOF2 marker present).
-pub(crate) fn is_progressive_jpeg(data: &[u8]) -> bool {
+pub fn is_progressive_jpeg(data: &[u8]) -> bool {
     // Scan for SOF2 marker (0xFF 0xC2)
     for i in 0..data.len().saturating_sub(1) {
         if data[i] == 0xFF && data[i + 1] == 0xC2 {
@@ -27,7 +33,7 @@ pub(crate) fn is_progressive_jpeg(data: &[u8]) -> bool {
 }
 
 /// Parse SOS markers to extract scan parameters.
-pub(crate) fn parse_scan_params(data: &[u8]) -> Vec<ScanParams> {
+pub fn parse_scan_params(data: &[u8]) -> Vec<ScanParams> {
     let mut scans = Vec::new();
     let mut i = 0;
     while i < data.len().saturating_sub(1) {
@@ -67,13 +73,13 @@ pub(crate) fn parse_scan_params(data: &[u8]) -> Vec<ScanParams> {
 }
 
 /// A 64-element DCT coefficient block.
-pub(crate) type DctBlock = [i32; 64];
+pub type DctBlock = [i32; 64];
 
 /// Accumulate a scan's coefficients into the coefficient buffer.
 /// For first DC scan (ss=0, ah=0): set DC coefficient
 /// For refinement (ah>0): refine existing coefficient precision
 /// For AC scan: set AC coefficients in range [ss..=se]
-pub(crate) fn merge_scan_coefficients(block: &mut DctBlock, scan_block: &DctBlock, params: &ScanParams) {
+pub fn merge_scan_coefficients(block: &mut DctBlock, scan_block: &DctBlock, params: &ScanParams) {
     if params.ah == 0 {
         // First scan for this range: copy coefficients
         for i in params.ss as usize..=params.se as usize {

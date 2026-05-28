@@ -71,7 +71,6 @@ pub fn integrate(world: &mut World, config: &PhysicsConfig) {
     // 1. Collect linear + angular updates
     let updates: Vec<(voltex_ecs::Entity, Vec3, Vec3, Vec3)> = world
         .query2::<Transform, RigidBody>()
-        .into_iter()
         .filter(|(_, _, rb)| !rb.is_static() && !rb.is_sleeping)
         .map(|(entity, transform, rb)| {
             let new_velocity = rb.velocity + config.gravity * rb.gravity_scale * config.fixed_dt;

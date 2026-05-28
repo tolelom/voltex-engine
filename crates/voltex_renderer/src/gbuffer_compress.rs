@@ -1,7 +1,7 @@
 #![allow(missing_docs)]
 
 /// Octahedral normal encoding: vec3 normal → vec2 (compact).
-pub(crate) fn encode_octahedral(n: [f32; 3]) -> [f32; 2] {
+pub fn encode_octahedral(n: [f32; 3]) -> [f32; 2] {
     let sum = n[0].abs() + n[1].abs() + n[2].abs();
     let mut oct = [n[0] / sum, n[1] / sum];
     if n[2] < 0.0 {
@@ -14,7 +14,7 @@ pub(crate) fn encode_octahedral(n: [f32; 3]) -> [f32; 2] {
 }
 
 /// Decode octahedral back to normal vec3.
-pub(crate) fn decode_octahedral(oct: [f32; 2]) -> [f32; 3] {
+pub fn decode_octahedral(oct: [f32; 2]) -> [f32; 3] {
     let mut n = [oct[0], oct[1], 1.0 - oct[0].abs() - oct[1].abs()];
     if n[2] < 0.0 {
         let ox = n[0];
@@ -27,7 +27,7 @@ pub(crate) fn decode_octahedral(oct: [f32; 2]) -> [f32; 3] {
 }
 
 /// Reconstruct world position from depth + UV + inverse view-projection matrix.
-pub(crate) fn reconstruct_position(uv: [f32; 2], depth: f32, inv_view_proj: &[[f32; 4]; 4]) -> [f32; 3] {
+pub fn reconstruct_position(uv: [f32; 2], depth: f32, inv_view_proj: &[[f32; 4]; 4]) -> [f32; 3] {
     let ndc_x = uv[0] * 2.0 - 1.0;
     let ndc_y = 1.0 - uv[1] * 2.0;
     let clip = [ndc_x, ndc_y, depth, 1.0];
@@ -52,9 +52,9 @@ pub(crate) fn reconstruct_position(uv: [f32; 2], depth: f32, inv_view_proj: &[[f
 }
 
 /// Compressed G-Buffer format recommendations.
-pub(crate) const COMPRESSED_NORMAL_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rg16Float;
-pub(crate) const COMPRESSED_ALBEDO_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8UnormSrgb;
-pub(crate) const COMPRESSED_MATERIAL_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8Unorm;
+pub const COMPRESSED_NORMAL_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rg16Float;
+pub const COMPRESSED_ALBEDO_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8UnormSrgb;
+pub const COMPRESSED_MATERIAL_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8Unorm;
 // Position: reconstructed from depth, no texture needed
 
 #[cfg(test)]

@@ -17,7 +17,6 @@ pub fn detect_collisions(world: &World) -> Vec<ContactPoint> {
     // 1. Gather entities with Transform + Collider
     let pairs_data: Vec<(Entity, Vec3, Collider)> = world
         .query2::<Transform, Collider>()
-        .into_iter()
         .map(|(e, t, c)| (e, t.position, c.clone()))
         .collect();
 

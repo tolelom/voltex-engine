@@ -28,7 +28,6 @@ pub fn collect_render_items(world: &mut World, assets: &RenderAssets) -> Vec<Ren
 
     let pairs: Vec<(Entity, WorldTransform, MeshHandle)> = world
         .query2::<WorldTransform, MeshHandle>()
-        .into_iter()
         .map(|(e, wt, mh)| (e, *wt, *mh))
         .collect();
 

@@ -26,7 +26,6 @@ pub struct RayHit {
 pub fn raycast(world: &World, ray: &Ray, max_dist: f32) -> Option<RayHit> {
     let entities: Vec<(Entity, Vec3, Collider)> = world
         .query2::<Transform, Collider>()
-        .into_iter()
         .map(|(e, t, c)| (e, t.position, c.clone()))
         .collect();
 
@@ -90,7 +89,6 @@ pub fn raycast(world: &World, ray: &Ray, max_dist: f32) -> Option<RayHit> {
 pub fn raycast_all(world: &World, ray: &Ray, max_dist: f32) -> Vec<RayHit> {
     let entities: Vec<(Entity, Vec3, Collider)> = world
         .query2::<Transform, Collider>()
-        .into_iter()
         .map(|(e, t, c)| (e, t.position, c.clone()))
         .collect();
 

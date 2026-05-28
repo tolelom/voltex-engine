@@ -5,7 +5,7 @@
 
 /// An OGG page header.
 #[derive(Debug, Clone)]
-pub(crate) struct OggPage {
+pub struct OggPage {
     /// Header type flags (0x01 = continuation, 0x02 = BOS, 0x04 = EOS).
     pub header_type: u8,
     /// Granule position (PCM sample position).

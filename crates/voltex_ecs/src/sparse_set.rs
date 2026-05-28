@@ -181,7 +181,7 @@ impl<T> Default for SparseSet<T> {
 
 /// Type-erased view of a [`SparseSet<T>`] — lets [`World`](crate::World)
 /// hold heterogeneous component stores in a single map.
-pub(crate) trait ComponentStorage: Any {
+pub trait ComponentStorage: Any {
     /// Downcast view as `&dyn Any`.
     fn as_any(&self) -> &dyn Any;
     /// Downcast view as `&mut dyn Any`.

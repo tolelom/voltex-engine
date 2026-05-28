@@ -125,7 +125,7 @@ impl BilateralBlur {
 }
 
 /// Pure CPU bilateral weight calculation (for testing).
-pub(crate) fn bilateral_weight(
+pub fn bilateral_weight(
     spatial_dist: f32,
     depth_diff: f32,
     normal_dot: f32,

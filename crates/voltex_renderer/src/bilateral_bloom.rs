@@ -2,7 +2,7 @@
 #![allow(missing_docs)]
 
 /// Bilateral bloom weight: attenuates blur across brightness edges.
-pub(crate) fn bilateral_bloom_weight(
+pub fn bilateral_bloom_weight(
     center_luminance: f32,
     sample_luminance: f32,
     spatial_weight: f32,
@@ -14,12 +14,12 @@ pub(crate) fn bilateral_bloom_weight(
 }
 
 /// Calculate luminance from RGB.
-pub(crate) fn luminance(r: f32, g: f32, b: f32) -> f32 {
+pub fn luminance(r: f32, g: f32, b: f32) -> f32 {
     0.2126 * r + 0.7152 * g + 0.0722 * b
 }
 
 /// 5-tap Gaussian weights for 1D bloom blur.
-pub(crate) fn gaussian_5tap() -> [f32; 5] {
+pub fn gaussian_5tap() -> [f32; 5] {
     // Sigma ≈ 1.4
     [0.0625, 0.25, 0.375, 0.25, 0.0625]
 }

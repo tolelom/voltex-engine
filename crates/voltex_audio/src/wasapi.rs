@@ -1,5 +1,6 @@
 #![allow(non_snake_case, non_camel_case_types, non_upper_case_globals, dead_code)]
 #![allow(missing_docs)] // 1:1 Win32 FFI bindings — Microsoft's MSDN is the canonical reference.
+#![allow(clippy::upper_case_acronyms)] // Win32 type names must match the Windows API exactly.
 
 //! WASAPI FFI bindings for Windows audio output.
 //!
@@ -42,7 +43,7 @@ pub(crate) const WAVE_FORMAT_EXTENSIBLE: WORD = 0xFFFE;
 
 #[repr(C)]
 #[derive(Clone, Copy)]
-pub(crate) struct GUID {
+pub struct GUID {
     pub Data1: u32,
     pub Data2: u16,
     pub Data3: u16,
