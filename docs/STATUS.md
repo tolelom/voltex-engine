@@ -173,6 +173,10 @@
 
 v1.0.9 부터는 **서비스 배포 완성도** 로드맵 (`docs/superpowers/specs/2026-05-21-service-readiness-roadmap.md`) 기준으로 진행.
 
+### v1.0.57 (2026-05-28) — voltex_image crate 분리 완료 (E1 + C1)
+
+신규 L0 crate `voltex_image` — PNG/JPG/glTF/OBJ/JSON 디코더 + PNG 인코더 + `MeshVertex` POD. `voltex_renderer`는 `pub use` 재export로 역호환 유지, `voltex_capture`의 중복 CRC32/Adler32 제거(C1 해소). facade `voltex`에 `image` 모듈 추가. 테스트 91개 이관, 워크스페이스 전체 그린.
+
 ### v1.0.56 (2026-05-28) — 아키텍처/테스트 품질 심층 감사 (병렬 에이전트)
 
 이전 라운드(v1.0.40~55)가 robustness 버그 헌팅이었다면, 이번엔 **아키텍처/설계 + 테스트 품질** 두 축으로 4개 병렬 탐색 에이전트가 16 crate 를 정적 감사하고, 발견을 5개 병렬 fix 에이전트로 처리했다. **레이어링 위반 0건** 확인. 진짜 결함 3건 + 거짓-확신 테스트 다수 + 문서 drift 정리.

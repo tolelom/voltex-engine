@@ -19,6 +19,7 @@
 //! - 렌더링: [`renderer`] + [`renderer_ecs`] — GPU + ECS 브릿지
 //! - 런타임: [`runtime`] — `RuntimeApp` 부트스트랩
 //! - 에디터: [`editor`] — `EditorSession`, `EditorCommand`
+//! - 이미지 코덱: [`image`] — `parse_png`, `parse_jpg`, `parse_gltf`, `MeshVertex` (GPU 무의존 L0)
 //! - 물리/오디오/AI/네트워킹/스크립트: [`physics`], [`audio`], [`ai`],
 //!   [`net`], [`script`]
 
@@ -27,6 +28,7 @@ pub use voltex_asset as asset;
 pub use voltex_audio as audio;
 pub use voltex_ecs as ecs;
 pub use voltex_editor as editor;
+pub use voltex_image as image;
 pub use voltex_math as math;
 pub use voltex_net as net;
 pub use voltex_physics as physics;
@@ -49,12 +51,12 @@ pub use voltex_asset::Vfs;
 /// 제외 — `voltex::ecs::Result`, `voltex::editor::Result` 등 명시 경로 사용.
 pub mod prelude {
     // 수학 — 거의 모든 코드가 필요
-    pub use voltex_math::{Vec2, Vec3, Vec4, Mat4, AABB, Ray};
+    pub use voltex_math::{Mat4, Ray, Vec2, Vec3, Vec4, AABB};
 
     // ECS 핵심 + C0a 의 렌더링 컴포넌트 + S1 의 스크립트 컴포넌트
     pub use voltex_ecs::{
-        Bounds, Children, Component, ComponentRegistry, Entity, MaterialHandle,
-        MeshHandle, Parent, ScriptComponent, Transform, World,
+        Bounds, Children, Component, ComponentRegistry, Entity, MaterialHandle, MeshHandle, Parent,
+        ScriptComponent, Transform, World,
     };
 
     // 플랫폼 (윈도우, 입력, 타이머)
@@ -91,5 +93,7 @@ mod tests {
         let _ = crate::math::Vec3::ZERO;
         let _ = crate::ecs::World::new();
         let _ = crate::runtime::RuntimeConfig::new();
+        // voltex_image facade re-export
+        let _: Option<crate::image::MeshVertex> = None;
     }
 }

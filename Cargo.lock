@@ -2106,6 +2106,7 @@ dependencies = [
  "voltex_audio",
  "voltex_ecs",
  "voltex_editor",
+ "voltex_image",
  "voltex_math",
  "voltex_net",
  "voltex_physics",

@@ -21,7 +21,7 @@
 
 ## C. 중복 제거 (DRY)
 
-- [~] **C1** CRC32/Adler32 중복 — **E1 로 연기**: renderer 의 copy 는 test-only(production 중복은 capture 1곳, drift 무해), 제대로 된 공유 위치는 `voltex_image`(E1). God-crate 인 renderer 에 지금 pub util 추가는 역효과.
+- [x] **C1** CRC32/Adler32 중복 — E1 완료로 해소: 체크섬 구현은 `voltex_image::checksum`(crate-private)으로 단일화. `voltex_capture`의 중복 CRC32/Adler32 제거, `voltex_image::encode_rgba8` 재export로 교체. (커밋 7ee76f4 + b0c2d63)
 - [x] **C2** `LoadState` vs `PendingState` 동일 상태공간 이중 정의 → `PendingState` 제거, `LoadState`(+Clone) 단일화. (커밋 후속)
 - [x] **C3** `SparseSet::increment_tick` trait impl 이 inherent 메서드로 위임. (커밋 후속)
 - [~] **C4** LE-f32 헬퍼 — **won't-fix**: 실제로는 각 crate 가 `f32::to_le_bytes`/`from_le_bytes`(std) 를 호출할 뿐, 추출할 공유 로직 없음.
@@ -34,7 +34,7 @@
 
 ## E. 대형 리팩터링 (영향 큼, 신중)
 
-- [ ] **E1** `voltex_image` crate 분리 — renderer 의 PNG/JPG/deflate/glTF/OBJ/json_parser 는 wgpu 무의존 → God-crate(~120 export) 해소, L0/L1 강등. (大)
+- [x] **E1** `voltex_image` crate 분리 — renderer 의 PNG/JPG/deflate/glTF/OBJ/json_parser 는 wgpu 무의존 → God-crate(~120 export) 해소, L0 신규 crate. 역호환 `pub use` 재export 유지. (커밋 202afea + 7ee76f4 + f3684ae + b0c2d63 + 1856ef1 + 이번 커밋)
 - [ ] **E2** `query2/3/4` 가 `Vec` 반환(매 프레임 할당) → iterator화 + min-selection 로직 추출. (borrow 제약 검토)
 - [ ] **E3** `Transform`/snapshot 회전이 Euler `Vec3` → quaternion 저장 검토. (광범위)
 
@@ -48,6 +48,7 @@
 - [ ] **F6** Linux/macOS 오디오 백엔드 실 머신 검증
 - [ ] **F7** CI 첫 green run (GitHub mirror/self-hosted runner)
 - [ ] **F8** `pub(crate)` 다운그레이드 audit 실행
+- [ ] **F9** `voltex_image` 의 moved 디코더 파일들에 남아있는 `#![allow(missing_docs)]` 점진 제거 — copy 단계에서 인계된 suppressions, 점진적으로 doc 작성 후 제거 (저리스크)
 
 ## P3 — 보류 (저가치)
 

@@ -10,6 +10,37 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## [v1.0.57] — 2026-05-28 — voltex_image crate split (E1 + C1 audit items)
+
+**Refactor / Additive**. New L0 crate `voltex_image` extracts all GPU-agnostic asset
+codecs from `voltex_renderer`, resolving audit items E1 (God-crate reduction) and C1
+(CRC32/Adler32 deduplication). Commits: 202afea + 7ee76f4 + f3684ae + b0c2d63 + 1856ef1.
+
+### What moved to `voltex_image`
+- PNG decoder (`parse_png`), JPEG Baseline + Progressive decoder (`parse_jpg`)
+- DEFLATE inflate (`deflate` module), PNG encoder (`encode_rgba8`)
+- glTF 2.0/GLB parser (`parse_gltf`, `GltfData`/`GltfMesh`/`GltfMaterial`)
+- OBJ parser (`obj` module), JSON parser (`json_parser` module)
+- `MeshVertex` POD struct (`bytemuck::Pod + Zeroable`)
+- CRC32/Adler32 (`checksum` module — crate-private)
+
+### What stays in `voltex_renderer`
+- `MESH_VERTEX_LAYOUT` (`VertexBufferLayout` for `MeshVertex`) — renderer/vertex.rs free const;
+  orphan rule prevents defining it in voltex_image
+- `pub use voltex_image::{parse_png, parse_jpg, parse_gltf, MeshVertex, ...}` back-compat
+  re-exports — existing code using `voltex_renderer::parse_png` continues to compile
+
+### Other changes
+- `voltex_capture`: duplicate CRC32/Adler32 removed; uses `voltex_image::encode_rgba8` (C1)
+- `voltex` facade: `pub use voltex_image as image` added (`voltex::image` module)
+- 91 tests migrated to voltex_image; workspace total remains green
+
+### Follow-up
+- F9: `#![allow(missing_docs)]` suppressions in moved decoder files — to be resolved
+  incrementally with doc comments (low risk, tracked in AUDIT-BACKLOG)
+
+---
+
 ## [v1.0.54] — 2026-05-22 — Sphere generator degenerate-input clamp
 
 **Fix**. `voltex_renderer::sphere::generate_sphere(radius, sectors, stacks)` divided by zero on multiple paths when called with degenerate inputs:

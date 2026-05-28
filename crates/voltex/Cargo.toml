@@ -17,4 +17,5 @@ voltex_ai = { workspace = true }
 voltex_net = { workspace = true }
 voltex_script = { workspace = true }
 voltex_editor = { workspace = true }
+voltex_image = { workspace = true }
 voltex_runtime = { workspace = true }

@@ -36,6 +36,7 @@ L0 (no voltex deps):
   voltex_math       — Vec/Mat/AABB/Ray
   voltex_asset      — Handle, AssetStorage, AssetLoader, FileWatcher
   voltex_net        — UDP, Packet, Reliable, Snapshot, Interpolation
+  voltex_image      — PNG/JPG/glTF/OBJ/JSON 디코더 + PNG 인코더 + MeshVertex (GPU 무의존)
 
 L1 (depends on math only):
   voltex_platform   → voltex_math   (winit window/input/timer)
@@ -46,7 +47,7 @@ L2:
   voltex_ai         → voltex_math, voltex_ecs        (NavMesh, A*, steering)
   voltex_physics    → voltex_math, voltex_ecs        (Collider, RigidBody, Raycast)
   voltex_script     → voltex_math, voltex_ecs        (Lua 5.4, sandbox)
-  voltex_renderer   → voltex_math, voltex_platform   (wgpu, PBR, RT, post-process)
+  voltex_renderer   → voltex_math, voltex_platform, voltex_image   (wgpu, PBR, RT, post-process; 디코더는 voltex_image에서 재export)
 
 L3:
   voltex_renderer_ecs → voltex_math, voltex_ecs, voltex_asset, voltex_renderer
@@ -60,12 +61,12 @@ L3.5:
 
 L4 (facade):
   voltex            → 모든 sub-crate(runtime 포함)를 모듈로 re-export + prelude
-                      (사용자 진입점, 신규/외부 코드는 여기부터 import)
+                      (사용자 진입점, 신규/외부 코드는 여기부터 import; `voltex::image` 모듈 포함)
 
 Tools (워크스페이스 밖 진입점, 다른 crate가 의존하지 않음):
   voltex_cli        → voltex_asset            (voltex new/build/run 빌드 파이프라인)
-  voltex_capture    → math, ecs, asset, renderer, renderer_ecs, editor
-                      (HeadlessGpu 오프스크린 render-to-PNG 시각 검증 하니스)
+  voltex_capture    → math, ecs, asset, renderer, renderer_ecs, editor, voltex_image
+                      (HeadlessGpu 오프스크린 render-to-PNG 시각 검증 하니스; encode_rgba8는 voltex_image 재export)
 ```
 
 **변경 영향도**: L0 변경은 거의 모든 crate에 영향 (특히 voltex_math). L3 변경은 영향 적음. 변경 전 의존 그래프를 따라 영향 범위 확인.

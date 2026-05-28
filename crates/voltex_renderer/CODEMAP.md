@@ -1,7 +1,7 @@
 # voltex_renderer
 
 ## 책임 (한 줄)
-wgpu 기반 렌더링 — 메시/PBR/그림자/IBL/디퍼드/RT/post-process + 이미지 디코더(PNG/JPG) + glTF 파서.
+wgpu 기반 렌더링 — 메시/PBR/그림자/IBL/디퍼드/RT/post-process. 이미지 디코더(PNG/JPG) + glTF/OBJ 파서 + MeshVertex는 `voltex_image`(L0)로 이동; 역호환 `pub use` 재export 유지.
 
 ## 공개 API 진입점
 
@@ -13,13 +13,14 @@ wgpu 기반 렌더링 — 메시/PBR/그림자/IBL/디퍼드/RT/post-process + �
 - `Camera`, `FpsController` — 카메라 (src/camera.rs)
 - `GpuTexture`, `pbr_texture_bind_group_layout` 등 — GPU 텍스처 + PBR 바인딩 (src/texture.rs)
 
-### Image / Model
-- `parse_png` — PNG 디코더 (src/png.rs)
-- `parse_jpg` — JPG Baseline (src/jpg/) + Progressive (src/progressive_jpeg.rs)
-- `parse_gltf`, `GltfData`, `GltfMesh`, `GltfMaterial` — glTF 2.0/GLB (src/gltf/)
-- `obj` — OBJ 파서 (src/obj.rs)
-- `deflate` — zlib/deflate (src/deflate.rs)
-- `json_parser` — glTF JSON 파서 (src/json_parser.rs)
+### Image / Model (voltex_image 재export)
+- `parse_png`, `parse_jpg`, `parse_gltf`, `GltfData`, `GltfMesh`, `GltfMaterial`, `MeshVertex` 등 — `voltex_image` crate로 이동; `pub use voltex_image::{...}` 역호환 재export 유지 (src/lib.rs)
+- `obj` — OBJ 파서 모듈 재export (`voltex_image::obj`) (src/obj.rs → voltex_image)
+- `deflate` — zlib/deflate inflate 모듈 재export (`voltex_image::deflate`)
+- `json_parser` — glTF JSON 파서 모듈 재export (`voltex_image::json_parser`)
+
+### Vertex Layout
+- `MESH_VERTEX_LAYOUT` — wgpu `VertexBufferLayout` for `MeshVertex` (src/vertex.rs의 free const). `MeshVertex` 자체는 voltex_image에 있어 orphan rule상 inherent impl 불가 — layout descriptor만 renderer에 유지.
 
 ### Materials / Lighting / Shadows
 - `MaterialUniform` — PBR 머티리얼 (src/material.rs)
@@ -84,7 +85,7 @@ wgpu 기반 렌더링 — 메시/PBR/그림자/IBL/디퍼드/RT/post-process + �
 
 대분류 (자세한 항목은 lib.rs의 `pub mod`/`pub use` 참조):
 - 코어 GPU: gpu, vertex, mesh, camera, texture, sphere, fullscreen_quad
-- 이미지/모델: png, jpg, progressive_jpeg, deflate, obj, gltf, json_parser
+- 이미지/모델: voltex_image 재export (png, jpg, progressive_jpeg, deflate, obj, gltf, json_parser — 실제 파일은 voltex_image에 있음)
 - 머티리얼/조명/그림자: material, light, shadow, csm, point_shadow, spot_shadow, frustum, shadow_pipeline, pbr_pipeline
 - IBL: sh, brdf_lut, ibl
 - 애니메이션: animation, skinned_vertex
@@ -95,7 +96,7 @@ wgpu 기반 렌더링 — 메시/PBR/그림자/IBL/디퍼드/RT/post-process + �
 - 셰이더: 각종 .wgsl 파일 (mesh, pbr, shadow, deferred, ssgi, rt, bloom, taa, ssr, motion_blur, dof, bilateral_blur, auto_exposure, brdf_lut_compute, instanced, forward, skinned)
 
 ## 의존성
-- voltex crate: voltex_math, voltex_platform
+- voltex crate: voltex_math, voltex_platform, voltex_image
 - 외부 crate: wgpu 28.0, bytemuck (workspace), winit (간접)
 
 ## 변경 시 주의점
@@ -104,10 +105,11 @@ wgpu 기반 렌더링 — 메시/PBR/그림자/IBL/디퍼드/RT/post-process + �
 - wgpu 28.0 전용 필드: immediate_size, multiview_mask, TexelCopyTextureInfo
 - gltf, jpg, deferred_pipeline은 src/<name>/ 디렉토리로 분리됨 (M2 완료). texture.rs (514줄)는 spec 만족 (600줄 이하), 분리 대상 아님
 - deferred_pipeline 하위 모듈에서 WGSL 셰이더 include 경로는 `include_str!("../<name>.wgsl")` (한 단계 깊음)
-- 이미지 디코더/glTF 파서는 향후 voltex_image 같은 별도 crate로 분리 고려 (DEFERRED)
+- 이미지 디코더/glTF 파서는 `voltex_image`(L0)로 분리 완료 (E1, 2026-05-28). `pub use` 재export로 역호환 유지
+- `RendererError::Image(#[from] voltex_image::ImageError)` variant — 디코더 에러를 렌더러 에러 체인으로 연결
 - Forward pass(mesh_shader.wgsl, Blinn-Phong)와 PBR/Deferred path는 별도 — 기존 예제(triangle, model_viewer)는 forward 사용
 
 ## 테스트
 - 단위 테스트: src/**/*.rs `#[cfg(test)]`
 - 실행: `cargo test -p voltex_renderer --lib`
-- 현재 테스트 개수: 200개
+- 현재 테스트 개수: 174개 (E1 분리 후 — 91개는 voltex_image로 이관)

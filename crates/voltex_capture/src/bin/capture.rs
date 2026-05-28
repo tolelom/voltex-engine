@@ -8,10 +8,17 @@ use voltex_capture::{
 };
 
 /// (name, render fn, width, height) for one capture.
-type Shot = (&'static str, fn(&HeadlessGpu, u32, u32) -> Vec<u8>, u32, u32);
+type Shot = (
+    &'static str,
+    fn(&HeadlessGpu, u32, u32) -> Vec<u8>,
+    u32,
+    u32,
+);
 
 fn main() {
-    let out_dir = std::env::args().nth(1).unwrap_or_else(|| "target/captures".to_string());
+    let out_dir = std::env::args()
+        .nth(1)
+        .unwrap_or_else(|| "target/captures".to_string());
     // Optional second arg: cap the longest dimension (downscale the requested
     // sizes proportionally) to produce small reference thumbnails.
     let cap: Option<u32> = std::env::args().nth(2).and_then(|s| s.parse().ok());
@@ -32,7 +39,12 @@ fn main() {
         ("pbr_grid", scene::render_pbr_grid, 768, 768),
         ("shadow_scene", scene_shadow::render_shadow_scene, 800, 600),
         ("multi_light", scene_lights::render_multi_light, 800, 600),
-        ("gizmo_translate", scene_gizmo::render_gizmo_translate, 480, 480),
+        (
+            "gizmo_translate",
+            scene_gizmo::render_gizmo_translate,
+            480,
+            480,
+        ),
         ("gizmo_rotate", scene_gizmo::render_gizmo_rotate, 480, 480),
         ("gizmo_scale", scene_gizmo::render_gizmo_scale, 480, 480),
         ("editor_ui", scene_ui::render_editor_ui, 640, 400),
@@ -43,7 +55,10 @@ fn main() {
         let (w, h) = match cap {
             Some(c) if *w0.max(h0) > c => {
                 let s = c as f32 / *w0.max(h0) as f32;
-                (((*w0 as f32 * s) as u32).max(1), ((*h0 as f32 * s) as u32).max(1))
+                (
+                    ((*w0 as f32 * s) as u32).max(1),
+                    ((*h0 as f32 * s) as u32).max(1),
+                )
             }
             _ => (*w0, *h0),
         };
