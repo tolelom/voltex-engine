@@ -1,103 +1,7 @@
 #![allow(missing_docs)]
 
 use crate::gltf::{AnimationPath, GltfChannel, Interpolation};
-
-/// Quaternion for rotation interpolation.
-#[derive(Debug, Clone, Copy)]
-pub struct Quat {
-    pub x: f32,
-    pub y: f32,
-    pub z: f32,
-    pub w: f32,
-}
-
-impl Quat {
-    pub fn identity() -> Self {
-        Quat {
-            x: 0.0,
-            y: 0.0,
-            z: 0.0,
-            w: 1.0,
-        }
-    }
-
-    pub fn slerp(a: Quat, b: Quat, t: f32) -> Quat {
-        let mut dot = a.x * b.x + a.y * b.y + a.z * b.z + a.w * b.w;
-        let mut b = b;
-        if dot < 0.0 {
-            b = Quat {
-                x: -b.x,
-                y: -b.y,
-                z: -b.z,
-                w: -b.w,
-            };
-            dot = -dot;
-        }
-        // `acos` returns NaN for inputs outside [-1, 1]. Floating-point
-        // accumulation in the dot product above can push the result just past
-        // 1.0 even for unit quaternions, which used to silently produce
-        // NaN-filled rotations downstream.
-        dot = dot.clamp(-1.0, 1.0);
-        if dot > 0.9995 {
-            // Linear interpolation for nearly identical quaternions
-            let r = Quat {
-                x: a.x + t * (b.x - a.x),
-                y: a.y + t * (b.y - a.y),
-                z: a.z + t * (b.z - a.z),
-                w: a.w + t * (b.w - a.w),
-            };
-            return r.normalize();
-        }
-        let theta = dot.acos();
-        let sin_theta = theta.sin();
-        let wa = ((1.0 - t) * theta).sin() / sin_theta;
-        let wb = (t * theta).sin() / sin_theta;
-        Quat {
-            x: wa * a.x + wb * b.x,
-            y: wa * a.y + wb * b.y,
-            z: wa * a.z + wb * b.z,
-            w: wa * a.w + wb * b.w,
-        }
-    }
-
-    pub fn normalize(self) -> Quat {
-        let len = (self.x * self.x + self.y * self.y + self.z * self.z + self.w * self.w).sqrt();
-        if len < 1e-8 {
-            return Quat::identity();
-        }
-        Quat {
-            x: self.x / len,
-            y: self.y / len,
-            z: self.z / len,
-            w: self.w / len,
-        }
-    }
-
-    pub fn to_mat4(&self) -> [[f32; 4]; 4] {
-        let (x, y, z, w) = (self.x, self.y, self.z, self.w);
-        [
-            [
-                1.0 - 2.0 * (y * y + z * z),
-                2.0 * (x * y + w * z),
-                2.0 * (x * z - w * y),
-                0.0,
-            ],
-            [
-                2.0 * (x * y - w * z),
-                1.0 - 2.0 * (x * x + z * z),
-                2.0 * (y * z + w * x),
-                0.0,
-            ],
-            [
-                2.0 * (x * z + w * y),
-                2.0 * (y * z - w * x),
-                1.0 - 2.0 * (x * x + y * y),
-                0.0,
-            ],
-            [0.0, 0.0, 0.0, 1.0],
-        ]
-    }
-}
+use voltex_math::Quat;
 
 /// Sample a keyframe channel at time t.
 pub fn sample_channel(channel: &GltfChannel, time: f32) -> Vec<f32> {
@@ -249,7 +153,7 @@ pub fn build_trs(translation: &[f32], rotation: &[f32], scale: &[f32]) -> [[f32;
         Quat::identity()
     };
 
-    let rot = q.to_mat4();
+    let rot = q.to_mat4().cols;
     let (tx, ty, tz) = if translation.len() >= 3 {
         (translation[0], translation[1], translation[2])
     } else {
@@ -291,7 +195,7 @@ mod tests {
     #[test]
     fn test_quat_identity_to_mat4() {
         let q = Quat::identity();
-        let m = q.to_mat4();
+        let m = q.to_mat4().cols;
         assert!((m[0][0] - 1.0).abs() < 1e-6);
         assert!((m[1][1] - 1.0).abs() < 1e-6);
         assert!((m[2][2] - 1.0).abs() < 1e-6);
@@ -319,7 +223,7 @@ mod tests {
             z: 0.0,
             w: s,
         };
-        let m = q.to_mat4();
+        let m = q.to_mat4().cols;
         // Column-major (outer = column): rotating +Z must yield +X.
         // Derived by hand from the matrix entries: column2 = m[2] = [1,0,0].
         let rotated_z = transform_point(&m, [0.0, 0.0, 1.0]);

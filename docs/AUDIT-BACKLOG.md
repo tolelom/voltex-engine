@@ -39,7 +39,7 @@
 - [~] **E3** `Transform`/snapshot 회전이 Euler `Vec3` → quaternion. **Phase 1 완료**, 나머지는 sub-item 으로 분해 (광범위·다중 세션):
     - [x] **E3a** `voltex_math::Quat` 정식 추가 — `from_axis_angle`/`from_euler_yxz`(`Transform::matrix()`의 RotY·RotX·RotZ 순서 일치)/`to_mat4`/`mul`(Hamilton)/`conjugate`/`inverse`/`normalize`/`dot`/`length`/NaN-safe `slerp`/`Default = IDENTITY`. 테스트 20개(axis-angle = `Mat4::rotation_{x,y,z}` 동치, YXZ euler = `Transform::matrix()` 동치, slerp boundary/midpoint/shorter-arc/clamp/NaN-drift, conj·inv, zero/normalize edge). (이번 커밋)
     - [ ] **E3b** `Transform.rotation: Vec3` → `Quat` 마이그레이션 — 71 sites / 18 files (ecs/physics/editor/script/animation/examples). `Transform::matrix()` 재작성, text/binary/JSON 직렬화 호환 (rotation 필드 wire format 변경 또는 quat/euler dual-write), editor inspector Euler↔Quat round-trip 표시, Lua API 회전 read/write 마이그레이션.
-    - [ ] **E3c** `voltex_renderer::animation::Quat` (local) → `voltex_math::Quat` 통합 — animation.rs 의 자체 Quat 제거 후 facade 사용. skinning/glTF 채널 sample 경로 회귀 테스트.
+    - [x] **E3c** `voltex_renderer::animation::Quat` (local) → `voltex_math::Quat` 통합 — animation.rs 의 자체 Quat struct/impl 삭제, `use voltex_math::Quat` 도입. `to_mat4()` 시그니처 차이([[f32;4];4] → Mat4)는 호출처 3곳에서 `.cols` 체이닝으로 해소. lib.rs 는 `pub use voltex_math::Quat` 로 `voltex_renderer::Quat` 경로 역호환 유지. animation 14 테스트 통과. (이번 커밋)
 
 ## F. 기존 v1.1 백로그 (DEFERRED 출처)
 
