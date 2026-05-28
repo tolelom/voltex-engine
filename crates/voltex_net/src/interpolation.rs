@@ -225,12 +225,13 @@ mod tests {
     }
 
     #[test]
-    fn test_extrapolation_returns_latest() {
+    fn test_beyond_latest_clamps_to_latest() {
         let mut buf = InterpolationBuffer::new(0.1);
         buf.push(0.0, make_snapshot(0, 0.0));
         buf.push(1.0, make_snapshot(10, 10.0));
 
-        // render_time beyond all snapshots
+        // render_time beyond all snapshots: the buffer does NOT extrapolate —
+        // it clamps and returns the latest snapshot unchanged.
         let result = buf.interpolate(2.0).expect("should return latest");
         assert_eq!(result.entities[0].position[0], 10.0);
     }

@@ -28,9 +28,9 @@
 
 ## D. 남은 테스트 / 커버리지 갭
 
-- [ ] **D1** `ssgi` `pseudo_random`/`generate_noise_data` 미테스트. (`renderer/ssgi.rs`, P2)
-- [ ] **D2** `BlasTracker::mark_dirty` 미등록 id no-op, `BonePalette::set_bone` OOB drop 미테스트. (renderer, P3)
-- [ ] **D3** `test_extrapolation_returns_latest` 가 사실 클램핑만 검증 — 이름 오해. (`net/interpolation.rs`, P3)
+- [x] **D1** `ssgi` `pseudo_random`(범위/결정성/시드차) + `generate_noise_data`(길이16/unit-length) 테스트 +4. (커밋 후속)
+- [x] **D2** `BlasTracker::mark_dirty` 미등록 id no-op, `BonePalette::set_bone` OOB drop 테스트. (커밋 후속)
+- [x] **D3** `test_extrapolation_returns_latest` → `test_beyond_latest_clamps_to_latest` 리네임 + 명확화 주석. (커밋 후속)
 
 ## E. 대형 리팩터링 (영향 큼, 신중)
 

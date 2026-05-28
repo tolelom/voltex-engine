@@ -304,6 +304,61 @@ mod tests {
     }
 
     #[test]
+    fn test_pseudo_random_in_unit_range() {
+        // x is a u32, divided by u32::MAX, so the result is always in [0, 1].
+        for seed in 0u32..1000 {
+            let v = pseudo_random(seed);
+            assert!(
+                (0.0..=1.0).contains(&v),
+                "pseudo_random({seed}) = {v} out of [0, 1]"
+            );
+        }
+    }
+
+    #[test]
+    fn test_pseudo_random_deterministic() {
+        // Same seed always yields the same value (pure function).
+        for seed in [0u32, 1, 42, 1337, u32::MAX] {
+            assert_eq!(pseudo_random(seed), pseudo_random(seed));
+        }
+    }
+
+    #[test]
+    fn test_pseudo_random_differs_across_seeds() {
+        // Distinct seeds should hash to distinct outputs (no trivial collisions
+        // for small consecutive seeds).
+        let a = pseudo_random(0);
+        let b = pseudo_random(1);
+        let c = pseudo_random(2);
+        assert_ne!(a, b);
+        assert_ne!(b, c);
+        assert_ne!(a, c);
+    }
+
+    #[test]
+    fn test_noise_data_length_and_components() {
+        // generate_noise_data() builds exactly NOISE_DIM*NOISE_DIM = 16 entries,
+        // each [cos(angle), sin(angle), 0.0, 0.0].
+        let noise = generate_noise_data();
+        assert_eq!(noise.len(), 16);
+        for entry in &noise {
+            // All components finite.
+            for &c in entry {
+                assert!(c.is_finite(), "noise component {c} is not finite");
+            }
+            // cos/sin are bounded to [-1, 1].
+            assert!((-1.0..=1.0).contains(&entry[0]), "cos out of range: {}", entry[0]);
+            assert!((-1.0..=1.0).contains(&entry[1]), "sin out of range: {}", entry[1]);
+            // (cos, sin) is a unit vector.
+            let len = (entry[0] * entry[0] + entry[1] * entry[1]).sqrt();
+            assert!((len - 1.0).abs() < 1e-5, "xy length {len} != 1.0");
+            // z and w are padding (always 0).
+            assert_eq!(entry[2], 0.0);
+            assert_eq!(entry[3], 0.0);
+        }
+    }
+
+    #[test]
     fn test_uniform_defaults() {
         let u = SsgiUniform::default();
         assert!((u.radius - 0.5).abs() < f32::EPSILON);

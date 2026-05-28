@@ -39,4 +39,24 @@ mod tests {
         t.clear_dirty();
         assert!(t.dirty_meshes().is_empty());
     }
+
+    #[test]
+    fn test_mark_dirty_unregistered_is_noop() {
+        // mark_dirty only flips an existing entry; an id that was never
+        // registered is silently ignored — no entry is created.
+        let mut t = BlasTracker::new();
+        t.mark_dirty(99);
+        assert!(t.dirty_meshes().is_empty());
+        assert_eq!(t.mesh_count(), 0);
+    }
+
+    #[test]
+    fn test_mark_dirty_unregistered_does_not_affect_registered() {
+        // Marking an unrelated, unregistered id leaves registered meshes untouched.
+        let mut t = BlasTracker::new();
+        t.register(1); t.register(2);
+        t.mark_dirty(99);
+        assert!(t.dirty_meshes().is_empty());
+        assert_eq!(t.mesh_count(), 2);
+    }
 }

@@ -92,6 +92,23 @@ mod tests {
     }
 
     #[test]
+    fn test_bone_palette_set_out_of_bounds_is_ignored() {
+        // index == MAX_BONES is out of range; set_bone silently drops it
+        // (no panic, no mutation). The last in-range slot is MAX_BONES - 1.
+        let mut palette = BonePalette::new();
+        let custom = [[7.0,0.0,0.0,0.0],[0.0,7.0,0.0,0.0],[0.0,0.0,7.0,0.0],[0.0,0.0,0.0,1.0]];
+
+        // Out-of-bounds write is a no-op: last valid slot stays identity.
+        palette.set_bone(MAX_BONES, custom);
+        assert!((palette.matrices[MAX_BONES - 1][0][0] - 1.0).abs() < 1e-6);
+
+        // In-range write at the boundary index does take effect.
+        palette.set_bone(MAX_BONES - 1, custom);
+        assert!((palette.matrices[MAX_BONES - 1][0][0] - 7.0).abs() < 1e-6);
+        assert!((palette.matrices[MAX_BONES - 1][1][1] - 7.0).abs() < 1e-6);
+    }
+
+    #[test]
     fn test_bone_palette_size() {
         let size = std::mem::size_of::<BonePalette>();
         assert_eq!(size, MAX_BONES * 64); // 128 * 64 = 8192
