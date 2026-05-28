@@ -1,0 +1,9 @@
+[package]
+name = "voltex_image"
+version = "0.1.0"
+edition = "2021"
+license.workspace = true
+
+[dependencies]
+bytemuck.workspace = true
+thiserror = { workspace = true }
