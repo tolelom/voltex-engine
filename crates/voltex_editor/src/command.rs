@@ -5,7 +5,7 @@
 //! side-effects (state mutation + log entry + scene file sync).
 
 use voltex_ecs::Entity;
-use voltex_math::Vec3;
+use voltex_math::{Quat, Vec3};
 
 use crate::error::EditorError;
 
@@ -29,8 +29,8 @@ pub enum EditorCommand {
         entity: Entity,
         /// New world position.
         position: Vec3,
-        /// New Euler rotation (radians, XYZ).
-        rotation: Vec3,
+        /// New orientation as a unit quaternion.
+        rotation: Quat,
         /// New scale.
         scale: Vec3,
     },
@@ -257,16 +257,17 @@ mod tests {
         let entity = world.spawn();
         world.add(entity, Transform::new());
 
+        let q = Quat::from_axis_angle(Vec3::new(0.0, 1.0, 0.0), 0.5);
         let cmd = EditorCommand::SetTransform {
             entity,
             position: Vec3::new(1.0, 2.0, 3.0),
-            rotation: Vec3::new(0.0, 0.5, 0.0),
+            rotation: q,
             scale: Vec3::new(2.0, 2.0, 2.0),
         };
         apply_command(&mut world, &registry, &cmd).expect("ok");
         let t = world.get::<Transform>(entity).unwrap();
         assert_eq!(t.position, Vec3::new(1.0, 2.0, 3.0));
-        assert_eq!(t.rotation, Vec3::new(0.0, 0.5, 0.0));
+        assert_eq!(t.rotation, q);
         assert_eq!(t.scale, Vec3::new(2.0, 2.0, 2.0));
     }
 
@@ -279,7 +280,7 @@ mod tests {
         let cmd = EditorCommand::SetTransform {
             entity,
             position: Vec3::ZERO,
-            rotation: Vec3::ZERO,
+            rotation: Quat::IDENTITY,
             scale: Vec3::new(1.0, 1.0, 1.0),
         };
         assert_eq!(
@@ -317,7 +318,7 @@ mod tests {
         apply_command(&mut world1, &registry, &EditorCommand::SetTransform {
             entity: e1,
             position: Vec3::new(7.0, 8.0, 9.0),
-            rotation: Vec3::ZERO,
+            rotation: Quat::IDENTITY,
             scale: Vec3::new(1.0, 1.0, 1.0),
         }).unwrap();
         apply_command(&mut world1, &registry, &EditorCommand::SetTag {

@@ -1,7 +1,7 @@
 //! Rotate gizmo — ring plane intersection + atan2 angle delta.
 
 use voltex_ecs::Transform;
-use voltex_math::{Ray, Vec3};
+use voltex_math::{Quat, Ray, Vec3};
 
 use super::{DragState, GizmoAxis};
 
@@ -90,10 +90,11 @@ pub(crate) fn compute_transform(drag: &DragState, ray: &Ray) -> Transform {
         delta += std::f32::consts::TAU;
     }
     let mut t = drag.initial_transform;
-    let idx = drag.axis.index();
-    let mut rot = [t.rotation.x, t.rotation.y, t.rotation.z];
-    rot[idx] += delta;
-    t.rotation = Vec3::new(rot[0], rot[1], rot[2]);
+    // Compose the delta in world space: q_new = q_delta * q_initial. This
+    // makes the gizmo's behaviour axis-stable regardless of the initial
+    // orientation (the prior Euler-add path drifted around gimbal lock).
+    let q_delta = Quat::from_axis_angle(drag.axis.dir(), delta);
+    t.rotation = (q_delta * drag.initial_transform.rotation).normalize();
     t
 }
 
@@ -131,10 +132,14 @@ mod tests {
         // Ray hits Y=0 plane at v_dir position (-RING_RADIUS, 0, 0) → angle π/2.
         let ray = Ray::new(Vec3::new(-RING_RADIUS, 10.0, 0.0), Vec3::new(0.0, -1.0, 0.0));
         let t = compute_transform(&drag, &ray);
+        // The composed rotation is π/2 around +Y. A pure-Y axis-angle quat
+        // has only x = z = 0 and y = sin(π/4) ≈ 0.7071.
         assert!(
-            approx(t.rotation.y, std::f32::consts::FRAC_PI_2, 1e-3),
+            approx(t.rotation.y, (std::f32::consts::FRAC_PI_2 * 0.5).sin(), 1e-3),
             "rotation.y: {}",
             t.rotation.y
         );
+        assert!(approx(t.rotation.x, 0.0, 1e-3), "rotation.x: {}", t.rotation.x);
+        assert!(approx(t.rotation.z, 0.0, 1e-3), "rotation.z: {}", t.rotation.z);
     }
 }

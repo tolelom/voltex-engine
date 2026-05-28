@@ -4,14 +4,19 @@
 //! the `Snapshot` and `SnapshotDelta` packet variants.
 
 /// State of a single entity at a point in time.
+///
+/// Wire format changed in E3b: `rotation` is now a unit quaternion
+/// `[x, y, z, w]` instead of the prior 3-float Euler triple. Old peers
+/// cannot decode new packets and vice versa — this is an intentional
+/// hard cutover for an ephemeral wire format (snapshots are not persisted).
 #[derive(Debug, Clone, PartialEq)]
 pub struct EntityState {
     /// Entity id (typically `Entity::id`).
     pub id: u32,
     /// World position `[x, y, z]`.
     pub position: [f32; 3],
-    /// Euler rotation `[pitch, yaw, roll]` in radians.
-    pub rotation: [f32; 3],
+    /// Orientation quaternion `[x, y, z, w]` (Hamilton, right-handed).
+    pub rotation: [f32; 4],
     /// Linear velocity `[vx, vy, vz]`.
     pub velocity: [f32; 3],
 }
@@ -25,8 +30,8 @@ pub struct Snapshot {
     pub entities: Vec<EntityState>,
 }
 
-/// Binary size of one entity: id(4) + pos(12) + rot(12) + vel(12) = 40 bytes
-const ENTITY_SIZE: usize = 4 + 12 + 12 + 12;
+/// Binary size of one entity: id(4) + pos(12) + rot quat(16) + vel(12) = 44 bytes
+const ENTITY_SIZE: usize = 4 + 12 + 16 + 12;
 
 fn write_f32_le(buf: &mut Vec<u8>, v: f32) {
     buf.extend_from_slice(&v.to_le_bytes());
@@ -50,10 +55,26 @@ fn read_f32x3(data: &[u8], offset: usize) -> [f32; 3] {
     ]
 }
 
+fn write_f32x4(buf: &mut Vec<u8>, v: &[f32; 4]) {
+    write_f32_le(buf, v[0]);
+    write_f32_le(buf, v[1]);
+    write_f32_le(buf, v[2]);
+    write_f32_le(buf, v[3]);
+}
+
+fn read_f32x4(data: &[u8], offset: usize) -> [f32; 4] {
+    [
+        read_f32_le(data, offset),
+        read_f32_le(data, offset + 4),
+        read_f32_le(data, offset + 8),
+        read_f32_le(data, offset + 12),
+    ]
+}
+
 fn serialize_entity(buf: &mut Vec<u8>, e: &EntityState) {
     buf.extend_from_slice(&e.id.to_le_bytes());
     write_f32x3(buf, &e.position);
-    write_f32x3(buf, &e.rotation);
+    write_f32x4(buf, &e.rotation);
     write_f32x3(buf, &e.velocity);
 }
 
@@ -62,8 +83,8 @@ fn deserialize_entity(data: &[u8], offset: usize) -> EntityState {
         data[offset], data[offset + 1], data[offset + 2], data[offset + 3],
     ]);
     let position = read_f32x3(data, offset + 4);
-    let rotation = read_f32x3(data, offset + 16);
-    let velocity = read_f32x3(data, offset + 28);
+    let rotation = read_f32x4(data, offset + 16);
+    let velocity = read_f32x3(data, offset + 32);
     EntityState { id, position, rotation, velocity }
 }
 
@@ -148,7 +169,7 @@ pub fn diff_snapshots(old: &Snapshot, new: &Snapshot) -> Vec<u8> {
             }
             if new_ent.rotation != old_ent.rotation {
                 flags |= 0x02;
-                write_f32x3(&mut fields, &new_ent.rotation);
+                write_f32x4(&mut fields, &new_ent.rotation);
             }
             if new_ent.velocity != old_ent.velocity {
                 flags |= 0x04;
@@ -166,7 +187,7 @@ pub fn diff_snapshots(old: &Snapshot, new: &Snapshot) -> Vec<u8> {
             entries.extend_from_slice(&new_ent.id.to_le_bytes());
             entries.push(0x80); // "new entity" flag
             write_f32x3(&mut entries, &new_ent.position);
-            write_f32x3(&mut entries, &new_ent.rotation);
+            write_f32x4(&mut entries, &new_ent.rotation);
             write_f32x3(&mut entries, &new_ent.velocity);
             count += 1;
         }
@@ -219,14 +240,14 @@ pub fn apply_diff(base: &Snapshot, diff: &[u8]) -> crate::Result<Snapshot> {
         }
 
         if flags & 0x80 != 0 {
-            // New entity — full state
-            if offset + 36 > diff.len() {
+            // New entity — full state (pos 12 + quat 16 + vel 12 = 40)
+            if offset + 40 > diff.len() {
                 return Err("Diff truncated at new entity data".into());
             }
             let position = read_f32x3(diff, offset);
-            let rotation = read_f32x3(diff, offset + 12);
-            let velocity = read_f32x3(diff, offset + 24);
-            offset += 36;
+            let rotation = read_f32x4(diff, offset + 12);
+            let velocity = read_f32x3(diff, offset + 28);
+            offset += 40;
 
             // Add or replace
             if let Some(ent) = entities.iter_mut().find(|e| e.id == id) {
@@ -249,11 +270,11 @@ pub fn apply_diff(base: &Snapshot, diff: &[u8]) -> crate::Result<Snapshot> {
                 offset += 12;
             }
             if flags & 0x02 != 0 {
-                if offset + 12 > diff.len() {
+                if offset + 16 > diff.len() {
                     return Err("Diff truncated at rotation".into());
                 }
-                ent.rotation = read_f32x3(diff, offset);
-                offset += 12;
+                ent.rotation = read_f32x4(diff, offset);
+                offset += 16;
             }
             if flags & 0x04 != 0 {
                 if offset + 12 > diff.len() {
@@ -276,7 +297,7 @@ mod tests {
         EntityState {
             id,
             position: [px, py, pz],
-            rotation: [0.0, 0.0, 0.0],
+            rotation: [0.0, 0.0, 0.0, 1.0], // identity quaternion
             velocity: [0.0, 0.0, 0.0],
         }
     }
@@ -334,7 +355,7 @@ mod tests {
             entities: vec![EntityState {
                 id: 1,
                 position: [1.0, 2.0, 3.0],
-                rotation: [0.0, 0.0, 0.0],
+                rotation: [0.0, 0.0, 0.0, 1.0],
                 velocity: [0.0, 0.0, 0.0],
             }],
         };
@@ -345,7 +366,7 @@ mod tests {
         assert_eq!(result.tick, 11);
         assert_eq!(result.entities.len(), 1);
         assert_eq!(result.entities[0].position, [1.0, 2.0, 3.0]);
-        assert_eq!(result.entities[0].rotation, [0.0, 0.0, 0.0]); // unchanged
+        assert_eq!(result.entities[0].rotation, [0.0, 0.0, 0.0, 1.0]); // unchanged
     }
 
     #[test]
@@ -377,7 +398,7 @@ mod tests {
             entities: vec![EntityState {
                 id: 1,
                 position: [0.0, 0.0, 0.0],
-                rotation: [0.0, 0.0, 0.0],
+                rotation: [0.0, 0.0, 0.0, 1.0],
                 velocity: [0.0, 0.0, 0.0],
             }],
         };
@@ -386,7 +407,7 @@ mod tests {
             entities: vec![EntityState {
                 id: 1,
                 position: [1.0, 1.0, 1.0],
-                rotation: [2.0, 2.0, 2.0],
+                rotation: [0.1, 0.2, 0.3, 0.9],
                 velocity: [3.0, 3.0, 3.0],
             }],
         };
@@ -395,7 +416,7 @@ mod tests {
         let result = apply_diff(&old, &diff).unwrap();
 
         assert_eq!(result.entities[0].position, [1.0, 1.0, 1.0]);
-        assert_eq!(result.entities[0].rotation, [2.0, 2.0, 2.0]);
+        assert_eq!(result.entities[0].rotation, [0.1, 0.2, 0.3, 0.9]);
         assert_eq!(result.entities[0].velocity, [3.0, 3.0, 3.0]);
     }
 
@@ -466,7 +487,7 @@ mod tests {
             entities: vec![EntityState {
                 id: 1,
                 position: [1.0, 2.0, 3.0],
-                rotation: [0.0, 0.0, 0.0],
+                rotation: [0.0, 0.0, 0.0, 1.0],
                 velocity: [0.0, 0.0, 0.0],
             }],
         };

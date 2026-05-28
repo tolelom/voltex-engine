@@ -4,6 +4,7 @@
 use std::collections::VecDeque;
 
 use crate::snapshot::{EntityState, Snapshot};
+use voltex_math::Quat;
 
 /// Buffers recent snapshots and interpolates between them for smooth rendering.
 pub struct InterpolationBuffer {
@@ -89,36 +90,22 @@ fn lerp_f32x3(a: &[f32; 3], b: &[f32; 3], t: f32) -> [f32; 3] {
     [lerp(a[0], b[0], t), lerp(a[1], b[1], t), lerp(a[2], b[2], t)]
 }
 
-/// Interpolate between two angles (in radians) along the shortest arc.
-///
-/// `EntityState::rotation` holds Euler angles in radians (matching
-/// `voltex_ecs::Transform`). A naive component-wise linear lerp of angles
-/// takes the long way around the circle whenever the two values straddle the
-/// ±π wrap boundary (e.g. ~6.11 rad → ~0.17 rad would pass through π instead
-/// of crossing 0). Wrapping the difference into `[-π, π]` first guarantees the
-/// interpolation follows the shortest rotation. When the pair does not wrap,
-/// this reduces to plain linear interpolation.
-fn lerp_angle(a: f32, b: f32, t: f32) -> f32 {
-    use std::f32::consts::PI;
-    let diff = (b - a + PI).rem_euclid(2.0 * PI) - PI;
-    a + diff * t
-}
-
-fn lerp_angles3(a: &[f32; 3], b: &[f32; 3], t: f32) -> [f32; 3] {
-    [
-        lerp_angle(a[0], b[0], t),
-        lerp_angle(a[1], b[1], t),
-        lerp_angle(a[2], b[2], t),
-    ]
+/// Spherical linear interpolation between two unit-quaternion wire reps.
+/// Picks the shorter arc and stays NaN-safe via `Quat::slerp`.
+fn slerp_quat_wire(a: &[f32; 4], b: &[f32; 4], t: f32) -> [f32; 4] {
+    let qa = Quat::new(a[0], a[1], a[2], a[3]);
+    let qb = Quat::new(b[0], b[1], b[2], b[3]);
+    let r = Quat::slerp(qa, qb, t);
+    [r.x, r.y, r.z, r.w]
 }
 
 fn lerp_entity(a: &EntityState, b: &EntityState, t: f32) -> EntityState {
     EntityState {
         id: a.id,
         position: lerp_f32x3(&a.position, &b.position, t),
-        // Rotation is Euler radians — interpolate along the shortest arc so we
-        // do not spin the long way around the ±π wrap boundary.
-        rotation: lerp_angles3(&a.rotation, &b.rotation, t),
+        // Rotation is a unit quaternion since E3b — slerp picks the shorter
+        // arc, sidestepping the prior componentwise-Euler long-way bug.
+        rotation: slerp_quat_wire(&a.rotation, &b.rotation, t),
         velocity: lerp_f32x3(&a.velocity, &b.velocity, t),
     }
 }
@@ -166,7 +153,7 @@ mod tests {
             entities: vec![EntityState {
                 id: 1,
                 position: [x, 0.0, 0.0],
-                rotation: [0.0, 0.0, 0.0],
+                rotation: [0.0, 0.0, 0.0, 1.0],
                 velocity: [0.0, 0.0, 0.0],
             }],
         }
@@ -175,7 +162,7 @@ mod tests {
     fn make_full_snapshot(
         tick: u32,
         position: [f32; 3],
-        rotation: [f32; 3],
+        rotation: [f32; 4],
         velocity: [f32; 3],
     ) -> Snapshot {
         Snapshot {
@@ -257,49 +244,47 @@ mod tests {
     }
 
     #[test]
-    fn test_rotation_interpolates_shortest_arc_across_wrap() {
-        use std::f32::consts::PI;
-        // 6.1 rad (~349.5°) -> 0.17 rad (~9.7°). The shortest arc crosses 0,
-        // landing near 0 / 2π at the midpoint. A naive lerp would land near
-        // (6.1 + 0.17) / 2 = 3.135 rad (~180°), the long way around.
+    fn rotation_slerps_shorter_arc_when_dot_negative() {
+        use voltex_math::Vec3;
+        // Two unit quats representing the same physical rotation (q and -q):
+        // a 180° flip in sign should not produce a 360° rotation on slerp.
+        let qa = Quat::from_axis_angle(Vec3::new(0.0, 1.0, 0.0), 0.0); // identity
+        let qb_pos = Quat::from_axis_angle(Vec3::new(0.0, 1.0, 0.0), 0.4);
+        let qb_neg = Quat::new(-qb_pos.x, -qb_pos.y, -qb_pos.z, -qb_pos.w);
+
         let mut buf = InterpolationBuffer::new(0.1);
-        buf.push(0.0, make_full_snapshot(0, [0.0; 3], [6.1, 6.1, 6.1], [0.0; 3]));
-        buf.push(1.0, make_full_snapshot(10, [0.0; 3], [0.17, 0.17, 0.17], [0.0; 3]));
+        buf.push(0.0, make_full_snapshot(0, [0.0; 3], [qa.x, qa.y, qa.z, qa.w], [0.0; 3]));
+        buf.push(1.0, make_full_snapshot(10, [0.0; 3], [qb_neg.x, qb_neg.y, qb_neg.z, qb_neg.w], [0.0; 3]));
 
         let result = buf.interpolate(0.5).expect("should interpolate");
-        let rot = result.entities[0].rotation;
-
-        // diff = wrap(0.17 - 6.1) = wrap(-5.93) -> ~0.353; midpoint = 6.1 + 0.353*0.5 = ~6.2765
-        // Normalize to the circle and confirm it is near 0 / 2π, NOT near PI.
-        for (i, &r) in rot.iter().enumerate() {
-            let norm = r.rem_euclid(2.0 * PI); // in [0, 2π)
-            let dist_to_zero = norm.min(2.0 * PI - norm); // angular distance to 0
-            assert!(
-                dist_to_zero < 0.05,
-                "component {i}: expected midpoint near 0/2π (shortest arc), got {r} (norm {norm}, dist {dist_to_zero})",
-            );
-            // And explicitly NOT the naive long-way result near PI.
-            assert!(
-                (norm - PI).abs() > 1.0,
-                "component {i}: result {norm} is near PI — naive lerp bug present",
-            );
-        }
+        let r = result.entities[0].rotation;
+        let q = Quat::new(r[0], r[1], r[2], r[3]);
+        // Midpoint should be near the half-rotation of the shorter arc
+        // (0.2 rad around Y), not 180° around an arbitrary axis.
+        let expected = Quat::from_axis_angle(Vec3::new(0.0, 1.0, 0.0), 0.2);
+        // Either sign is acceptable (q ≡ -q for rotations).
+        let matches = (q.x - expected.x).abs() < 1e-3
+            && (q.y - expected.y).abs() < 1e-3
+            && (q.z - expected.z).abs() < 1e-3
+            && (q.w - expected.w).abs() < 1e-3;
+        let matches_neg = (q.x + expected.x).abs() < 1e-3
+            && (q.y + expected.y).abs() < 1e-3
+            && (q.z + expected.z).abs() < 1e-3
+            && (q.w + expected.w).abs() < 1e-3;
+        assert!(matches || matches_neg, "slerp midpoint {q:?} ≠ ±{expected:?}");
     }
 
     #[test]
-    fn test_rotation_no_wrap_reduces_to_linear() {
-        // 0.0 -> 1.0 rad does not straddle the wrap boundary, so shortest-arc
-        // interpolation must match plain linear lerp: midpoint = 0.5.
+    fn rotation_slerp_at_endpoints_returns_endpoints() {
+        let qa = [0.0, 0.0, 0.0, 1.0];
+        let qb = [0.1, 0.2, 0.3, 0.9];
         let mut buf = InterpolationBuffer::new(0.1);
-        buf.push(0.0, make_full_snapshot(0, [0.0; 3], [0.0, 0.0, 0.0], [0.0; 3]));
-        buf.push(1.0, make_full_snapshot(10, [0.0; 3], [1.0, 1.0, 1.0], [0.0; 3]));
+        buf.push(0.0, make_full_snapshot(0, [0.0; 3], qa, [0.0; 3]));
+        buf.push(1.0, make_full_snapshot(10, [0.0; 3], qb, [0.0; 3]));
 
-        let result = buf.interpolate(0.5).expect("should interpolate");
-        for (i, &r) in result.entities[0].rotation.iter().enumerate() {
-            assert!(
-                (r - 0.5).abs() < 1e-5,
-                "component {i}: expected linear midpoint 0.5, got {r}",
-            );
+        let at_a = buf.interpolate(0.0).expect("interp");
+        for (i, &expected) in qa.iter().enumerate() {
+            assert!((at_a.entities[0].rotation[i] - expected).abs() < 1e-5);
         }
     }
 
@@ -310,11 +295,16 @@ mod tests {
         let mut buf = InterpolationBuffer::new(0.1);
         buf.push(
             0.0,
-            make_full_snapshot(0, [0.0, 0.0, 0.0], [0.0; 3], [0.0, 0.0, 0.0]),
+            make_full_snapshot(0, [0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 1.0], [0.0, 0.0, 0.0]),
         );
         buf.push(
             1.0,
-            make_full_snapshot(10, [10.0, 20.0, 30.0], [0.0; 3], [4.0, 8.0, 12.0]),
+            make_full_snapshot(
+                10,
+                [10.0, 20.0, 30.0],
+                [0.0, 0.0, 0.0, 1.0],
+                [4.0, 8.0, 12.0],
+            ),
         );
 
         let result = buf.interpolate(0.5).expect("should interpolate");

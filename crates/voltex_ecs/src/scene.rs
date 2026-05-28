@@ -8,7 +8,7 @@ use crate::json::{self, JsonVal};
 use crate::transform::Transform;
 use crate::world::World;
 use std::collections::HashMap;
-use voltex_math::Vec3;
+use voltex_math::{Quat, Vec3};
 
 /// String tag for entity identification.
 #[derive(Debug, Clone)]
@@ -26,20 +26,45 @@ fn parse_vec3(s: &str) -> Option<Vec3> {
     Some(Vec3::new(x, y, z))
 }
 
-/// Parse a transform line of the form "px py pz | rx ry rz | sx sy sz".
+/// Parse a transform line of the form
+/// "px py pz | qx qy qz qw | sx sy sz" (current quaternion layout) or
+/// "px py pz | rx ry rz       | sx sy sz" (legacy Euler YXZ, accepted for
+/// backward-compatible `.vscn` loading).
 fn parse_transform(s: &str) -> Option<Transform> {
     let parts: Vec<&str> = s.splitn(3, '|').collect();
     if parts.len() != 3 {
         return None;
     }
     let position = parse_vec3(parts[0].trim())?;
-    let rotation = parse_vec3(parts[1].trim())?;
+    let rotation = parse_rotation(parts[1].trim())?;
     let scale = parse_vec3(parts[2].trim())?;
     Some(Transform {
         position,
         rotation,
         scale,
     })
+}
+
+/// Parse rotation as either a 4-float quaternion (current) or a 3-float
+/// YXZ Euler triple (legacy `.vscn` files).
+fn parse_rotation(s: &str) -> Option<Quat> {
+    let parts: Vec<&str> = s.split_whitespace().collect();
+    match parts.len() {
+        4 => {
+            let x = parts[0].parse::<f32>().ok()?;
+            let y = parts[1].parse::<f32>().ok()?;
+            let z = parts[2].parse::<f32>().ok()?;
+            let w = parts[3].parse::<f32>().ok()?;
+            Some(Quat::new(x, y, z, w))
+        }
+        3 => {
+            let x = parts[0].parse::<f32>().ok()?;
+            let y = parts[1].parse::<f32>().ok()?;
+            let z = parts[2].parse::<f32>().ok()?;
+            Some(Quat::from_euler_yxz(Vec3::new(x, y, z)))
+        }
+        _ => None,
+    }
 }
 
 /// Serialize all entities with a Transform component to the `.vscn` text format.
@@ -71,13 +96,13 @@ pub fn serialize_scene(world: &World) -> String {
         output.push('\n');
         output.push_str(&format!("entity {}\n", local_idx));
 
-        // Transform line
+        // Transform line — quaternion (4 floats) since E3b.
         let p = transform.position;
         let r = transform.rotation;
         let s = transform.scale;
         output.push_str(&format!(
-            "  transform {} {} {} | {} {} {} | {} {} {}\n",
-            p.x, p.y, p.z, r.x, r.y, r.z, s.x, s.y, s.z
+            "  transform {} {} {} | {} {} {} {} | {} {} {}\n",
+            p.x, p.y, p.z, r.x, r.y, r.z, r.w, s.x, s.y, s.z
         ));
 
         // Parent line (if entity has a Parent)
@@ -382,7 +407,7 @@ mod tests {
     use super::*;
     use crate::component_registry::ComponentRegistry;
     use crate::hierarchy::{add_child, roots, Parent};
-    use voltex_math::Vec3;
+    use voltex_math::{Quat, Vec3};
 
     #[test]
     fn test_serialize_single_entity() {
@@ -392,7 +417,7 @@ mod tests {
             e,
             Transform {
                 position: Vec3::new(1.0, 2.0, 3.0),
-                rotation: Vec3::ZERO,
+                rotation: Quat::IDENTITY,
                 scale: Vec3::ONE,
             },
         );
@@ -428,11 +453,12 @@ mod tests {
 
         // Entity 0: sun (root)
         let sun = world1.spawn();
+        let sun_rot = Quat::from_axis_angle(Vec3::new(0.0, 1.0, 0.0), 0.5);
         world1.add(
             sun,
             Transform {
                 position: Vec3::new(1.0, 2.0, 3.0),
-                rotation: Vec3::new(0.0, 0.5, 0.0),
+                rotation: sun_rot,
                 scale: Vec3::ONE,
             },
         );
@@ -444,7 +470,7 @@ mod tests {
             planet,
             Transform {
                 position: Vec3::new(5.0, 0.0, 0.0),
-                rotation: Vec3::ZERO,
+                rotation: Quat::IDENTITY,
                 scale: Vec3::new(0.5, 0.5, 0.5),
             },
         );
@@ -477,9 +503,13 @@ mod tests {
             (sun_transform.position.z - 3.0).abs() < 1e-4,
             "sun position.z"
         );
+        // Quaternion components round-trip exactly through the text format.
         assert!(
-            (sun_transform.rotation.y - 0.5).abs() < 1e-4,
-            "sun rotation.y"
+            (sun_transform.rotation.x - sun_rot.x).abs() < 1e-4
+                && (sun_transform.rotation.y - sun_rot.y).abs() < 1e-4
+                && (sun_transform.rotation.z - sun_rot.z).abs() < 1e-4
+                && (sun_transform.rotation.w - sun_rot.w).abs() < 1e-4,
+            "sun rotation round-trip"
         );
 
         let planet_transform = world2
@@ -602,6 +632,30 @@ entity 2
         let mut world2 = World::new();
         let entities = deserialize_scene_json(&mut world2, &json, &registry).unwrap();
         assert_eq!(entities.len(), 5);
+    }
+
+    #[test]
+    fn parse_rotation_accepts_legacy_3_float_euler() {
+        // Files written before the E3b migration had a 3-float Euler payload.
+        // The parser must still consume them and produce the equivalent quat.
+        let q = super::parse_rotation("0.3 0.7 -0.4").expect("parsed");
+        let expected = Quat::from_euler_yxz(Vec3::new(0.3, 0.7, -0.4));
+        assert!((q.x - expected.x).abs() < 1e-6);
+        assert!((q.y - expected.y).abs() < 1e-6);
+        assert!((q.z - expected.z).abs() < 1e-6);
+        assert!((q.w - expected.w).abs() < 1e-6);
+    }
+
+    #[test]
+    fn parse_rotation_accepts_4_float_quaternion() {
+        let q = super::parse_rotation("0.1 0.2 0.3 0.9").expect("parsed");
+        assert_eq!((q.x, q.y, q.z, q.w), (0.1, 0.2, 0.3, 0.9));
+    }
+
+    #[test]
+    fn parse_rotation_rejects_other_arities() {
+        assert!(super::parse_rotation("1 2").is_none());
+        assert!(super::parse_rotation("1 2 3 4 5").is_none());
     }
 
     // ── adversarial / robustness tests ───────────────────────────────

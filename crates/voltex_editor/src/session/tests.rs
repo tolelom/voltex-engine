@@ -1,5 +1,5 @@
 use super::*;
-use voltex_math::Vec3;
+use voltex_math::{Quat, Vec3};
 
 fn temp_path(name: &str) -> String {
     std::env::temp_dir()
@@ -37,7 +37,7 @@ fn dispatch_appends_to_log() {
         .dispatch(EditorCommand::SetTransform {
             entity: e,
             position: Vec3::new(1.0, 2.0, 3.0),
-            rotation: Vec3::ZERO,
+            rotation: Quat::IDENTITY,
             scale: Vec3::new(1.0, 1.0, 1.0),
         })
         .unwrap();
@@ -78,7 +78,7 @@ fn undo_set_transform_restores_previous_values() {
         .dispatch(EditorCommand::SetTransform {
             entity: e,
             position: Vec3::new(5.0, 6.0, 7.0),
-            rotation: Vec3::ZERO,
+            rotation: Quat::IDENTITY,
             scale: Vec3::new(2.0, 2.0, 2.0),
         })
         .unwrap();
@@ -226,7 +226,7 @@ fn set_mode_play_to_edit_restores_world_state() {
     session.dispatch(EditorCommand::SetTransform {
         entity: e,
         position: Vec3::new(10.0, 0.0, 0.0),
-        rotation: Vec3::ZERO,
+        rotation: Quat::IDENTITY,
         scale: Vec3::new(1.0, 1.0, 1.0),
     }).unwrap();
 
@@ -456,7 +456,7 @@ fn multi_step_undo_redo_walks_both_ways() {
         .dispatch(EditorCommand::SetTransform {
             entity: e,
             position: Vec3::new(1.0, 0.0, 0.0),
-            rotation: Vec3::ZERO,
+            rotation: Quat::IDENTITY,
             scale: Vec3::new(1.0, 1.0, 1.0),
         })
         .unwrap();
@@ -464,7 +464,7 @@ fn multi_step_undo_redo_walks_both_ways() {
         .dispatch(EditorCommand::SetTransform {
             entity: e,
             position: Vec3::new(2.0, 0.0, 0.0),
-            rotation: Vec3::ZERO,
+            rotation: Quat::IDENTITY,
             scale: Vec3::new(1.0, 1.0, 1.0),
         })
         .unwrap();

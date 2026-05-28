@@ -211,10 +211,19 @@ mod tests {
 
         for e in cubes {
             let t = world.get::<Transform>(e).unwrap();
+            // After 3 ticks of dt=0.1 the script accumulated yaw=0.3 rad via
+            // get_rotation/set_rotation. Since E3b the Lua API still talks
+            // YXZ Euler, but the stored value is a quaternion — compare in
+            // quat space to avoid relying on the Vec3-style field meaning.
+            let expected =
+                voltex_math::Quat::from_euler_yxz(Vec3::new(0.0, 0.3, 0.0));
             assert!(
-                (t.rotation.y - 0.3).abs() < 1e-5,
-                "expected rotation.y ≈ 0.3, got {}",
-                t.rotation.y
+                (t.rotation.x - expected.x).abs() < 1e-5
+                    && (t.rotation.y - expected.y).abs() < 1e-5
+                    && (t.rotation.z - expected.z).abs() < 1e-5
+                    && (t.rotation.w - expected.w).abs() < 1e-5,
+                "expected rotation ≈ from_euler(0, 0.3, 0), got {:?}",
+                t.rotation
             );
         }
     }

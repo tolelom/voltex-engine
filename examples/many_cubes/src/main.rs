@@ -1,5 +1,5 @@
 use voltex_ecs::{Transform, World};
-use voltex_math::Vec3;
+use voltex_math::{Quat, Vec3};
 use voltex_platform::{GameTimer, InputState, VoltexWindow, WindowConfig};
 use voltex_renderer::{
     obj, pipeline, Camera, CameraUniform, FpsController, GpuContext, GpuTexture, LightUniform, Mesh,
@@ -311,7 +311,10 @@ impl ApplicationHandler for ManyCubesApp {
                     uniform.camera_pos = cam_pos;
 
                     let mut t = **transform;
-                    t.rotation.y = state.time * 0.5 + t.position.x * 0.1 + t.position.z * 0.1;
+                    // Set absolute Y rotation per cube — build a pure-Y quat.
+                    let angle =
+                        state.time * 0.5 + t.position.x * 0.1 + t.position.z * 0.1;
+                    t.rotation = Quat::from_axis_angle(Vec3::new(0.0, 1.0, 0.0), angle);
                     uniform.model = t.matrix().cols;
 
                     let bytes = bytemuck::bytes_of(&uniform);

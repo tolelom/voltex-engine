@@ -33,15 +33,15 @@ cargo test --workspace
 
 ```
 L0 (no voltex deps):
-  voltex_math       — Vec/Mat/AABB/Ray
+  voltex_math       — Vec/Mat/Quat/AABB/Ray
   voltex_asset      — Handle, AssetStorage, AssetLoader, FileWatcher
-  voltex_net        — UDP, Packet, Reliable, Snapshot, Interpolation
   voltex_image      — PNG/JPG/glTF/OBJ/JSON 디코더 + PNG 인코더 + MeshVertex (GPU 무의존)
 
 L1 (depends on math only):
   voltex_platform   → voltex_math   (winit window/input/timer)
   voltex_ecs        → voltex_math, voltex_asset   (World, Entity, Component, Scheduler, Handle 컴포넌트)
   voltex_audio      → voltex_math   (WAV/OGG, WASAPI, 3D, mixer)
+  voltex_net        → voltex_math   (UDP, Packet, Reliable, Snapshot quat slerp, Interpolation)
 
 L2:
   voltex_ai         → voltex_math, voltex_ecs        (NavMesh, A*, steering)

@@ -20,7 +20,7 @@ use voltex_editor::{
 };
 use voltex_ecs::entity::Entity;
 use voltex_ecs::{Bounds, MaterialHandle, MeshHandle};
-use voltex_math::{Vec3, AABB};
+use voltex_math::{Quat, Vec3, AABB};
 use voltex_physics::{physics_step, Collider, PhysicsConfig, RigidBody};
 
 struct EditorDemoApp {
@@ -185,7 +185,7 @@ impl ApplicationHandler for EditorDemoApp {
             session.dispatch(EditorCommand::SetTransform {
                 entity: e,
                 position: pos,
-                rotation: Vec3::ZERO,
+                rotation: Quat::IDENTITY,
                 scale: Vec3::new(1.0, 1.0, 1.0),
             }).unwrap();
             session.dispatch(EditorCommand::SetTag {
@@ -411,7 +411,7 @@ impl ApplicationHandler for EditorDemoApp {
                             let _ = state.session.dispatch(EditorCommand::SetTransform {
                                 entity: e,
                                 position: Vec3::new(0.0, 0.5, 0.0),
-                                rotation: Vec3::ZERO,
+                                rotation: Quat::IDENTITY,
                                 scale: Vec3::new(1.0, 1.0, 1.0),
                             });
                             state.session.world.add(e, MeshHandle(state.cube_mesh_h.0));

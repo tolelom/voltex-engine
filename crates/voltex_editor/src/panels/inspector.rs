@@ -8,8 +8,8 @@ use crate::command::EditorCommand;
 use crate::session::EditorSession;
 use crate::ui_context::UiContext;
 use voltex_ecs::scene::Tag;
-use voltex_ecs::Transform;
-use voltex_math::Vec3;
+use voltex_ecs::{Entity, Transform};
+use voltex_math::{Quat, Vec3};
 
 const EPSILON: f32 = 1e-4;
 
@@ -28,34 +28,70 @@ const ADD_COMPONENT_BUTTONS: [AddComponentSpec; 6] = [
     AddComponentSpec { name: "script" },
 ];
 
-/// Persistent buffers for the inspector's text inputs. The inspector is stateless
-/// across frames except for these strings (the source of truth is the World).
-#[derive(Default)]
+/// Persistent buffers for the inspector's text inputs and Euler rotation
+/// proxy. The Inspector itself is stateless across frames except for these
+/// fields (the source of truth is the World); the Euler buffer exists only
+/// to keep rotation sliders smooth — round-tripping `Quat → Euler → Quat`
+/// every frame would jitter and lose info near gimbal lock.
 pub struct InspectorState {
     /// Current contents of the tag text input.
     pub tag: String,
-    /// Entity whose state populated the text inputs (used to reset on selection change).
-    pub last_entity_id: Option<u32>,
+    /// Cached Euler triple (YXZ, radians) for the currently selected entity.
+    /// Re-extracted from `Transform.rotation` only when selection changes
+    /// or the world's quaternion drifts away from `last_quat`.
+    pub euler: Vec3,
+    /// The quaternion `euler` was derived from. Used to detect external
+    /// changes (e.g. gizmo, undo, physics in Play mode) that should refresh
+    /// the proxy without nuking an in-progress slider drag.
+    pub last_quat: Quat,
+    /// Entity whose state populated the buffers (used to reset on selection change).
+    pub last_entity: Option<Entity>,
+}
+
+impl Default for InspectorState {
+    fn default() -> Self {
+        Self {
+            tag: String::new(),
+            euler: Vec3::ZERO,
+            last_quat: Quat::IDENTITY,
+            last_entity: None,
+        }
+    }
 }
 
 impl InspectorState {
-    /// Refresh the buffers from the world if the selected entity changed since
-    /// last frame. Idempotent if selection is stable.
+    /// Refresh the buffers from the world if the selected entity changed
+    /// since last frame, or if an external write moved the rotation
+    /// quaternion away from what the Euler proxy currently represents.
     fn sync_from(&mut self, session: &EditorSession) {
         let Some(entity) = session.selected else {
-            self.last_entity_id = None;
+            self.last_entity = None;
             self.tag.clear();
             return;
         };
-        if self.last_entity_id == Some(entity.id) {
-            return;
+
+        let entity_changed = self.last_entity != Some(entity);
+        if entity_changed {
+            self.last_entity = Some(entity);
+            self.tag = session
+                .world
+                .get::<Tag>(entity)
+                .map(|t| t.0.clone())
+                .unwrap_or_default();
         }
-        self.last_entity_id = Some(entity.id);
-        self.tag = session
-            .world
-            .get::<Tag>(entity)
-            .map(|t| t.0.clone())
-            .unwrap_or_default();
+
+        // Refresh Euler from quat when (a) selection just changed, or
+        // (b) the world's quat no longer matches the one we derived from.
+        if let Some(t) = session.world.get::<Transform>(entity) {
+            let drifted = (t.rotation.x - self.last_quat.x).abs() > 1e-5
+                || (t.rotation.y - self.last_quat.y).abs() > 1e-5
+                || (t.rotation.z - self.last_quat.z).abs() > 1e-5
+                || (t.rotation.w - self.last_quat.w).abs() > 1e-5;
+            if entity_changed || drifted {
+                self.euler = t.rotation.to_euler_yxz();
+                self.last_quat = t.rotation;
+            }
+        }
     }
 }
 
@@ -89,7 +125,9 @@ pub fn inspector_panel(
     // ── Transform (sliders, dispatched as SetTransform on change) ──
     if let Some(t) = session.world.get::<Transform>(entity) {
         let (px, py, pz) = (t.position.x, t.position.y, t.position.z);
-        let (rx, ry, rz) = (t.rotation.x, t.rotation.y, t.rotation.z);
+        // Use the Euler buffer for rotation sliders — see InspectorState
+        // docs for why we don't extract from the quat every frame.
+        let (rx, ry, rz) = (state.euler.x, state.euler.y, state.euler.z);
         let (sx, sy, sz) = (t.scale.x, t.scale.y, t.scale.z);
 
         ui.text("-- Transform --");
@@ -107,10 +145,16 @@ pub fn inspector_panel(
         let rotated = changed(rx, new_rx) || changed(ry, new_ry) || changed(rz, new_rz);
         let scaled = changed(sx, new_sx) || changed(sy, new_sy) || changed(sz, new_sz);
         if moved || rotated || scaled {
+            let new_euler = Vec3::new(new_rx, new_ry, new_rz);
+            let new_quat = Quat::from_euler_yxz(new_euler);
+            // Update the proxy in lockstep so sync_from doesn't re-extract
+            // immediately and undo the slider change.
+            state.euler = new_euler;
+            state.last_quat = new_quat;
             let _ = session.dispatch(EditorCommand::SetTransform {
                 entity,
                 position: Vec3::new(new_px, new_py, new_pz),
-                rotation: Vec3::new(new_rx, new_ry, new_rz),
+                rotation: new_quat,
                 scale: Vec3::new(new_sx, new_sy, new_sz),
             });
         }

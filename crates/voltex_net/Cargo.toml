@@ -6,3 +6,4 @@ license.workspace = true
 
 [dependencies]
 thiserror = { workspace = true }
+voltex_math = { path = "../voltex_math" }

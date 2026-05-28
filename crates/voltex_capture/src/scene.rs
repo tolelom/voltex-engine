@@ -4,7 +4,7 @@
 //! frame isn't blank.
 
 use voltex_ecs::{Bounds, MaterialHandle, MeshHandle, Transform, World};
-use voltex_math::{Mat4, Vec3, AABB};
+use voltex_math::{Mat4, Quat, Vec3, AABB};
 use voltex_renderer::{
     create_pbr_full_texture_bind_group, create_pbr_pipeline, generate_sphere,
     pbr_full_texture_bind_group_layout, Camera, CameraUniform, GpuTexture, IblResources, LightData,
@@ -143,8 +143,7 @@ pub fn render_single_cube(gpu: &HeadlessGpu, width: u32, height: u32) -> Vec<u8>
     let mut world = World::new();
     let e = world.spawn();
     let mut t = Transform::from_position(Vec3::ZERO);
-    t.rotation.y = 0.6;
-    t.rotation.x = 0.3;
+    t.rotation = Quat::from_euler_yxz(Vec3::new(0.3, 0.6, 0.0));
     world.add(e, t);
     world.add(e, MeshHandle(mesh_h.0));
     world.add(e, MaterialHandle(mat_h.0));

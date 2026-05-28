@@ -18,7 +18,7 @@ use crate::ffi;
 use crate::state::LuaState;
 use voltex_ecs::World;
 use voltex_ecs::Transform;
-use voltex_math::Vec3;
+use voltex_math::{Quat, Vec3};
 use std::os::raw::c_int;
 
 /// Register engine API functions into the Lua state.
@@ -178,7 +178,9 @@ unsafe extern "C" fn lua_set_rotation(L: *mut ffi::lua_State) -> c_int {
         return 0;
     }
     if let Some(t) = world.get_mut::<Transform>(entity) {
-        t.rotation = Vec3::new(x, y, z);
+        // Lua continues to expose Euler (YXZ radians) — convert at the FFI
+        // boundary so existing scripts stay portable across the E3b change.
+        t.rotation = Quat::from_euler_yxz(Vec3::new(x, y, z));
     }
     0
 }
@@ -191,9 +193,12 @@ unsafe extern "C" fn lua_get_rotation(L: *mut ffi::lua_State) -> c_int {
         return 0;
     }
     if let Some(t) = world.get::<Transform>(entity) {
-        ffi::lua_pushnumber(L, t.rotation.x as f64);
-        ffi::lua_pushnumber(L, t.rotation.y as f64);
-        ffi::lua_pushnumber(L, t.rotation.z as f64);
+        // Decompose the unit quat into the YXZ Euler triple. Gimbal-lock
+        // ambiguity collapses (y, z) → (0, z') — matches the Inspector.
+        let e = t.rotation.to_euler_yxz();
+        ffi::lua_pushnumber(L, e.x as f64);
+        ffi::lua_pushnumber(L, e.y as f64);
+        ffi::lua_pushnumber(L, e.z as f64);
         3
     } else {
         0

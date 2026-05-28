@@ -335,9 +335,15 @@ impl ApplicationHandler for HierarchyDemoApp {
                 state.time += dt;
 
                 // ---- Animate: rotate each body around Y ----
+                // Apply a quat delta (axis-angle around +Y) instead of mutating
+                // an Euler-Y component — Transform.rotation became Quat in E3b.
                 for body in &state.bodies {
                     if let Some(t) = state.world.get_mut::<Transform>(body.entity) {
-                        t.rotation.y += dt * body.speed;
+                        let dq = Quat::from_axis_angle(
+                            Vec3::new(0.0, 1.0, 0.0),
+                            dt * body.speed,
+                        );
+                        t.rotation = (dq * t.rotation).normalize();
                     }
                 }
 

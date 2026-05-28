@@ -14,7 +14,7 @@ use std::fs::OpenOptions;
 use std::io::Write;
 use voltex_ecs::scene::Tag;
 use voltex_ecs::{ComponentRegistry, Entity, Transform, World};
-use voltex_math::Vec3;
+use voltex_math::{Quat, Vec3};
 
 /// Editor mode: Edit allows mutation, Play freezes the user-facing dispatch
 /// and lets systems (physics, scripts) drive the World instead.
@@ -37,7 +37,7 @@ enum Inverse {
     SetTransform {
         entity: Entity,
         position: Vec3,
-        rotation: Vec3,
+        rotation: Quat,
         scale: Vec3,
     },
     /// Undo SetTag: restore the previous Tag (or remove if there was none).

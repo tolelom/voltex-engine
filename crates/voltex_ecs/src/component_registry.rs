@@ -127,14 +127,16 @@ impl Default for ComponentRegistry {
     }
 }
 
-// ── Transform: 9 f32s in little-endian (pos.xyz, rot.xyz, scale.xyz) ─
+// ── Transform: 10 f32s LE (pos.xyz, rot quat xyzw, scale.xyz). ──
+// Legacy 9-f32 layout (pos.xyz, rot Euler xyz, scale.xyz) is still accepted
+// on read so existing .vscn files keep loading after the E3b migration.
 
 impl Component for crate::Transform {
     const NAME: &'static str = "transform";
 
     fn serialize(world: &World, entity: Entity) -> Option<Vec<u8>> {
         let t = world.get::<crate::Transform>(entity)?;
-        let mut data = Vec::with_capacity(36);
+        let mut data = Vec::with_capacity(40);
         for &v in &[
             t.position.x,
             t.position.y,
@@ -142,6 +144,7 @@ impl Component for crate::Transform {
             t.rotation.x,
             t.rotation.y,
             t.rotation.z,
+            t.rotation.w,
             t.scale.x,
             t.scale.y,
             t.scale.z,
@@ -152,28 +155,40 @@ impl Component for crate::Transform {
     }
 
     fn deserialize(world: &mut World, entity: Entity, data: &[u8]) -> crate::Result<()> {
-        if data.len() < 36 {
-            return Err("Transform data too short".into());
-        }
         let f = |off: usize| {
             f32::from_le_bytes([data[off], data[off + 1], data[off + 2], data[off + 3]])
         };
-        let t = crate::Transform {
-            position: voltex_math::Vec3::new(f(0), f(4), f(8)),
-            rotation: voltex_math::Vec3::new(f(12), f(16), f(20)),
-            scale: voltex_math::Vec3::new(f(24), f(28), f(32)),
+        let t = if data.len() >= 40 {
+            // Current quaternion layout.
+            crate::Transform {
+                position: voltex_math::Vec3::new(f(0), f(4), f(8)),
+                rotation: voltex_math::Quat::new(f(12), f(16), f(20), f(24)),
+                scale: voltex_math::Vec3::new(f(28), f(32), f(36)),
+            }
+        } else if data.len() >= 36 {
+            // Legacy Euler layout — convert to quaternion using the same
+            // YXZ Tait-Bryan order Transform::matrix() used to build.
+            let euler = voltex_math::Vec3::new(f(12), f(16), f(20));
+            crate::Transform {
+                position: voltex_math::Vec3::new(f(0), f(4), f(8)),
+                rotation: voltex_math::Quat::from_euler_yxz(euler),
+                scale: voltex_math::Vec3::new(f(24), f(28), f(32)),
+            }
+        } else {
+            return Err("Transform data too short".into());
         };
         world.add(entity, t);
         Ok(())
     }
 
-    /// Default Transform = identity (pos/rot zero, scale = 1).
+    /// Default Transform = identity (zero pos, identity quat, unit scale).
     fn default_bytes() -> Vec<u8> {
-        let mut out = Vec::with_capacity(36);
+        let mut out = Vec::with_capacity(40);
         // position (3 × f32 = 0)
         out.extend_from_slice(&[0u8; 12]);
-        // rotation (3 × f32 = 0)
+        // rotation quat = (0, 0, 0, 1)
         out.extend_from_slice(&[0u8; 12]);
+        out.extend_from_slice(&1.0f32.to_le_bytes());
         // scale (3 × f32 = 1)
         for _ in 0..3 {
             out.extend_from_slice(&1.0f32.to_le_bytes());
@@ -209,7 +224,7 @@ impl Component for crate::scene::Tag {
 mod tests {
     use super::*;
     use crate::{Transform, World};
-    use voltex_math::Vec3;
+    use voltex_math::{Quat, Vec3};
 
     #[test]
     fn test_register_and_find() {
@@ -255,7 +270,7 @@ mod tests {
         let entry = registry.find("transform").unwrap();
         let data = (entry.serialize)(&world, e);
         assert!(data.is_some());
-        assert_eq!(data.unwrap().len(), 36); // 9 f32s * 4 bytes
+        assert_eq!(data.unwrap().len(), 40); // 10 f32s * 4 bytes (pos3 + quat4 + scale3)
     }
 
     #[test]
@@ -276,11 +291,12 @@ mod tests {
         registry.register_defaults();
         let mut world = World::new();
         let e = world.spawn();
+        let q = Quat::from_axis_angle(Vec3::new(0.0, 1.0, 0.0), 1.2);
         world.add(
             e,
             Transform {
                 position: Vec3::new(1.0, 2.0, 3.0),
-                rotation: Vec3::new(0.1, 0.2, 0.3),
+                rotation: q,
                 scale: Vec3::new(4.0, 5.0, 6.0),
             },
         );
@@ -296,8 +312,38 @@ mod tests {
         assert!((t.position.x - 1.0).abs() < 1e-6);
         assert!((t.position.y - 2.0).abs() < 1e-6);
         assert!((t.position.z - 3.0).abs() < 1e-6);
-        assert!((t.rotation.x - 0.1).abs() < 1e-6);
+        assert!((t.rotation.x - q.x).abs() < 1e-6);
+        assert!((t.rotation.y - q.y).abs() < 1e-6);
+        assert!((t.rotation.w - q.w).abs() < 1e-6);
         assert!((t.scale.x - 4.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn legacy_36_byte_euler_payload_is_converted_to_quat() {
+        // .vscn files written before the E3b migration store rotation as
+        // a 3-float Euler triple. The deserializer must still accept that
+        // wire format and produce an equivalent quaternion via YXZ.
+        let mut data = Vec::with_capacity(36);
+        for v in [
+            // position
+            1.0f32, 2.0, 3.0,
+            // euler (YXZ)
+            0.3, 0.7, -0.4,
+            // scale
+            4.0, 5.0, 6.0,
+        ] {
+            data.extend_from_slice(&v.to_le_bytes());
+        }
+        let mut world = World::new();
+        let e = world.spawn();
+        <Transform as Component>::deserialize(&mut world, e, &data).unwrap();
+        let t = world.get::<Transform>(e).unwrap();
+        let expected = Quat::from_euler_yxz(Vec3::new(0.3, 0.7, -0.4));
+        assert!((t.rotation.x - expected.x).abs() < 1e-6);
+        assert!((t.rotation.y - expected.y).abs() < 1e-6);
+        assert!((t.rotation.z - expected.z).abs() < 1e-6);
+        assert!((t.rotation.w - expected.w).abs() < 1e-6);
+        assert_eq!(t.scale, Vec3::new(4.0, 5.0, 6.0));
     }
 
     #[test]
@@ -383,7 +429,7 @@ mod tests {
     #[test]
     fn default_bytes_roundtrip_transform() {
         let bytes = <crate::Transform as Component>::default_bytes();
-        assert_eq!(bytes.len(), 36);
+        assert_eq!(bytes.len(), 40);
         let mut world = World::new();
         let e = world.spawn();
         <crate::Transform as Component>::deserialize(&mut world, e, &bytes).unwrap();
@@ -392,7 +438,7 @@ mod tests {
         // produces a usable identity transform, not a degenerate (scale = 0) one.
         assert_eq!(t.scale, Vec3::new(1.0, 1.0, 1.0));
         assert_eq!(t.position, Vec3::ZERO);
-        assert_eq!(t.rotation, Vec3::ZERO);
+        assert_eq!(t.rotation, Quat::IDENTITY);
     }
 
     #[test]
@@ -433,7 +479,7 @@ mod tests {
         registry.register_defaults();
         let entry = registry.find("transform").unwrap();
         let bytes = (entry.default_bytes)();
-        assert_eq!(bytes.len(), 36);
+        assert_eq!(bytes.len(), 40);
     }
 
     #[test]

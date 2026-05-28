@@ -3,7 +3,7 @@
 //! line guideline.
 
 use super::*;
-use voltex_math::Vec3;
+use voltex_math::{Quat, Vec3};
 
 fn temp_path(name: &str) -> String {
     std::env::temp_dir()
@@ -75,7 +75,7 @@ fn despawn_undo_restores_entity_and_components() {
         .dispatch(EditorCommand::SetTransform {
             entity: e,
             position: Vec3::new(5.0, 6.0, 7.0),
-            rotation: Vec3::ZERO,
+            rotation: Quat::IDENTITY,
             scale: Vec3::new(2.0, 2.0, 2.0),
         })
         .unwrap();

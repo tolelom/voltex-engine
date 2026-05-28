@@ -121,7 +121,9 @@ fn register_orbit_system(app: &mut RuntimeApp) {
         }
         for (e, delta) in updates {
             if let Some(t) = world.get_mut::<Transform>(e) {
-                t.rotation.y += delta;
+                // Quat-based Y rotation accumulation (E3b).
+                let dq = Quat::from_axis_angle(Vec3::new(0.0, 1.0, 0.0), delta);
+                t.rotation = (dq * t.rotation).normalize();
             }
         }
     });

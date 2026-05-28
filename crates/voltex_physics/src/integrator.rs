@@ -66,16 +66,19 @@ pub fn inv_inertia(inertia: Vec3) -> Vec3 {
 }
 
 /// Advances every `(Transform, RigidBody)` entity by one `config.fixed_dt`
-/// step using semi-implicit Euler (linear + angular). Static bodies skipped.
+/// step using semi-implicit Euler for linear motion and quaternion-correct
+/// `dq/dt = ½ ω q` for angular motion. Static bodies skipped.
 pub fn integrate(world: &mut World, config: &PhysicsConfig) {
     // 1. Collect linear + angular updates
-    let updates: Vec<(voltex_ecs::Entity, Vec3, Vec3, Vec3)> = world
+    let updates: Vec<(voltex_ecs::Entity, Vec3, Vec3, voltex_math::Quat)> = world
         .query2::<Transform, RigidBody>()
         .filter(|(_, _, rb)| !rb.is_static() && !rb.is_sleeping)
         .map(|(entity, transform, rb)| {
             let new_velocity = rb.velocity + config.gravity * rb.gravity_scale * config.fixed_dt;
             let new_position = transform.position + new_velocity * config.fixed_dt;
-            let new_rotation = transform.rotation + rb.angular_velocity * config.fixed_dt;
+            let new_rotation = transform
+                .rotation
+                .integrate(rb.angular_velocity, config.fixed_dt);
             (entity, new_velocity, new_position, new_rotation)
         })
         .collect();
@@ -240,8 +243,12 @@ mod tests {
         integrate(&mut world, &config);
 
         let t = world.get::<Transform>(e).unwrap();
-        let expected_rot_y = PI * config.fixed_dt;
-        assert!(approx(t.rotation.y, expected_rot_y));
+        // After 1/60 s at PI rad/s around Y, rotation ≈ π/60 around Y.
+        // A pure-Y axis-angle quaternion has y = sin(angle/2).
+        let expected_y = (PI * config.fixed_dt * 0.5).sin();
+        assert!(approx(t.rotation.y, expected_y), "y = {}", t.rotation.y);
+        assert!(approx(t.rotation.x, 0.0));
+        assert!(approx(t.rotation.z, 0.0));
         // Position should not change (no linear velocity, no gravity)
         assert!(approx(t.position.x, 0.0));
         assert!(approx(t.position.y, 0.0));
@@ -262,8 +269,18 @@ mod tests {
         integrate(&mut world, &config);
 
         let t = world.get::<Transform>(e).unwrap();
-        let expected_rot_x = 2.0 * config.fixed_dt;
-        assert!(approx(t.rotation.x, expected_rot_x));
+        // Two semi-implicit steps of ω = (1, 0, 0) rad/s. The composed
+        // rotation is approximately the X axis-angle quat of 2*dt.
+        let total_angle = 2.0 * config.fixed_dt;
+        let expected_x = (total_angle * 0.5).sin();
+        assert!(approx(t.rotation.x, expected_x), "x = {}", t.rotation.x);
+        // Quaternion stays unit-length under integration.
+        let len = (t.rotation.x.powi(2)
+            + t.rotation.y.powi(2)
+            + t.rotation.z.powi(2)
+            + t.rotation.w.powi(2))
+        .sqrt();
+        assert!((len - 1.0).abs() < 1e-5, "unit: {}", len);
     }
 
     // --- Sleep system tests ---
