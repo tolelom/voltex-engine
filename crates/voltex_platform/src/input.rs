@@ -110,10 +110,18 @@ impl InputState {
     }
 
     /// Apply a key event from winit. `pressed` is the new state.
+    ///
+    /// OS key-repeat delivers additional `Pressed` events while a key is
+    /// held; those must NOT re-fire the `just_pressed` edge — only the
+    /// true off→on transition does. A repeat on an already-held key
+    /// clears any stale `just_pressed` entry so `is_key_just_pressed`
+    /// stays a single-frame edge.
     pub fn process_key(&mut self, key: KeyCode, pressed: bool) {
         if pressed {
             if self.pressed.insert(key) {
                 self.just_pressed.insert(key);
+            } else {
+                self.just_pressed.remove(&key);
             }
         } else if self.pressed.remove(&key) {
             self.just_released.insert(key);
@@ -186,5 +194,60 @@ mod tests {
         assert_eq!(input.mouse_delta(), (0.0, 0.0), "begin_frame clears delta");
         input.process_mouse_move(115.0, 100.0); // delta (5, 0)
         assert!((input.mouse_delta().0 - 5.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn key_press_edge_then_held_then_release() {
+        let mut input = InputState::new();
+
+        // Press edge: both just_pressed and pressed are set.
+        input.process_key(KeyCode::KeyW, true);
+        assert!(input.is_key_just_pressed(KeyCode::KeyW), "press edge must set just_pressed");
+        assert!(input.is_key_pressed(KeyCode::KeyW), "press must set held state");
+        assert!(!input.is_key_just_released(KeyCode::KeyW));
+
+        // A second press event for an already-held key must NOT re-fire
+        // just_pressed (this is the high-value no-re-fire assertion), but
+        // the held state stays true.
+        input.process_key(KeyCode::KeyW, true);
+        assert!(!input.is_key_just_pressed(KeyCode::KeyW), "held key must not re-fire just_pressed");
+        assert!(input.is_key_pressed(KeyCode::KeyW), "held state must persist");
+
+        // Release edge: just_released set, held state cleared.
+        input.process_key(KeyCode::KeyW, false);
+        assert!(input.is_key_just_released(KeyCode::KeyW), "release edge must set just_released");
+        assert!(!input.is_key_pressed(KeyCode::KeyW), "release must clear held state");
+    }
+
+    #[test]
+    fn begin_frame_clears_just_sets_but_keeps_held() {
+        let mut input = InputState::new();
+        input.process_key(KeyCode::KeyW, true);
+        input.process_mouse_button(MouseButton::Left, true);
+        input.process_scroll(2.0);
+
+        input.begin_frame();
+
+        // just_* edges and scroll/delta accumulators are cleared.
+        assert!(!input.is_key_just_pressed(KeyCode::KeyW), "begin_frame clears just_pressed");
+        assert!(!input.is_mouse_button_just_pressed(MouseButton::Left), "begin_frame clears button just_pressed");
+        assert_eq!(input.mouse_scroll(), 0.0, "begin_frame clears scroll");
+        assert_eq!(input.mouse_delta(), (0.0, 0.0), "begin_frame clears delta");
+
+        // Held state survives a frame boundary.
+        assert!(input.is_key_pressed(KeyCode::KeyW), "begin_frame keeps held key");
+        assert!(input.is_mouse_button_pressed(MouseButton::Left), "begin_frame keeps held button");
+
+        // A release after begin_frame still produces a just_released edge.
+        input.process_key(KeyCode::KeyW, false);
+        assert!(input.is_key_just_released(KeyCode::KeyW), "release edge after begin_frame");
+    }
+
+    #[test]
+    fn scroll_accumulates_within_frame() {
+        let mut input = InputState::new();
+        input.process_scroll(1.0);
+        input.process_scroll(0.5);
+        assert!((input.mouse_scroll() - 1.5).abs() < 1e-9, "scroll must accumulate: got {}", input.mouse_scroll());
     }
 }
