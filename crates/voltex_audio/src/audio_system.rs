@@ -12,7 +12,7 @@ use crate::mix_group::{MixGroup, MixerState};
 // ---------------------------------------------------------------------------
 
 /// Commands sent to the audio thread.
-pub enum AudioCommand {
+pub(crate) enum AudioCommand {
     /// Start playing a clip.
     Play {
         /// Clip index into the system's clip list.

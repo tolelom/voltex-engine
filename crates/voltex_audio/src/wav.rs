@@ -224,7 +224,7 @@ pub fn generate_wav_bytes(samples_f32: &[f32], sample_rate: u32) -> Vec<u8> {
 
 /// Generate a minimal PCM 24-bit mono WAV file from f32 samples.
 /// Used for round-trip testing.
-pub fn generate_wav_bytes_24bit(samples_f32: &[f32], sample_rate: u32) -> Vec<u8> {
+pub(crate) fn generate_wav_bytes_24bit(samples_f32: &[f32], sample_rate: u32) -> Vec<u8> {
     let channels: u16 = 1;
     let bits_per_sample: u16 = 24;
     let byte_rate = sample_rate * channels as u32 * bits_per_sample as u32 / 8;
@@ -267,7 +267,7 @@ pub fn generate_wav_bytes_24bit(samples_f32: &[f32], sample_rate: u32) -> Vec<u8
 
 /// Generate a minimal IEEE float 32-bit mono WAV file from f32 samples.
 /// Used for round-trip testing.
-pub fn generate_wav_bytes_f32(samples_f32: &[f32], sample_rate: u32) -> Vec<u8> {
+pub(crate) fn generate_wav_bytes_f32(samples_f32: &[f32], sample_rate: u32) -> Vec<u8> {
     let channels: u16 = 1;
     let bits_per_sample: u16 = 32;
     let byte_rate = sample_rate * channels as u32 * bits_per_sample as u32 / 8;

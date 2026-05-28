@@ -11,30 +11,30 @@ use std::ffi::c_void;
 // Basic Windows types
 // ---------------------------------------------------------------------------
 
-pub type HRESULT = i32;
-pub type ULONG = u32;
-pub type DWORD = u32;
-pub type WORD = u16;
-pub type BOOL = i32;
-pub type UINT = u32;
-pub type UINT32 = u32;
-pub type BYTE = u8;
-pub type REFERENCE_TIME = i64;
-pub type HANDLE = *mut c_void;
-pub type LPVOID = *mut c_void;
-pub type LPCWSTR = *const u16;
+pub(crate) type HRESULT = i32;
+pub(crate) type ULONG = u32;
+pub(crate) type DWORD = u32;
+pub(crate) type WORD = u16;
+pub(crate) type BOOL = i32;
+pub(crate) type UINT = u32;
+pub(crate) type UINT32 = u32;
+pub(crate) type BYTE = u8;
+pub(crate) type REFERENCE_TIME = i64;
+pub(crate) type HANDLE = *mut c_void;
+pub(crate) type LPVOID = *mut c_void;
+pub(crate) type LPCWSTR = *const u16;
 
-pub const S_OK: HRESULT = 0;
-pub const AUDCLNT_SHAREMODE_SHARED: u32 = 0;
-pub const AUDCLNT_STREAMFLAGS_RATEADJUST: u32 = 0x00100000;
-pub const CLSCTX_ALL: DWORD = 0x17;
-pub const COINIT_APARTMENTTHREADED: DWORD = 0x2;
-pub const DEVICE_STATE_ACTIVE: DWORD = 0x1;
-pub const eRender: u32 = 0;
-pub const eConsole: u32 = 0;
-pub const WAVE_FORMAT_PCM: WORD = 1;
-pub const WAVE_FORMAT_IEEE_FLOAT: WORD = 3;
-pub const WAVE_FORMAT_EXTENSIBLE: WORD = 0xFFFE;
+pub(crate) const S_OK: HRESULT = 0;
+pub(crate) const AUDCLNT_SHAREMODE_SHARED: u32 = 0;
+pub(crate) const AUDCLNT_STREAMFLAGS_RATEADJUST: u32 = 0x00100000;
+pub(crate) const CLSCTX_ALL: DWORD = 0x17;
+pub(crate) const COINIT_APARTMENTTHREADED: DWORD = 0x2;
+pub(crate) const DEVICE_STATE_ACTIVE: DWORD = 0x1;
+pub(crate) const eRender: u32 = 0;
+pub(crate) const eConsole: u32 = 0;
+pub(crate) const WAVE_FORMAT_PCM: WORD = 1;
+pub(crate) const WAVE_FORMAT_IEEE_FLOAT: WORD = 3;
+pub(crate) const WAVE_FORMAT_EXTENSIBLE: WORD = 0xFFFE;
 
 // ---------------------------------------------------------------------------
 // GUID
@@ -42,7 +42,7 @@ pub const WAVE_FORMAT_EXTENSIBLE: WORD = 0xFFFE;
 
 #[repr(C)]
 #[derive(Clone, Copy)]
-pub struct GUID {
+pub(crate) struct GUID {
     pub Data1: u32,
     pub Data2: u16,
     pub Data3: u16,
@@ -50,7 +50,7 @@ pub struct GUID {
 }
 
 /// CLSID_MMDeviceEnumerator: {BCDE0395-E52F-467C-8E3D-C4579291692E}
-pub const CLSID_MMDeviceEnumerator: GUID = GUID {
+pub(crate) const CLSID_MMDeviceEnumerator: GUID = GUID {
     Data1: 0xBCDE0395,
     Data2: 0xE52F,
     Data3: 0x467C,
@@ -58,7 +58,7 @@ pub const CLSID_MMDeviceEnumerator: GUID = GUID {
 };
 
 /// IID_IMMDeviceEnumerator: {A95664D2-9614-4F35-A746-DE8DB63617E6}
-pub const IID_IMMDeviceEnumerator: GUID = GUID {
+pub(crate) const IID_IMMDeviceEnumerator: GUID = GUID {
     Data1: 0xA95664D2,
     Data2: 0x9614,
     Data3: 0x4F35,
@@ -66,7 +66,7 @@ pub const IID_IMMDeviceEnumerator: GUID = GUID {
 };
 
 /// IID_IAudioClient: {1CB9AD4C-DBFA-4c32-B178-C2F568A703B2}
-pub const IID_IAudioClient: GUID = GUID {
+pub(crate) const IID_IAudioClient: GUID = GUID {
     Data1: 0x1CB9AD4C,
     Data2: 0xDBFA,
     Data3: 0x4C32,
@@ -74,7 +74,7 @@ pub const IID_IAudioClient: GUID = GUID {
 };
 
 /// IID_IAudioRenderClient: {F294ACFC-3146-4483-A7BF-ADDCA7C260E2}
-pub const IID_IAudioRenderClient: GUID = GUID {
+pub(crate) const IID_IAudioRenderClient: GUID = GUID {
     Data1: 0xF294ACFC,
     Data2: 0x3146,
     Data3: 0x4483,
@@ -87,7 +87,7 @@ pub const IID_IAudioRenderClient: GUID = GUID {
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug)]
-pub struct WAVEFORMATEX {
+pub(crate) struct WAVEFORMATEX {
     pub wFormatTag: WORD,
     pub nChannels: WORD,
     pub nSamplesPerSec: DWORD,
@@ -103,7 +103,7 @@ pub struct WAVEFORMATEX {
 
 /// IUnknown vtable (base for all COM interfaces)
 #[repr(C)]
-pub struct IUnknownVtbl {
+pub(crate) struct IUnknownVtbl {
     pub QueryInterface: unsafe extern "system" fn(
         this: *mut c_void,
         riid: *const GUID,
@@ -115,7 +115,7 @@ pub struct IUnknownVtbl {
 
 /// IMMDeviceEnumerator vtable
 #[repr(C)]
-pub struct IMMDeviceEnumeratorVtbl {
+pub(crate) struct IMMDeviceEnumeratorVtbl {
     pub base: IUnknownVtbl,
     pub EnumAudioEndpoints: unsafe extern "system" fn(
         this: *mut c_void,
@@ -146,7 +146,7 @@ pub struct IMMDeviceEnumeratorVtbl {
 
 /// IMMDevice vtable
 #[repr(C)]
-pub struct IMMDeviceVtbl {
+pub(crate) struct IMMDeviceVtbl {
     pub base: IUnknownVtbl,
     pub Activate: unsafe extern "system" fn(
         this: *mut c_void,
@@ -172,7 +172,7 @@ pub struct IMMDeviceVtbl {
 
 /// IAudioClient vtable
 #[repr(C)]
-pub struct IAudioClientVtbl {
+pub(crate) struct IAudioClientVtbl {
     pub base: IUnknownVtbl,
     pub Initialize: unsafe extern "system" fn(
         this: *mut c_void,
@@ -226,7 +226,7 @@ pub struct IAudioClientVtbl {
 
 /// IAudioRenderClient vtable
 #[repr(C)]
-pub struct IAudioRenderClientVtbl {
+pub(crate) struct IAudioRenderClientVtbl {
     pub base: IUnknownVtbl,
     pub GetBuffer: unsafe extern "system" fn(
         this: *mut c_void,

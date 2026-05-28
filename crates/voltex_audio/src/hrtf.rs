@@ -8,7 +8,7 @@ const SPEED_OF_SOUND: f32 = 343.0;
 
 /// HRTF filter result for a sound at a given azimuth angle.
 #[derive(Debug, Clone, Copy)]
-pub struct HrtfResult {
+pub(crate) struct HrtfResult {
     /// ITD: delay for the left ear in samples.
     pub left_delay_samples: f32,
     /// ITD: delay for the right ear in samples.
@@ -21,7 +21,7 @@ pub struct HrtfResult {
 
 /// Calculate HRTF parameters from azimuth angle.
 /// azimuth: angle in radians, 0 = front, PI/2 = right, -PI/2 = left, PI = behind.
-pub fn calculate_hrtf(azimuth: f32, sample_rate: u32) -> HrtfResult {
+pub(crate) fn calculate_hrtf(azimuth: f32, sample_rate: u32) -> HrtfResult {
     // ITD: Woodworth formula
     // time_diff = (HEAD_RADIUS / SPEED_OF_SOUND) * (azimuth + sin(azimuth))
     let itd = (HEAD_RADIUS / SPEED_OF_SOUND) * (azimuth.abs() + azimuth.abs().sin());
@@ -55,7 +55,7 @@ pub fn calculate_hrtf(azimuth: f32, sample_rate: u32) -> HrtfResult {
 }
 
 /// Calculate azimuth angle from listener position/forward to sound position.
-pub fn azimuth_from_positions(
+pub(crate) fn azimuth_from_positions(
     listener_pos: [f32; 3],
     listener_forward: [f32; 3],
     listener_right: [f32; 3],

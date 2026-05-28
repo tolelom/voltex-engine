@@ -5,7 +5,7 @@
 
 /// An OGG page header.
 #[derive(Debug, Clone)]
-pub struct OggPage {
+pub(crate) struct OggPage {
     /// Header type flags (0x01 = continuation, 0x02 = BOS, 0x04 = EOS).
     pub header_type: u8,
     /// Granule position (PCM sample position).
@@ -23,7 +23,7 @@ pub struct OggPage {
 }
 
 /// Parse all OGG pages from raw bytes.
-pub fn parse_ogg_pages(data: &[u8]) -> crate::Result<Vec<OggPage>> {
+pub(crate) fn parse_ogg_pages(data: &[u8]) -> crate::Result<Vec<OggPage>> {
     let mut pages = Vec::new();
     let mut offset = 0;
 
@@ -117,7 +117,7 @@ pub fn parse_ogg_pages(data: &[u8]) -> crate::Result<Vec<OggPage>> {
 ///
 /// Packets can span multiple segments (segment length = 255 means continuation).
 /// Packets can also span multiple pages (header_type bit 0x01 = continuation).
-pub fn extract_packets(pages: &[OggPage]) -> crate::Result<Vec<Vec<u8>>> {
+pub(crate) fn extract_packets(pages: &[OggPage]) -> crate::Result<Vec<Vec<u8>>> {
     let mut packets: Vec<Vec<u8>> = Vec::new();
     let mut current_packet: Vec<u8> = Vec::new();
 
