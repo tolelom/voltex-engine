@@ -2185,6 +2185,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "voltex_image"
+version = "0.1.0"
+dependencies = [
+ "bytemuck",
+ "thiserror 2.0.18",
+]
+
+[[package]]
 name = "voltex_math"
 version = "0.1.0"
 
