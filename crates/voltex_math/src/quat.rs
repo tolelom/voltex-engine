@@ -183,6 +183,59 @@ impl Quat {
         }
     }
 
+    /// Decompose into YXZ Tait-Bryan Euler angles (radians), returning
+    /// `Vec3(x = pitch, y = yaw, z = roll)` such that
+    /// `Quat::from_euler_yxz(q.to_euler_yxz())` reproduces the same rotation
+    /// modulo gimbal lock at `|pitch| = π/2`.
+    ///
+    /// Derivation: for `R = RotY(b) * RotX(a) * RotZ(c)` the matrix entry
+    /// `M[1][2] = -sin(a)`. Outside gimbal lock the remaining angles come
+    /// from `atan2` on stable pairs of matrix elements. At gimbal lock
+    /// `cos(a) ≈ 0` we collapse `b` to 0 and put the combined yaw+roll
+    /// into `c` (consistent, lossy convention shared with the inspector).
+    pub fn to_euler_yxz(self) -> Vec3 {
+        let (x, y, z, w) = (self.x, self.y, self.z, self.w);
+        // M[1][2] = 2(yz - wx)   →   sin(a) = -M[1][2] = 2(wx - yz)
+        let sin_x = (2.0 * (w * x - y * z)).clamp(-1.0, 1.0);
+        let a = sin_x.asin();
+        // Threshold chosen generously: floating-point drift can leave `sin_x`
+        // a few ULP away from ±1 even when the input came from a true
+        // gimbal-lock Euler. Using a tight `cos_x > 1e-6` falls through to
+        // the atan2 branch, where both numerator and denominator are near
+        // zero and the recovered (b, c) lose all information.
+        if sin_x.abs() > 1.0 - 1e-5 {
+            // Gimbal: collapse b → 0, put everything into c via M[0][1]/M[0][0].
+            // M[0][1] = 2(xy - wz), M[0][0] = 1 - 2(y² + z²)
+            let c = (-2.0 * (x * y - w * z)).atan2(1.0 - 2.0 * (y * y + z * z));
+            Vec3::new(a, 0.0, c)
+        } else {
+            // b = atan2(M[0][2], M[2][2])  with M[0][2] = 2(xz + wy), M[2][2] = 1 - 2(x² + y²)
+            // c = atan2(M[1][0], M[1][1])  with M[1][0] = 2(xy + wz), M[1][1] = 1 - 2(x² + z²)
+            let b = (2.0 * (x * z + w * y)).atan2(1.0 - 2.0 * (x * x + y * y));
+            let c = (2.0 * (x * y + w * z)).atan2(1.0 - 2.0 * (x * x + z * z));
+            Vec3::new(a, b, c)
+        }
+    }
+
+    /// Semi-implicit quaternion integration: rotate `self` by world-space
+    /// angular velocity `omega` (rad/s) over `dt` seconds and renormalise.
+    ///
+    /// Uses the standard `dq/dt = 0.5 * ω̃ · q` formula where `ω̃ = (ω, 0)`
+    /// is the pure-imaginary quaternion of the angular velocity. Drift is
+    /// bounded by the final `normalize()`.
+    pub fn integrate(self, omega: Vec3, dt: f32) -> Self {
+        let omega_q = Self::new(omega.x, omega.y, omega.z, 0.0);
+        let dq = omega_q.mul_quat(self);
+        let half_dt = 0.5 * dt;
+        Self {
+            x: self.x + dq.x * half_dt,
+            y: self.y + dq.y * half_dt,
+            z: self.z + dq.z * half_dt,
+            w: self.w + dq.w * half_dt,
+        }
+        .normalize()
+    }
+
     /// Spherical linear interpolation between two unit quaternions.
     /// `t` is clamped to `[0, 1]`. Picks the shorter arc by flipping `b`
     /// when `dot(a, b) < 0`. Falls back to normalized linear interpolation
@@ -419,5 +472,73 @@ mod tests {
     fn from_euler_yxz_pi_y_matches_rotation_y_pi() {
         let q = Quat::from_euler_yxz(Vec3::new(0.0, PI, 0.0));
         assert_mat4_close(&q.to_mat4(), &Mat4::rotation_y(PI), 1e-5, "euler Y=π");
+    }
+
+    #[test]
+    fn to_euler_yxz_roundtrip_non_gimbal() {
+        // Outside gimbal lock, `from_euler_yxz` ∘ `to_euler_yxz` is an
+        // identity on the *rotation* (the Euler triple itself may differ
+        // by 2π aliasing, so compare matrices).
+        let e = Vec3::new(0.3, 0.7, -0.4);
+        let q = Quat::from_euler_yxz(e);
+        let back = q.to_euler_yxz();
+        let q2 = Quat::from_euler_yxz(back);
+        assert_mat4_close(&q.to_mat4(), &q2.to_mat4(), 1e-5, "yxz roundtrip");
+    }
+
+    #[test]
+    fn to_euler_yxz_returns_zero_for_identity() {
+        let e = Quat::identity().to_euler_yxz();
+        assert!(e.x.abs() < 1e-6 && e.y.abs() < 1e-6 && e.z.abs() < 1e-6, "got {e:?}");
+    }
+
+    #[test]
+    fn to_euler_yxz_recovers_pure_y() {
+        let q = Quat::from_axis_angle(Vec3::new(0.0, 1.0, 0.0), 1.2);
+        let e = q.to_euler_yxz();
+        assert!(e.x.abs() < 1e-5 && (e.y - 1.2).abs() < 1e-5 && e.z.abs() < 1e-5, "got {e:?}");
+    }
+
+    #[test]
+    fn to_euler_yxz_gimbal_lock_x_plus_half_pi_does_not_nan() {
+        // sin(x) = 1 → cos(x) = 0 → gimbal lock branch.
+        let q = Quat::from_euler_yxz(Vec3::new(FRAC_PI_2, 0.7, -0.3));
+        let e = q.to_euler_yxz();
+        // x = π/2 must round-trip exactly. y/z may collapse, but the
+        // produced quaternion's matrix must still match.
+        assert!((e.x - FRAC_PI_2).abs() < 1e-3, "x: {}", e.x);
+        let q2 = Quat::from_euler_yxz(e);
+        assert_mat4_close(&q.to_mat4(), &q2.to_mat4(), 1e-3, "gimbal lock collapse");
+    }
+
+    #[test]
+    fn integrate_zero_omega_is_identity() {
+        let q = Quat::from_axis_angle(Vec3::new(0.0, 1.0, 0.0), 0.4);
+        let after = q.integrate(Vec3::ZERO, 1.0 / 60.0);
+        assert_quat_eq(after, q, 1e-6, "ω=0 noop");
+    }
+
+    #[test]
+    fn integrate_y_omega_produces_y_rotation_after_a_second() {
+        // ω = (0, π, 0) for 1 second → 180° around Y. Single Euler step
+        // is approximate, so verify direction/magnitude rather than exact
+        // equality against a closed-form rotation.
+        let q = Quat::IDENTITY;
+        let after = q.integrate(Vec3::new(0.0, PI, 0.0), 1.0);
+        // Quaternion should be unit.
+        assert!((after.length() - 1.0).abs() < 1e-5, "unit: {}", after.length());
+        // Should have non-trivial Y component (the rotation axis).
+        assert!(after.y.abs() > 0.5, "Y component too small: {}", after.y);
+    }
+
+    #[test]
+    fn integrate_stays_unit_after_many_steps() {
+        let mut q = Quat::IDENTITY;
+        let omega = Vec3::new(1.0, 2.0, 0.5);
+        let dt = 1.0 / 240.0;
+        for _ in 0..10_000 {
+            q = q.integrate(omega, dt);
+        }
+        assert!((q.length() - 1.0).abs() < 1e-4, "drift: {}", q.length());
     }
 }
