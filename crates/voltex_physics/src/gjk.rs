@@ -44,7 +44,7 @@ fn support_minkowski(a: &Collider, pos_a: Vec3, b: &Collider, pos_b: Vec3, dir: 
 }
 
 /// GJK: returns Some(simplex) if shapes overlap, None if separated.
-pub fn gjk(a: &Collider, pos_a: Vec3, b: &Collider, pos_b: Vec3) -> Option<Vec<Vec3>> {
+pub(crate) fn gjk(a: &Collider, pos_a: Vec3, b: &Collider, pos_b: Vec3) -> Option<Vec<Vec3>> {
     let mut dir = pos_b - pos_a;
     if dir.length_squared() < 1e-10 {
         dir = Vec3::X;
@@ -260,7 +260,7 @@ struct EpaFace {
 
 /// EPA: given a simplex containing the origin, find penetration info.
 /// Returns (normal, depth, point_on_a, point_on_b).
-pub fn epa(
+pub(crate) fn epa(
     a: &Collider, pos_a: Vec3,
     b: &Collider, pos_b: Vec3,
     simplex: &[Vec3],
@@ -397,7 +397,7 @@ fn make_face(polytope: &[Vec3], indices: [usize; 3]) -> EpaFace {
 }
 
 /// Combined GJK + EPA: returns (normal, depth, point_on_a, point_on_b) or None.
-pub fn gjk_epa(
+pub(crate) fn gjk_epa(
     a: &Collider, pos_a: Vec3,
     b: &Collider, pos_b: Vec3,
 ) -> Option<(Vec3, f32, Vec3, Vec3)> {

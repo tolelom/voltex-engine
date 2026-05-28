@@ -5,7 +5,7 @@ use voltex_math::{Vec3, Ray, AABB};
 
 /// Ray vs AABB (slab method). Returns t of nearest intersection, or None.
 /// If ray starts inside AABB, returns Some(0.0).
-pub fn ray_vs_aabb(ray: &Ray, aabb: &AABB) -> Option<f32> {
+pub(crate) fn ray_vs_aabb(ray: &Ray, aabb: &AABB) -> Option<f32> {
     let mut t_min = f32::NEG_INFINITY;
     let mut t_max = f32::INFINITY;
 
@@ -42,7 +42,7 @@ pub fn ray_vs_aabb(ray: &Ray, aabb: &AABB) -> Option<f32> {
 }
 
 /// Ray vs Sphere. Returns (t, normal) or None.
-pub fn ray_vs_sphere(ray: &Ray, center: Vec3, radius: f32) -> Option<(f32, Vec3)> {
+pub(crate) fn ray_vs_sphere(ray: &Ray, center: Vec3, radius: f32) -> Option<(f32, Vec3)> {
     let oc = ray.origin - center;
     let a = ray.direction.dot(ray.direction);
     let b = 2.0 * oc.dot(ray.direction);
@@ -69,7 +69,7 @@ pub fn ray_vs_sphere(ray: &Ray, center: Vec3, radius: f32) -> Option<(f32, Vec3)
 }
 
 /// Ray vs axis-aligned Box. Returns (t, normal) or None.
-pub fn ray_vs_box(ray: &Ray, center: Vec3, half_extents: Vec3) -> Option<(f32, Vec3)> {
+pub(crate) fn ray_vs_box(ray: &Ray, center: Vec3, half_extents: Vec3) -> Option<(f32, Vec3)> {
     let aabb = AABB::from_center_half_extents(center, half_extents);
     let t = ray_vs_aabb(ray, &aabb)?;
 
@@ -124,7 +124,7 @@ pub fn ray_vs_box(ray: &Ray, center: Vec3, half_extents: Vec3) -> Option<(f32, V
 
 /// Ray vs Capsule (Y-axis aligned). Returns (t, normal) or None.
 /// Capsule = cylinder of given half_height along Y + hemisphere caps of given radius.
-pub fn ray_vs_capsule(ray: &Ray, center: Vec3, radius: f32, half_height: f32) -> Option<(f32, Vec3)> {
+pub(crate) fn ray_vs_capsule(ray: &Ray, center: Vec3, radius: f32, half_height: f32) -> Option<(f32, Vec3)> {
     // Test the two hemisphere caps
     let top_center = Vec3::new(center.x, center.y + half_height, center.z);
     let bot_center = Vec3::new(center.x, center.y - half_height, center.z);

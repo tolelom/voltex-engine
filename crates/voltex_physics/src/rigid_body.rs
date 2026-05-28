@@ -4,9 +4,9 @@ use voltex_math::Vec3;
 
 /// Bodies whose linear+angular velocity stay under this threshold for
 /// `SLEEP_TIME_THRESHOLD` seconds are put to sleep.
-pub const SLEEP_VELOCITY_THRESHOLD: f32 = 0.01;
+pub(crate) const SLEEP_VELOCITY_THRESHOLD: f32 = 0.01;
 /// Seconds a body must remain "quiet" before it is put to sleep.
-pub const SLEEP_TIME_THRESHOLD: f32 = 0.5;
+pub(crate) const SLEEP_TIME_THRESHOLD: f32 = 0.5;
 
 /// Rigid body state attached to an entity by the physics solver.
 ///

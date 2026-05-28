@@ -5,7 +5,7 @@
 use voltex_math::Vec3;
 
 /// Returns (normal A→B, depth, point_on_a, point_on_b) or None if no collision.
-pub fn sphere_vs_sphere(
+pub(crate) fn sphere_vs_sphere(
     pos_a: Vec3, radius_a: f32,
     pos_b: Vec3, radius_b: f32,
 ) -> Option<(Vec3, f32, Vec3, Vec3)> {
@@ -32,7 +32,7 @@ pub fn sphere_vs_sphere(
 }
 
 /// Sphere-vs-Box (AABB) contact. Returns `(normal A→B, depth, point_on_a, point_on_b)`.
-pub fn sphere_vs_box(
+pub(crate) fn sphere_vs_box(
     sphere_pos: Vec3, radius: f32,
     box_pos: Vec3, half_extents: Vec3,
 ) -> Option<(Vec3, f32, Vec3, Vec3)> {
@@ -107,7 +107,7 @@ pub fn sphere_vs_box(
 }
 
 /// Box-vs-Box (AABB) contact. Returns `(normal A→B, depth, point_on_a, point_on_b)`.
-pub fn box_vs_box(
+pub(crate) fn box_vs_box(
     pos_a: Vec3, half_a: Vec3,
     pos_b: Vec3, half_b: Vec3,
 ) -> Option<(Vec3, f32, Vec3, Vec3)> {
