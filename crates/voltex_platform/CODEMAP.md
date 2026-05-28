@@ -15,7 +15,7 @@
 
 ## 의존성
 - voltex crate: voltex_math (cursor position 등에 Vec2 사용)
-- 외부 crate: winit 0.30
+- 외부 crate: winit 0.30, log (로깅)
 
 ## 변경 시 주의점
 - winit 버전 업그레이드 시 ApplicationHandler API 변경 점검 필요

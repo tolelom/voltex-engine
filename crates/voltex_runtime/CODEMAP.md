@@ -10,7 +10,7 @@
 
 ## 모듈 구조
 - `app` — RuntimeApp (모든 subsystem 보관 + `tick_systems_only`) (src/app.rs)
-- `config` — RuntimeConfig + 8개 builder 메서드 + 5개 callback 타입 (src/config.rs)
+- `config` — RuntimeConfig + 13개 builder 메서드 + 4개 callback 타입 (RegistrySetupFn, SceneBuilderFn, SystemSetupFn, GpuInitFn) (src/config.rs)
 - `error` — RuntimeError enum + Result alias (src/error.rs)
 - `handler` (crate-private) — winit ApplicationHandler 구현 (src/handler.rs)
 
@@ -20,7 +20,7 @@
 
 (voltex_audio 는 v1 에서는 사용자가 직접 관리 — RuntimeApp 가 통합하지 않음. v1.1+ 에서 audio_sync_system 으로 통합 예정.)
 
-## RuntimeConfig 빌더 메서드 (8개)
+## RuntimeConfig 빌더 메서드 (13개)
 | 메서드 | 시점 | 인자 |
 |---|---|---|
 | `with_window_title(s)` | new 직전 | window.title |
@@ -30,8 +30,12 @@
 | `with_scene_builder(F)` | new 마지막 단계 | `&mut World, &mut ComponentRegistry` — GPU 없이 가능한 entity seed |
 | `with_system_setup(F)` | new 마지막 단계 | `&mut RuntimeApp` — `add_system` 호출 등 |
 | `with_gpu_init(F)` | 첫 `resumed` 시 (GPU 준비 후) | `&mut RuntimeApp, &Device, &Queue` — 메시 업로드, MeshHandle 부착 |
-| `with_fixed_dt(f32)` | every frame | `Option<f32>` 가 Some 이면 timer.frame_dt 무시 |
-| `disable_physics()` / `disable_scripts()` | tick_systems_only | false 이면 해당 step skip |
+| `with_fixed_dt(f32)` | new 직후 | delta 시간 고정화 |
+| `disable_physics()` | new 직후 | physics_step skip |
+| `disable_scripts()` | new 직후 | script 시스템 skip |
+| `with_vfs(Vfs)` | new 직후 | 가상 파일시스템 (`.vpkg` 아카이브 지원) |
+| `with_crash_log_dir(path)` | new 직후 | crash log 저장 경로 |
+| `disable_crash_log()` | new 직후 | panic hook 비활성화 (headless/테스트 용) |
 
 ## RuntimeApp::tick_systems_only(dt) 실행 순서
 1. `propagate_transforms(world)` (항상)

@@ -12,8 +12,10 @@
 //! - [`Parent`] / [`Children`] hierarchy helpers.
 //! - [`Scheduler`] / [`System`] + dependency-aware [`DependencyScheduler`].
 //! - [`Component`] trait + [`ComponentRegistry`] for typed serialization.
-//! - [`serialize_scene`] / [`deserialize_scene`] (text JSON) +
-//!   [`serialize_scene_binary`] / [`deserialize_scene_binary`] (VSCN).
+//! - [`serialize_scene`] / [`deserialize_scene`] (`.vscn` text, Transform/
+//!   Parent/Tag only) and [`serialize_scene_json`] / [`deserialize_scene_json`]
+//!   (registry-driven, all components) +
+//!   [`serialize_scene_binary`] / [`deserialize_scene_binary`] (VSCN binary).
 
 #![warn(missing_docs)]
 

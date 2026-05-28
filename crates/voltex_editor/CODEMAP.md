@@ -59,7 +59,7 @@ Immediate-mode UI 에디터 — 도킹/플로팅/뷰포트/인스펙터/에셋 �
 - 뷰포트: orbit_camera, viewport_texture, viewport_renderer, picking, gizmo/
 - 패널: panels/{hierarchy, inspector}, asset_browser
 - 커맨드/세션: command, session, lifecycle
-- 셰이더: ui_shader.wgsl, gizmo/shader.wgsl
+- 셰이더: ui_shader.wgsl, gizmo/shader.wgsl, viewport_shader.wgsl
 
 ## 의존성
 - voltex crate: voltex_math, voltex_ecs, voltex_renderer

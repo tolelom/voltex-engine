@@ -30,7 +30,7 @@
 
 ## 의존성
 - voltex crate: voltex_math (3D 사운드 좌표)
-- 외부 crate: 없음 (WASAPI는 Windows API 직접 사용)
+- 외부 crate: thiserror (에러 타입)
 
 ## 변경 시 주의점
 - WASAPI 는 Windows 전용 FFI — `backend::WasapiBackend` 가 trait impl 로 래핑

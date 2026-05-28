@@ -54,9 +54,18 @@ L3:
   voltex_editor       → voltex_math, voltex_ecs, voltex_renderer
                         (IMGUI, dock, viewport, inspector, TTF)
 
+L3.5:
+  voltex_runtime    → math, platform, ecs, asset, renderer, renderer_ecs, physics, script
+                      (RuntimeApp 풀 부트스트랩, GameLoop, HUD, crash hook. drop 순서 주의)
+
 L4 (facade):
-  voltex            → 모든 sub-crate를 모듈로 re-export + prelude
+  voltex            → 모든 sub-crate(runtime 포함)를 모듈로 re-export + prelude
                       (사용자 진입점, 신규/외부 코드는 여기부터 import)
+
+Tools (워크스페이스 밖 진입점, 다른 crate가 의존하지 않음):
+  voltex_cli        → voltex_asset            (voltex new/build/run 빌드 파이프라인)
+  voltex_capture    → math, ecs, asset, renderer, renderer_ecs, editor
+                      (HeadlessGpu 오프스크린 render-to-PNG 시각 검증 하니스)
 ```
 
 **변경 영향도**: L0 변경은 거의 모든 crate에 영향 (특히 voltex_math). L3 변경은 영향 적음. 변경 전 의존 그래프를 따라 영향 범위 확인.
@@ -83,9 +92,10 @@ L4 (facade):
 - 각 crate `src/error.rs` 에 `<Crate>Error` enum + `Generic(String)` variant + `#[from] std::io::Error`
 - `From<String> for <Crate>Error`, `From<&str> for <Crate>Error` 자동 변환 impl 제공
 - crate 간 에러 전파: `?` 연산자 + `Generic` variant로 String 메시지 흡수 (`.into()` 또는 `.to_string().into()`)
-- 에러 타입이 존재하는 crate: asset, net, ecs, audio, ai, script, renderer, editor
+- 에러 타입이 존재하는 crate: asset, net, ecs, audio, ai, script, renderer, renderer_ecs, editor
 - 에러 타입이 없는 crate (Result<T,String> 미사용): math, platform, physics
-- voltex_editor: `EditorError`가 기존 `CommandError`를 흡수 (Generic/EntityNotAlive/Io/Parse variants, PartialEq 유지)
+- voltex_editor: `EditorError`가 기존 `CommandError`를 흡수 (Generic/EntityNotAlive/Io/Parse variants, PartialEq 유지). `PartialEq`/`Clone` 보존을 위해 `#[from] std::io::Error` 대신 `Io(String)`/`Parse(String)` 사용 — 표준 패턴의 의도적 예외.
+- 예외 (M4 표준 미적용): `voltex_cli`는 외부 dep 0 정책으로 thiserror 대신 손수 작성한 `CliError` + `Display`; `voltex_capture`는 CI graceful-skip 용 `Result<_, String>` (전용 에러 타입 없음). `voltex_runtime`은 하위 crate 에러를 String 으로 흡수.
 
 ### 컴포넌트 등록 (M5 표준화 완료)
 직렬화 가능한 컴포넌트는 `voltex_ecs::Component` trait를 구현하고 `ComponentRegistry::register::<T>()` 로 등록한다.
@@ -111,11 +121,11 @@ impl Component for Health {
 
 let mut registry = ComponentRegistry::new();
 registry.register::<Health>();           // 표준 경로
-registry.register_defaults();            // Transform + Tag (engine built-in)
+registry.register_defaults();            // Transform, Tag, MeshHandle, MaterialHandle, Bounds, ScriptComponent (engine built-ins)
 ```
 
 - **Escape hatch**: trait 구현이 불가능한 외부 타입은 `registry.register_raw(name, ser, deser)` 사용.
-- `register_defaults()` 는 Transform, Tag 두 built-in을 한 번에 등록.
+- `register_defaults()` 는 6개 built-in(Transform, Tag, MeshHandle, MaterialHandle, Bounds, ScriptComponent)을 한 번에 등록.
 - 등록 안 된 컴포넌트는 `serialize_scene_json` / `serialize_scene_binary` 결과에 포함되지 않는다.
 
 ### 시스템 정의 (M5 표준화 완료)

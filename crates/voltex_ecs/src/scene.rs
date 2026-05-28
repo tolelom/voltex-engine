@@ -38,7 +38,17 @@ fn parse_transform(s: &str) -> Option<Transform> {
     Some(Transform { position, rotation, scale })
 }
 
-/// Serialize all entities with a Transform component to the .vscn text format.
+/// Serialize all entities with a Transform component to the `.vscn` text format.
+///
+/// # Limitations
+///
+/// This human-readable format only persists the built-in `Transform`, `Parent`,
+/// and `Tag` components. It does **not** consult the [`ComponentRegistry`], so
+/// `MeshHandle`, `MaterialHandle`, `Bounds`, `ScriptComponent`, and any
+/// user-registered components are **silently omitted**. For lossless,
+/// registry-driven persistence of arbitrary components use
+/// [`serialize_scene_json`] / [`deserialize_scene_json`] or the binary
+/// [`serialize_scene_binary`](crate::serialize_scene_binary) path instead.
 pub fn serialize_scene(world: &World) -> String {
     // Collect all entities with Transform
     let entities_with_transform: Vec<(Entity, Transform)> = world
@@ -93,6 +103,10 @@ pub fn serialize_scene(world: &World) -> String {
 const MAX_SCENE_ENTITIES: usize = 1_000_000;
 
 /// Parse a .vscn string, create entities in the world, and return the created entities.
+///
+/// Only `Transform`, `Parent`, and `Tag` are restored — see
+/// [`serialize_scene`] for why this text format is lossy for other
+/// components, and which paths to use for lossless persistence.
 ///
 /// Robustness: entity indices and parent indices that exceed
 /// [`MAX_SCENE_ENTITIES`] are silently skipped; out-of-range parent

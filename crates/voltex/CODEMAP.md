@@ -1,10 +1,10 @@
 # voltex
 
 ## 책임 (한 줄)
-Facade crate — 11개 `voltex_*` sub-crate를 모듈로 노출하고 자주 쓰는 타입을 `prelude`에 모은다.
+Facade crate — 13개 `voltex_*` sub-crate를 모듈로 노출하고 자주 쓰는 타입을 `prelude`에 모은다.
 
 ## 공개 API 진입점
-- 모듈 re-export: `math`, `ecs`, `renderer`, `physics`, `audio`, `asset`, `ai`, `net`, `script`, `editor`, `platform` (src/lib.rs)
+- 모듈 re-export: `math`, `ecs`, `renderer`, `renderer_ecs`, `physics`, `audio`, `asset`, `ai`, `net`, `script`, `editor`, `platform`, `runtime` (src/lib.rs)
 - `prelude` 모듈 — 자주 쓰는 타입 묶음 (src/lib.rs)
 
 ## 모듈 구조

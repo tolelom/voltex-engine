@@ -38,7 +38,7 @@ blobs        concat
 
 ## 의존성
 - voltex crate: 없음
-- 외부 crate: 없음 (std만 사용 + thiserror)
+- 외부 crate: thiserror (에러 타입)
 
 ## 변경 시 주의점
 - Handle<T>의 generation 필드 시맨틱 변경 시 모든 자원 추적 깨짐

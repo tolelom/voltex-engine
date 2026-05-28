@@ -6,11 +6,13 @@
 ## 공개 API 진입점
 - `Collider` — Sphere/Box/Capsule/ConvexHull (src/collider.rs)
 - `MeshCollider` — triangle mesh (src/mesh_collider.rs)
-- `ContactPoint`, `gjk_epa` — 좁은 단계 충돌 (src/gjk.rs, src/contact.rs)
-- `BVH` — 넓은 단계 + refit + query_ray (src/bvh.rs)
+- `ContactPoint` — 좁은 단계 충돌 (src/contact.rs)
+- `gjk` — narrow 모듈 (src/gjk.rs, src/narrow.rs)
+- `BvhTree` — 넓은 단계 + refit + query_ray (src/bvh.rs)
 - `RigidBody` — 질량/속도/각속도/마찰/sleep (src/rigid_body.rs)
-- `Integrator`, `Solver` — Semi-implicit Euler + Sequential Impulse (src/integrator.rs, src/solver.rs)
-- raycast — `raycast`, `raycast_all`, ray_vs_aabb/sphere/box/capsule/triangle/mesh (src/raycast.rs, src/ray.rs)
+- `integrate`, `inertia_tensor`, `inv_inertia` — Semi-implicit Euler (src/integrator.rs)
+- `physics_step`, `resolve_collisions` — Sequential Impulse solver (src/solver.rs)
+- raycast — `raycast`, `raycast_all`, ray_vs_triangle, ray_vs_plane, ray_vs_mesh (src/raycast.rs, src/ray.rs)
 - `detect_collisions` — ECS 통합 (src/collision.rs)
 - CCD — `swept_sphere_vs_aabb` (src/ccd.rs)
 
