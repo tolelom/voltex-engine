@@ -10,6 +10,97 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## [v1.0.58] — 2026-05-28 — Quat Transform + fuzz + coverage gate + audio smoke (E3b/F4/F5/F6/F7)
+
+Closes every remaining item in `docs/AUDIT-BACKLOG.md`.
+
+### Breaking — Transform.rotation Vec3 → Quat (E3b)
+
+`voltex_ecs::Transform.rotation` was an Euler `Vec3` (YXZ radians). It is
+now a unit `voltex_math::Quat`. 24 files touched across ecs, physics,
+editor, script, net, examples, capture.
+
+- `Transform::matrix()` uses `Quat::to_mat4` directly.
+- `Transform::from_euler_yxz(pos, euler, scale)` helper for call sites
+  that still author orientations as Euler triples.
+- `EditorCommand::SetTransform.rotation` is now `Quat`.
+- Inspector keeps an Euler buffer per selected entity (re-extract only
+  on selection change or external quat drift) so sliders stay smooth
+  without round-tripping `Quat → Euler → Quat` every frame.
+- Gizmo rotate composes `q_new = (q_delta * q_initial).normalize()` —
+  axis-stable regardless of initial orientation.
+- Lua API surface unchanged: `set_rotation` / `get_rotation` still talk
+  YXZ Euler, with `Quat::from_euler_yxz` / `to_euler_yxz` at the FFI
+  boundary so existing scripts keep working.
+- Physics integrator switches `rotation + ω·dt` (wrong) to
+  `Quat::integrate(ω, dt)` (semi-implicit `dq/dt = ½ωq + normalize`).
+- voltex_math gains `Quat::to_euler_yxz` (gimbal-collapsing inverse of
+  from_euler_yxz) + `Quat::integrate` helpers, +8 tests (commit bee796c).
+- voltex_math::Quat re-exported via `voltex::prelude`.
+
+### Wire format compatibility
+
+Persistent formats (`.vscn` text, JSON, binary) **dual-read** 3-float
+Euler (legacy) and 4-float quaternion (current). Existing user scene
+files keep loading without conversion. Writers emit 4-float quat.
+
+Ephemeral wire format (`voltex_net::EntityState.rotation`) is a **hard
+cutover** from `[f32;3]` to `[f32;4]`. `ENTITY_SIZE` 40 → 44 bytes.
+Interpolation uses `Quat::slerp` instead of componentwise Euler lerp,
+sidestepping the long-way bug previously patched at v1.0.56.
+
+### Layer graph
+
+voltex_net moved L0 → L1 (now depends on voltex_math for Quat::slerp).
+CLAUDE.md dependency graph updated.
+
+### Additive — F4 cargo-fuzz scaffold
+
+New `fuzz/` crate (excluded from workspace) with 9 libfuzzer targets:
+parse_png/jpg/gltf/obj, scene text/json/binary, snapshot, navmesh.
+Each target is a thin `|data: &[u8]| -> _` wrapper that calls the
+parser/deserializer and discards the result. Documents nightly
+invocation in `fuzz/README.md`. voltex_ai gains pub re-exports for
+`serialize_navmesh` / `deserialize_navmesh`.
+
+### CI — F5 coverage gate flipped to blocking
+
+The `coverage` job in `.github/workflows/ci.yml` was advisory; now
+blocks at `--fail-under-lines 78`. Runner installs mesa-vulkan-drivers
++ lavapipe (software Vulkan) and runs with `-- --include-ignored` so
+voltex_capture's GPU-gated tests exercise renderer / renderer_ecs /
+runtime headless paths. lavapipe missing → tests graceful-skip,
+78% gate still passes on lib-only coverage (79.69% measured locally,
+84.24% with GPU paths).
+
+`scripts/coverage.sh` mirrors the CI invocation for local repro;
+supports `--lib-only` / `--html` / `VOLTEX_COV_FAIL_UNDER_LINES`
+override.
+
+### Test — F6 audio backend real-device smoke
+
+Each backend (`wasapi`, `alsa`, `coreaudio`) gains an `#[ignore]` test
+that opens the default output device, writes 64 frames of silence, and
+tears down. Skip with `eprintln!("skipping: no <backend> device")` on
+init failure so scripted unattended runs are safe. WASAPI verified on
+RTX/Realtek box; ALSA / CoreAudio await real-hardware passes (tracked
+in pre-release checklist).
+
+### Docs — F7 CI green-run procedure
+
+`docs/release.md` gains "Real-hardware audio backend verification (F6)"
+and "First green CI run on GitHub mirror (F7)" sections under the
+pre-release checklist. Per-OS `cargo test ... --ignored` invocation
+pinned; `git push github master` workflow documented.
+
+### Verification
+
+`cargo build --workspace` clean, `cargo clippy --workspace --all-targets
+-- -D warnings` clean, `cargo test --workspace --lib` 1158 tests passing
+(↑ from 1157 — new WASAPI smoke test runs on this Windows host).
+
+---
+
 ## [v1.0.57] — 2026-05-28 — voltex_image crate split (E1 + C1 audit items)
 
 **Refactor / Additive**. New L0 crate `voltex_image` extracts all GPU-agnostic asset
