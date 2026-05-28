@@ -14,7 +14,10 @@ pub fn cmd(args: &[String]) -> Result<()> {
 
     // Resolve the resulting exe path from manifest + current dir.
     let manifest_dir = if let Some(idx) = args.iter().position(|a| a == "--manifest-path") {
-        PathBuf::from(args.get(idx + 1).ok_or(CliError::MissingArg("--manifest-path <path>"))?)
+        PathBuf::from(
+            args.get(idx + 1)
+                .ok_or(CliError::MissingArg("--manifest-path <path>"))?,
+        )
     } else {
         std::env::current_dir()?
     };

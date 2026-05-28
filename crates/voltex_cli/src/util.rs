@@ -25,7 +25,9 @@ pub fn canonicalize_friendly(p: &Path) -> Result<PathBuf> {
 #[cfg(windows)]
 fn strip_verbatim_prefix(p: PathBuf) -> PathBuf {
     let Some(s) = p.to_str() else { return p };
-    let Some(rest) = s.strip_prefix(r"\\?\") else { return p };
+    let Some(rest) = s.strip_prefix(r"\\?\") else {
+        return p;
+    };
     if rest.starts_with("UNC\\") {
         return p;
     }

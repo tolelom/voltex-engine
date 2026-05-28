@@ -1,6 +1,6 @@
 //! 4D `f32` vector — homogeneous coords + RGBA + shader uniform packing.
 
-use std::ops::{Add, Sub, Mul, Neg};
+use std::ops::{Add, Mul, Neg, Sub};
 
 use crate::Vec3;
 
@@ -21,9 +21,19 @@ pub struct Vec4 {
 
 impl Vec4 {
     /// `(0, 0, 0, 0)`.
-    pub const ZERO: Self = Self { x: 0.0, y: 0.0, z: 0.0, w: 0.0 };
+    pub const ZERO: Self = Self {
+        x: 0.0,
+        y: 0.0,
+        z: 0.0,
+        w: 0.0,
+    };
     /// `(1, 1, 1, 1)`.
-    pub const ONE: Self = Self { x: 1.0, y: 1.0, z: 1.0, w: 1.0 };
+    pub const ONE: Self = Self {
+        x: 1.0,
+        y: 1.0,
+        z: 1.0,
+        w: 1.0,
+    };
 
     /// Construct a new vector.
     pub const fn new(x: f32, y: f32, z: f32, w: f32) -> Self {
@@ -33,7 +43,12 @@ impl Vec4 {
     /// Promote a [`Vec3`] to [`Vec4`] with the given `w`
     /// (commonly `1.0` for positions or `0.0` for directions).
     pub fn from_vec3(v: Vec3, w: f32) -> Self {
-        Self { x: v.x, y: v.y, z: v.z, w }
+        Self {
+            x: v.x,
+            y: v.y,
+            z: v.z,
+            w,
+        }
     }
 
     /// Drop the `w` component and return the leading `(x, y, z)` as
@@ -61,28 +76,48 @@ impl Vec4 {
 impl Add for Vec4 {
     type Output = Self;
     fn add(self, rhs: Self) -> Self {
-        Self { x: self.x + rhs.x, y: self.y + rhs.y, z: self.z + rhs.z, w: self.w + rhs.w }
+        Self {
+            x: self.x + rhs.x,
+            y: self.y + rhs.y,
+            z: self.z + rhs.z,
+            w: self.w + rhs.w,
+        }
     }
 }
 
 impl Sub for Vec4 {
     type Output = Self;
     fn sub(self, rhs: Self) -> Self {
-        Self { x: self.x - rhs.x, y: self.y - rhs.y, z: self.z - rhs.z, w: self.w - rhs.w }
+        Self {
+            x: self.x - rhs.x,
+            y: self.y - rhs.y,
+            z: self.z - rhs.z,
+            w: self.w - rhs.w,
+        }
     }
 }
 
 impl Mul<f32> for Vec4 {
     type Output = Self;
     fn mul(self, rhs: f32) -> Self {
-        Self { x: self.x * rhs, y: self.y * rhs, z: self.z * rhs, w: self.w * rhs }
+        Self {
+            x: self.x * rhs,
+            y: self.y * rhs,
+            z: self.z * rhs,
+            w: self.w * rhs,
+        }
     }
 }
 
 impl Neg for Vec4 {
     type Output = Self;
     fn neg(self) -> Self {
-        Self { x: -self.x, y: -self.y, z: -self.z, w: -self.w }
+        Self {
+            x: -self.x,
+            y: -self.y,
+            z: -self.z,
+            w: -self.w,
+        }
     }
 }
 

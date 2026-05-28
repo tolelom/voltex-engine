@@ -67,7 +67,9 @@ pub fn validate_target(
 
 fn parse_manifest_path(args: &[String]) -> Result<PathBuf> {
     if let Some(idx) = args.iter().position(|a| a == "--manifest-path") {
-        let value = args.get(idx + 1).ok_or(CliError::MissingArg("--manifest-path <path>"))?;
+        let value = args
+            .get(idx + 1)
+            .ok_or(CliError::MissingArg("--manifest-path <path>"))?;
         Ok(PathBuf::from(value))
     } else {
         Ok(std::env::current_dir()?)
@@ -86,16 +88,18 @@ fn resolve_engine_path(args: &[String]) -> Result<PathBuf> {
             .ok_or(CliError::MissingArg("--engine-path <path>"))?;
         return Ok(PathBuf::from(value));
     }
-    let env = std::env::var(VOLTEX_REPO_ENV).map_err(|_| CliError::Io(format!(
-        "engine path unknown — set `{env}` or pass `--engine-path <repo-root>`.\n\
+    let env = std::env::var(VOLTEX_REPO_ENV).map_err(|_| {
+        CliError::Io(format!(
+            "engine path unknown — set `{env}` or pass `--engine-path <repo-root>`.\n\
          \n\
          Typical fix in a scaffolded project (`voltex new my_game && cd my_game`):\n  \
            voltex build --engine-path /path/to/voltex\n\
          or persist for the shell session:\n  \
            export {env}=/path/to/voltex   # bash/zsh\n  \
            $env:{env}='C:/path/to/voltex' # PowerShell",
-        env = VOLTEX_REPO_ENV
-    )))?;
+            env = VOLTEX_REPO_ENV
+        ))
+    })?;
     Ok(PathBuf::from(env))
 }
 
@@ -139,7 +143,11 @@ pub fn build_target(
     let exe_src = wrapper_dir
         .join("target")
         .join("release")
-        .join(if cfg!(windows) { "wrapper.exe" } else { "wrapper" });
+        .join(if cfg!(windows) {
+            "wrapper.exe"
+        } else {
+            "wrapper"
+        });
     let exe_dst = dist_dir.join(if cfg!(windows) {
         format!("{}.exe", manifest.project.name)
     } else {
@@ -152,10 +160,7 @@ pub fn build_target(
 
     let licenses = copy_license_files(&engine_path, &dist_dir)?;
     if !licenses.is_empty() {
-        eprintln!(
-            "voltex build: bundled {} license file(s)",
-            licenses.len()
-        );
+        eprintln!("voltex build: bundled {} license file(s)", licenses.len());
     }
 
     Ok(())
@@ -272,11 +277,7 @@ fn main() -> voltex_runtime::RuntimeResult<()> {{
 /// Walk the manifest's scene + scripts + assets dirs and write a `.vpkg`.
 /// Paths inside the archive use forward slashes and are relative to the
 /// manifest directory (so `with_initial_scene("scene.vscn")` works).
-pub fn pack_archive(
-    manifest_dir: &Path,
-    manifest: &Manifest,
-    out_path: &Path,
-) -> Result<()> {
+pub fn pack_archive(manifest_dir: &Path, manifest: &Manifest, out_path: &Path) -> Result<()> {
     let mut entries: Vec<(String, Vec<u8>)> = Vec::new();
 
     // 1. scene
@@ -477,14 +478,14 @@ mod tests {
             .parent()
             .unwrap()
             .to_path_buf();
-        let dist = std::env::temp_dir().join(format!(
-            "voltex_cli_license_real_{}",
-            std::process::id()
-        ));
+        let dist =
+            std::env::temp_dir().join(format!("voltex_cli_license_real_{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dist);
         let copied = copy_license_files(&workspace_root, &dist).unwrap();
         assert!(
-            copied.iter().any(|p| p.to_str() == Some("THIRD-PARTY-LICENSES.md")),
+            copied
+                .iter()
+                .any(|p| p.to_str() == Some("THIRD-PARTY-LICENSES.md")),
             "expected THIRD-PARTY-LICENSES.md to be bundled from {} — got {:?}",
             workspace_root.display(),
             copied,

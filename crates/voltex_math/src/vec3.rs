@@ -1,6 +1,6 @@
 //! 3D `f32` vector — positions, directions, normals.
 
-use std::ops::{Add, Sub, Mul, Neg};
+use std::ops::{Add, Mul, Neg, Sub};
 
 /// Three-component `f32` vector. The fundamental position / direction
 /// type in voltex.
@@ -16,15 +16,35 @@ pub struct Vec3 {
 
 impl Vec3 {
     /// `(0, 0, 0)`.
-    pub const ZERO: Self = Self { x: 0.0, y: 0.0, z: 0.0 };
+    pub const ZERO: Self = Self {
+        x: 0.0,
+        y: 0.0,
+        z: 0.0,
+    };
     /// `(1, 1, 1)`.
-    pub const ONE: Self = Self { x: 1.0, y: 1.0, z: 1.0 };
+    pub const ONE: Self = Self {
+        x: 1.0,
+        y: 1.0,
+        z: 1.0,
+    };
     /// `(1, 0, 0)` — right.
-    pub const X: Self = Self { x: 1.0, y: 0.0, z: 0.0 };
+    pub const X: Self = Self {
+        x: 1.0,
+        y: 0.0,
+        z: 0.0,
+    };
     /// `(0, 1, 0)` — up.
-    pub const Y: Self = Self { x: 0.0, y: 1.0, z: 0.0 };
+    pub const Y: Self = Self {
+        x: 0.0,
+        y: 1.0,
+        z: 0.0,
+    };
     /// `(0, 0, 1)` — forward (right-handed: out of the screen).
-    pub const Z: Self = Self { x: 0.0, y: 0.0, z: 1.0 };
+    pub const Z: Self = Self {
+        x: 0.0,
+        y: 0.0,
+        z: 1.0,
+    };
 
     /// Construct a new vector.
     pub const fn new(x: f32, y: f32, z: f32) -> Self {
@@ -97,28 +117,44 @@ impl Vec3 {
 impl Add for Vec3 {
     type Output = Self;
     fn add(self, rhs: Self) -> Self {
-        Self { x: self.x + rhs.x, y: self.y + rhs.y, z: self.z + rhs.z }
+        Self {
+            x: self.x + rhs.x,
+            y: self.y + rhs.y,
+            z: self.z + rhs.z,
+        }
     }
 }
 
 impl Sub for Vec3 {
     type Output = Self;
     fn sub(self, rhs: Self) -> Self {
-        Self { x: self.x - rhs.x, y: self.y - rhs.y, z: self.z - rhs.z }
+        Self {
+            x: self.x - rhs.x,
+            y: self.y - rhs.y,
+            z: self.z - rhs.z,
+        }
     }
 }
 
 impl Mul<f32> for Vec3 {
     type Output = Self;
     fn mul(self, rhs: f32) -> Self {
-        Self { x: self.x * rhs, y: self.y * rhs, z: self.z * rhs }
+        Self {
+            x: self.x * rhs,
+            y: self.y * rhs,
+            z: self.z * rhs,
+        }
     }
 }
 
 impl Neg for Vec3 {
     type Output = Self;
     fn neg(self) -> Self {
-        Self { x: -self.x, y: -self.y, z: -self.z }
+        Self {
+            x: -self.x,
+            y: -self.y,
+            z: -self.z,
+        }
     }
 }
 

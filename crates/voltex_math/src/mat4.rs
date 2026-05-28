@@ -1,7 +1,7 @@
 //! 4x4 column-major matrix — view / projection / TRS transforms.
 
-use std::ops::Mul;
 use crate::{Vec3, Vec4};
+use std::ops::Mul;
 
 /// 4x4 matrix in column-major order (matches wgpu/WGSL convention).
 ///
@@ -25,7 +25,9 @@ impl Mat4 {
 
     /// Construct from four column vectors.
     pub fn from_cols(c0: [f32; 4], c1: [f32; 4], c2: [f32; 4], c3: [f32; 4]) -> Self {
-        Self { cols: [c0, c1, c2, c3] }
+        Self {
+            cols: [c0, c1, c2, c3],
+        }
     }
 
     /// Return a flat 16-element slice suitable for GPU upload.
@@ -55,10 +57,22 @@ impl Mat4 {
 
     /// Matrix × Vec4 multiplication.
     pub fn mul_vec4(&self, v: Vec4) -> Vec4 {
-        let x = self.cols[0][0] * v.x + self.cols[1][0] * v.y + self.cols[2][0] * v.z + self.cols[3][0] * v.w;
-        let y = self.cols[0][1] * v.x + self.cols[1][1] * v.y + self.cols[2][1] * v.z + self.cols[3][1] * v.w;
-        let z = self.cols[0][2] * v.x + self.cols[1][2] * v.y + self.cols[2][2] * v.z + self.cols[3][2] * v.w;
-        let w = self.cols[0][3] * v.x + self.cols[1][3] * v.y + self.cols[2][3] * v.z + self.cols[3][3] * v.w;
+        let x = self.cols[0][0] * v.x
+            + self.cols[1][0] * v.y
+            + self.cols[2][0] * v.z
+            + self.cols[3][0] * v.w;
+        let y = self.cols[0][1] * v.x
+            + self.cols[1][1] * v.y
+            + self.cols[2][1] * v.z
+            + self.cols[3][1] * v.w;
+        let z = self.cols[0][2] * v.x
+            + self.cols[1][2] * v.y
+            + self.cols[2][2] * v.z
+            + self.cols[3][2] * v.w;
+        let w = self.cols[0][3] * v.x
+            + self.cols[1][3] * v.y
+            + self.cols[2][3] * v.z
+            + self.cols[3][3] * v.w;
         Vec4 { x, y, z, w }
     }
 
@@ -69,7 +83,7 @@ impl Mat4 {
                 [1.0, 0.0, 0.0, 0.0],
                 [0.0, 1.0, 0.0, 0.0],
                 [0.0, 0.0, 1.0, 0.0],
-                [x,   y,   z,   1.0],
+                [x, y, z, 1.0],
             ],
         }
     }
@@ -78,9 +92,9 @@ impl Mat4 {
     pub fn scale(sx: f32, sy: f32, sz: f32) -> Self {
         Self {
             cols: [
-                [sx,  0.0, 0.0, 0.0],
-                [0.0, sy,  0.0, 0.0],
-                [0.0, 0.0, sz,  0.0],
+                [sx, 0.0, 0.0, 0.0],
+                [0.0, sy, 0.0, 0.0],
+                [0.0, 0.0, sz, 0.0],
                 [0.0, 0.0, 0.0, 1.0],
             ],
         }
@@ -92,8 +106,8 @@ impl Mat4 {
         Self {
             cols: [
                 [1.0, 0.0, 0.0, 0.0],
-                [0.0,  c,   s,  0.0],
-                [0.0, -s,   c,  0.0],
+                [0.0, c, s, 0.0],
+                [0.0, -s, c, 0.0],
                 [0.0, 0.0, 0.0, 1.0],
             ],
         }
@@ -104,9 +118,9 @@ impl Mat4 {
         let (s, c) = angle.sin_cos();
         Self {
             cols: [
-                [ c,  0.0, -s,  0.0],
+                [c, 0.0, -s, 0.0],
                 [0.0, 1.0, 0.0, 0.0],
-                [ s,  0.0,  c,  0.0],
+                [s, 0.0, c, 0.0],
                 [0.0, 0.0, 0.0, 1.0],
             ],
         }
@@ -117,8 +131,8 @@ impl Mat4 {
         let (s, c) = angle.sin_cos();
         Self {
             cols: [
-                [ c,   s,  0.0, 0.0],
-                [-s,   c,  0.0, 0.0],
+                [c, s, 0.0, 0.0],
+                [-s, c, 0.0, 0.0],
                 [0.0, 0.0, 1.0, 0.0],
                 [0.0, 0.0, 0.0, 1.0],
             ],
@@ -139,15 +153,15 @@ impl Mat4 {
     /// `up` is not parallel to `target - eye`.
     pub fn look_at(eye: Vec3, target: Vec3, up: Vec3) -> Self {
         let f = (target - eye).normalize(); // forward
-        let r = f.cross(up).normalize();    // right
-        let u = r.cross(f);                 // true up
+        let r = f.cross(up).normalize(); // right
+        let u = r.cross(f); // true up
 
         Self {
             cols: [
-                [r.x,            u.x,            -f.x,           0.0],
-                [r.y,            u.y,            -f.y,           0.0],
-                [r.z,            u.z,            -f.z,           0.0],
-                [-r.dot(eye),   -u.dot(eye),      f.dot(eye),    1.0],
+                [r.x, u.x, -f.x, 0.0],
+                [r.y, u.y, -f.y, 0.0],
+                [r.z, u.z, -f.z, 0.0],
+                [-r.dot(eye), -u.dot(eye), f.dot(eye), 1.0],
             ],
         }
     }
@@ -163,10 +177,10 @@ impl Mat4 {
         let range_inv = 1.0 / (near - far);
         Self {
             cols: [
-                [f / aspect, 0.0, 0.0,                   0.0],
-                [0.0,        f,   0.0,                   0.0],
-                [0.0,        0.0, far * range_inv,       -1.0],
-                [0.0,        0.0, near * far * range_inv, 0.0],
+                [f / aspect, 0.0, 0.0, 0.0],
+                [0.0, f, 0.0, 0.0],
+                [0.0, 0.0, far * range_inv, -1.0],
+                [0.0, 0.0, near * far * range_inv, 0.0],
             ],
         }
     }
@@ -180,7 +194,12 @@ impl Mat4 {
             [2.0 / rml, 0.0, 0.0, 0.0],
             [0.0, 2.0 / tmb, 0.0, 0.0],
             [0.0, 0.0, -1.0 / fmn, 0.0],
-            [-(right + left) / rml, -(top + bottom) / tmb, -near / fmn, 1.0],
+            [
+                -(right + left) / rml,
+                -(top + bottom) / tmb,
+                -near / fmn,
+                1.0,
+            ],
         )
     }
 
@@ -196,11 +215,10 @@ impl Mat4 {
         let e = |r: usize, c: usize| -> f32 { m[c][r] };
 
         // 3x3 determinant of a row-major 3-by-3 block.
-        let det3 = |a: f32, b: f32, c: f32,
-                    d: f32, ee: f32, f: f32,
-                    g: f32, h: f32, i: f32| -> f32 {
-            a * (ee * i - f * h) - b * (d * i - f * g) + c * (d * h - ee * g)
-        };
+        let det3 =
+            |a: f32, b: f32, c: f32, d: f32, ee: f32, f: f32, g: f32, h: f32, i: f32| -> f32 {
+                a * (ee * i - f * h) - b * (d * i - f * g) + c * (d * h - ee * g)
+            };
 
         // Cofactor at (r, c): signed 3x3 minor with row r and column c removed.
         let cof = |r: usize, c: usize| -> f32 {
@@ -222,15 +240,21 @@ impl Mat4 {
             }
             let sign = if (r + c).is_multiple_of(2) { 1.0 } else { -1.0 };
             sign * det3(
-                e(rows[0], cols[0]), e(rows[0], cols[1]), e(rows[0], cols[2]),
-                e(rows[1], cols[0]), e(rows[1], cols[1]), e(rows[1], cols[2]),
-                e(rows[2], cols[0]), e(rows[2], cols[1]), e(rows[2], cols[2]),
+                e(rows[0], cols[0]),
+                e(rows[0], cols[1]),
+                e(rows[0], cols[2]),
+                e(rows[1], cols[0]),
+                e(rows[1], cols[1]),
+                e(rows[1], cols[2]),
+                e(rows[2], cols[0]),
+                e(rows[2], cols[1]),
+                e(rows[2], cols[2]),
             )
         };
 
         // det(M) = Laplace expansion along row 0.
-        let det = e(0,0) * cof(0,0) + e(0,1) * cof(0,1)
-                + e(0,2) * cof(0,2) + e(0,3) * cof(0,3);
+        let det =
+            e(0, 0) * cof(0, 0) + e(0, 1) * cof(0, 1) + e(0, 2) * cof(0, 2) + e(0, 3) * cof(0, 3);
         if det.abs() < 1e-12 {
             return None;
         }
@@ -321,25 +345,56 @@ mod tests {
     #[test]
     fn test_translation_mul_vec4() {
         let t = Mat4::translation(10.0, 20.0, 30.0);
-        let v = Vec4 { x: 1.0, y: 2.0, z: 3.0, w: 1.0 };
+        let v = Vec4 {
+            x: 1.0,
+            y: 2.0,
+            z: 3.0,
+            w: 1.0,
+        };
         let result = t * v;
-        assert!(vec4_approx_eq(result, Vec4 { x: 11.0, y: 22.0, z: 33.0, w: 1.0 }));
+        assert!(vec4_approx_eq(
+            result,
+            Vec4 {
+                x: 11.0,
+                y: 22.0,
+                z: 33.0,
+                w: 1.0
+            }
+        ));
     }
 
     // 3. scale(2,3,4) * (1,1,1,1) == (2,3,4,1)
     #[test]
     fn test_scale() {
         let s = Mat4::scale(2.0, 3.0, 4.0);
-        let v = Vec4 { x: 1.0, y: 1.0, z: 1.0, w: 1.0 };
+        let v = Vec4 {
+            x: 1.0,
+            y: 1.0,
+            z: 1.0,
+            w: 1.0,
+        };
         let result = s * v;
-        assert!(vec4_approx_eq(result, Vec4 { x: 2.0, y: 3.0, z: 4.0, w: 1.0 }));
+        assert!(vec4_approx_eq(
+            result,
+            Vec4 {
+                x: 2.0,
+                y: 3.0,
+                z: 4.0,
+                w: 1.0
+            }
+        ));
     }
 
     // 4. rotation_y(90°) * (1,0,0,1) -> approximately (0,0,-1,1)
     #[test]
     fn test_rotation_y_90() {
         let r = Mat4::rotation_y(FRAC_PI_2);
-        let v = Vec4 { x: 1.0, y: 0.0, z: 0.0, w: 1.0 };
+        let v = Vec4 {
+            x: 1.0,
+            y: 0.0,
+            z: 0.0,
+            w: 1.0,
+        };
         let result = r * v;
         assert!(approx_eq(result.x, 0.0));
         assert!(approx_eq(result.y, 0.0));
@@ -350,13 +405,18 @@ mod tests {
     // 5. look_at(eye=(0,0,5), target=origin, up=Y) — origin maps to (0,0,-5)
     #[test]
     fn test_look_at_origin() {
-        let eye    = Vec3::new(0.0, 0.0, 5.0);
+        let eye = Vec3::new(0.0, 0.0, 5.0);
         let target = Vec3::ZERO;
-        let up     = Vec3::Y;
-        let view   = Mat4::look_at(eye, target, up);
+        let up = Vec3::Y;
+        let view = Mat4::look_at(eye, target, up);
 
         // The world-space origin in homogeneous coords:
-        let origin = Vec4 { x: 0.0, y: 0.0, z: 0.0, w: 1.0 };
+        let origin = Vec4 {
+            x: 0.0,
+            y: 0.0,
+            z: 0.0,
+            w: 1.0,
+        };
         let result = view * origin;
 
         assert!(approx_eq(result.x, 0.0));
@@ -368,18 +428,26 @@ mod tests {
     // 6. Near plane point maps to NDC z = 0
     #[test]
     fn test_perspective_near_plane() {
-        let fov_y  = std::f32::consts::FRAC_PI_2; // 90°
+        let fov_y = std::f32::consts::FRAC_PI_2; // 90°
         let aspect = 1.0f32;
-        let near   = 1.0f32;
-        let far    = 100.0f32;
-        let proj   = Mat4::perspective(fov_y, aspect, near, far);
+        let near = 1.0f32;
+        let far = 100.0f32;
+        let proj = Mat4::perspective(fov_y, aspect, near, far);
 
         // A point exactly at the near plane in view space (z = -near in RH).
-        let p = Vec4 { x: 0.0, y: 0.0, z: -near, w: 1.0 };
+        let p = Vec4 {
+            x: 0.0,
+            y: 0.0,
+            z: -near,
+            w: 1.0,
+        };
         let clip = proj * p;
         // NDC z = clip.z / clip.w should equal 0 for the near plane.
         let ndc_z = clip.z / clip.w;
-        assert!(approx_eq(ndc_z, 0.0), "near-plane NDC z = {ndc_z}, expected 0");
+        assert!(
+            approx_eq(ndc_z, 0.0),
+            "near-plane NDC z = {ndc_z}, expected 0"
+        );
     }
 
     // 7. Transpose swaps rows and columns
@@ -395,9 +463,12 @@ mod tests {
         // After transpose, col[i][j] == original col[j][i]
         for col in 0..4 {
             for row in 0..4 {
-                assert!(approx_eq(t.cols[col][row], m.cols[row][col]),
+                assert!(
+                    approx_eq(t.cols[col][row], m.cols[row][col]),
                     "t.cols[{col}][{row}] = {} != m.cols[{row}][{col}] = {}",
-                    t.cols[col][row], m.cols[row][col]);
+                    t.cols[col][row],
+                    m.cols[row][col]
+                );
             }
         }
     }
@@ -434,7 +505,10 @@ mod tests {
                 assert!(
                     (product.cols[col][row] - expected).abs() < 1e-3,
                     "[col {} row {}] = {}, expected {}",
-                    col, row, product.cols[col][row], expected,
+                    col,
+                    row,
+                    product.cols[col][row],
+                    expected,
                 );
             }
         }
@@ -456,12 +530,12 @@ mod tests {
         let slice = Mat4::IDENTITY.as_slice();
         assert_eq!(slice.len(), 16);
         // Diagonal indices in column-major flat layout: 0, 5, 10, 15
-        assert!(approx_eq(slice[0],  1.0));
-        assert!(approx_eq(slice[5],  1.0));
+        assert!(approx_eq(slice[0], 1.0));
+        assert!(approx_eq(slice[5], 1.0));
         assert!(approx_eq(slice[10], 1.0));
         assert!(approx_eq(slice[15], 1.0));
         // Off-diagonal should be zero (spot check)
-        assert!(approx_eq(slice[1],  0.0));
-        assert!(approx_eq(slice[4],  0.0));
+        assert!(approx_eq(slice[1], 0.0));
+        assert!(approx_eq(slice[4], 0.0));
     }
 }

@@ -7,19 +7,34 @@ use std::path::PathBuf;
 pub enum CliError {
     MissingArg(&'static str),
     ManifestNotFound(PathBuf),
-    ManifestParse { line: usize, msg: String },
-    MissingField { section: &'static str, field: &'static str },
-    InvalidValue { field: String, got: String },
+    ManifestParse {
+        line: usize,
+        msg: String,
+    },
+    MissingField {
+        section: &'static str,
+        field: &'static str,
+    },
+    InvalidValue {
+        field: String,
+        got: String,
+    },
     NewTargetExists(PathBuf),
     CargoMissing,
     CargoBuildFailed(i32),
     Io(String),
     /// User asked to build for a target that does not match the host triple.
     /// `voltex build` does not cross-compile.
-    CrossCompileNotSupported { host: String, requested: String },
+    CrossCompileNotSupported {
+        host: String,
+        requested: String,
+    },
     /// Manifest `targets = [...]` listed only non-host triples — we cannot
     /// build any of them from the current machine.
-    HostNotInManifestTargets { host: String, listed: Vec<String> },
+    HostNotInManifestTargets {
+        host: String,
+        listed: Vec<String>,
+    },
     /// A key was found in `voltex.toml` that the engine does not recognise
     /// for that section. Suggests close matches when possible.
     UnknownField {
@@ -98,7 +113,12 @@ impl fmt::Display for CliError {
                     host, listed, host, host
                 )
             }
-            CliError::UnknownField { section, field, valid, suggestion } => {
+            CliError::UnknownField {
+                section,
+                field,
+                valid,
+                suggestion,
+            } => {
                 let hint = match suggestion {
                     Some(s) => format!("\n  hint: did you mean `{}`?", s),
                     None => format!("\n  valid keys: {:?}", valid),
@@ -109,14 +129,21 @@ impl fmt::Display for CliError {
                     field, section, hint
                 )
             }
-            CliError::UnknownSection { name, valid_prefixes } => {
+            CliError::UnknownSection {
+                name,
+                valid_prefixes,
+            } => {
                 write!(
                     f,
                     "unknown section [{}] in voltex.toml\n  valid sections: {:?}",
                     name, valid_prefixes
                 )
             }
-            CliError::ManifestPathMissing { field, path, base_dir } => {
+            CliError::ManifestPathMissing {
+                field,
+                path,
+                base_dir,
+            } => {
                 write!(
                     f,
                     "manifest field `{}` references missing path\n  path:     {}\n  base dir: {}\n  hint: create the file/directory, or remove the entry from voltex.toml",

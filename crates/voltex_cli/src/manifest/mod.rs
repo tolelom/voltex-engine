@@ -59,16 +59,23 @@ impl Manifest {
         let toml = parse_toml(text)?;
         validate_schema(&toml)?;
 
-        let project_section = toml
-            .get("project")
-            .ok_or(CliError::MissingField { section: "project", field: "name" })?;
+        let project_section = toml.get("project").ok_or(CliError::MissingField {
+            section: "project",
+            field: "name",
+        })?;
         let name = project_section
             .get_string("name")
-            .ok_or(CliError::MissingField { section: "project", field: "name" })?
+            .ok_or(CliError::MissingField {
+                section: "project",
+                field: "name",
+            })?
             .to_string();
         let version = project_section
             .get_string("version")
-            .ok_or(CliError::MissingField { section: "project", field: "version" })?
+            .ok_or(CliError::MissingField {
+                section: "project",
+                field: "version",
+            })?
             .to_string();
 
         let build_section = toml.get("build");
@@ -132,10 +139,18 @@ impl Manifest {
 
     /// Resolve every script path in the manifest against `base_dir`.
     pub fn resolved_script_dirs(&self, base_dir: &Path) -> Vec<PathBuf> {
-        self.build.scripts.iter().map(|s| base_dir.join(strip_glob(s))).collect()
+        self.build
+            .scripts
+            .iter()
+            .map(|s| base_dir.join(strip_glob(s)))
+            .collect()
     }
     pub fn resolved_assets_dirs(&self, base_dir: &Path) -> Vec<PathBuf> {
-        self.build.assets.iter().map(|s| base_dir.join(strip_glob(s))).collect()
+        self.build
+            .assets
+            .iter()
+            .map(|s| base_dir.join(strip_glob(s)))
+            .collect()
     }
 }
 
@@ -164,7 +179,11 @@ fn levenshtein(a: &str, b: &str) -> usize {
     for i in 1..=av.len() {
         curr[0] = i;
         for j in 1..=bv.len() {
-            let cost = if av[i - 1].eq_ignore_ascii_case(&bv[j - 1]) { 0 } else { 1 };
+            let cost = if av[i - 1].eq_ignore_ascii_case(&bv[j - 1]) {
+                0
+            } else {
+                1
+            };
             curr[j] = (prev[j] + 1).min(curr[j - 1] + 1).min(prev[j - 1] + cost);
         }
         std::mem::swap(&mut prev, &mut curr);
@@ -221,10 +240,7 @@ fn strip_glob(pattern: &str) -> &str {
     }
 }
 
-fn extract_build(
-    section: Option<&TomlSection>,
-    project_name: &str,
-) -> Result<BuildConfig> {
+fn extract_build(section: Option<&TomlSection>, project_name: &str) -> Result<BuildConfig> {
     let default_scene = "scene.vscn".to_string();
     let default_scripts = vec!["scripts/**/*.lua".to_string()];
     let default_assets = vec!["assets/**/*".to_string()];
@@ -243,13 +259,12 @@ fn extract_build(
         });
     };
 
-    let scene = s.get_string("scene").map(|s| s.to_string()).unwrap_or(default_scene);
-    let scripts = s
-        .get_string_array("scripts")?
-        .unwrap_or(default_scripts);
-    let assets = s
-        .get_string_array("assets")?
-        .unwrap_or(default_assets);
+    let scene = s
+        .get_string("scene")
+        .map(|s| s.to_string())
+        .unwrap_or(default_scene);
+    let scripts = s.get_string_array("scripts")?.unwrap_or(default_scripts);
+    let assets = s.get_string_array("assets")?.unwrap_or(default_assets);
     let window_title = s
         .get_string("window_title")
         .map(|s| s.to_string())
@@ -264,9 +279,7 @@ fn extract_build(
         }
         None => default_size,
     };
-    let targets = s
-        .get_string_array("targets")?
-        .unwrap_or(default_targets);
+    let targets = s.get_string_array("targets")?.unwrap_or(default_targets);
 
     Ok(BuildConfig {
         scene,
@@ -345,7 +358,10 @@ struct TomlDoc {
 
 impl TomlDoc {
     fn get(&self, name: &str) -> Option<&TomlSection> {
-        self.sections.iter().find(|(k, _)| k == name).map(|(_, v)| v)
+        self.sections
+            .iter()
+            .find(|(k, _)| k == name)
+            .map(|(_, v)| v)
     }
     fn sections(&self) -> impl Iterator<Item = (&String, &TomlSection)> {
         self.sections.iter().map(|(k, v)| (k, v))
@@ -361,7 +377,9 @@ fn parse_toml(text: &str) -> Result<TomlDoc> {
         if !name.is_empty() || !entries.is_empty() {
             doc.sections.push((
                 name.clone(),
-                TomlSection { entries: std::mem::take(entries) },
+                TomlSection {
+                    entries: std::mem::take(entries),
+                },
             ));
             name.clear();
         }
@@ -481,10 +499,12 @@ fn parse_string(raw: &str, line_no: usize) -> Result<String> {
                 Some('n') => out.push('\n'),
                 Some('t') => out.push('\t'),
                 Some(other) => out.push(other),
-                None => return Err(CliError::ManifestParse {
-                    line: line_no,
-                    msg: "trailing backslash in string".to_string(),
-                }),
+                None => {
+                    return Err(CliError::ManifestParse {
+                        line: line_no,
+                        msg: "trailing backslash in string".to_string(),
+                    })
+                }
             }
         } else {
             out.push(c);
@@ -549,7 +569,6 @@ fn split_array_items(s: &str) -> Vec<&str> {
     }
     parts
 }
-
 
 #[cfg(test)]
 mod tests;

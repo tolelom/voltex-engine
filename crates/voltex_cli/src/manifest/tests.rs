@@ -57,7 +57,13 @@ fn missing_name_returns_missing_field() {
 version = "0.1.0"
 "#;
     let err = Manifest::parse(toml).unwrap_err();
-    matches!(err, CliError::MissingField { section: "project", field: "name" });
+    matches!(
+        err,
+        CliError::MissingField {
+            section: "project",
+            field: "name"
+        }
+    );
 }
 
 #[test]
@@ -67,7 +73,13 @@ fn missing_version_returns_missing_field() {
 name = "x"
 "#;
     let err = Manifest::parse(toml).unwrap_err();
-    matches!(err, CliError::MissingField { section: "project", field: "version" });
+    matches!(
+        err,
+        CliError::MissingField {
+            section: "project",
+            field: "version"
+        }
+    );
 }
 
 #[test]
@@ -193,7 +205,9 @@ windows_title = "Game"
 "#;
     let err = Manifest::parse(toml).unwrap_err();
     match err {
-        CliError::UnknownField { field, suggestion, .. } => {
+        CliError::UnknownField {
+            field, suggestion, ..
+        } => {
             assert_eq!(field, "windows_title");
             assert_eq!(suggestion, Some("window_title"));
         }
