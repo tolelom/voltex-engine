@@ -156,18 +156,16 @@ fn cross_xz(a: Vec3, b: Vec3, c: Vec3) -> f32 {
 /// Given the sequence of triangle indices from A*, produces a path with
 /// waypoints at portal edge corners where the path turns.
 ///
-/// # Known limitation (tracked in `docs/DEFERRED.md`)
+/// # Algorithm note (apex restart)
 ///
-/// When the funnel inverts and a new apex is set, this implementation
-/// `continue`s from the *current* portal index instead of restarting the scan
-/// from `apex_idx + 1` as Mikko Mononen's canonical SSF does. For straight or
-/// single-turn corridors the result is identical, but in a zig-zag corridor
-/// (two tight turns in opposite directions) the skipped portals can yield a
-/// sub-optimal path that cuts an interior corner. The engine's own
-/// [`find_path`] does **not** use this — it returns triangle centroids — so
-/// the limitation only affects callers that invoke `funnel_smooth` directly.
-/// A correct fix needs the while-loop restart form plus a zig-zag regression
-/// test built with visual verification.
+/// When the funnel inverts and a new apex is set, the scan is restarted from
+/// the portal *after* the new apex (`i = apex_idx`, then the loop's own `i += 1`
+/// resumes at `apex_idx + 1`), exactly as Mikko Mononen's canonical SSF does.
+/// An earlier version `continue`d from the current portal index; that skipped
+/// portals between the old and new apex and, in zig-zag corridors, cut interior
+/// corners, producing paths that left the navigable corridor (verified: up to
+/// ~0.41 units of penetration on a 3-band zig-zag — see
+/// `test_funnel_zigzag_stays_inside_corridor`). The restart form fixes this.
 pub fn funnel_smooth(path_triangles: &[usize], navmesh: &NavMesh, start: Vec3, end: Vec3) -> Vec<Vec3> {
     // Trivial cases
     if path_triangles.is_empty() {
@@ -199,6 +197,8 @@ pub fn funnel_smooth(path_triangles: &[usize], navmesh: &NavMesh, start: Vec3, e
     let mut apex = start;
     let mut left = start;
     let mut right = start;
+    // Initialized to 0 but always reassigned (from left_idx/right_idx) before
+    // being read via `i = apex_idx`; the initial value is intentionally unused.
     #[allow(unused_assignments)]
     let mut apex_idx: usize = 0;
     let mut left_idx: usize = 0;
@@ -206,7 +206,10 @@ pub fn funnel_smooth(path_triangles: &[usize], navmesh: &NavMesh, start: Vec3, e
 
     let n = portals_left.len();
 
-    for i in 0..n {
+    // `while` loop (not `for`) so the scan can be restarted at the apex index
+    // when the funnel inverts, matching Mononen's canonical SSF.
+    let mut i = 0;
+    while i < n {
         let pl = portals_left[i];
         let pr = portals_right[i];
 
@@ -227,10 +230,10 @@ pub fn funnel_smooth(path_triangles: &[usize], navmesh: &NavMesh, start: Vec3, e
                 right = apex;
                 left_idx = apex_idx;
                 right_idx = apex_idx;
-                // Restart scan from apex
-                // We need to continue from apex_idx + 1, but since
-                // we can't restart a for loop, we use a recursive approach
-                // or just continue (the standard SSF continues from i)
+                // Restart the scan from the new apex. The `i += 1` below then
+                // resumes at apex_idx + 1 (canonical Mononen SSF).
+                i = apex_idx;
+                i += 1;
                 continue;
             }
         }
@@ -252,9 +255,13 @@ pub fn funnel_smooth(path_triangles: &[usize], navmesh: &NavMesh, start: Vec3, e
                 right = apex;
                 left_idx = apex_idx;
                 right_idx = apex_idx;
+                i = apex_idx;
+                i += 1;
                 continue;
             }
         }
+
+        i += 1;
     }
 
     // Add end point if not already there
@@ -332,8 +339,15 @@ mod tests {
         // start in tri0, goal in tri1
         let start = Vec3::new(0.8, 0.0, 0.5);
         let goal = Vec3::new(2.5, 0.0, 1.5);
+
+        // Exact triangle sequence: tri0 -> tri1 (adjacent).
+        let tris = find_path_triangles(&nm, start, goal).expect("should find tri path");
+        assert_eq!(tris, vec![0, 1], "expected exactly tri0 -> tri1");
+
         let path = find_path(&nm, start, goal).expect("should find path");
-        assert!(path.len() >= 2);
+        // 2 adjacent triangles => start + goal only (centroid of intermediate tris
+        // is empty because tri_path[1..len-1] is empty for len 2).
+        assert_eq!(path.len(), 2);
         assert_eq!(path[0], start);
         assert_eq!(path[path.len() - 1], goal);
     }
@@ -344,10 +358,26 @@ mod tests {
         // start in tri0, goal in tri2
         let start = Vec3::new(0.8, 0.0, 0.5);
         let goal = Vec3::new(2.0, 0.0, 3.5);
+
+        // Exact triangle sequence: tri0 -> tri1 -> tri2.
+        let tris = find_path_triangles(&nm, start, goal).expect("should find tri path");
+        assert_eq!(tris, vec![0, 1, 2], "expected exactly tri0 -> tri1 -> tri2");
+
         let path = find_path(&nm, start, goal).expect("should find path");
-        assert!(path.len() >= 3, "path through 3 triangles should have at least 3 points");
+        // 3 triangles => start + centroid(tri1) + goal == 3 points.
+        assert_eq!(path.len(), 3, "path through 3 triangles should have 3 points");
         assert_eq!(path[0], start);
+        // Middle waypoint is the centroid of the intermediate triangle (tri1).
+        let mid = nm.triangle_center(1);
+        assert!((path[1].x - mid.x).abs() < 1e-5 && (path[1].z - mid.z).abs() < 1e-5,
+            "intermediate waypoint should be tri1 centroid, got {:?}", path[1]);
         assert_eq!(path[path.len() - 1], goal);
+
+        // Total length must be within tolerance of the threaded centroid distance.
+        let expected = distance_xz(start, mid) + distance_xz(mid, goal);
+        let actual: f32 = path.windows(2).map(|w| distance_xz(w[0], w[1])).sum();
+        assert!((actual - expected).abs() < 1e-4,
+            "path length {actual} should match centroid-threaded distance {expected}");
     }
 
     #[test]
@@ -391,15 +421,16 @@ mod tests {
 
     #[test]
     fn test_funnel_straight_path() {
-        // Straight corridor: path should be just start and end (2 points)
+        // Straight corridor: funnel must NOT introduce spurious corners.
         let nm = make_strip();
         let start = Vec3::new(1.0, 0.0, 0.5);
         let end = Vec3::new(2.0, 0.0, 3.5);
         let tris = find_path_triangles(&nm, start, end).expect("should find path");
         let smoothed = funnel_smooth(&tris, &nm, start, end);
-        assert!(smoothed.len() >= 2, "funnel path should have at least 2 points, got {}", smoothed.len());
+        assert_eq!(smoothed.len(), 2,
+            "straight corridor must produce exactly start+end, got {:?}", smoothed);
         assert_eq!(smoothed[0], start);
-        assert_eq!(smoothed[smoothed.len() - 1], end);
+        assert_eq!(smoothed[1], end);
     }
 
     #[test]
@@ -442,12 +473,165 @@ mod tests {
 
         let start = Vec3::new(0.3, 0.0, 0.3);
         let end = Vec3::new(3.5, 0.0, 0.5);
-        let tris = find_path_triangles(&nm, start, end);
-        if let Some(tris) = tris {
-            let smoothed = funnel_smooth(&tris, &nm, start, end);
-            assert!(smoothed.len() >= 2);
-            assert_eq!(smoothed[0], start);
-            assert_eq!(smoothed[smoothed.len() - 1], end);
+
+        // A path MUST exist (tri0 -> tri1 -> tri2). The old test wrapped the
+        // assertions in `if let Some`, so it silently passed when no path was
+        // found; require the path explicitly.
+        let tris = find_path_triangles(&nm, start, end).expect("path exists");
+        assert_eq!(tris, vec![0, 1, 2], "expected tri0 -> tri1 -> tri2");
+
+        let smoothed = funnel_smooth(&tris, &nm, start, end);
+        assert_eq!(smoothed[0], start);
+        assert_eq!(smoothed[smoothed.len() - 1], end);
+
+        // start (0.3,0.3) and end (3.5,0.5) both sit near z=0; the taut string
+        // travelling right wraps the single inside corner at vertex 1 = (2,0,0).
+        // The path must therefore turn exactly once, at that corner.
+        assert_eq!(smoothed.len(), 3, "L-path should turn once, got {smoothed:?}");
+        let corner = Vec3::new(2.0, 0.0, 0.0);
+        assert!(
+            (smoothed[1].x - corner.x).abs() < 1e-4 && (smoothed[1].z - corner.z).abs() < 1e-4,
+            "expected turn at inside corner {corner:?}, got {:?}",
+            smoothed[1]
+        );
+
+        // The turned path must stay inside the corridor.
+        let pen = max_penetration(&nm, &smoothed);
+        assert!(pen < 1e-3, "L-path left the corridor by {pen} units: {smoothed:?}");
+    }
+
+    /// Build a zig-zag corridor as a triangle strip and return
+    /// `(navmesh, start, end)`. The corridor weaves so the taut path must touch
+    /// an interior corner; a naive funnel that fails to restart the scan at the
+    /// apex cuts that corner and leaves the corridor.
+    fn make_zigzag() -> (NavMesh, Vec3, Vec3) {
+        // Left-wall (l) and right-wall (r) chains. Coordinates chosen (via a
+        // randomized search arbitrated by a max-penetration oracle) so the
+        // pre-fix `continue`-from-i funnel produced a path ~0.41 units outside
+        // the corridor, while the apex-restart funnel stays inside.
+        let l = [
+            Vec3::new(-2.8217, 0.0, 0.0000),
+            Vec3::new(-3.7173, 0.0, 1.3245),
+            Vec3::new(-4.9518, 0.0, 4.1572),
+            Vec3::new(-4.4156, 0.0, 5.8779),
+        ];
+        let r = [
+            Vec3::new(-0.2940, 0.0, 0.0000),
+            Vec3::new(-2.3601, 0.0, 1.3245),
+            Vec3::new(-2.8620, 0.0, 4.1572),
+            Vec3::new(-0.4660, 0.0, 5.8779),
+        ];
+        let bands = l.len() - 1;
+        let mut vertices = Vec::new();
+        for k in 0..l.len() {
+            vertices.push(l[k]);
+            vertices.push(r[k]);
         }
+        let li = |k: usize| k * 2;
+        let ri = |k: usize| k * 2 + 1;
+        let mut triangles: Vec<NavTriangle> = Vec::new();
+        for k in 0..bands {
+            let ta = triangles.len();
+            let tb = ta + 1;
+            let prev_tb = if k == 0 { None } else { Some(ta - 1) };
+            let next_ta = if k == bands - 1 { None } else { Some(tb + 1) };
+            // Ta = (L_k, R_k, L_{k+1}); edge1 (R_k, L_{k+1}) -> Tb
+            triangles.push(NavTriangle {
+                indices: [li(k), ri(k), li(k + 1)],
+                neighbors: [prev_tb, Some(tb), None],
+            });
+            // Tb = (R_k, R_{k+1}, L_{k+1}); edge1 (R_{k+1}, L_{k+1}) -> next Ta; edge2 -> Ta
+            triangles.push(NavTriangle {
+                indices: [ri(k), ri(k + 1), li(k + 1)],
+                neighbors: [None, next_ta, Some(ta)],
+            });
+        }
+        let nm = NavMesh::new(vertices, triangles);
+        let start = Vec3::new(-1.5579, 0.0, 0.01);
+        let end = Vec3::new(-2.4408, 0.0, 5.8679);
+        (nm, start, end)
+    }
+
+    /// Maximum distance any interior path sample lies outside ALL triangles.
+    /// Returns 0.0 when the whole path stays inside (or merely touches) the
+    /// corridor. Robust to the float-edge noise of a pure inside/outside test.
+    fn max_penetration(nm: &NavMesh, path: &[Vec3]) -> f32 {
+        fn point_in_tri(p: Vec3, a: Vec3, b: Vec3, c: Vec3) -> bool {
+            let d1 = (p.x - b.x) * (a.z - b.z) - (a.x - b.x) * (p.z - b.z);
+            let d2 = (p.x - c.x) * (b.z - c.z) - (b.x - c.x) * (p.z - c.z);
+            let d3 = (p.x - a.x) * (c.z - a.z) - (c.x - a.x) * (p.z - a.z);
+            let has_neg = d1 < 0.0 || d2 < 0.0 || d3 < 0.0;
+            let has_pos = d1 > 0.0 || d2 > 0.0 || d3 > 0.0;
+            !(has_neg && has_pos)
+        }
+        fn dist_seg(p: Vec3, a: Vec3, b: Vec3) -> f32 {
+            let abx = b.x - a.x;
+            let abz = b.z - a.z;
+            let denom = abx * abx + abz * abz;
+            let t = if denom > 0.0 {
+                (((p.x - a.x) * abx + (p.z - a.z) * abz) / denom).clamp(0.0, 1.0)
+            } else {
+                0.0
+            };
+            let cx = a.x + abx * t;
+            let cz = a.z + abz * t;
+            ((p.x - cx).powi(2) + (p.z - cz).powi(2)).sqrt()
+        }
+        let mut worst = 0.0f32;
+        for w in path.windows(2) {
+            for s in 1..100 {
+                let t = s as f32 / 100.0;
+                let pt = Vec3::new(
+                    w[0].x + (w[1].x - w[0].x) * t,
+                    0.0,
+                    w[0].z + (w[1].z - w[0].z) * t,
+                );
+                let mut inside = false;
+                let mut best = f32::INFINITY;
+                for tri in &nm.triangles {
+                    let a = nm.vertices[tri.indices[0]];
+                    let b = nm.vertices[tri.indices[1]];
+                    let c = nm.vertices[tri.indices[2]];
+                    if point_in_tri(pt, a, b, c) {
+                        inside = true;
+                        break;
+                    }
+                    let d = dist_seg(pt, a, b).min(dist_seg(pt, b, c)).min(dist_seg(pt, c, a));
+                    if d < best {
+                        best = d;
+                    }
+                }
+                if !inside && best > worst {
+                    worst = best;
+                }
+            }
+        }
+        worst
+    }
+
+    #[test]
+    fn test_funnel_zigzag_stays_inside_corridor() {
+        // Regression for the SSF apex-restart bug (docs/DEFERRED.md). The funnel
+        // must touch the interior corner at (-2.862, 4.1572) so the path stays
+        // inside the zig-zag corridor. The pre-fix `continue`-from-current-index
+        // funnel skipped that corner, producing a path ~0.41 units outside.
+        let (nm, start, end) = make_zigzag();
+        let tris = find_path_triangles(&nm, start, end).expect("path exists");
+        assert_eq!(tris, vec![0, 1, 2, 3, 4, 5], "expected the full 6-triangle strip");
+
+        let smoothed = funnel_smooth(&tris, &nm, start, end);
+        assert_eq!(smoothed[0], start);
+        assert_eq!(smoothed[smoothed.len() - 1], end);
+
+        // Must turn at the interior corner (vertex L2 = (-2.862, 4.1572)).
+        let corner = Vec3::new(-2.8620, 0.0, 4.1572);
+        let has_corner = smoothed
+            .iter()
+            .any(|p| (p.x - corner.x).abs() < 1e-3 && (p.z - corner.z).abs() < 1e-3);
+        assert!(has_corner, "funnel must touch interior corner {corner:?}, got {smoothed:?}");
+
+        // Decisive oracle: the smoothed path must NOT leave the corridor.
+        let pen = max_penetration(&nm, &smoothed);
+        assert!(pen < 1e-3, "funnel path left the corridor by {pen} units: {smoothed:?}");
     }
 }
