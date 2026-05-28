@@ -2,21 +2,21 @@
 
 /// Progressive JPEG scan parameters.
 #[derive(Debug, Clone)]
-pub struct ScanParams {
+pub(crate) struct ScanParams {
     /// Spectral selection start (DCT coefficient index).
-    pub ss: u8,
+    pub(crate) ss: u8,
     /// Spectral selection end (DCT coefficient index).
-    pub se: u8,
+    pub(crate) se: u8,
     /// Successive approximation bit position high.
-    pub ah: u8,
+    pub(crate) ah: u8,
     /// Successive approximation bit position low.
-    pub al: u8,
+    pub(crate) al: u8,
     /// Component indices included in this scan.
-    pub components: Vec<u8>,
+    pub(crate) components: Vec<u8>,
 }
 
 /// Detect if a JPEG is progressive (SOF2 marker present).
-pub fn is_progressive_jpeg(data: &[u8]) -> bool {
+pub(crate) fn is_progressive_jpeg(data: &[u8]) -> bool {
     // Scan for SOF2 marker (0xFF 0xC2)
     for i in 0..data.len().saturating_sub(1) {
         if data[i] == 0xFF && data[i + 1] == 0xC2 {
@@ -27,7 +27,7 @@ pub fn is_progressive_jpeg(data: &[u8]) -> bool {
 }
 
 /// Parse SOS markers to extract scan parameters.
-pub fn parse_scan_params(data: &[u8]) -> Vec<ScanParams> {
+pub(crate) fn parse_scan_params(data: &[u8]) -> Vec<ScanParams> {
     let mut scans = Vec::new();
     let mut i = 0;
     while i < data.len().saturating_sub(1) {
@@ -67,13 +67,13 @@ pub fn parse_scan_params(data: &[u8]) -> Vec<ScanParams> {
 }
 
 /// A 64-element DCT coefficient block.
-pub type DctBlock = [i32; 64];
+pub(crate) type DctBlock = [i32; 64];
 
 /// Accumulate a scan's coefficients into the coefficient buffer.
 /// For first DC scan (ss=0, ah=0): set DC coefficient
 /// For refinement (ah>0): refine existing coefficient precision
 /// For AC scan: set AC coefficients in range [ss..=se]
-pub fn merge_scan_coefficients(block: &mut DctBlock, scan_block: &DctBlock, params: &ScanParams) {
+pub(crate) fn merge_scan_coefficients(block: &mut DctBlock, scan_block: &DctBlock, params: &ScanParams) {
     if params.ah == 0 {
         // First scan for this range: copy coefficients
         for i in params.ss as usize..=params.se as usize {
