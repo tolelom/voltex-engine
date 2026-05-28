@@ -17,7 +17,6 @@
 #![warn(missing_docs)]
 
 mod headless;
-mod png_encode;
 pub mod scene;
 pub mod scene_gizmo;
 pub mod scene_lights;
@@ -26,8 +25,8 @@ pub mod scene_ui;
 mod target;
 
 pub use headless::HeadlessGpu;
-pub use png_encode::encode_rgba8;
 pub use target::{OffscreenTarget, CAPTURE_FORMAT, DEPTH_FORMAT};
+pub use voltex_image::encode_rgba8;
 
 /// Encode an RGBA8 buffer to PNG and write it to `path`.
 pub fn save_png(path: &str, width: u32, height: u32, rgba: &[u8]) -> std::io::Result<()> {
@@ -69,9 +68,17 @@ impl ImageStats {
         }
         Self {
             pixels,
-            black_fraction: if pixels == 0 { 0.0 } else { black as f32 / pixels as f32 },
+            black_fraction: if pixels == 0 {
+                0.0
+            } else {
+                black as f32 / pixels as f32
+            },
             distinct_colors: colors.len(),
-            mean_luminance: if pixels == 0 { 0.0 } else { (lum_sum / pixels as f64 / 255.0) as f32 },
+            mean_luminance: if pixels == 0 {
+                0.0
+            } else {
+                (lum_sum / pixels as f64 / 255.0) as f32
+            },
         }
     }
 
