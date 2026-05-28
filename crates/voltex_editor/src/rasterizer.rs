@@ -5,19 +5,19 @@
 use crate::ttf_parser::GlyphOutline;
 
 /// Result of rasterizing a single glyph.
-pub struct RasterResult {
-    pub width: u32,
-    pub height: u32,
+pub(crate) struct RasterResult {
+    pub(crate) width: u32,
+    pub(crate) height: u32,
     /// R8 alpha bitmap, row-major.
-    pub bitmap: Vec<u8>,
+    pub(crate) bitmap: Vec<u8>,
     /// Left bearing in pixels.
-    pub offset_x: f32,
+    pub(crate) offset_x: f32,
     /// Distance from baseline to top of glyph bbox in pixels.
-    pub offset_y: f32,
+    pub(crate) offset_y: f32,
 }
 
 /// Recursively flatten a quadratic bezier into line segments.
-pub fn flatten_quad(
+pub(crate) fn flatten_quad(
     x0: f32, y0: f32,
     cx: f32, cy: f32,
     x1: f32, y1: f32,
@@ -46,7 +46,7 @@ pub fn flatten_quad(
 }
 
 /// Rasterize a glyph outline at the given scale into an alpha bitmap.
-pub fn rasterize(outline: &GlyphOutline, scale: f32) -> RasterResult {
+pub(crate) fn rasterize(outline: &GlyphOutline, scale: f32) -> RasterResult {
     // Handle empty outline (e.g., space)
     if outline.contours.is_empty() || outline.x_max <= outline.x_min {
         return RasterResult {

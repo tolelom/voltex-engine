@@ -78,7 +78,7 @@ pub fn ray_vs_sphere_t(ray: &Ray, center: Vec3, radius: f32) -> Option<f32> {
 ///
 /// voltex_physics has an equivalent — this is duplicated here to avoid a
 /// voltex_editor → voltex_physics dependency.
-pub fn ray_vs_aabb(ray: &Ray, aabb: &AABB) -> Option<f32> {
+pub(crate) fn ray_vs_aabb(ray: &Ray, aabb: &AABB) -> Option<f32> {
     let mut t_min = f32::NEG_INFINITY;
     let mut t_max = f32::INFINITY;
     let o = [ray.origin.x, ray.origin.y, ray.origin.z];
@@ -113,7 +113,7 @@ pub fn ray_vs_aabb(ray: &Ray, aabb: &AABB) -> Option<f32> {
 /// Transform a mesh-local AABB into world space by transforming the 8 corners
 /// and rebuilding an axis-aligned AABB. Loose for rotated meshes (OBB picking
 /// is out of scope per E1 spec).
-pub fn world_aabb_from_local(local: &AABB, world: &Mat4) -> AABB {
+pub(crate) fn world_aabb_from_local(local: &AABB, world: &Mat4) -> AABB {
     let corners = [
         Vec3::new(local.min.x, local.min.y, local.min.z),
         Vec3::new(local.max.x, local.min.y, local.min.z),

@@ -97,7 +97,7 @@ use voltex_ecs::ComponentRegistry;
 ///
 /// The caller is responsible for logging and persistence — this function only
 /// mutates the world.
-pub fn apply_command(
+pub(crate) fn apply_command(
     world: &mut World,
     registry: &ComponentRegistry,
     cmd: &EditorCommand,

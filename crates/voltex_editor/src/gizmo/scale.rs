@@ -57,7 +57,7 @@ fn ray_plane_hit(ray: &Ray, origin: Vec3, normal: Vec3) -> Option<Vec3> {
 }
 
 /// Picks which scale handle the ray hits, if any.
-pub fn hit_axis(gizmo_origin: Vec3, ray: &Ray) -> Option<GizmoAxis> {
+pub(crate) fn hit_axis(gizmo_origin: Vec3, ray: &Ray) -> Option<GizmoAxis> {
     let mut best: Option<(GizmoAxis, f32)> = None;
     for axis in [GizmoAxis::X, GizmoAxis::Y, GizmoAxis::Z] {
         let bar = axis_local_aabb(axis);

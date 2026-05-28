@@ -34,25 +34,25 @@ fn read_u32(data: &[u8], off: usize) -> u32 {
 // --- Data types ---
 
 #[derive(Debug, Clone)]
-pub struct OutlinePoint {
-    pub x: f32,
-    pub y: f32,
-    pub on_curve: bool,
+pub(crate) struct OutlinePoint {
+    pub(crate) x: f32,
+    pub(crate) y: f32,
+    pub(crate) on_curve: bool,
 }
 
 #[derive(Debug, Clone)]
-pub struct GlyphOutline {
-    pub contours: Vec<Vec<OutlinePoint>>,
-    pub x_min: i16,
-    pub y_min: i16,
-    pub x_max: i16,
-    pub y_max: i16,
+pub(crate) struct GlyphOutline {
+    pub(crate) contours: Vec<Vec<OutlinePoint>>,
+    pub(crate) x_min: i16,
+    pub(crate) y_min: i16,
+    pub(crate) x_max: i16,
+    pub(crate) y_max: i16,
 }
 
 #[derive(Debug, Clone, Copy)]
-pub struct GlyphMetrics {
-    pub advance_width: u16,
-    pub left_side_bearing: i16,
+pub(crate) struct GlyphMetrics {
+    pub(crate) advance_width: u16,
+    pub(crate) left_side_bearing: i16,
 }
 
 // --- Flag bits for simple glyph parsing ---
@@ -65,16 +65,16 @@ const Y_SAME_OR_POS: u8 = 0x20;
 
 // --- TtfParser ---
 
-pub struct TtfParser {
+pub(crate) struct TtfParser {
     data: Vec<u8>,
-    pub tables: HashMap<[u8; 4], (u32, u32)>, // tag -> (offset, length)
-    pub units_per_em: u16,
-    pub num_glyphs: u16,
-    pub ascender: i16,
-    pub descender: i16,
-    pub line_gap: i16,
-    pub num_h_metrics: u16,
-    pub loca_format: i16,
+    pub(crate) tables: HashMap<[u8; 4], (u32, u32)>, // tag -> (offset, length)
+    pub(crate) units_per_em: u16,
+    pub(crate) num_glyphs: u16,
+    pub(crate) ascender: i16,
+    pub(crate) descender: i16,
+    pub(crate) line_gap: i16,
+    pub(crate) num_h_metrics: u16,
+    pub(crate) loca_format: i16,
 }
 
 impl TtfParser {

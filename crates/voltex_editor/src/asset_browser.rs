@@ -27,7 +27,7 @@ pub struct AssetBrowser {
     pub selected_file: Option<String>,
 }
 
-pub fn format_size(bytes: u64) -> String {
+pub(crate) fn format_size(bytes: u64) -> String {
     if bytes < 1024 {
         format!("{} B", bytes)
     } else if bytes < 1024 * 1024 {

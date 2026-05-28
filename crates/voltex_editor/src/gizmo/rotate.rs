@@ -43,7 +43,7 @@ fn angle_on_ring(p: Vec3, origin: Vec3, axis: GizmoAxis) -> f32 {
 
 /// Test all three rings; return the axis whose hit lies in the donut
 /// (radius ± tolerance), with the smallest ray-t.
-pub fn hit_axis(origin: Vec3, ray: &Ray) -> Option<(GizmoAxis, Vec3)> {
+pub(crate) fn hit_axis(origin: Vec3, ray: &Ray) -> Option<(GizmoAxis, Vec3)> {
     let mut best: Option<(GizmoAxis, f32, Vec3)> = None;
     for axis in [GizmoAxis::X, GizmoAxis::Y, GizmoAxis::Z] {
         let n = ring_plane_normal(axis);

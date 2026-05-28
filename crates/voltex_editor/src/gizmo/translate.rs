@@ -31,7 +31,7 @@ fn axis_local_aabb(axis: GizmoAxis) -> AABB {
 
 /// Pick the most camera-facing plane that contains `axis`. Returns the plane
 /// normal (orthogonal to axis).
-pub fn pick_drag_plane_normal(axis: GizmoAxis, gizmo_origin: Vec3, cam_pos: Vec3) -> Vec3 {
+pub(crate) fn pick_drag_plane_normal(axis: GizmoAxis, gizmo_origin: Vec3, cam_pos: Vec3) -> Vec3 {
     let cam_dir = (cam_pos - gizmo_origin).normalize();
     let (n1, n2) = match axis {
         GizmoAxis::X => (Vec3::new(0.0, 1.0, 0.0), Vec3::new(0.0, 0.0, 1.0)),
@@ -55,7 +55,7 @@ fn ray_plane_hit(ray: &Ray, origin: Vec3, normal: Vec3) -> Option<Vec3> {
 
 /// Test the ray against each axis's thin AABB (translated by gizmo_origin).
 /// Returns the axis with the nearest hit, or None.
-pub fn hit_axis(gizmo_origin: Vec3, ray: &Ray) -> Option<GizmoAxis> {
+pub(crate) fn hit_axis(gizmo_origin: Vec3, ray: &Ray) -> Option<GizmoAxis> {
     let mut best: Option<(GizmoAxis, f32)> = None;
     for axis in [GizmoAxis::X, GizmoAxis::Y, GizmoAxis::Z] {
         let local = axis_local_aabb(axis);
