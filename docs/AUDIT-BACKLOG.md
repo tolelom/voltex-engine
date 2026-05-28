@@ -42,7 +42,7 @@
 
 - [ ] **F1** missing_docs ~1476개 (11 crate) 점진 작성
 - [ ] **F2** `validate_hierarchy` pass — 직렬화 씬의 pre-existing 사이클 방어
-- [ ] **F3** JSON deserializer entity-count cap (text/binary 는 완료)
+- [x] **F3** JSON deserializer entity-count cap (text/binary 는 완료) — `deserialize_scene_json` 에 `MAX_SCENE_ENTITIES` cap 추가 + `_with_cap` 테스트 헬퍼 + boundary/reject 테스트 2개. 파서 자체 array-length cap 은 별도 (이 fix 는 deserializer 경계 방어). (이번 커밋)
 - [ ] **F4** coverage-guided fuzzing (cargo-fuzz/honggfuzz)
 - [ ] **F5** GPU/winit 의존 4 crate headless 커버리지 + `--fail-under-lines 80` CI gate
 - [ ] **F6** Linux/macOS 오디오 백엔드 실 머신 검증

@@ -1,14 +1,14 @@
 //! Text/JSON scene (de)serialization. The binary VSCN format lives in
 //! [`binary_scene`](crate::binary_scene).
 
+use crate::component_registry::ComponentRegistry;
+use crate::entity::Entity;
+use crate::hierarchy::{add_child, Parent};
+use crate::json::{self, JsonVal};
+use crate::transform::Transform;
+use crate::world::World;
 use std::collections::HashMap;
 use voltex_math::Vec3;
-use crate::entity::Entity;
-use crate::world::World;
-use crate::transform::Transform;
-use crate::hierarchy::{add_child, Parent};
-use crate::component_registry::ComponentRegistry;
-use crate::json::{self, JsonVal};
 
 /// String tag for entity identification.
 #[derive(Debug, Clone)]
@@ -35,7 +35,11 @@ fn parse_transform(s: &str) -> Option<Transform> {
     let position = parse_vec3(parts[0].trim())?;
     let rotation = parse_vec3(parts[1].trim())?;
     let scale = parse_vec3(parts[2].trim())?;
-    Some(Transform { position, rotation, scale })
+    Some(Transform {
+        position,
+        rotation,
+        scale,
+    })
 }
 
 /// Serialize all entities with a Transform component to the `.vscn` text format.
@@ -51,10 +55,8 @@ fn parse_transform(s: &str) -> Option<Transform> {
 /// [`serialize_scene_binary`](crate::serialize_scene_binary) path instead.
 pub fn serialize_scene(world: &World) -> String {
     // Collect all entities with Transform
-    let entities_with_transform: Vec<(Entity, Transform)> = world
-        .query::<Transform>()
-        .map(|(e, t)| (e, *t))
-        .collect();
+    let entities_with_transform: Vec<(Entity, Transform)> =
+        world.query::<Transform>().map(|(e, t)| (e, *t)).collect();
 
     // Build entity -> local index map
     let entity_to_index: HashMap<Entity, usize> = entities_with_transform
@@ -75,9 +77,7 @@ pub fn serialize_scene(world: &World) -> String {
         let s = transform.scale;
         output.push_str(&format!(
             "  transform {} {} {} | {} {} {} | {} {} {}\n",
-            p.x, p.y, p.z,
-            r.x, r.y, r.z,
-            s.x, s.y, s.z
+            p.x, p.y, p.z, r.x, r.y, r.z, s.x, s.y, s.z
         ));
 
         // Parent line (if entity has a Parent)
@@ -236,10 +236,8 @@ fn hex_digit(c: u8) -> crate::Result<u8> {
 /// Serialize all entities with a Transform to JSON format using the component registry.
 /// Format: {"version":1,"entities":[{"parent":null_or_idx,"components":{"name":"hex",...}}]}
 pub fn serialize_scene_json(world: &World, registry: &ComponentRegistry) -> String {
-    let entities_with_transform: Vec<(Entity, Transform)> = world
-        .query::<Transform>()
-        .map(|(e, t)| (e, *t))
-        .collect();
+    let entities_with_transform: Vec<(Entity, Transform)> =
+        world.query::<Transform>().map(|(e, t)| (e, *t)).collect();
 
     let entity_to_index: HashMap<Entity, usize> = entities_with_transform
         .iter()
@@ -284,23 +282,52 @@ pub fn serialize_scene_json(world: &World, registry: &ComponentRegistry) -> Stri
 }
 
 /// Deserialize entities from a JSON scene string.
+///
+/// Caps entity count at [`MAX_SCENE_ENTITIES`] (mirrors the binary/text
+/// formats) so a malicious JSON cannot drive a multi-GB
+/// `Vec::with_capacity` allocation post-parse. Note: a separate parser-
+/// level array-length cap in `json::json_parse` would block the bomb
+/// earlier; this is defense-in-depth at the deserializer boundary.
 pub fn deserialize_scene_json(
     world: &mut World,
     json_str: &str,
     registry: &ComponentRegistry,
 ) -> crate::Result<Vec<Entity>> {
+    deserialize_scene_json_with_cap(world, json_str, registry, MAX_SCENE_ENTITIES)
+}
+
+/// Test-friendly variant exposing the entity cap. Keeps the production
+/// path on `MAX_SCENE_ENTITIES` while letting tests exercise the
+/// rejection branch with a small fixture.
+pub(crate) fn deserialize_scene_json_with_cap(
+    world: &mut World,
+    json_str: &str,
+    registry: &ComponentRegistry,
+    cap: usize,
+) -> crate::Result<Vec<Entity>> {
     let root = json::json_parse(json_str)?;
 
-    let version = root.get("version")
+    let version = root
+        .get("version")
         .and_then(|v| v.as_f64())
         .ok_or_else(|| crate::EcsError::from("Missing or invalid 'version'"))?;
     if version as u32 != 1 {
         return Err(format!("Unsupported version: {}", version).into());
     }
 
-    let entities_arr = root.get("entities")
+    let entities_arr = root
+        .get("entities")
         .and_then(|v| v.as_array())
         .ok_or_else(|| crate::EcsError::from("Missing or invalid 'entities'"))?;
+
+    if entities_arr.len() > cap {
+        return Err(format!(
+            "JSON scene entity count {} exceeds limit {}",
+            entities_arr.len(),
+            cap
+        )
+        .into());
+    }
 
     // First pass: create entities and deserialize components
     let mut created: Vec<Entity> = Vec::with_capacity(entities_arr.len());
@@ -348,19 +375,22 @@ pub fn deserialize_scene_json(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::hierarchy::{add_child, roots, Parent};
     use crate::component_registry::ComponentRegistry;
+    use crate::hierarchy::{add_child, roots, Parent};
     use voltex_math::Vec3;
 
     #[test]
     fn test_serialize_single_entity() {
         let mut world = World::new();
         let e = world.spawn();
-        world.add(e, Transform {
-            position: Vec3::new(1.0, 2.0, 3.0),
-            rotation: Vec3::ZERO,
-            scale: Vec3::ONE,
-        });
+        world.add(
+            e,
+            Transform {
+                position: Vec3::new(1.0, 2.0, 3.0),
+                rotation: Vec3::ZERO,
+                scale: Vec3::ONE,
+            },
+        );
         world.add(e, Tag("sun".to_string()));
 
         let output = serialize_scene(&world);
@@ -381,7 +411,10 @@ mod tests {
         add_child(&mut world, parent, child);
 
         let output = serialize_scene(&world);
-        assert!(output.contains("parent"), "should contain 'parent' for child entity");
+        assert!(
+            output.contains("parent"),
+            "should contain 'parent' for child entity"
+        );
     }
 
     #[test]
@@ -390,20 +423,26 @@ mod tests {
 
         // Entity 0: sun (root)
         let sun = world1.spawn();
-        world1.add(sun, Transform {
-            position: Vec3::new(1.0, 2.0, 3.0),
-            rotation: Vec3::new(0.0, 0.5, 0.0),
-            scale: Vec3::ONE,
-        });
+        world1.add(
+            sun,
+            Transform {
+                position: Vec3::new(1.0, 2.0, 3.0),
+                rotation: Vec3::new(0.0, 0.5, 0.0),
+                scale: Vec3::ONE,
+            },
+        );
         world1.add(sun, Tag("sun".to_string()));
 
         // Entity 1: planet (child of sun)
         let planet = world1.spawn();
-        world1.add(planet, Transform {
-            position: Vec3::new(5.0, 0.0, 0.0),
-            rotation: Vec3::ZERO,
-            scale: Vec3::new(0.5, 0.5, 0.5),
-        });
+        world1.add(
+            planet,
+            Transform {
+                position: Vec3::new(5.0, 0.0, 0.0),
+                rotation: Vec3::ZERO,
+                scale: Vec3::new(0.5, 0.5, 0.5),
+            },
+        );
         world1.add(planet, Tag("planet".to_string()));
         add_child(&mut world1, sun, planet);
 
@@ -418,18 +457,42 @@ mod tests {
         let sun2 = entities[0];
         let planet2 = entities[1];
 
-        let sun_transform = world2.get::<Transform>(sun2).expect("sun should have Transform");
-        assert!((sun_transform.position.x - 1.0).abs() < 1e-4, "sun position.x");
-        assert!((sun_transform.position.y - 2.0).abs() < 1e-4, "sun position.y");
-        assert!((sun_transform.position.z - 3.0).abs() < 1e-4, "sun position.z");
-        assert!((sun_transform.rotation.y - 0.5).abs() < 1e-4, "sun rotation.y");
+        let sun_transform = world2
+            .get::<Transform>(sun2)
+            .expect("sun should have Transform");
+        assert!(
+            (sun_transform.position.x - 1.0).abs() < 1e-4,
+            "sun position.x"
+        );
+        assert!(
+            (sun_transform.position.y - 2.0).abs() < 1e-4,
+            "sun position.y"
+        );
+        assert!(
+            (sun_transform.position.z - 3.0).abs() < 1e-4,
+            "sun position.z"
+        );
+        assert!(
+            (sun_transform.rotation.y - 0.5).abs() < 1e-4,
+            "sun rotation.y"
+        );
 
-        let planet_transform = world2.get::<Transform>(planet2).expect("planet should have Transform");
-        assert!((planet_transform.position.x - 5.0).abs() < 1e-4, "planet position.x");
-        assert!((planet_transform.scale.x - 0.5).abs() < 1e-4, "planet scale.x");
+        let planet_transform = world2
+            .get::<Transform>(planet2)
+            .expect("planet should have Transform");
+        assert!(
+            (planet_transform.position.x - 5.0).abs() < 1e-4,
+            "planet position.x"
+        );
+        assert!(
+            (planet_transform.scale.x - 0.5).abs() < 1e-4,
+            "planet scale.x"
+        );
 
         // Verify Parent relationship
-        let parent_comp = world2.get::<Parent>(planet2).expect("planet should have Parent");
+        let parent_comp = world2
+            .get::<Parent>(planet2)
+            .expect("planet should have Parent");
         assert_eq!(parent_comp.0, sun2, "planet's parent should be sun");
 
         // Verify Tag values
@@ -586,9 +649,41 @@ entity 0
     fn deserialize_scene_at_cap_boundary_works() {
         // Index exactly equal to the cap is rejected; one below succeeds
         // but would allocate ~1M Vec entries, which is acceptable.
-        let source = format!("entity {}\n  transform 0 0 0 | 0 0 0 | 1 1 1\n", MAX_SCENE_ENTITIES);
+        let source = format!(
+            "entity {}\n  transform 0 0 0 | 0 0 0 | 1 1 1\n",
+            MAX_SCENE_ENTITIES
+        );
         let mut world = World::new();
         let created = deserialize_scene(&mut world, &source);
-        assert!(created.is_empty(), "entity at MAX_SCENE_ENTITIES must be rejected");
+        assert!(
+            created.is_empty(),
+            "entity at MAX_SCENE_ENTITIES must be rejected"
+        );
+    }
+
+    #[test]
+    fn deserialize_scene_json_rejects_count_above_cap() {
+        // Defense-in-depth: an oversized `entities` array must be rejected
+        // before allocating downstream `Vec<Entity>` / parent-index buffers.
+        // Uses the `_with_cap` helper to exercise the rejection branch with
+        // a small fixture instead of constructing a real ~1M-entity JSON.
+        let json = r#"{"version":1,"entities":[{},{},{}]}"#;
+        let mut world = World::new();
+        let registry = ComponentRegistry::new();
+        let err = deserialize_scene_json_with_cap(&mut world, json, &registry, 2)
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("exceeds limit"), "unexpected error: {err}");
+    }
+
+    #[test]
+    fn deserialize_scene_json_at_cap_boundary_works() {
+        // Count exactly at the cap is accepted (boundary check is strictly >).
+        let json = r#"{"version":1,"entities":[{},{}]}"#;
+        let mut world = World::new();
+        let registry = ComponentRegistry::new();
+        let created = deserialize_scene_json_with_cap(&mut world, json, &registry, 2)
+            .expect("count at cap must be accepted");
+        assert_eq!(created.len(), 2);
     }
 }
