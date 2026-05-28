@@ -30,7 +30,7 @@ impl SteeringAgent {
 }
 
 /// Truncate vector `v` to at most `max_len` magnitude.
-pub fn truncate(v: Vec3, max_len: f32) -> Vec3 {
+pub(crate) fn truncate(v: Vec3, max_len: f32) -> Vec3 {
     let len_sq = v.length_squared();
     if len_sq > max_len * max_len {
         v.normalize() * max_len

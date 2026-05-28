@@ -249,7 +249,7 @@ impl NavMesh {
 }
 
 /// Test whether `point` lies inside or on the triangle (a, b, c) using XZ barycentric coordinates.
-pub fn point_in_triangle_xz(point: Vec3, a: Vec3, b: Vec3, c: Vec3) -> bool {
+pub(crate) fn point_in_triangle_xz(point: Vec3, a: Vec3, b: Vec3, c: Vec3) -> bool {
     // Compute barycentric coordinates using XZ plane
     let px = point.x;
     let pz = point.z;
@@ -271,7 +271,7 @@ pub fn point_in_triangle_xz(point: Vec3, a: Vec3, b: Vec3, c: Vec3) -> bool {
 
 /// Serialize a NavMesh to binary format.
 /// Format: vertex_count(u32) + vertices(f32*3 each) + triangle_count(u32) + triangles(indices u32*3 + neighbors i32*3 each)
-pub fn serialize_navmesh(navmesh: &NavMesh) -> Vec<u8> {
+pub(crate) fn serialize_navmesh(navmesh: &NavMesh) -> Vec<u8> {
     let mut data = Vec::new();
 
     // Vertex count
@@ -320,7 +320,7 @@ const MAX_NAVMESH_TRIANGLES: usize = 1_000_000;
 /// triangle array. This means downstream consumers
 /// (`NavMesh::shared_edge`, `point_in_triangle_xz`) can use these
 /// indices without re-checking.
-pub fn deserialize_navmesh(data: &[u8]) -> crate::Result<NavMesh> {
+pub(crate) fn deserialize_navmesh(data: &[u8]) -> crate::Result<NavMesh> {
     let mut offset = 0;
 
     let read_u32 = |off: &mut usize| -> crate::Result<u32> {

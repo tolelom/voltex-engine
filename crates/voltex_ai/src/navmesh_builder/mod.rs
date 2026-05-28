@@ -33,52 +33,52 @@ impl Default for NavMeshBuilder {
 }
 
 /// Heightfield: a 2D grid of min/max height spans for voxelized geometry.
-pub struct Heightfield {
-    pub width: usize,  // number of cells along X
-    pub depth: usize,  // number of cells along Z
-    pub min_x: f32,
-    pub min_z: f32,
-    pub cell_size: f32,
-    pub cell_height: f32,
+pub(crate) struct Heightfield {
+    pub(crate) width: usize,  // number of cells along X
+    pub(crate) depth: usize,  // number of cells along Z
+    pub(crate) min_x: f32,
+    pub(crate) min_z: f32,
+    pub(crate) cell_size: f32,
+    pub(crate) cell_height: f32,
     /// For each cell (x, z), store (min_y, max_y). None if empty.
-    pub cells: Vec<Option<(f32, f32)>>,
+    pub(crate) cells: Vec<Option<(f32, f32)>>,
 }
 
 impl Heightfield {
-    pub fn cell_index(&self, x: usize, z: usize) -> usize {
+    pub(crate) fn cell_index(&self, x: usize, z: usize) -> usize {
         z * self.width + x
     }
 }
 
 /// Map of walkable cells. True if the cell is walkable.
-pub struct WalkableMap {
-    pub width: usize,
-    pub depth: usize,
-    pub min_x: f32,
-    pub min_z: f32,
-    pub cell_size: f32,
-    pub walkable: Vec<bool>,
+pub(crate) struct WalkableMap {
+    pub(crate) width: usize,
+    pub(crate) depth: usize,
+    pub(crate) min_x: f32,
+    pub(crate) min_z: f32,
+    pub(crate) cell_size: f32,
+    pub(crate) walkable: Vec<bool>,
     /// Height at each walkable cell (top of walkable surface).
-    pub heights: Vec<f32>,
+    pub(crate) heights: Vec<f32>,
 }
 
 impl WalkableMap {
-    pub fn cell_index(&self, x: usize, z: usize) -> usize {
+    pub(crate) fn cell_index(&self, x: usize, z: usize) -> usize {
         z * self.width + x
     }
 }
 
 /// A region of connected walkable cells (flood-fill result).
-pub struct RegionMap {
-    pub width: usize,
-    pub depth: usize,
-    pub min_x: f32,
-    pub min_z: f32,
-    pub cell_size: f32,
+pub(crate) struct RegionMap {
+    pub(crate) width: usize,
+    pub(crate) depth: usize,
+    pub(crate) min_x: f32,
+    pub(crate) min_z: f32,
+    pub(crate) cell_size: f32,
     /// Region ID per cell. 0 = not walkable, 1+ = region ID.
-    pub regions: Vec<u32>,
-    pub heights: Vec<f32>,
-    pub num_regions: u32,
+    pub(crate) regions: Vec<u32>,
+    pub(crate) heights: Vec<f32>,
+    pub(crate) num_regions: u32,
 }
 
 impl NavMeshBuilder {

@@ -41,7 +41,7 @@ impl Ord for AStarNode {
 }
 
 /// XZ distance between two Vec3 points (ignoring Y).
-pub fn distance_xz(a: Vec3, b: Vec3) -> f32 {
+pub(crate) fn distance_xz(a: Vec3, b: Vec3) -> f32 {
     let dx = a.x - b.x;
     let dz = a.z - b.z;
     (dx * dx + dz * dz).sqrt()
@@ -49,7 +49,7 @@ pub fn distance_xz(a: Vec3, b: Vec3) -> f32 {
 
 /// Run A* on the NavMesh and return the sequence of triangle indices from start to goal.
 /// Returns None if either point is outside the mesh or no path exists.
-pub fn find_path_triangles(navmesh: &NavMesh, start: Vec3, goal: Vec3) -> Option<Vec<usize>> {
+pub(crate) fn find_path_triangles(navmesh: &NavMesh, start: Vec3, goal: Vec3) -> Option<Vec<usize>> {
     let start_tri = navmesh.find_triangle(start)?;
     let goal_tri = navmesh.find_triangle(goal)?;
 
@@ -166,7 +166,7 @@ fn cross_xz(a: Vec3, b: Vec3, c: Vec3) -> f32 {
 /// corners, producing paths that left the navigable corridor (verified: up to
 /// ~0.41 units of penetration on a 3-band zig-zag — see
 /// `test_funnel_zigzag_stays_inside_corridor`). The restart form fixes this.
-pub fn funnel_smooth(path_triangles: &[usize], navmesh: &NavMesh, start: Vec3, end: Vec3) -> Vec<Vec3> {
+pub(crate) fn funnel_smooth(path_triangles: &[usize], navmesh: &NavMesh, start: Vec3, end: Vec3) -> Vec<Vec3> {
     // Trivial cases
     if path_triangles.is_empty() {
         return vec![start, end];
