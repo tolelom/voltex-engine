@@ -4,12 +4,32 @@
 /// a generation counter that increments on each despawn, so handles to slots
 /// that have been reused refer to a different generation and `World::is_alive`
 /// returns false. Cheap to copy; small enough to pass by value everywhere.
+///
+/// The fields are intentionally public: `Entity` is a plain-data handle that
+/// round-trips through network snapshots ([`voltex_net`]), the Lua FFI, and
+/// scene (de)serialization, all of which must reconstruct an `(id, generation)`
+/// pair from the wire/disk/script. Safe handles come from
+/// [`EntityAllocator::allocate`]; code reconstructing a handle from external
+/// data should use [`Entity::from_raw_parts`] and then validate it with
+/// [`World::is_alive`](crate::World::is_alive) before dereferencing.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct Entity {
     /// Slot index. Stable across the lifetime of the slot, but reused after despawn.
     pub id: u32,
     /// Generation counter bumped on each despawn. Used to detect stale handles.
     pub generation: u32,
+}
+
+impl Entity {
+    /// Reconstruct an `Entity` from a raw `(id, generation)` pair — e.g. a
+    /// handle read back from a network snapshot, the Lua FFI, or a saved scene.
+    ///
+    /// The result is **not** guaranteed to reference a live entity; validate it
+    /// with [`World::is_alive`](crate::World::is_alive) before use. Mirrors
+    /// `voltex_asset::Handle::from_raw_parts`.
+    pub fn from_raw_parts(id: u32, generation: u32) -> Self {
+        Entity { id, generation }
+    }
 }
 
 struct EntityEntry {
@@ -135,6 +155,16 @@ impl Default for EntityAllocator {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn from_raw_parts_round_trips_id_and_generation() {
+        let e = Entity::from_raw_parts(42, 7);
+        assert_eq!(e.id, 42);
+        assert_eq!(e.generation, 7);
+        // A reconstructed handle is not implicitly alive in any world.
+        let alloc = EntityAllocator::new();
+        assert!(!alloc.is_alive(e));
+    }
 
     #[test]
     fn test_allocate() {

@@ -8,9 +8,9 @@
 
 ## A. 타입 안전성 · 캡슐화
 
-- [ ] **A1** `Entity` 가 `pub id/generation` 노출 — `Handle<T>` 는 캡슐화돼 비대칭. 임의 Entity 위조 가능. (`voltex_ecs/entity.rs`, 中/中)
+- [x] **A1** `Entity` `pub` 필드는 net/Lua/씬 직렬화 round-trip 용 의도적 POD — private화 high-churn·low-benefit. 대신 의도 명시 문서화 + `Entity::from_raw_parts` named 생성자(Handle 미러) 추가 + Lua bare 리터럴 마이그레이션 + 가드 테스트. (커밋 후속)
 - [x] **A2** `AudioSource` → `ClipId(u32)` newtype + "재생 디스크립터(ECS 무의존)" 로 문서/CODEMAP 정정. `new(impl Into<ClipId>)` 로 ergonomics 유지. (커밋 후속)
-- [ ] **A3** `MeshHandle`/`MaterialHandle` 의 `pub` inner `Handle` + `from_raw_parts` 로 lockstep 불변식 비강제. (`voltex_ecs/render_components.rs`, `renderer_ecs/assets.rs`, 小/中)
+- [x] **A3** `MeshHandle`/`MaterialHandle` `pub` inner 는 핸들 재사용·직렬화용 의도 — id 공간이 `Assets` TypeId 로 보호됨(latent weakness, not live bug). 의도 명시 문서화로 처리(private화는 ~10 파일 영향이라 거부). (커밋 후속)
 - [x] **A4** Lua 마샬링: read 측은 기존 `read_handle_strict*` 유지 + `read_handle_strict` 가 `_at(1,2)` 로 위임, push 측 `push_entity`/`push_entity_table` 헬퍼로 spawn/find_by_tag/find_all_by_tag/iter_entities 중복 제거. (커밋 후속)
 
 ## B. 데드코드 정리 (YAGNI)
@@ -21,10 +21,10 @@
 
 ## C. 중복 제거 (DRY)
 
-- [ ] **C1** CRC32/Adler32/stored-deflate 가 renderer 와 capture 에 각각 구현. (`capture/png_encode.rs` ↔ `renderer/deflate.rs`)
+- [~] **C1** CRC32/Adler32 중복 — **E1 로 연기**: renderer 의 copy 는 test-only(production 중복은 capture 1곳, drift 무해), 제대로 된 공유 위치는 `voltex_image`(E1). God-crate 인 renderer 에 지금 pub util 추가는 역효과.
 - [x] **C2** `LoadState` vs `PendingState` 동일 상태공간 이중 정의 → `PendingState` 제거, `LoadState`(+Clone) 단일화. (커밋 후속)
 - [x] **C3** `SparseSet::increment_tick` trait impl 이 inherent 메서드로 위임. (커밋 후속)
-- [ ] **C4** LE-f32 직렬화 헬퍼가 ecs/net/audio 에 재발명. (3 crate)
+- [~] **C4** LE-f32 헬퍼 — **won't-fix**: 실제로는 각 crate 가 `f32::to_le_bytes`/`from_le_bytes`(std) 를 호출할 뿐, 추출할 공유 로직 없음.
 
 ## D. 남은 테스트 / 커버리지 갭
 

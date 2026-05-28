@@ -309,7 +309,7 @@ unsafe fn read_handle_strict_at(L: *mut ffi::lua_State, id_pos: c_int, gen_pos: 
     if isnum_id == 0 || isnum_gen == 0 {
         return None;
     }
-    Some(voltex_ecs::Entity { id, generation })
+    Some(voltex_ecs::Entity::from_raw_parts(id, generation))
 }
 
 /// `add_child(parent_id, parent_gen, child_id, child_gen)` — attaches `child`

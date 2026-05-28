@@ -14,10 +14,18 @@ pub struct MeshAsset;
 pub struct MaterialAsset;
 
 /// 한 엔티티가 어떤 메시 자원으로 렌더링되는지 가리키는 컴포넌트.
+///
+/// inner `Handle` 가 `pub` 인 것은 의도적이다 — 게임 코드가 한 핸들을 여러
+/// 엔티티에 재사용 (`MeshHandle(other.0)`) 하고, 직렬화/역직렬화가 `(id, gen)`
+/// 을 직접 다뤄야 한다. lockstep 무결성은 `voltex_renderer_ecs::RenderAssets`
+/// 가 책임지며, id 공간은 `voltex_asset::Assets` 의 `TypeId` 분리로 보호된다
+/// (잘못된 핸들은 `RenderAssets::mesh()` 에서 `None` → 해당 엔티티 skip).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct MeshHandle(pub Handle<MeshAsset>);
 
 /// 한 엔티티가 어떤 머티리얼 자원을 사용하는지 가리키는 컴포넌트.
+///
+/// inner `Handle` 의 `pub` 노출 의도는 [`MeshHandle`] 과 동일.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct MaterialHandle(pub Handle<MaterialAsset>);
 
