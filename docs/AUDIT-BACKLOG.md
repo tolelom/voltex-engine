@@ -50,7 +50,8 @@
 - [ ] **F5** GPU/winit 의존 4 crate headless 커버리지 + `--fail-under-lines 80` CI gate
 - [ ] **F6** Linux/macOS 오디오 백엔드 실 머신 검증
 - [ ] **F7** CI 첫 green run (GitHub mirror/self-hosted runner)
-- [x] **F8** `pub(crate)` 다운그레이드 audit 실행 — 5개 crate 총 63개 항목 downgrade (ai: 12개 커밋 6093bc6, script/ffi: 35개 커밋 7b16ead, image: 5개 커밋 346b83a, editor: 14개 커밋 a511a6c, renderer: 34개 커밋 8845676). voltex_runtime은 macro-exported API chain 이유로 변경 없음. 전 workspace build+174 tests 통과.
+- [x] **F8** `pub(crate)` 다운그레이드 audit 실행 — 9개 crate 총 139개 항목 downgrade: audio 20 (커밋 7c273c9), ecs 9 (커밋 f142f4f), net 1 (커밋 3dba5cc), physics 9 (커밋 47510b7), ai 12 (커밋 6093bc6), script 35 (커밋 7b16ead), image 5 (커밋 346b83a), editor 14 (커밋 a511a6c), renderer 34 (커밋 8845676). voltex_runtime은 macro-exported API chain 이유로 변경 없음. 전 workspace build+174 tests 통과.
+  - **후속**: visibility-coherence (`X is more private than item Y`) 경고와 future-API의 dead_code 경고를 발생시킨 over-downgrade 일부를 `pub` 복원. 대상: audio 8개 (GUID/BusInput/HrtfResult/HEAD_RADIUS/SPEED_OF_SOUND/calculate_hrtf/azimuth_from_positions/GainEffect/OggPage/generate_wav_bytes_24bit/generate_wav_bytes_f32), ecs 8개 (JsonVal/json_write_*/json_parse/ComponentStorage), net 1개 (HistoryEntry), ai 3개 (serialize_navmesh/deserialize_navmesh/funnel_smooth), script 전체 ffi (LUA_*/lua_* 상수/함수), renderer 23개 (bilateral_weight/circle_of_confusion/encode_octahedral 등), editor 1개 (RasterResult+fields). 추가로 pre-existing clippy 경고(physics/renderer_ecs/survivor_game의 useless_conversion, audio wasapi upper_case_acronyms) 일괄 수정. 워크스페이스 경고 0 회복, `cargo clippy --workspace -- -D warnings` clean.
 - [x] **F9** `voltex_image` 의 moved 디코더 파일들에 남아있는 `#![allow(missing_docs)]` 제거 — 7개 파일 doc 작성 + gltf/types.rs·parser.rs pub 항목 doc 추가. (이번 커밋)
 
 ## P3 — 보류 (저가치)
