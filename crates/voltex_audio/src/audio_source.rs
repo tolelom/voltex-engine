@@ -1,10 +1,27 @@
-//! `AudioSource` ECS component — per-entity playback handle.
+//! `AudioSource` — per-entity playback descriptor.
 
-/// ECS component that attaches audio playback to an entity.
+/// Typed identifier for an [`AudioClip`](crate::AudioClip) in the caller's clip
+/// table. A newtype (rather than a bare `u32`) so a clip id cannot be silently
+/// confused with any other index. Construct from a `u32` via `ClipId(n)` or
+/// `n.into()`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct ClipId(pub u32);
+
+impl From<u32> for ClipId {
+    fn from(v: u32) -> Self {
+        ClipId(v)
+    }
+}
+
+/// Per-entity playback descriptor. `voltex_audio` has no ECS dependency, so
+/// this is a plain struct; the integration layer (e.g. game code or
+/// `voltex_runtime`) registers it as an ECS component and an `audio_sync_system`
+/// drives the mixer from it.
 #[derive(Debug, Clone)]
 pub struct AudioSource {
-    /// Clip identifier (key into the asset table holding the [`AudioClip`](crate::AudioClip)).
-    pub clip_id: u32,
+    /// Clip identifier (key into the caller's clip table holding the
+    /// [`AudioClip`](crate::AudioClip)).
+    pub clip_id: ClipId,
     /// Linear volume multiplier (0.0 = silent, 1.0 = unattenuated).
     pub volume: f32,
     /// If `true`, the mixer applies 3D spatialisation using the entity transform.
@@ -20,9 +37,9 @@ pub struct AudioSource {
 
 impl AudioSource {
     /// Creates a stopped, 100%-volume, non-spatial, non-looping source.
-    pub fn new(clip_id: u32) -> Self {
+    pub fn new(clip_id: impl Into<ClipId>) -> Self {
         AudioSource {
-            clip_id,
+            clip_id: clip_id.into(),
             volume: 1.0,
             spatial: false,
             looping: false,
@@ -55,7 +72,7 @@ mod tests {
     #[test]
     fn test_new_defaults() {
         let src = AudioSource::new(42);
-        assert_eq!(src.clip_id, 42);
+        assert_eq!(src.clip_id, ClipId(42));
         assert!((src.volume - 1.0).abs() < 1e-6);
         assert!(!src.spatial);
         assert!(!src.looping);

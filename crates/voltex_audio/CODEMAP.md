@@ -6,7 +6,7 @@
 ## 공개 API 진입점
 - `AudioSystem` — 메인 오디오 시스템 (src/audio_system.rs)
 - `AudioClip` — PCM 데이터 (src/audio_clip.rs)
-- `AudioSource` — ECS 컴포넌트 (src/audio_source.rs)
+- `AudioSource` / `ClipId` — per-entity 재생 디스크립터 + 타입화된 clip 식별자. ECS 컴포넌트로 등록 가능하나 audio crate 자체는 ECS 무의존 (src/audio_source.rs)
 - `AsyncAudioLoader` — 비동기 로딩 (src/async_loader.rs)
 - WAV/OGG 디코더 — `parse_wav`, `decode_ogg` (src/wav.rs, src/ogg.rs, src/vorbis.rs)
 - `MixGroup`, `MixGroupManager`, `AudioBus` — 믹싱 (src/mix_group.rs, src/dynamic_groups.rs, src/audio_bus.rs)

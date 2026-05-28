@@ -9,9 +9,9 @@
 ## A. 타입 안전성 · 캡슐화
 
 - [ ] **A1** `Entity` 가 `pub id/generation` 노출 — `Handle<T>` 는 캡슐화돼 비대칭. 임의 Entity 위조 가능. (`voltex_ecs/entity.rs`, 中/中)
-- [ ] **A2** `AudioSource` 가 "ECS 컴포넌트" 문서화됐지만 ECS 의존 없음 + `clip_id: u32` primitive obsession → `ClipId` newtype + 문서 정정. (`voltex_audio/audio_source.rs`, 小/低)
+- [x] **A2** `AudioSource` → `ClipId(u32)` newtype + "재생 디스크립터(ECS 무의존)" 로 문서/CODEMAP 정정. `new(impl Into<ClipId>)` 로 ergonomics 유지. (커밋 후속)
 - [ ] **A3** `MeshHandle`/`MaterialHandle` 의 `pub` inner `Handle` + `from_raw_parts` 로 lockstep 불변식 비강제. (`voltex_ecs/render_components.rs`, `renderer_ecs/assets.rs`, 小/中)
-- [ ] **A4** Lua `(id,gen)` 마샬링이 17개 함수에 산재 → `entity_from_lua`/`push_entity` 헬퍼 일원화. (`voltex_script/engine_api.rs`, 中/低)
+- [x] **A4** Lua 마샬링: read 측은 기존 `read_handle_strict*` 유지 + `read_handle_strict` 가 `_at(1,2)` 로 위임, push 측 `push_entity`/`push_entity_table` 헬퍼로 spawn/find_by_tag/find_all_by_tag/iter_entities 중복 제거. (커밋 후속)
 
 ## B. 데드코드 정리 (YAGNI)
 

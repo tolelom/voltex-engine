@@ -72,14 +72,27 @@ unsafe fn get_world(L: *mut ffi::lua_State) -> Option<&'static mut World> {
 /// who pass strings/nils/tables get a silent no-op instead of accidentally
 /// targeting entity (0, 0).
 unsafe fn read_handle_strict(L: *mut ffi::lua_State) -> Option<voltex_ecs::Entity> {
-    let mut isnum_id: c_int = 0;
-    let mut isnum_gen: c_int = 0;
-    let id = ffi::lua_tonumberx(L, 1, &mut isnum_id) as u32;
-    let generation = ffi::lua_tonumberx(L, 2, &mut isnum_gen) as u32;
-    if isnum_id == 0 || isnum_gen == 0 {
-        return None;
-    }
-    Some(voltex_ecs::Entity { id, generation })
+    read_handle_strict_at(L, 1, 2)
+}
+
+/// Push an entity across the FFI boundary as two numbers `(id, gen)` (the
+/// engine-wide handle contract). Returns the Lua return count (2).
+unsafe fn push_entity(L: *mut ffi::lua_State, entity: voltex_ecs::Entity) -> c_int {
+    ffi::lua_pushnumber(L, entity.id as f64);
+    ffi::lua_pushnumber(L, entity.generation as f64);
+    2
+}
+
+/// Push an entity as a `{ id =, gen = }` table, leaving it on top of the stack
+/// (at -1) so the caller can `lua_rawseti` it into an array.
+unsafe fn push_entity_table(L: *mut ffi::lua_State, entity: voltex_ecs::Entity) {
+    let id_key = std::ffi::CString::new("id").unwrap();
+    let gen_key = std::ffi::CString::new("gen").unwrap();
+    ffi::lua_createtable(L, 0, 2);
+    ffi::lua_pushnumber(L, entity.id as f64);
+    ffi::lua_setfield(L, -2, id_key.as_ptr());
+    ffi::lua_pushnumber(L, entity.generation as f64);
+    ffi::lua_setfield(L, -2, gen_key.as_ptr());
 }
 
 /// `spawn_entity()` → `id, gen`
@@ -87,9 +100,7 @@ unsafe extern "C" fn lua_spawn_entity(L: *mut ffi::lua_State) -> c_int {
     let Some(world) = get_world(L) else { return 0 };
     let entity = world.spawn();
     world.add(entity, Transform::new());
-    ffi::lua_pushnumber(L, entity.id as f64);
-    ffi::lua_pushnumber(L, entity.generation as f64);
-    2
+    push_entity(L, entity)
 }
 
 /// `set_position(id, gen, x, y, z)` — writes only if the handle is still alive.
@@ -277,17 +288,11 @@ unsafe extern "C" fn lua_find_all_by_tag(L: *mut ffi::lua_State) -> c_int {
     }
     let needle = std::ffi::CStr::from_ptr(cstr).to_string_lossy().into_owned();
 
-    let id_key = std::ffi::CString::new("id").unwrap();
-    let gen_key = std::ffi::CString::new("gen").unwrap();
     let mut index: ffi::lua_Integer = 1;
     for (entity, tag) in world.query::<voltex_ecs::scene::Tag>() {
         if tag.0 == needle {
-            ffi::lua_createtable(L, 0, 2);
-            ffi::lua_pushnumber(L, entity.id as f64);
-            ffi::lua_setfield(L, -2, id_key.as_ptr());
-            ffi::lua_pushnumber(L, entity.generation as f64);
-            ffi::lua_setfield(L, -2, gen_key.as_ptr());
-            // outer table is now at -2, inner at -1 → assign and pop inner.
+            // push_entity_table leaves the inner `{id=,gen=}` at -1, outer at -2.
+            push_entity_table(L, entity);
             ffi::lua_rawseti(L, -2, index);
             index += 1;
         }
@@ -342,15 +347,9 @@ unsafe extern "C" fn lua_iter_entities(L: *mut ffi::lua_State) -> c_int {
         return 1;
     };
     ffi::lua_createtable(L, 0, 0);
-    let id_key = std::ffi::CString::new("id").unwrap();
-    let gen_key = std::ffi::CString::new("gen").unwrap();
     let mut index: ffi::lua_Integer = 1;
     for entity in world.live_entities() {
-        ffi::lua_createtable(L, 0, 2);
-        ffi::lua_pushnumber(L, entity.id as f64);
-        ffi::lua_setfield(L, -2, id_key.as_ptr());
-        ffi::lua_pushnumber(L, entity.generation as f64);
-        ffi::lua_setfield(L, -2, gen_key.as_ptr());
+        push_entity_table(L, entity);
         ffi::lua_rawseti(L, -2, index);
         index += 1;
     }
@@ -375,9 +374,7 @@ unsafe extern "C" fn lua_find_by_tag(L: *mut ffi::lua_State) -> c_int {
     let needle = std::ffi::CStr::from_ptr(cstr).to_string_lossy().into_owned();
     for (entity, tag) in world.query::<voltex_ecs::scene::Tag>() {
         if tag.0 == needle {
-            ffi::lua_pushnumber(L, entity.id as f64);
-            ffi::lua_pushnumber(L, entity.generation as f64);
-            return 2;
+            return push_entity(L, entity);
         }
     }
     0

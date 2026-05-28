@@ -37,7 +37,7 @@ pub mod occlusion;
 
 pub use error::{AudioError, Result};
 pub use audio_clip::AudioClip;
-pub use audio_source::AudioSource;
+pub use audio_source::{AudioSource, ClipId};
 pub use wav::{parse_wav, generate_wav_bytes};
 pub use ogg::parse_ogg;
 pub use vorbis::decode_vorbis;
