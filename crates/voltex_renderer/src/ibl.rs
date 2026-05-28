@@ -2,7 +2,7 @@
 
 use crate::brdf_lut::generate_brdf_lut;
 
-pub const BRDF_LUT_SIZE: u32 = 256;
+pub(crate) const BRDF_LUT_SIZE: u32 = 256;
 
 pub struct IblResources {
     pub brdf_lut_texture: wgpu::Texture,

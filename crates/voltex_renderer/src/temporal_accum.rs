@@ -151,7 +151,7 @@ impl TemporalAccumulation {
 }
 
 /// Pure CPU temporal blend (for testing).
-pub fn temporal_blend(history: f32, current: f32, factor: f32) -> f32 {
+pub(crate) fn temporal_blend(history: f32, current: f32, factor: f32) -> f32 {
     history * (1.0 - factor) + current * factor
 }
 

@@ -22,7 +22,7 @@ pub struct Taa {
 }
 
 /// Halton sequence for jitter offsets (base 2 and 3).
-pub fn halton(index: usize, base: usize) -> f32 {
+pub(crate) fn halton(index: usize, base: usize) -> f32 {
     let mut result = 0.0_f32;
     let mut f = 1.0 / base as f32;
     let mut i = index;
@@ -35,7 +35,7 @@ pub fn halton(index: usize, base: usize) -> f32 {
 }
 
 /// Generate jitter offset for frame N (in pixel units, centered around 0).
-pub fn jitter_offset(frame: usize) -> [f32; 2] {
+pub(crate) fn jitter_offset(frame: usize) -> [f32; 2] {
     let idx = (frame % 16) + 1; // avoid index 0
     [halton(idx, 2) - 0.5, halton(idx, 3) - 0.5]
 }

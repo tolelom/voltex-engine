@@ -31,7 +31,7 @@ impl SoftShadowParams {
 }
 
 /// Penumbra estimation: wider penumbra for objects farther from occluder.
-pub fn penumbra_size(light_radius: f32, blocker_dist: f32, receiver_dist: f32) -> f32 {
+pub(crate) fn penumbra_size(light_radius: f32, blocker_dist: f32, receiver_dist: f32) -> f32 {
     if blocker_dist < 1e-6 {
         return 0.0;
     }

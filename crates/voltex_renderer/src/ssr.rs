@@ -193,7 +193,7 @@ impl Ssr {
 }
 
 /// Reflect a vector about a normal (CPU version for testing).
-pub fn reflect(incident: [f32; 3], normal: [f32; 3]) -> [f32; 3] {
+pub(crate) fn reflect(incident: [f32; 3], normal: [f32; 3]) -> [f32; 3] {
     let d = 2.0 * (incident[0] * normal[0] + incident[1] * normal[1] + incident[2] * normal[2]);
     [
         incident[0] - d * normal[0],

@@ -3,13 +3,13 @@
 #![allow(missing_docs)]
 
 /// In-memory decoded BMP image (RGBA pixel rows).
-pub struct BmpImage {
+pub(crate) struct BmpImage {
     /// Pixel width.
-    pub width: u32,
+    pub(crate) width: u32,
     /// Pixel height.
-    pub height: u32,
+    pub(crate) height: u32,
     /// Pixel data — `width * height * 4` bytes, RGBA.
-    pub pixels: Vec<u8>,
+    pub(crate) pixels: Vec<u8>,
 }
 
 /// Hard cap on either dimension we'll decode. Matches the typical GPU texture
@@ -18,7 +18,7 @@ pub struct BmpImage {
 /// overflow on the size computation below.
 const BMP_MAX_DIMENSION: u32 = 16_384;
 
-pub fn parse_bmp(data: &[u8]) -> crate::Result<BmpImage> {
+pub(crate) fn parse_bmp(data: &[u8]) -> crate::Result<BmpImage> {
     if data.len() < 54 {
         return Err(format!("BMP too small: {} bytes", data.len()).into());
     }

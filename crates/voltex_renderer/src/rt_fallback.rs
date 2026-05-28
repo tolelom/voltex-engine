@@ -31,7 +31,7 @@ pub enum RenderMode {
     Minimal,         // Shadow maps + no reflections
 }
 
-pub fn select_render_mode(caps: &RtCapabilities) -> RenderMode {
+pub(crate) fn select_render_mode(caps: &RtCapabilities) -> RenderMode {
     if caps.can_use_rt() {
         RenderMode::Full
     } else if caps.supports_compute {

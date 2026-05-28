@@ -1,7 +1,7 @@
 #![allow(missing_docs)]
 
 /// Van der Corput sequence via bit-reversal.
-pub fn radical_inverse_vdc(mut bits: u32) -> f32 {
+pub(crate) fn radical_inverse_vdc(mut bits: u32) -> f32 {
     bits = bits.rotate_right(16);
     bits = ((bits & 0x55555555) << 1) | ((bits & 0xAAAAAAAA) >> 1);
     bits = ((bits & 0x33333333) << 2) | ((bits & 0xCCCCCCCC) >> 2);
@@ -11,12 +11,12 @@ pub fn radical_inverse_vdc(mut bits: u32) -> f32 {
 }
 
 /// Hammersley low-discrepancy 2D sample.
-pub fn hammersley(i: u32, n: u32) -> [f32; 2] {
+pub(crate) fn hammersley(i: u32, n: u32) -> [f32; 2] {
     [i as f32 / n as f32, radical_inverse_vdc(i)]
 }
 
 /// GGX importance-sampled half vector in tangent space (N = (0,0,1)).
-pub fn importance_sample_ggx(xi: [f32; 2], roughness: f32) -> [f32; 3] {
+pub(crate) fn importance_sample_ggx(xi: [f32; 2], roughness: f32) -> [f32; 3] {
     let a = roughness * roughness;
     let phi = 2.0 * std::f32::consts::PI * xi[0];
     let cos_theta = ((1.0 - xi[1]) / (1.0 + (a * a - 1.0) * xi[1])).sqrt();
@@ -25,7 +25,7 @@ pub fn importance_sample_ggx(xi: [f32; 2], roughness: f32) -> [f32; 3] {
 }
 
 /// Smith geometry function for IBL: k = a²/2.
-pub fn geometry_smith_ibl(n_dot_v: f32, n_dot_l: f32, roughness: f32) -> f32 {
+pub(crate) fn geometry_smith_ibl(n_dot_v: f32, n_dot_l: f32, roughness: f32) -> f32 {
     let a = roughness * roughness;
     let k = a / 2.0;
     let ggx_v = n_dot_v / (n_dot_v * (1.0 - k) + k);
@@ -35,7 +35,7 @@ pub fn geometry_smith_ibl(n_dot_v: f32, n_dot_l: f32, roughness: f32) -> f32 {
 
 /// Monte Carlo integration of the split-sum BRDF for a given NdotV and roughness.
 /// Returns (scale, bias) such that F_env ≈ F0 * scale + bias.
-pub fn integrate_brdf(n_dot_v: f32, roughness: f32) -> (f32, f32) {
+pub(crate) fn integrate_brdf(n_dot_v: f32, roughness: f32) -> (f32, f32) {
     const NUM_SAMPLES: u32 = 1024;
 
     // View vector in tangent space where N = (0,0,1).
@@ -77,7 +77,7 @@ pub fn integrate_brdf(n_dot_v: f32, roughness: f32) -> (f32, f32) {
 ///
 /// Returns `size * size` elements. Each element is `[scale, bias]` where
 /// the x-axis (u) maps NdotV in [0, 1] and the y-axis (v) maps roughness in [0, 1].
-pub fn generate_brdf_lut(size: u32) -> Vec<[f32; 2]> {
+pub(crate) fn generate_brdf_lut(size: u32) -> Vec<[f32; 2]> {
     let mut lut = Vec::with_capacity((size * size) as usize);
     for row in 0..size {
         // v maps to roughness (row 0 → roughness near 0, last row → 1).

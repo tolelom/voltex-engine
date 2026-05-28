@@ -2,12 +2,12 @@
 #![allow(missing_docs)]
 
 /// Calculate half-resolution dimensions (rounded up).
-pub fn half_resolution(width: u32, height: u32) -> (u32, u32) {
+pub(crate) fn half_resolution(width: u32, height: u32) -> (u32, u32) {
     (width.div_ceil(2), height.div_ceil(2))
 }
 
 /// Bilinear upscale weight calculation for a 2x2 tap pattern.
-pub fn bilinear_weights(frac_x: f32, frac_y: f32) -> [f32; 4] {
+pub(crate) fn bilinear_weights(frac_x: f32, frac_y: f32) -> [f32; 4] {
     let w00 = (1.0 - frac_x) * (1.0 - frac_y);
     let w10 = frac_x * (1.0 - frac_y);
     let w01 = (1.0 - frac_x) * frac_y;
@@ -16,7 +16,7 @@ pub fn bilinear_weights(frac_x: f32, frac_y: f32) -> [f32; 4] {
 }
 
 /// Depth-aware upscale: reject samples with large depth discontinuity.
-pub fn depth_aware_weight(center_depth: f32, sample_depth: f32, threshold: f32) -> f32 {
+pub(crate) fn depth_aware_weight(center_depth: f32, sample_depth: f32, threshold: f32) -> f32 {
     if (center_depth - sample_depth).abs() > threshold {
         0.0
     } else {

@@ -1,7 +1,7 @@
 #![allow(missing_docs)]
 
 /// Pure CPU exposure calculation logic (testable).
-pub fn calculate_target_exposure(
+pub(crate) fn calculate_target_exposure(
     avg_log_luminance: f32,
     key_value: f32,
     min_exp: f32,
@@ -13,7 +13,7 @@ pub fn calculate_target_exposure(
 }
 
 /// Smooth adaptation over time.
-pub fn adapt_exposure(current: f32, target: f32, dt: f32, speed: f32) -> f32 {
+pub(crate) fn adapt_exposure(current: f32, target: f32, dt: f32, speed: f32) -> f32 {
     current + (target - current) * (1.0 - (-dt * speed).exp())
 }
 

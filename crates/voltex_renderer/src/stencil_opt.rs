@@ -2,7 +2,7 @@
 #![allow(missing_docs)]
 
 /// Stencil state for marking pixels inside a light volume.
-pub fn light_volume_stencil_mark() -> wgpu::DepthStencilState {
+pub(crate) fn light_volume_stencil_mark() -> wgpu::DepthStencilState {
     wgpu::DepthStencilState {
         format: wgpu::TextureFormat::Depth24PlusStencil8,
         depth_write_enabled: false,
@@ -28,7 +28,7 @@ pub fn light_volume_stencil_mark() -> wgpu::DepthStencilState {
 }
 
 /// Stencil state for rendering only where stencil != 0 (inside light volume).
-pub fn light_volume_stencil_test() -> wgpu::DepthStencilState {
+pub(crate) fn light_volume_stencil_test() -> wgpu::DepthStencilState {
     wgpu::DepthStencilState {
         format: wgpu::TextureFormat::Depth24PlusStencil8,
         depth_write_enabled: false,

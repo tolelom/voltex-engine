@@ -3,7 +3,7 @@
 use bytemuck::{Pod, Zeroable};
 
 pub const SSGI_OUTPUT_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba16Float;
-pub const SSGI_KERNEL_SIZE: usize = 64;
+pub(crate) const SSGI_KERNEL_SIZE: usize = 64;
 
 const NOISE_TEXTURE_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba32Float;
 const NOISE_DIM: u32 = 4; // 4x4 = 16 noise samples
@@ -109,7 +109,7 @@ impl SsgiResources {
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 /// Simple deterministic hash → [0, 1) float.
-pub fn pseudo_random(seed: u32) -> f32 {
+pub(crate) fn pseudo_random(seed: u32) -> f32 {
     let mut x = seed;
     x = x.wrapping_add(0x9e3779b9);
     x = x.wrapping_mul(0x6c62272e);
@@ -121,7 +121,7 @@ pub fn pseudo_random(seed: u32) -> f32 {
 
 /// Generate `count` hemisphere samples (z >= 0) biased towards center.
 /// Each sample is stored as [x, y, z, 0.0] (w=0 unused / padding).
-pub fn generate_kernel(count: usize) -> Vec<[f32; 4]> {
+pub(crate) fn generate_kernel(count: usize) -> Vec<[f32; 4]> {
     let mut samples = Vec::with_capacity(count);
     let mut seed = 0u32;
 
@@ -153,7 +153,7 @@ pub fn generate_kernel(count: usize) -> Vec<[f32; 4]> {
 
 /// Generate 16 (4×4) random rotation vectors for SSGI noise.
 /// Each entry is [cos(angle), sin(angle), 0.0, 0.0] (xy rotation in tangent space).
-pub fn generate_noise_data() -> Vec<[f32; 4]> {
+pub(crate) fn generate_noise_data() -> Vec<[f32; 4]> {
     let mut data = Vec::with_capacity(16);
     let mut seed = 1337u32;
 
@@ -172,7 +172,7 @@ fn lerp(a: f32, b: f32, t: f32) -> f32 {
 }
 
 /// Create the SSGI output render target (RGBA16Float, screen-sized).
-pub fn create_ssgi_output(device: &wgpu::Device, width: u32, height: u32) -> wgpu::TextureView {
+pub(crate) fn create_ssgi_output(device: &wgpu::Device, width: u32, height: u32) -> wgpu::TextureView {
     let texture = device.create_texture(&wgpu::TextureDescriptor {
         label: Some("SSGI Output Texture"),
         size: wgpu::Extent3d {
@@ -191,7 +191,7 @@ pub fn create_ssgi_output(device: &wgpu::Device, width: u32, height: u32) -> wgp
 }
 
 /// Create the 4×4 SSGI noise texture (Rgba32Float) and its sampler.
-pub fn create_noise_texture(
+pub(crate) fn create_noise_texture(
     device: &wgpu::Device,
     queue: &wgpu::Queue,
 ) -> (wgpu::TextureView, wgpu::Sampler) {
