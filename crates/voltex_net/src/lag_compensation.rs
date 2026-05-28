@@ -114,13 +114,27 @@ mod tests {
 
     #[test]
     fn test_prune_old() {
-        let mut lc = LagCompensation::new(100.0); // 100ms
+        let mut lc = LagCompensation::new(100.0); // 100ms retention window
         for i in 0..20 {
             lc.record(HistoryEntry { tick: i, timestamp: i as f32 * 0.016, positions: vec![] });
         }
-        // At t=0.304, cutoff = 0.304 - 0.1 = 0.204
-        // Entries before t=0.204 should be pruned
-        assert!(lc.history_len() < 20);
+        // Newest entry: tick 19 @ t = 19 * 0.016 = 0.304.
+        // cutoff = 0.304 - 0.1 = 0.204. record() prunes entries with
+        // timestamp < cutoff from the front. timestamps are i * 0.016:
+        //   tick 12 @ 0.192 < 0.204  -> pruned
+        //   tick 13 @ 0.208 >= 0.204 -> retained
+        // So ticks 13..=19 survive: exactly 7 entries.
+        assert_eq!(lc.history_len(), 7, "expected exactly 7 retained entries after pruning");
+
+        // Oldest retained entry is tick 13; the just-recorded newest is tick 19.
+        assert_eq!(lc.history.front().unwrap().tick, 13, "oldest retained tick should be 13");
+        assert_eq!(lc.history.back().unwrap().tick, 19, "newest tick should be retained");
+
+        // The previously-oldest tick (0) must be gone.
+        assert!(
+            lc.history.iter().all(|e| e.tick >= 13),
+            "all retained entries should have tick >= 13 (oldest pruned)",
+        );
     }
 
     #[test]
