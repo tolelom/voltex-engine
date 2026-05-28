@@ -36,7 +36,10 @@
 
 - [x] **E1** `voltex_image` crate 분리 — renderer 의 PNG/JPG/deflate/glTF/OBJ/json_parser 는 wgpu 무의존 → God-crate(~120 export) 해소, L0 신규 crate. 역호환 `pub use` 재export 유지. (커밋 202afea + 7ee76f4 + f3684ae + b0c2d63 + 1856ef1 + 이번 커밋)
 - [x] **E2** `query2/3/4` 가 `Vec` 반환(매 프레임 할당) → `impl Iterator<...> + '_` 로 변경 (zero-alloc, `Either2/3/4` enum 으로 stack-allocated tagged union, `argmin3/4` 헬퍼로 min-selection 추출). 콜러 6곳(physics 단순 iter는 무수정, asset_demo/many_cubes는 `.len()`+iter 둘다 쓰는 곳만 `.collect::<Vec<_>>()` 1회). (이번 커밋)
-- [ ] **E3** `Transform`/snapshot 회전이 Euler `Vec3` → quaternion 저장 검토. (광범위)
+- [~] **E3** `Transform`/snapshot 회전이 Euler `Vec3` → quaternion. **Phase 1 완료**, 나머지는 sub-item 으로 분해 (광범위·다중 세션):
+    - [x] **E3a** `voltex_math::Quat` 정식 추가 — `from_axis_angle`/`from_euler_yxz`(`Transform::matrix()`의 RotY·RotX·RotZ 순서 일치)/`to_mat4`/`mul`(Hamilton)/`conjugate`/`inverse`/`normalize`/`dot`/`length`/NaN-safe `slerp`/`Default = IDENTITY`. 테스트 20개(axis-angle = `Mat4::rotation_{x,y,z}` 동치, YXZ euler = `Transform::matrix()` 동치, slerp boundary/midpoint/shorter-arc/clamp/NaN-drift, conj·inv, zero/normalize edge). (이번 커밋)
+    - [ ] **E3b** `Transform.rotation: Vec3` → `Quat` 마이그레이션 — 71 sites / 18 files (ecs/physics/editor/script/animation/examples). `Transform::matrix()` 재작성, text/binary/JSON 직렬화 호환 (rotation 필드 wire format 변경 또는 quat/euler dual-write), editor inspector Euler↔Quat round-trip 표시, Lua API 회전 read/write 마이그레이션.
+    - [ ] **E3c** `voltex_renderer::animation::Quat` (local) → `voltex_math::Quat` 통합 — animation.rs 의 자체 Quat 제거 후 facade 사용. skinning/glTF 채널 sample 경로 회귀 테스트.
 
 ## F. 기존 v1.1 백로그 (DEFERRED 출처)
 
