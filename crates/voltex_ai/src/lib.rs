@@ -18,6 +18,6 @@ pub mod steering;
 
 pub use error::{AiError, Result};
 pub use nav_agent::NavAgent;
-pub use navmesh::{NavMesh, NavTriangle};
+pub use navmesh::{deserialize_navmesh, serialize_navmesh, NavMesh, NavTriangle};
 pub use pathfinding::find_path;
 pub use steering::{SteeringAgent, seek, flee, arrive, wander, follow_path};

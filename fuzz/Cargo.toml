@@ -1,0 +1,82 @@
+[package]
+name = "voltex-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+
+# Not part of the workspace — libfuzzer-sys requires nightly. Run from this
+# directory with `cargo +nightly fuzz run <target>`.
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+
+voltex_image = { path = "../crates/voltex_image" }
+voltex_ecs = { path = "../crates/voltex_ecs" }
+voltex_net = { path = "../crates/voltex_net" }
+voltex_ai = { path = "../crates/voltex_ai" }
+
+[[bin]]
+name = "fuzz_png"
+path = "fuzz_targets/fuzz_png.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "fuzz_jpg"
+path = "fuzz_targets/fuzz_jpg.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "fuzz_gltf"
+path = "fuzz_targets/fuzz_gltf.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "fuzz_obj"
+path = "fuzz_targets/fuzz_obj.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "fuzz_scene_text"
+path = "fuzz_targets/fuzz_scene_text.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "fuzz_scene_json"
+path = "fuzz_targets/fuzz_scene_json.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "fuzz_scene_binary"
+path = "fuzz_targets/fuzz_scene_binary.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "fuzz_snapshot"
+path = "fuzz_targets/fuzz_snapshot.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "fuzz_navmesh"
+path = "fuzz_targets/fuzz_navmesh.rs"
+test = false
+doc = false
+bench = false
