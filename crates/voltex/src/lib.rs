@@ -23,6 +23,8 @@
 //! - 물리/오디오/AI/네트워킹/스크립트: [`physics`], [`audio`], [`ai`],
 //!   [`net`], [`script`]
 
+#![warn(missing_docs)]
+
 pub use voltex_ai as ai;
 pub use voltex_asset as asset;
 pub use voltex_audio as audio;

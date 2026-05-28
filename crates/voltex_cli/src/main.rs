@@ -1,6 +1,8 @@
 //! voltex CLI — `new`, `build`, `run` subcommands. Each subcommand lives in
 //! its own module; this file is dispatch + help text.
 
+#![warn(missing_docs)]
+
 use std::process::ExitCode;
 
 mod build;

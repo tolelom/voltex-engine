@@ -1,3 +1,7 @@
+//! Build script — compiles the bundled Lua 5.4 C sources into a static
+//! library that `voltex_script` links against. Re-runs only when `lua/`
+//! sources change.
+
 fn main() {
     let mut build = cc::Build::new();
     build.include("lua");

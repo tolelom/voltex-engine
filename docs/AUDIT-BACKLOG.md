@@ -40,7 +40,7 @@
 
 ## F. 기존 v1.1 백로그 (DEFERRED 출처)
 
-- [ ] **F1** missing_docs ~1476개 (11 crate) 점진 작성
+- [x] **F1** missing_docs ~1476개 (11 crate) — **백로그 작성 시점 figure는 stale**. 현재 13개 library crate(`voltex_math`/`platform`/`asset`/`audio`/`physics`/`ai`/`net`/`script`/`runtime`/`renderer`/`renderer_ecs`/`editor`/`image` + `ecs` + `capture`)는 모두 `#![warn(missing_docs)]` 적용 + `cargo build --workspace`에서 missing_docs 경고 0. 이번 커밋에서 `voltex` facade + `voltex_cli` binary + `voltex_script/build.rs`에도 doc 추가. 예제/게임 binary crate 의 strict `-D missing_docs` 통과는 별도 P3 (실 API 표면 아님). (이번 커밋)
 - [x] **F2** `validate_hierarchy` pass — 직렬화 씬의 pre-existing 사이클 방어. `add_child` 우회 경로(ComponentRegistry-driven Parent deserialize / 수기 편집 / 적대적 입력)로 들어온 cycle 을 walk + visited-set 으로 탐지 후 시작 entity 의 `Parent` 제거 + 해당 부모의 `Children` 정리. binary/JSON deserializer 양쪽에서 호출. depth cap = `VALIDATION_MAX_DEPTH(1024)` (`MAX_HIERARCHY_DEPTH` 와 일치). 테스트 4개. (이번 커밋)
 - [x] **F3** JSON deserializer entity-count cap (text/binary 는 완료) — `deserialize_scene_json` 에 `MAX_SCENE_ENTITIES` cap 추가 + `_with_cap` 테스트 헬퍼 + boundary/reject 테스트 2개. 파서 자체 array-length cap 은 별도 (이 fix 는 deserializer 경계 방어). (이번 커밋)
 - [ ] **F4** coverage-guided fuzzing (cargo-fuzz/honggfuzz)
