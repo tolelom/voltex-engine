@@ -216,22 +216,40 @@ jobs:
       - name: cargo deny check (all checks)
         run: cargo deny check
 
-  # Non-blocking coverage job — reports line/function/region coverage so
-  # contributors can see the trend over time. Threshold enforcement
-  # (--fail-under-lines 80) is deferred until GPU/winit code paths are
-  # covered by integration tests; today the baseline is ~82% lib only.
+  # Blocking coverage gate. Gates the workspace at >= 78% line coverage —
+  # the empirically-measured floor without GPU code paths (79.69% locally
+  # w/ --lib only). With lavapipe (software Vulkan) available, the GPU-
+  # gated #[ignore]'d tests in voltex_capture push the total to ~84%; we
+  # still run them via `-- --include-ignored` because they cost ~30s
+  # and contribute the only coverage signal for renderer headless /
+  # renderer_ecs::basic_renderer / runtime::handler. If lavapipe is
+  # missing on the runner the tests graceful-skip (HeadlessGpu returns
+  # Err) and the 78% threshold still passes — F5 is robust to missing
+  # GPU on weird runners.
   coverage:
-    name: coverage (ubuntu-latest, advisory)
+    name: coverage (ubuntu-latest)
     runs-on: ubuntu-latest
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: llvm-tools-preview
-      - name: Install Linux audio dev headers (ALSA)
-        run: sudo apt-get update && sudo apt-get install -y libasound2-dev
+      - name: Install Linux audio dev headers (ALSA) + software Vulkan (lavapipe)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libasound2-dev \
+            mesa-vulkan-drivers libvulkan1 vulkan-tools
+          # Verify lavapipe is the ICD vulkaninfo will pick up (best-effort —
+          # graceful-skip in tests if it is not).
+          VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/lvp_icd.x86_64.json \
+            vulkaninfo --summary || true
       - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@cargo-llvm-cov
-      - name: cargo llvm-cov --workspace --lib --summary-only
-        run: cargo llvm-cov --workspace --lib --summary-only
+      - name: cargo llvm-cov --workspace --lib (include-ignored, gate at 78%)
+        env:
+          VK_ICD_FILENAMES: /usr/share/vulkan/icd.d/lvp_icd.x86_64.json
+          WGPU_ADAPTER_NAME: llvmpipe
+        run: |
+          cargo llvm-cov --workspace --lib --summary-only \
+            --fail-under-lines 78 \
+            -- --include-ignored
