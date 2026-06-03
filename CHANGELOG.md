@@ -34,6 +34,13 @@ v1.0.59 데모(game_ready_demo)를 실제로 돌려보며 드러난 엔진 갭�
 - **HUD 바**: `UiContext::progress_bar` / `draw_rect` (체력/진행 바). 데모에
   danger meter 추가.
 
+- **그림자**: `RuntimeConfig::with_shadows(true)` — BasicRenderer directional
+  shadow mapping (depth pre-pass + mesh_colored 3×3 PCF, group 3). 기본 off
+  (동작 불변). 캡처 검증 `docs/visual/shadow_on.png`. 한계: 스킨드 caster 제외,
+  ortho 고정, 바닥 접촉 오브젝트 self-occlusion.
+- **헤드리스 데모 검증 하니스**: `voltex_capture::scene_playthrough` — 데모
+  장면을 오프스크린 렌더해 시각/동작을 자동 확인(라이브 창 불필요).
+
 ### Fixed
 
 - **generate_sphere winding**: 구가 CW-from-outside로 감겨 카메라 향한 반구가

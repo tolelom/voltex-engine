@@ -29,7 +29,8 @@ pub fn render_demo_frame(
     let device = &gpu.device;
     let queue = &gpu.queue;
     let target = OffscreenTarget::new(device, width, height);
-    let renderer = BasicRenderer::new(device, queue, CAPTURE_FORMAT, 64);
+    let mut renderer = BasicRenderer::new(device, queue, CAPTURE_FORMAT, 64);
+    renderer.set_shadows(true); // demo enables directional shadows
 
     let mut assets = RenderAssets::new();
     let cube = assets.add_mesh(unit_cube(device));

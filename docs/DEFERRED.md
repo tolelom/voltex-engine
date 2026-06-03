@@ -157,6 +157,8 @@
 
 ## 렌더링 한계
 
+- ~~**런타임 그림자 없음**~~ ✅ 2026-06-03 — BasicRenderer directional shadow mapping (`RuntimeConfig::with_shadows(true)`): shadow depth pre-pass + mesh_colored 3x3 PCF (group 3). 기본 off. 한계: 스킨드 메시 caster 아님, ortho 고정(30), 바닥 접촉 오브젝트 self-occlusion. 캡처 검증 docs/visual/shadow_on.png.
+
 - ~~**per-entity dynamic UBO**~~ ✅ GPU 인스턴싱 (InstanceData, InstanceBuffer, instanced pipeline) 완료.
 - **max_bind_groups=4** — 리소스 합치기로 해결 중.
 - ~~**BasicRenderer 가 머티리얼 색상 무시**~~ ✅ 2026-06-03 — 런타임 Blinn-Phong 경로(BasicRenderer)가 `MaterialUniform.base_color` 를 무시하고 흰색 기본 텍스처만 써 모든 오브젝트가 같은 회색 → 같은 색 바닥에 묻힘("박스 안 보임" 2차 원인). `ColoredCameraUniform`(per-entity base_color) + `mesh_colored.wgsl` + `create_colored_mesh_pipeline` 로 BasicRenderer 만 격리 수정 (shared CameraUniform/mesh_shader/PBR/4개 레거시 예제 무영향). voltex_capture `basic_renderer_applies_material_base_color` 회귀. 한계: 텍스처/노멀맵 등 풀 PBR 머티리얼은 여전히 PBR 파이프라인 전용 — 런타임 PBR 통합은 후속.

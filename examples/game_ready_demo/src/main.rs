@@ -81,6 +81,7 @@ fn main() -> RuntimeResult<()> {
                 Vec3::new(1.0, 0.95, 0.85),
                 0.15,
             )
+            .with_shadows(true)
             .with_audio(vec![beep_clip()])
             // No rigid-body dynamics here — collisions are used only as
             // trigger events (the set_collision_fn catch detector).

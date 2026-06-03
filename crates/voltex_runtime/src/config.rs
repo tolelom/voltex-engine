@@ -84,6 +84,8 @@ pub struct RuntimeConfig {
     pub light_color: [f32; 3],
     /// Ambient light strength `[0, 1]`. Default `0.1`.
     pub light_ambient: f32,
+    /// Enable directional shadow mapping in the runtime renderer. Default `false`.
+    pub enable_shadows: bool,
 }
 
 impl Default for RuntimeConfig {
@@ -113,6 +115,7 @@ impl Default for RuntimeConfig {
             light_direction: [0.0, -1.0, -1.0],
             light_color: [1.0, 1.0, 1.0],
             light_ambient: 0.1,
+            enable_shadows: false,
         }
     }
 }
@@ -221,6 +224,12 @@ impl RuntimeConfig {
         self
     }
 
+    /// Enable directional shadow mapping in the runtime renderer.
+    pub fn with_shadows(mut self, enabled: bool) -> Self {
+        self.enable_shadows = enabled;
+        self
+    }
+
     /// Set the directional light: `direction` is the way light travels,
     /// `color` is RGB, `ambient` is the ambient floor `[0, 1]`. Animate it
     /// per-frame (day/night, flicker) with
@@ -326,6 +335,12 @@ mod tests {
     fn hud_is_off_by_default_and_toggleable() {
         assert!(!RuntimeConfig::default().enable_hud);
         assert!(RuntimeConfig::new().with_hud(true).enable_hud);
+    }
+
+    #[test]
+    fn shadows_off_by_default_and_toggleable() {
+        assert!(!RuntimeConfig::default().enable_shadows);
+        assert!(RuntimeConfig::new().with_shadows(true).enable_shadows);
     }
 
     #[test]

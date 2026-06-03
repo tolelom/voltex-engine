@@ -107,7 +107,10 @@ pub use rt_point_shadow::RtPointShadow;
 pub use rt_reflections::RtReflections;
 pub use rt_shadow::{RtShadowResources, RtShadowUniform, RT_SHADOW_FORMAT};
 pub use sh::{compute_sh_coefficients, evaluate_sh_cpu, pack_sh_coefficients};
-pub use shadow::{ShadowMap, ShadowPassUniform, ShadowUniform, SHADOW_FORMAT, SHADOW_MAP_SIZE};
+pub use shadow::{
+    shadow_main_bind_group_layout, ShadowMainUniform, ShadowMap, ShadowPassUniform, ShadowUniform,
+    SHADOW_FORMAT, SHADOW_MAP_SIZE,
+};
 pub use shadow_pipeline::{create_shadow_pipeline, shadow_pass_bind_group_layout};
 pub use sphere::generate_sphere;
 pub use spot_shadow::{spot_shadow_matrix, SpotShadowMap};

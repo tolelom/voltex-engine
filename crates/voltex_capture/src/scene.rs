@@ -543,6 +543,77 @@ pub fn render_cube_with_texture(
     target.read_rgba8(&gpu.device, &gpu.queue)
 }
 
+/// Render a ground slab + a floating occluder cube lit by one angled
+/// directional light, with shadow mapping `shadows` on/off. With shadows on,
+/// the occluder casts a shadow onto the ground. Returns RGBA8.
+pub fn render_shadow_demo(gpu: &HeadlessGpu, width: u32, height: u32, shadows: bool) -> Vec<u8> {
+    let mut renderer = BasicRenderer::new(&gpu.device, &gpu.queue, CAPTURE_FORMAT, 8);
+    renderer.set_shadows(shadows);
+    let target = OffscreenTarget::new(&gpu.device, width, height);
+    let mut assets = RenderAssets::new();
+    let cube = assets.add_mesh(unit_cube(&gpu.device));
+    let gray = assets.add_material(MaterialUniform::with_params([0.7, 0.7, 0.7, 1.0], 0.0, 1.0));
+    let occ = assets.add_material(MaterialUniform::with_params([0.8, 0.5, 0.3, 1.0], 0.0, 1.0));
+
+    // Up-facing ground quad (correct +Y normal + CCW-from-above winding) so the
+    // overhead light actually lits it and the shadow is visible.
+    let n = [0.0f32, 1.0, 0.0];
+    let mk = |x: f32, z: f32, u: f32, v: f32| MeshVertex {
+        position: [x, 0.0, z],
+        normal: n,
+        uv: [u, v],
+        tangent: [1.0, 0.0, 0.0, 1.0],
+    };
+    let gverts = [
+        mk(-12.0, -12.0, 0.0, 0.0),
+        mk(12.0, -12.0, 1.0, 0.0),
+        mk(12.0, 12.0, 1.0, 1.0),
+        mk(-12.0, 12.0, 0.0, 1.0),
+    ];
+    let gidx = [0u32, 2, 1, 0, 3, 2];
+    let ground_mesh = assets.add_mesh(voltex_renderer::Mesh::new(&gpu.device, &gverts, &gidx));
+
+    let mut world = World::new();
+    let ground = world.spawn();
+    world.add(ground, Transform::from_position(Vec3::ZERO));
+    world.add(ground, MeshHandle(ground_mesh.0));
+    world.add(ground, MaterialHandle(gray.0));
+    // Floating occluder.
+    let occluder = world.spawn();
+    let mut ot = Transform::from_position(Vec3::new(0.0, 2.5, 0.0));
+    ot.scale = Vec3::new(1.5, 1.5, 1.5);
+    world.add(occluder, ot);
+    world.add(occluder, MeshHandle(cube.0));
+    world.add(occluder, MaterialHandle(occ.0));
+    voltex_ecs::propagate_transforms(&mut world);
+
+    let mut camera = Camera::new(Vec3::new(7.0, 7.0, 7.0), width as f32 / height as f32);
+    camera.yaw = -0.785;
+    camera.pitch = -0.615;
+    let mut light = LightUniform::new();
+    light.direction = [-0.3, -1.0, -0.25];
+    light.color = [1.0, 1.0, 1.0];
+    light.ambient_strength = 0.12;
+
+    let mut encoder = gpu
+        .device
+        .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("shadow demo") });
+    renderer.render(
+        &gpu.queue,
+        &mut encoder,
+        &target.color_view,
+        &target.depth_view,
+        wgpu::Color { r: 0.1, g: 0.1, b: 0.15, a: 1.0 },
+        &mut world,
+        &assets,
+        camera.view_projection(),
+        camera.position,
+        light,
+    );
+    gpu.queue.submit(Some(encoder.finish()));
+    target.read_rgba8(&gpu.device, &gpu.queue)
+}
+
 /// Render a white cube under a dim directional light + the given additive
 /// point lights (via `BasicRenderer::set_point_lights`). Returns RGBA8.
 pub fn render_cube_point_lit(
@@ -724,6 +795,28 @@ mod tests {
         glb.extend_from_slice(&0x004E4942u32.to_le_bytes()); // BIN\0
         glb.extend_from_slice(&bin);
         glb
+    }
+
+    #[test]
+    #[ignore = "requires a GPU adapter"]
+    fn shadows_darken_ground_under_occluder() {
+        let gpu = match HeadlessGpu::new() {
+            Ok(g) => g,
+            Err(e) => {
+                eprintln!("skip: {e}");
+                return;
+            }
+        };
+        let off = render_shadow_demo(&gpu, 512, 512, false);
+        let on = render_shadow_demo(&gpu, 512, 512, true);
+        let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../../docs/visual/");
+        crate::save_png(&format!("{dir}shadow_off.png"), 512, 512, &off).unwrap();
+        crate::save_png(&format!("{dir}shadow_on.png"), 512, 512, &on).unwrap();
+        // Shadows on → overall darker (occluded ground region) than shadows off.
+        let lum = |r: &[u8]| -> u64 {
+            r.chunks_exact(4).map(|p| p[0] as u64 + p[1] as u64 + p[2] as u64).sum()
+        };
+        assert!(lum(&on) < lum(&off), "shadowed frame should be darker overall");
     }
 
     #[test]

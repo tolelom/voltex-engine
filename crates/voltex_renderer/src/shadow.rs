@@ -162,3 +162,72 @@ pub struct ShadowUniform {
 pub struct ShadowPassUniform {
     pub light_vp_model: [[f32; 4]; 4],
 }
+
+/// Minimal shadow uniform for the `BasicRenderer` colored pass (no PBR/SH/sky
+/// baggage). `shadow_map_size == 0.0` disables shadow sampling in the shader.
+#[repr(C)]
+#[derive(Copy, Clone, Debug, Pod, Zeroable)]
+pub struct ShadowMainUniform {
+    /// Light view-projection used to project fragments into shadow space.
+    pub light_view_proj: [[f32; 4]; 4],
+    /// Shadow map resolution; `0.0` disables shadows (full light).
+    pub shadow_map_size: f32,
+    /// Depth bias to fight shadow acne.
+    pub shadow_bias: f32,
+    pub _pad: [f32; 2],
+}
+
+impl ShadowMainUniform {
+    /// Disabled (no shadows) — identity matrix, size 0.
+    pub fn disabled() -> Self {
+        Self {
+            light_view_proj: [
+                [1.0, 0.0, 0.0, 0.0],
+                [0.0, 1.0, 0.0, 0.0],
+                [0.0, 0.0, 1.0, 0.0],
+                [0.0, 0.0, 0.0, 1.0],
+            ],
+            shadow_map_size: 0.0,
+            shadow_bias: 0.0,
+            _pad: [0.0; 2],
+        }
+    }
+}
+
+/// Bind group layout for [`ShadowMainUniform`] sampling (group 3 of the colored
+/// mesh shader): depth texture + comparison sampler + uniform.
+pub fn shadow_main_bind_group_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
+    device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+        label: Some("Shadow Main BGL"),
+        entries: &[
+            wgpu::BindGroupLayoutEntry {
+                binding: 0,
+                visibility: wgpu::ShaderStages::FRAGMENT,
+                ty: wgpu::BindingType::Texture {
+                    sample_type: wgpu::TextureSampleType::Depth,
+                    view_dimension: wgpu::TextureViewDimension::D2,
+                    multisampled: false,
+                },
+                count: None,
+            },
+            wgpu::BindGroupLayoutEntry {
+                binding: 1,
+                visibility: wgpu::ShaderStages::FRAGMENT,
+                ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Comparison),
+                count: None,
+            },
+            wgpu::BindGroupLayoutEntry {
+                binding: 2,
+                visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
+                ty: wgpu::BindingType::Buffer {
+                    ty: wgpu::BufferBindingType::Uniform,
+                    has_dynamic_offset: false,
+                    min_binding_size: wgpu::BufferSize::new(
+                        std::mem::size_of::<ShadowMainUniform>() as u64,
+                    ),
+                },
+                count: None,
+            },
+        ],
+    })
+}

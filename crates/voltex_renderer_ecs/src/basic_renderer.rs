@@ -6,9 +6,11 @@
 use voltex_ecs::{World, WorldTransform};
 use voltex_math::{Mat4, Vec3, Vec4, AABB};
 use voltex_renderer::{
+    create_shadow_pipeline,
     pipeline::{create_colored_mesh_pipeline, create_skinned_mesh_pipeline},
-    BonePalette, ColoredCameraUniform, GpuTexture, LightUniform, PointLight, PointLightsUniform,
-    SkinnedCameraUniform,
+    shadow_main_bind_group_layout, shadow_pass_bind_group_layout, BonePalette, ColoredCameraUniform,
+    GpuTexture, LightUniform, PointLight, PointLightsUniform, ShadowMainUniform, ShadowMap,
+    ShadowPassUniform, SkinnedCameraUniform, SHADOW_MAP_SIZE,
 };
 
 use crate::assets::RenderAssets;
@@ -40,6 +42,15 @@ pub struct BasicRenderer {
     palette_bind_group: wgpu::BindGroup,
     skinned_cam_aligned: u32,
     palette_aligned: u32,
+    // Directional shadow mapping (off by default; enable with set_shadows).
+    shadows_enabled: bool,
+    shadow_map: ShadowMap,
+    shadow_pipeline: wgpu::RenderPipeline,
+    shadow_pass_buffer: wgpu::Buffer,
+    shadow_pass_bind_group: wgpu::BindGroup,
+    shadow_pass_aligned: u32,
+    shadow_main_buffer: wgpu::Buffer,
+    shadow_main_bind_group: wgpu::BindGroup,
 }
 
 impl BasicRenderer {
@@ -129,8 +140,71 @@ impl BasicRenderer {
             }],
         });
 
-        let pipeline =
-            create_colored_mesh_pipeline(device, target_format, &cl_layout, &tex_layout, &pl_layout);
+        // ── Shadow mapping resources (group 3 of the colored shader) ────────
+        let shadow_map = ShadowMap::new(device);
+        let shadow_main_layout = shadow_main_bind_group_layout(device);
+        let shadow_main_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("BasicRenderer Shadow Main UBO"),
+            size: std::mem::size_of::<ShadowMainUniform>() as u64,
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+        queue.write_buffer(
+            &shadow_main_buffer,
+            0,
+            bytemuck::bytes_of(&ShadowMainUniform::disabled()),
+        );
+        let shadow_main_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("BasicRenderer Shadow Main BG"),
+            layout: &shadow_main_layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: wgpu::BindingResource::TextureView(&shadow_map.view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::Sampler(&shadow_map.sampler),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 2,
+                    resource: shadow_main_buffer.as_entire_binding(),
+                },
+            ],
+        });
+
+        // Shadow depth pass (per-entity light_vp_model dynamic UBO).
+        let shadow_pass_layout = shadow_pass_bind_group_layout(device);
+        let shadow_pipeline = create_shadow_pipeline(device, &shadow_pass_layout);
+        let shadow_pass_aligned =
+            (std::mem::size_of::<ShadowPassUniform>() as u32).div_ceil(alignment) * alignment;
+        let shadow_pass_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("BasicRenderer Shadow Pass UBO"),
+            size: (shadow_pass_aligned as usize * max_entities) as u64,
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+        let shadow_pass_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("BasicRenderer Shadow Pass BG"),
+            layout: &shadow_pass_layout,
+            entries: &[wgpu::BindGroupEntry {
+                binding: 0,
+                resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
+                    buffer: &shadow_pass_buffer,
+                    offset: 0,
+                    size: wgpu::BufferSize::new(std::mem::size_of::<ShadowPassUniform>() as u64),
+                }),
+            }],
+        });
+
+        let pipeline = create_colored_mesh_pipeline(
+            device,
+            target_format,
+            &cl_layout,
+            &tex_layout,
+            &pl_layout,
+            &shadow_main_layout,
+        );
 
         // ── Skinned pass resources ──────────────────────────────────────────
         let skinned_cam_aligned =
@@ -208,7 +282,22 @@ impl BasicRenderer {
             palette_bind_group,
             skinned_cam_aligned,
             palette_aligned,
+            shadows_enabled: false,
+            shadow_map,
+            shadow_pipeline,
+            shadow_pass_buffer,
+            shadow_pass_bind_group,
+            shadow_pass_aligned,
+            shadow_main_buffer,
+            shadow_main_bind_group,
         }
+    }
+
+    /// Enable/disable directional shadow mapping for the non-skinned pass.
+    /// Off by default. When off, the shadow uniform is disabled (`size 0`) so
+    /// the shader returns full light — behaviour identical to no shadows.
+    pub fn set_shadows(&mut self, enabled: bool) {
+        self.shadows_enabled = enabled;
     }
 
     /// Set the additive point lights used by the non-skinned mesh pass. Excess
@@ -248,6 +337,64 @@ impl BasicRenderer {
             None => true,
         });
         let n = items.len().min(self.max_entities);
+
+        // ── Directional shadow depth pre-pass ───────────────────────────────
+        if self.shadows_enabled {
+            let light_vp = directional_light_vp(light.direction);
+            let sp_aligned = self.shadow_pass_aligned as usize;
+            let mut sp_staging = vec![0u8; n * sp_aligned];
+            for (i, item) in items.iter().take(n).enumerate() {
+                let u = ShadowPassUniform {
+                    light_vp_model: (light_vp * item.model).cols,
+                };
+                let o = i * sp_aligned;
+                sp_staging[o..o + std::mem::size_of::<ShadowPassUniform>()]
+                    .copy_from_slice(bytemuck::bytes_of(&u));
+            }
+            if n > 0 {
+                queue.write_buffer(&self.shadow_pass_buffer, 0, &sp_staging);
+            }
+            {
+                let mut dpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                    label: Some("BasicRenderer Shadow Depth Pass"),
+                    color_attachments: &[],
+                    depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                        view: &self.shadow_map.view,
+                        depth_ops: Some(wgpu::Operations {
+                            load: wgpu::LoadOp::Clear(1.0),
+                            store: wgpu::StoreOp::Store,
+                        }),
+                        stencil_ops: None,
+                    }),
+                    occlusion_query_set: None,
+                    timestamp_writes: None,
+                    multiview_mask: None,
+                });
+                dpass.set_pipeline(&self.shadow_pipeline);
+                for (i, item) in items.iter().take(n).enumerate() {
+                    let mesh = assets.mesh(item.mesh).expect("collect skipped stale");
+                    let off = (i as u32) * self.shadow_pass_aligned;
+                    dpass.set_bind_group(0, &self.shadow_pass_bind_group, &[off]);
+                    dpass.set_vertex_buffer(0, mesh.vertex_buffer.slice(..));
+                    dpass.set_index_buffer(mesh.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
+                    dpass.draw_indexed(0..mesh.num_indices, 0, 0..1);
+                }
+            }
+            let su = ShadowMainUniform {
+                light_view_proj: light_vp.cols,
+                shadow_map_size: SHADOW_MAP_SIZE as f32,
+                shadow_bias: 0.003,
+                _pad: [0.0; 2],
+            };
+            queue.write_buffer(&self.shadow_main_buffer, 0, bytemuck::bytes_of(&su));
+        } else {
+            queue.write_buffer(
+                &self.shadow_main_buffer,
+                0,
+                bytemuck::bytes_of(&ShadowMainUniform::disabled()),
+            );
+        }
+
         let aligned = self.aligned_size as usize;
 
         // staging: one CameraUniform per entity, padded to alignment.
@@ -296,8 +443,9 @@ impl BasicRenderer {
         });
 
         pass.set_pipeline(&self.pipeline);
-        // Point lights are shared across all non-skinned draws (group 2).
+        // Point lights (group 2) + shadow map (group 3) are shared across draws.
         pass.set_bind_group(2, &self.point_lights_bind_group, &[]);
+        pass.set_bind_group(3, &self.shadow_main_bind_group, &[]);
 
         for (i, item) in items.iter().take(n).enumerate() {
             let mesh = assets
@@ -401,6 +549,29 @@ impl BasicRenderer {
             pass.draw_indexed(0..mesh.num_indices, 0, 0..1);
         }
     }
+}
+
+/// Orthographic light view-projection for a directional light, framing a fixed
+/// area around the origin. Conservative coverage for typical small scenes;
+/// per-scene tuning (fit to camera frustum) is future work.
+fn directional_light_vp(light_dir: [f32; 3]) -> Mat4 {
+    let dir = Vec3::new(light_dir[0], light_dir[1], light_dir[2]).normalize_or_zero();
+    let dir = if dir == Vec3::ZERO {
+        Vec3::new(0.0, -1.0, 0.0)
+    } else {
+        dir
+    };
+    const EXTENT: f32 = 30.0;
+    let center = Vec3::ZERO;
+    let light_pos = center - dir * EXTENT;
+    let up = if dir.y.abs() > 0.99 {
+        Vec3::Z
+    } else {
+        Vec3::Y
+    };
+    let view = Mat4::look_at(light_pos, center, up);
+    let proj = Mat4::orthographic(-EXTENT, EXTENT, -EXTENT, EXTENT, 0.1, EXTENT * 2.5);
+    proj * view
 }
 
 /// Conservative world-space bounding sphere of a local-space [`AABB`] under a
