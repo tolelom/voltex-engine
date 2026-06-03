@@ -37,6 +37,12 @@ fn main() {
     let shots: &[Shot] = &[
         ("single_cube", scene::render_single_cube, 512, 512),
         ("cube_grid", scene::render_cube_grid, 640, 480),
+        (
+            "declarative_primitives",
+            scene::render_materialized_primitives,
+            512,
+            512,
+        ),
         ("pbr_grid", scene::render_pbr_grid, 768, 768),
         ("shadow_scene", scene_shadow::render_shadow_scene, 800, 600),
         ("multi_light", scene_lights::render_multi_light, 800, 600),

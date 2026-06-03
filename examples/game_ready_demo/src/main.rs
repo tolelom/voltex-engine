@@ -19,8 +19,8 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use voltex::ecs::{Bounds, Entity, MaterialHandle, MeshHandle, ScriptComponent, Tag};
-use voltex::math::{Vec3, AABB};
+use voltex::ecs::{Entity, ScriptComponent, Tag};
+use voltex::math::Vec3;
 use voltex::prelude::*;
 use voltex::physics::Collider;
 use voltex_ai::{nav_agent_system, NavAgent, NavMesh, NavTriangle};
@@ -28,9 +28,7 @@ use voltex_audio::{AudioClip, AudioSource};
 use voltex_renderer::gltf::{
     AnimationPath, GltfAnimation, GltfChannel, GltfNode, GltfSkin, Interpolation,
 };
-use voltex_renderer::{
-    material::MaterialUniform, mesh::Mesh, PointLight, Skeleton, SkinnedMesh, SkinnedMeshVertex,
-};
+use voltex_renderer::{PointLight, Skeleton, SkinnedMesh, SkinnedMeshVertex};
 // Sprite + Particle now come from voltex::prelude; only the free fn + the
 // skinned-pose type need explicit paths here.
 use voltex_renderer_ecs::{spawn_particle, SkinnedPose};
@@ -95,21 +93,27 @@ fn main() -> RuntimeResult<()> {
 }
 
 fn setup_scene(world: &mut World, _registry: &mut ComponentRegistry, script_path: &str) {
-    // Ground: a big flat scaled cube at y ≈ 0.
+    // Ground: a big flat scaled cube at y ≈ 0. Shape + color are declared by
+    // value — the runtime materializes the GPU mesh/material at gpu_init, so
+    // there's no separate "upload" phase or Tag round-trip for these.
     let ground = world.spawn();
     let mut gt = Transform::from_position(Vec3::new(0.0, -0.1, 0.0));
     gt.scale = Vec3::new(40.0, 0.2, 40.0);
     world.add(ground, gt);
     world.add(ground, Tag("ground".to_string()));
+    world.add(ground, PrimitiveMesh::cube(1.0));
+    world.add(ground, MaterialDesc::color([0.35, 0.37, 0.40, 1.0]));
 
-    // Player: Lua-controlled cube at the origin.
+    // Player: Lua-controlled blue cube at the origin.
     let player = world.spawn();
     world.add(player, Transform::from_position(Vec3::new(0.0, 0.5, 0.0)));
     world.add(player, Tag(PLAYER_TAG.to_string()));
     world.add(player, ScriptComponent::new(script_path.to_string()));
     world.add(player, Collider::Sphere { radius: 0.6 });
+    world.add(player, PrimitiveMesh::cube(1.0));
+    world.add(player, MaterialDesc::color([0.20, 0.50, 1.00, 1.0]));
 
-    // Chaser: nav-mesh agent that hunts the player, beeps on catch.
+    // Chaser: red nav-mesh agent that hunts the player, beeps on catch.
     let chaser = world.spawn();
     let mut ct = Transform::from_position(Vec3::new(10.0, 0.5, 10.0));
     ct.scale = Vec3::new(0.8, 0.8, 0.8);
@@ -118,6 +122,8 @@ fn setup_scene(world: &mut World, _registry: &mut ComponentRegistry, script_path
     world.add(chaser, NavAgent::new(3.5));
     world.add(chaser, AudioSource::new(0u32).spatial());
     world.add(chaser, Collider::Sphere { radius: 0.5 });
+    world.add(chaser, PrimitiveMesh::cube(1.0));
+    world.add(chaser, MaterialDesc::color([1.00, 0.30, 0.20, 1.0]));
 
     // Totem: a stationary GPU-skinned strip that waves — shows skeletal
     // animation in the live runtime (mesh + pose added in gpu_init).
@@ -143,40 +149,11 @@ fn setup_scene(world: &mut World, _registry: &mut ComponentRegistry, script_path
 
 fn upload_meshes(app: &mut RuntimeApp, device: &wgpu::Device, queue: &wgpu::Queue) {
     let _ = queue;
-    let mesh_h = app.assets.add_mesh(make_unit_cube(device));
-    // Distinct per-role colors so the player/chaser stand out from the ground
-    // (BasicRenderer now honours MaterialUniform.base_color).
-    let ground_mat = app
-        .assets
-        .add_material(MaterialUniform::with_params([0.35, 0.37, 0.40, 1.0], 0.0, 1.0));
-    let player_mat = app
-        .assets
-        .add_material(MaterialUniform::with_params([0.20, 0.50, 1.00, 1.0], 0.0, 1.0));
-    let chaser_mat = app
-        .assets
-        .add_material(MaterialUniform::with_params([1.00, 0.30, 0.20, 1.0], 0.0, 1.0));
-    let bounds = Bounds(AABB::new(
-        Vec3::new(-0.5, -0.5, -0.5),
-        Vec3::new(0.5, 0.5, 0.5),
-    ));
-    // Cube mesh for ground/player/chaser; the totem gets a skinned mesh below.
-    let assignments: Vec<(Entity, MaterialHandle)> = app
-        .world
-        .query::<Tag>()
-        .filter_map(|(e, tag)| match tag.0.as_str() {
-            PLAYER_TAG => Some((e, player_mat)),
-            CHASER_TAG => Some((e, chaser_mat)),
-            TOTEM_TAG => None, // skinned, handled separately
-            _ => Some((e, ground_mat)),
-        })
-        .collect();
-    for (e, mat) in assignments {
-        app.world.add(e, MeshHandle(mesh_h.0));
-        app.world.add(e, MaterialHandle(mat.0));
-        app.world.add(e, bounds);
-    }
-
-    // Skinned totem: GPU vertex-skinned strip + a looping wave animation.
+    // Ground/player/chaser are now declarative: they carry `PrimitiveMesh` +
+    // `MaterialDesc` from `setup_scene`, and the runtime materializes their GPU
+    // meshes/materials automatically (after this callback). Only the skinned
+    // totem still needs the device directly — skinned meshes aren't part of the
+    // declarative-primitive path.
     let strip_h = app.assets.add_skinned_mesh(skinned_strip(device));
     let totem = app
         .world
@@ -473,9 +450,4 @@ fn write_player_script() -> String {
     let path = dir.join("player_move.lua");
     std::fs::write(&path, PLAYER_LUA).expect("write player_move.lua");
     path.to_string_lossy().into_owned()
-}
-
-/// 24-vertex unit cube (per-face normals), shared by ground / player / chaser.
-fn make_unit_cube(device: &wgpu::Device) -> Mesh {
-    Mesh::cube(device, 1.0) // engine primitive — one call
 }

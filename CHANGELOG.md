@@ -10,6 +10,47 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## [v1.0.62] — 2026-06-03 — Declarative renderables (one-call "spawn a visible object")
+
+상용 엔진과의 **기초 워크플로 격차** 정정. 기능 폭(PBR/물리/오디오/AI/net/Lua)은
+이미 충분하지만, 엔진에서 가장 빈번한 연산 — "눈에 보이는 오브젝트 하나 놓기" —
+이 두 단계(GPU 없는 `scene_builder` ↔ GPU 필요한 `gpu_init`)로 갈라져, 엔티티를
+`Tag` 로 되찾아 `MeshHandle`/`MaterialHandle`/`Bounds` 를 별도 GPU 패스에서 수동
+부착하는 보일러플레이트가 모든 게임에 강제됐다. Unity 의 `CreatePrimitive` /
+Godot 의 노드 추가에 해당하는 한-줄 경로가 없었다.
+
+### Additive — `voltex_renderer_ecs::renderable`
+
+- **`PrimitiveMesh`** 컴포넌트 (값 타입, GPU 무관): `Cube`/`Plane`/`Quad`/`Sphere`.
+  생성자 `cube(size)`/`plane(size)`/`quad(w,h)`/`sphere(r,sec,stk)`/`sphere_default(r)`,
+  `aabb()`(자동 `Bounds` 용), `geometry()`(빌트인 generator 위임). `Component`
+  구현 → 씬 직렬화.
+- **`MaterialDesc(MaterialUniform)`** 컴포넌트: `color(rgba)` / `pbr(rgba,metallic,roughness)`.
+  `Component` 구현 → 씬 직렬화.
+- **`materialize_renderables(&mut World, &mut RenderAssets, &Device)`**: `PrimitiveMesh`
+  가 있고 `MeshHandle` 이 없는 엔티티마다 GPU 메시를 생성(**dedup**: 동일 프리미티브는
+  한 버텍스 버퍼 공유)하고 `MeshHandle`+`Bounds` 부착; `MaterialDesc` 도 동일하게
+  dedup 후 `MaterialHandle` 부착. **멱등** — 이미 resolve 된 엔티티는 skip 하므로 매
+  프레임/핫리로드 후 호출 안전. 순수 헬퍼 `plan_primitive_meshes`/`plan_materials`
+  (GPU 없이 멱등 계약 테스트 가능).
+- **자동 와이어링**: `RuntimeApp` 이 `register_defaults()` 직후 두 컴포넌트를 등록하고,
+  `gpu_init` 직후 `materialize_renderables` 를 한 번 호출. 게임은 `scene_builder`
+  한 곳에서 모양+색을 선언하면 끝 — device/`MeshHandle`/Tag 왕복 불필요.
+- **facade prelude** 에 `PrimitiveMesh`/`MaterialDesc` 추가.
+
+### 검증
+
+- 단위 13개(aabb 4종, geometry 카운트, dedup 키, plan 멱등 2종, 직렬화 round-trip 2종) +
+  변이 테스트로 dedup 키 충돌 검출 RED→GREEN 확인.
+- RTX 4080 capture 회귀 2개(`#[ignore]`): `materialized_primitives_render_nonblank`(선언적
+  엔티티만으로 비-blank 렌더), `materialize_dedupes_identical_meshes_and_attaches_bounds`(3개
+  동일 큐브 → 메시 1개 공유, sphere 분리, Bounds/MaterialHandle 부착, 2회 호출 멱등).
+  시각 기록 `docs/visual/declarative_primitives.png`(빨간 큐브 + 초록 구).
+- **실증**: `game_ready_demo` 의 `upload_meshes` 가 ~30줄(큐브 mesh/3머티리얼/Tag 재조회
+  루프/bounds) → 스킨드 토템 한 줄로 축소. ground/player/chaser 는 `setup_scene` 에서
+  `PrimitiveMesh::cube` + `MaterialDesc::color` 선언만.
+- workspace build / clippy(`-D warnings` all-targets) / lib test 전부 그린.
+
 ## [v1.0.61] — 2026-06-03 — Status sweep: hygiene + runtime lights/audio/shadows + robustness audit
 
 프로젝트 현황 점검 후 A(위생)→D(대형) 우선순위로 자율 진행한 세션. 모두 헤드리스

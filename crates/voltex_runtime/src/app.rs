@@ -171,6 +171,10 @@ impl RuntimeApp {
         // AudioSource lives in voltex_audio (no ECS dep), so it is registered
         // here via the register_raw escape hatch rather than register_defaults.
         crate::audio_sync::register_audio_source(&mut registry);
+        // Declarative renderables (PrimitiveMesh / MaterialDesc) live in
+        // voltex_renderer_ecs (L3), so they register here rather than in the
+        // L1 register_defaults. Materialized to GPU resources in gpu_init.
+        voltex_renderer_ecs::register_renderable_components(&mut registry);
         if let Some(setup) = config.register_components.take() {
             setup(&mut registry);
         }

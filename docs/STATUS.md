@@ -173,6 +173,24 @@
 
 v1.0.9 부터는 **서비스 배포 완성도** 로드맵 (`docs/superpowers/specs/2026-05-21-service-readiness-roadmap.md`) 기준으로 진행.
 
+### 2026-06-03 — 선언적 렌더러블 (v1.0.62, 자율 세션)
+
+상용 엔진(Unity/Godot)과 **기초 워크플로**를 비교: 기능 폭은 충분하나 "눈에 보이는
+오브젝트 하나 놓기"가 2단계(GPU 없는 `scene_builder` ↔ GPU 필요한 `gpu_init`)로 갈려
+`Tag` 재조회 + `MeshHandle`/`MaterialHandle`/`Bounds` 수동 부착 보일러플레이트가
+강제됐던 것을 정정 (상세 CHANGELOG v1.0.62).
+
+- **`voltex_renderer_ecs::renderable`**: `PrimitiveMesh`(Cube/Plane/Quad/Sphere) +
+  `MaterialDesc(MaterialUniform)` 값-타입 컴포넌트(둘 다 `Component` → 씬 직렬화) +
+  `materialize_renderables`(dedup + 멱등; gpu_init 직후 RuntimeApp 자동 호출).
+- 게임은 `scene_builder` 한 곳에서 `PrimitiveMesh::cube(1.0)` + `MaterialDesc::color(..)`
+  선언만 — device/`MeshHandle`/Tag 왕복 불필요. facade prelude 노출.
+- 검증: 단위 13 + 변이 테스트(dedup 키 RED→GREEN) + RTX 4080 capture 회귀 2개
+  (`docs/visual/declarative_primitives.png`). `game_ready_demo` `upload_meshes`
+  ~30줄 → 스킨드 토템 1줄로 축소. build/clippy/test 그린.
+- 미적용(후속): 스킨드 메시는 여전히 device 직접 경로. 텍스처/노멀맵 풀 PBR 머티리얼
+  선언은 `MaterialDesc`(색+metallic/roughness)까지만 — 4-맵은 `PbrTextures` 별도.
+
 ### 2026-06-03 — 현황 점검 sweep (v1.0.61, 자율 세션)
 
 현황 점검 후 A(위생)→D(대형) 우선순위로 진행 (상세 CHANGELOG v1.0.61). 점검 중

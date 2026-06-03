@@ -142,6 +142,71 @@ pub fn render_single_cube(gpu: &HeadlessGpu, width: u32, height: u32) -> Vec<u8>
     target.read_rgba8(&gpu.device, &gpu.queue)
 }
 
+/// Render a scene built entirely through the *declarative* renderable path:
+/// entities carry only `PrimitiveMesh` + `MaterialDesc` (no device, no
+/// `MeshHandle`/`MaterialHandle`), and [`materialize_renderables`] resolves
+/// them into GPU meshes + materials before drawing — exactly what
+/// `voltex_runtime` does at `gpu_init`. Proves the one-call "spawn a visible
+/// object" path actually rasterizes. Returns RGBA8.
+///
+/// [`materialize_renderables`]: voltex_renderer_ecs::materialize_renderables
+pub fn render_materialized_primitives(gpu: &HeadlessGpu, width: u32, height: u32) -> Vec<u8> {
+    use voltex_renderer_ecs::{materialize_renderables, MaterialDesc, PrimitiveMesh};
+
+    let target = OffscreenTarget::new(&gpu.device, width, height);
+    let renderer = BasicRenderer::new(&gpu.device, &gpu.queue, CAPTURE_FORMAT, 16);
+    let mut assets = RenderAssets::new();
+    let mut world = World::new();
+
+    // A red cube and a green sphere — declared purely by value.
+    let cube = world.spawn();
+    let mut ct = Transform::from_position(Vec3::new(-0.85, 0.0, 0.0));
+    ct.rotation = Quat::from_euler_yxz(Vec3::new(0.3, 0.6, 0.0));
+    world.add(cube, ct);
+    world.add(cube, PrimitiveMesh::cube(1.0));
+    world.add(cube, MaterialDesc::color([0.9, 0.2, 0.15, 1.0]));
+
+    let sphere = world.spawn();
+    world.add(sphere, Transform::from_position(Vec3::new(0.85, 0.0, 0.0)));
+    world.add(sphere, PrimitiveMesh::sphere_default(0.6));
+    world.add(sphere, MaterialDesc::color([0.2, 0.8, 0.3, 1.0]));
+
+    // The single call the runtime makes for the game at gpu_init.
+    materialize_renderables(&mut world, &mut assets, &gpu.device);
+
+    let mut camera = Camera::new(Vec3::new(0.0, 1.0, 4.0), width as f32 / height as f32);
+    camera.pitch = -0.22;
+    let view_proj = camera.view_projection();
+    let mut light = LightUniform::new();
+    light.direction = [-0.4, -1.0, -0.6];
+
+    let mut encoder = gpu
+        .device
+        .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+            label: Some("capture materialized_primitives"),
+        });
+    renderer.render(
+        &gpu.queue,
+        &mut encoder,
+        &target.color_view,
+        &target.depth_view,
+        wgpu::Color {
+            r: 0.05,
+            g: 0.05,
+            b: 0.08,
+            a: 1.0,
+        },
+        &mut world,
+        &assets,
+        view_proj,
+        camera.position,
+        light,
+    );
+    gpu.queue.submit(Some(encoder.finish()));
+
+    target.read_rgba8(&gpu.device, &gpu.queue)
+}
+
 /// Render the canonical PBR test: a 7×7 grid of spheres with metallic varying
 /// left→right and roughness varying bottom→top, lit by one directional light.
 /// Exercises the full Cook-Torrance pipeline (`create_pbr_pipeline`) plus the
@@ -1928,5 +1993,84 @@ mod tests {
         let rgba = render_cube_grid(&gpu, 320, 240);
         let stats = ImageStats::analyze(&rgba);
         assert!(!stats.looks_blank(), "cube grid frame is blank: {stats:?}");
+    }
+
+    #[test]
+    #[ignore]
+    fn materialized_primitives_render_nonblank() {
+        let gpu = match HeadlessGpu::new() {
+            Ok(g) => g,
+            Err(e) => {
+                eprintln!("skipping: {e}");
+                return;
+            }
+        };
+        let rgba = render_materialized_primitives(&gpu, 320, 240);
+        let stats = ImageStats::analyze(&rgba);
+        assert!(
+            !stats.looks_blank(),
+            "declarative primitive frame is blank — materialize_renderables \
+             did not produce drawable meshes: {stats:?}"
+        );
+        assert!(stats.mean_luminance > 0.01, "frame too dark: {stats:?}");
+    }
+
+    #[test]
+    #[ignore]
+    fn materialize_dedupes_identical_meshes_and_attaches_bounds() {
+        use voltex_ecs::Bounds;
+        use voltex_renderer_ecs::{materialize_renderables, MaterialDesc, PrimitiveMesh};
+
+        let gpu = match HeadlessGpu::new() {
+            Ok(g) => g,
+            Err(e) => {
+                eprintln!("skipping: {e}");
+                return;
+            }
+        };
+        let mut assets = RenderAssets::new();
+        let mut world = World::new();
+
+        // Three identical cubes + one sphere.
+        let cubes: Vec<_> = (0..3)
+            .map(|i| {
+                let e = world.spawn();
+                world.add(e, Transform::from_position(Vec3::new(i as f32, 0.0, 0.0)));
+                world.add(e, PrimitiveMesh::cube(1.0));
+                world.add(e, MaterialDesc::color([1.0, 1.0, 1.0, 1.0]));
+                e
+            })
+            .collect();
+        let sphere = world.spawn();
+        world.add(sphere, Transform::from_position(Vec3::ZERO));
+        world.add(sphere, PrimitiveMesh::sphere_default(0.5));
+        world.add(sphere, MaterialDesc::color([1.0, 1.0, 1.0, 1.0]));
+
+        materialize_renderables(&mut world, &mut assets, &gpu.device);
+
+        // Every entity got a MeshHandle, a MaterialHandle, and Bounds.
+        for &e in &cubes {
+            assert!(world.get::<MeshHandle>(e).is_some(), "cube missing MeshHandle");
+            assert!(world.get::<MaterialHandle>(e).is_some(), "cube missing MaterialHandle");
+            assert!(world.get::<Bounds>(e).is_some(), "cube missing Bounds");
+        }
+
+        // The three identical cubes share ONE mesh; the sphere differs.
+        let c0 = *world.get::<MeshHandle>(cubes[0]).unwrap();
+        let c1 = *world.get::<MeshHandle>(cubes[1]).unwrap();
+        let c2 = *world.get::<MeshHandle>(cubes[2]).unwrap();
+        let sp = *world.get::<MeshHandle>(sphere).unwrap();
+        assert_eq!(c0, c1, "identical cubes must dedupe to one mesh");
+        assert_eq!(c1, c2, "identical cubes must dedupe to one mesh");
+        assert_ne!(c0, sp, "a sphere must not share the cube's mesh");
+
+        // Identical materials also dedupe to one handle.
+        let m0 = *world.get::<MaterialHandle>(cubes[0]).unwrap();
+        let m_sp = *world.get::<MaterialHandle>(sphere).unwrap();
+        assert_eq!(m0, m_sp, "identical materials must dedupe to one handle");
+
+        // Idempotent: a second call adds nothing (handles unchanged).
+        materialize_renderables(&mut world, &mut assets, &gpu.device);
+        assert_eq!(c0, *world.get::<MeshHandle>(cubes[0]).unwrap());
     }
 }

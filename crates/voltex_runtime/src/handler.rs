@@ -96,6 +96,25 @@ impl ApplicationHandler for RuntimeHandler {
                 init(app, &st.gpu.device, &st.gpu.queue);
             }
         }
+        // Materialize declarative renderables now that the GPU exists. Runs
+        // after gpu_init so primitives added in either the scene builder or
+        // gpu_init are covered. Idempotent — entities that already resolved a
+        // MeshHandle/MaterialHandle are skipped.
+        {
+            let state_ptr: *const RuntimeState =
+                app.runtime_state.as_ref().expect("just inserted") as *const _;
+            // SAFETY: same split-borrow pattern as gpu_init above — we hold a
+            // shared ref to the GPU device while mutating world/assets, and
+            // drop it as soon as the call returns.
+            unsafe {
+                let st = &*state_ptr;
+                voltex_renderer_ecs::materialize_renderables(
+                    &mut app.world,
+                    &mut app.assets,
+                    &st.gpu.device,
+                );
+            }
+        }
     }
 
     fn window_event(

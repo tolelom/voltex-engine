@@ -69,7 +69,11 @@ pub mod prelude {
 
     // 게임에서 자주 붙이는 렌더링/게임플레이 컴포넌트
     // (2D 스택 + 자기정리 엔티티). 도메인 특화 타입과 달리 거의 모든 게임이 쓴다.
-    pub use voltex_renderer_ecs::{Particle, Sprite, SpriteAnimation, TextureHandle};
+    // PrimitiveMesh/MaterialDesc 는 "모양+색을 한 줄로 선언" 하는 진입점이라
+    // 거의 모든 게임이 가장 먼저 쓴다 (런타임이 GPU 메시/머티리얼로 materialize).
+    pub use voltex_renderer_ecs::{
+        MaterialDesc, Particle, PrimitiveMesh, Sprite, SpriteAnimation, TextureHandle,
+    };
     pub use voltex_runtime::{DebugLines, Lifetime};
 
     // 런타임 부트스트랩 — main 본문에서 가장 흔하게 쓰인다
@@ -100,6 +104,9 @@ mod tests {
         let _tex: Option<TextureHandle> = None;
         let _life: Option<Lifetime> = None;
         let _dbg: Option<DebugLines> = None;
+        // Declarative renderables reachable via prelude:
+        let _prim: Option<PrimitiveMesh> = Some(PrimitiveMesh::cube(1.0));
+        let _matd: Option<MaterialDesc> = Some(MaterialDesc::color([1.0, 1.0, 1.0, 1.0]));
     }
 
     /// 모듈 경로 re-export가 작동하는지 검증.

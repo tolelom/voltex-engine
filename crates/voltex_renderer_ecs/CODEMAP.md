@@ -22,6 +22,10 @@ ECS World ↔ voltex_renderer 브릿지. C0a 의 `MeshHandle` / `MaterialHandle`
 | `Sprite { texture, size, color, uv_rect }` + `Sprite::solid` / `textured` / `with_uv_rect(rect)` / `set_sheet_frame(cols,rows,index)` | `sprite.rs` | 카메라-facing 빌보드 컴포넌트. `WorldTransform`+`Sprite` 엔티티를 mesh 패스 후 alpha-blended·depth-tested(no write) 빌보드로 렌더. `uv_rect`로 스프라이트시트/아틀라스 프레임 선택. 카메라 right/up은 inverse VP에서 복원. 카메라 거리 기준 back-to-front 정렬(투명도 합성 순서 무관). MAX 256/frame |
 | `Particle { velocity, acceleration, age, lifetime, start/end_size, start/end_alpha }` + `Particle::new(vel,lifetime,size)` / `spawn_particle(world,pos,color,particle)` / `update_particles(&mut World, dt)` | `particle.rs` | CPU 파티클(=Transform+Sprite+Particle 엔티티). update가 이동·크기/알파 보간·수명 만료 despawn. RuntimeApp tick이 `update_particles` 자동 호출 |
 | `SpriteAnimation { cols, rows, frame_count, fps, time, playing, looping }` + `SpriteAnimation::new(cols,rows,frames,fps)` / `update_sprite_animations(&mut World, dt)` | `sprite.rs` | 스프라이트시트 애니메이션. Sprite+SpriteAnimation 엔티티의 `uv_rect`를 시간에 따라 프레임 진행(loop=wrap, else clamp+stop). RuntimeApp tick 자동 호출 |
+| `PrimitiveMesh` (`Cube`/`Plane`/`Quad`/`Sphere`) + `cube`/`plane`/`quad`/`sphere`/`sphere_default` / `aabb()` / `geometry()` | `renderable.rs` | 값-타입 모양 선언(GPU 무관). `Component` → 씬 직렬화. 빌트인 generator 위임 |
+| `MaterialDesc(MaterialUniform)` + `color(rgba)` / `pbr(rgba,metallic,roughness)` | `renderable.rs` | 값-타입 머티리얼 선언. `Component` → 씬 직렬화 |
+| `materialize_renderables(&mut World, &mut RenderAssets, &Device)` | `renderable.rs` | `PrimitiveMesh`/`MaterialDesc` → GPU 메시/머티리얼 + `MeshHandle`/`MaterialHandle`/`Bounds` 부착. **dedup**(동일 프리미티브·머티리얼 공유) + **멱등**(resolve 된 엔티티 skip). RuntimeApp 이 gpu_init 직후 자동 호출 |
+| `register_renderable_components(&mut ComponentRegistry)` / `plan_primitive_meshes(&World)` / `plan_materials(&World)` | `renderable.rs` | 등록 헬퍼 + 순수(GPU 무관) plan 헬퍼(멱등 계약 테스트용) |
 | `RenderAssets::add_skinned_mesh(SkinnedMesh) -> SkinnedMeshHandle` / `skinned_mesh(h)` | `assets.rs` | 스킨드 메시 저장 |
 | `RenderAssets::add_texture(GpuTexture)` / `add_texture_png(device,queue,bytes) -> Result` / `add_texture_rgba(device,queue,w,h,px)` / `texture(h)`, `TextureHandle` 컴포넌트 | `assets.rs` | per-entity 디퓨즈 텍스처 (없으면 흰색 기본). `_png`/`_rgba`는 레이아웃 생성+업로드를 한 번에 (런타임 스프라이트/메시 텍스처 로딩 편의) |
 | `SkinnedMeshHandle(Handle<SkinnedMesh>)`, `SkinnedPose{skeleton,animation,player}` | `skinned.rs` | 스킨드 ECS 컴포넌트 |
@@ -46,10 +50,13 @@ src/
 ├── assets.rs           # RenderAssets
 ├── items.rs            # RenderItem + collect_render_items
 ├── basic_renderer.rs   # BasicRenderer (비스킨 + 스킨드 패스)
+├── renderable.rs       # PrimitiveMesh / MaterialDesc / materialize_renderables (선언적 렌더러블)
+├── particle.rs         # Particle / spawn_particle / update_particles
+├── sprite.rs           # Sprite / SpriteAnimation / update_sprite_animations
 └── skinned.rs          # SkinnedMeshHandle / SkinnedPose / update_skinned_poses
 ```
 
-각 파일 300줄 미만. lib.rs 는 module/use 만.
+각 파일 600줄 미만. lib.rs 는 module/use 만.
 
 ## 변경 시 주의점
 
