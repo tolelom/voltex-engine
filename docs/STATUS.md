@@ -173,6 +173,26 @@
 
 v1.0.9 부터는 **서비스 배포 완성도** 로드맵 (`docs/superpowers/specs/2026-05-21-service-readiness-roadmap.md`) 기준으로 진행.
 
+### 2026-06-04 — 에셋 브라우저 → 에디터 파이프라인 연결 (v1.0.86, 자율 세션)
+
+에디터의 흩어진 조각(AssetBrowser, LoadScene, RenderAssets::add_texture_png,
+BasicRenderer 텍스처 샘플링)을 잇는 워크플로 작업. 브라우저에서 파일을 **Open**하면
+씬(.vscn/.json)은 로드되고, 텍스처(.png/.jpg)는 선택 엔티티에 적용돼 뷰포트에 보임.
+레이어링 유지 — `voltex_editor`는 GPU 무의존(선택+분류+활성화만 제공), `editor_demo`가
+실제 로드/적용(picking/gizmo와 동일 패턴).
+
+- **voltex_editor**: `AssetKind`(Texture/Scene/Mesh/Audio/Other, `from_path`) +
+  `DirEntry.kind` + 라벨 종류 접두 + "Open" 활성화 + `selected_full_path()`/
+  `selected_kind()`/`take_activated()`. 순수 단위 +6.
+- **editor_demo**: `take_activated` 소비 → LoadScene / `add_texture_png` +
+  `TextureHandle` 부착 + 툴바 상태 텍스트.
+- **voltex_capture**: `render_cube_with_png`(add_texture_png 디코드 경로) +
+  `editor_pipeline_loaded_png_texture_renders` RTX 4080 회귀(마젠타/그린 체커) +
+  `docs/visual/textured_entity.png`.
+- 설계: `docs/superpowers/specs/2026-06-04-asset-browser-pipeline-design.md`.
+- 비범위(후속): 핫리로드, Mesh/Audio 동작, 프리뷰 썸네일, 4-맵 머티리얼.
+- build/clippy(-D warnings)/test 그린.
+
 ### 2026-06-04 — Lua find_in_radius (v1.0.85, 자율 세션)
 
 Lua FFI 심화. 스크립트가 SpatialGrid 기반 `find_in_radius(x,y,z,r)`로 반경 내 엔티티
