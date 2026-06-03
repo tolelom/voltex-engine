@@ -86,15 +86,15 @@ pub use hdr::{HdrTarget, HDR_FORMAT};
 pub use ibl::IblResources;
 pub use instancing::{create_instanced_pipeline, InstanceBuffer, InstanceData};
 pub use light::{
-    CameraUniform, LightData, LightUniform, LightsUniform, LIGHT_DIRECTIONAL, LIGHT_POINT,
-    LIGHT_SPOT, MAX_LIGHTS,
+    CameraUniform, ColoredCameraUniform, LightData, LightUniform, LightsUniform, LIGHT_DIRECTIONAL,
+    LIGHT_POINT, LIGHT_SPOT, MAX_LIGHTS,
 };
 pub use material::MaterialUniform;
 pub use mesh::Mesh;
 pub use motion_blur::MotionBlur;
 pub use pbr_pipeline::create_pbr_pipeline;
 pub use pipeline::{
-    bone_palette_bind_group_layout, create_skinned_mesh_pipeline,
+    bone_palette_bind_group_layout, create_colored_mesh_pipeline, create_skinned_mesh_pipeline,
     skinned_camera_bind_group_layout,
 };
 pub use point_shadow::{

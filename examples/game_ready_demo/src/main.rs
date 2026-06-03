@@ -101,15 +101,36 @@ fn setup_scene(world: &mut World, _registry: &mut ComponentRegistry, script_path
 fn upload_meshes(app: &mut RuntimeApp, device: &wgpu::Device, queue: &wgpu::Queue) {
     let _ = queue;
     let mesh_h = app.assets.add_mesh(make_unit_cube(device));
-    let mat_h = app.assets.add_material(MaterialUniform::new());
+    // Distinct per-role colors so the player/chaser stand out from the ground
+    // (BasicRenderer now honours MaterialUniform.base_color).
+    let ground_mat = app
+        .assets
+        .add_material(MaterialUniform::with_params([0.35, 0.37, 0.40, 1.0], 0.0, 1.0));
+    let player_mat = app
+        .assets
+        .add_material(MaterialUniform::with_params([0.20, 0.50, 1.00, 1.0], 0.0, 1.0));
+    let chaser_mat = app
+        .assets
+        .add_material(MaterialUniform::with_params([1.00, 0.30, 0.20, 1.0], 0.0, 1.0));
     let bounds = Bounds(AABB::new(
         Vec3::new(-0.5, -0.5, -0.5),
         Vec3::new(0.5, 0.5, 0.5),
     ));
-    let entities: Vec<_> = app.world.query::<Transform>().map(|(e, _)| e).collect();
-    for e in entities {
+    let assignments: Vec<(Entity, MaterialHandle)> = app
+        .world
+        .query::<Tag>()
+        .map(|(e, tag)| {
+            let mat = match tag.0.as_str() {
+                PLAYER_TAG => player_mat,
+                CHASER_TAG => chaser_mat,
+                _ => ground_mat,
+            };
+            (e, mat)
+        })
+        .collect();
+    for (e, mat) in assignments {
         app.world.add(e, MeshHandle(mesh_h.0));
-        app.world.add(e, MaterialHandle(mat_h.0));
+        app.world.add(e, MaterialHandle(mat.0));
         app.world.add(e, bounds);
     }
 }

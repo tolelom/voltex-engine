@@ -6,7 +6,7 @@
 use voltex_ecs::World;
 use voltex_math::{Mat4, Vec3};
 use voltex_renderer::{
-    pipeline::create_mesh_pipeline, CameraUniform, GpuTexture, LightUniform,
+    pipeline::create_colored_mesh_pipeline, ColoredCameraUniform, GpuTexture, LightUniform,
 };
 
 use crate::assets::RenderAssets;
@@ -34,7 +34,7 @@ impl BasicRenderer {
         max_entities: usize,
     ) -> Self {
         let alignment = device.limits().min_uniform_buffer_offset_alignment;
-        let cam_size = std::mem::size_of::<CameraUniform>() as u32;
+        let cam_size = std::mem::size_of::<ColoredCameraUniform>() as u32;
         let aligned_size = cam_size.div_ceil(alignment) * alignment;
 
         let cl_layout = camera_light_bind_group_layout(device);
@@ -74,7 +74,7 @@ impl BasicRenderer {
         });
 
         let default_texture = GpuTexture::white_1x1(device, queue, &tex_layout);
-        let pipeline = create_mesh_pipeline(device, target_format, &cl_layout, &tex_layout);
+        let pipeline = create_colored_mesh_pipeline(device, target_format, &cl_layout, &tex_layout);
 
         Self {
             pipeline,
@@ -110,11 +110,12 @@ impl BasicRenderer {
         // staging: one CameraUniform per entity, padded to alignment.
         let mut staging = vec![0u8; n * aligned];
         for (i, item) in items.iter().take(n).enumerate() {
-            let uniform = CameraUniform {
+            let uniform = ColoredCameraUniform {
                 view_proj: view_proj.cols,
                 model: item.model.cols,
                 camera_pos: [cam_pos.x, cam_pos.y, cam_pos.z],
                 _padding: 0.0,
+                base_color: item.material.base_color,
             };
             let bytes = bytemuck::bytes_of(&uniform);
             let offset = i * aligned;
@@ -176,7 +177,7 @@ fn camera_light_bind_group_layout(device: &wgpu::Device) -> wgpu::BindGroupLayou
                     ty: wgpu::BufferBindingType::Uniform,
                     has_dynamic_offset: true,
                     min_binding_size: wgpu::BufferSize::new(
-                        std::mem::size_of::<CameraUniform>() as u64,
+                        std::mem::size_of::<ColoredCameraUniform>() as u64,
                     ),
                 },
                 count: None,

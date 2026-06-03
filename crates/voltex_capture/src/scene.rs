@@ -449,21 +449,24 @@ pub fn render_demo_like_cam(
     let renderer = BasicRenderer::new(&gpu.device, &gpu.queue, CAPTURE_FORMAT, 1024);
     let mut assets = RenderAssets::new();
     let mesh_h = assets.add_mesh(unit_cube(&gpu.device));
-    let mat_h = assets.add_material(MaterialUniform::new());
+    // Distinct per-role colors (exercises BasicRenderer's base_color path).
+    let gray = assets.add_material(MaterialUniform::with_params([0.35, 0.37, 0.40, 1.0], 0.0, 1.0));
+    let blue = assets.add_material(MaterialUniform::with_params([0.20, 0.50, 1.00, 1.0], 0.0, 1.0));
+    let red = assets.add_material(MaterialUniform::with_params([1.00, 0.30, 0.20, 1.0], 0.0, 1.0));
     let mut world = World::new();
     let all = [
-        (Vec3::new(0.0, -0.1, 0.0), Vec3::new(40.0, 0.2, 40.0)), // ground
-        (Vec3::new(0.0, 0.5, 0.0), Vec3::ONE),                   // player
-        (Vec3::new(10.0, 0.5, 10.0), Vec3::new(0.8, 0.8, 0.8)),  // chaser
+        (Vec3::new(0.0, -0.1, 0.0), Vec3::new(40.0, 0.2, 40.0), gray), // ground
+        (Vec3::new(0.0, 0.5, 0.0), Vec3::ONE, blue),                   // player
+        (Vec3::new(10.0, 0.5, 10.0), Vec3::new(0.8, 0.8, 0.8), red),   // chaser
     ];
-    let specs: &[(Vec3, Vec3)] = if include_ground { &all } else { &all[1..] };
-    for &(pos, scale) in specs {
+    let specs: &[(Vec3, Vec3, MaterialHandle)] = if include_ground { &all } else { &all[1..] };
+    for &(pos, scale, mat) in specs {
         let e = world.spawn();
         let mut t = Transform::from_position(pos);
         t.scale = scale;
         world.add(e, t);
         world.add(e, MeshHandle(mesh_h.0));
-        world.add(e, MaterialHandle(mat_h.0));
+        world.add(e, MaterialHandle(mat.0));
     }
     voltex_ecs::propagate_transforms(&mut world);
     let mut camera = Camera::new(cam_pos, width as f32 / height as f32);
@@ -513,6 +516,29 @@ mod tests {
     /// origin is a tiny speck under the runtime's default far camera
     /// `(0,10,20)`, but fills a large area once a framing camera is used. This
     /// is why `RuntimeConfig::with_camera` / `RuntimeApp::set_camera_fn` exist.
+    /// Regression for "objects camouflage against the ground": BasicRenderer
+    /// must honour `MaterialUniform.base_color`. With the old white-default
+    /// path a framed scene of same-shaded cubes + ground showed only 2 colors
+    /// (ground + background); distinct per-role colors add at least the blue
+    /// player on the gray ground → 3+.
+    #[test]
+    #[ignore = "requires a GPU adapter"]
+    fn basic_renderer_applies_material_base_color() {
+        let gpu = match HeadlessGpu::new() {
+            Ok(g) => g,
+            Err(e) => {
+                eprintln!("skip: {e}");
+                return;
+            }
+        };
+        let rgba = render_demo_like_cam(&gpu, 320, 180, Vec3::new(0.0, 9.0, 13.0), 0.0, -0.55, true);
+        let stats = ImageStats::analyze(&rgba);
+        assert!(
+            stats.distinct_colors >= 3,
+            "per-object base_color should be visible against the ground: {stats:?}"
+        );
+    }
+
     #[test]
     #[ignore = "requires a GPU adapter"]
     fn camera_framing_controls_visible_object_size() {

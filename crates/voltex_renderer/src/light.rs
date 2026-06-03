@@ -40,6 +40,45 @@ impl CameraUniform {
     }
 }
 
+/// Per-entity uniform for the [`BasicRenderer`](../../voltex_renderer_ecs) path:
+/// [`CameraUniform`] plus a `base_color` tint so meshes can be colored without
+/// a texture (the Blinn-Phong `mesh_shader` samples only a white default
+/// texture, leaving every object the same gray). Layout matches
+/// `mesh_colored.wgsl`'s `CameraUniform` (std140: `base_color` at offset 144).
+#[repr(C)]
+#[derive(Copy, Clone, Debug, Pod, Zeroable)]
+pub struct ColoredCameraUniform {
+    pub view_proj: [[f32; 4]; 4],
+    pub model: [[f32; 4]; 4],
+    pub camera_pos: [f32; 3],
+    pub _padding: f32,
+    pub base_color: [f32; 4],
+}
+
+impl Default for ColoredCameraUniform {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl ColoredCameraUniform {
+    pub fn new() -> Self {
+        let id = [
+            [1.0, 0.0, 0.0, 0.0],
+            [0.0, 1.0, 0.0, 0.0],
+            [0.0, 0.0, 1.0, 0.0],
+            [0.0, 0.0, 0.0, 1.0],
+        ];
+        Self {
+            view_proj: id,
+            model: id,
+            camera_pos: [0.0; 3],
+            _padding: 0.0,
+            base_color: [1.0, 1.0, 1.0, 1.0],
+        }
+    }
+}
+
 #[repr(C)]
 #[derive(Copy, Clone, Debug, Pod, Zeroable)]
 pub struct LightUniform {

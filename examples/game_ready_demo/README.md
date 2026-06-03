@@ -22,8 +22,10 @@ cargo run -p game_ready_demo
 - **RMB + drag** — orbit the fly-camera
 - **Esc** — quit
 
-The player (speed 6) is faster than the chaser (speed 3.5), so you can escape
-and get caught repeatedly — each catch fires a fresh beep and bumps the counter.
+The player is the **blue** cube; the chaser is the **red** one on the gray
+ground (per-object colors via `MaterialUniform.base_color`). The player
+(speed 6) is faster than the chaser (speed 3.5), so you can escape and get
+caught repeatedly — each catch fires a fresh beep and bumps the counter.
 
 ## Not included
 
