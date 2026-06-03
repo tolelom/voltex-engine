@@ -226,6 +226,76 @@ pub fn render_skinned_bent_demo(gpu: &HeadlessGpu, width: u32, height: u32) -> V
     render_skinned_bent(gpu, width, height, std::f32::consts::FRAC_PI_3)
 }
 
+/// Two-keyframe bend (rest at t=0 → 60° about Z at t=1) so advancing the
+/// animation clock visibly deforms the strip.
+fn bend_animation_2kf() -> GltfAnimation {
+    let s = (std::f32::consts::FRAC_PI_3 * 0.5).sin();
+    let c = (std::f32::consts::FRAC_PI_3 * 0.5).cos();
+    GltfAnimation {
+        name: None,
+        channels: vec![GltfChannel {
+            target_node: 1,
+            target_path: AnimationPath::Rotation,
+            interpolation: Interpolation::Linear,
+            times: vec![0.0, 1.0],
+            values: vec![0.0, 0.0, 0.0, 1.0, 0.0, 0.0, s, c],
+        }],
+    }
+}
+
+/// Render the 2-joint strip as a **runtime** skinned entity through
+/// `BasicRenderer` (the full ECS path: SkinnedMesh asset + SkinnedMeshHandle +
+/// SkinnedPose advanced `anim_time` seconds). Proves the runtime renderer skins
+/// on the GPU. Returns RGBA8.
+pub fn render_skinned_runtime(
+    gpu: &HeadlessGpu,
+    width: u32,
+    height: u32,
+    anim_time: f32,
+) -> Vec<u8> {
+    use voltex_ecs::{propagate_transforms, Transform, World};
+    use voltex_renderer::{LightUniform, SkinnedMesh};
+    use voltex_renderer_ecs::{update_skinned_poses, BasicRenderer, RenderAssets, SkinnedPose};
+
+    let device = &gpu.device;
+    let queue = &gpu.queue;
+    let target = OffscreenTarget::new(device, width, height);
+    let renderer = BasicRenderer::new(device, queue, CAPTURE_FORMAT, 16);
+
+    let mut assets = RenderAssets::new();
+    let (verts, indices) = strip_vertices();
+    let mesh_h = assets.add_skinned_mesh(SkinnedMesh::new(device, &verts, &indices));
+
+    let mut world = World::new();
+    let e = world.spawn();
+    world.add(e, Transform::new());
+    world.add(e, mesh_h);
+    world.add(e, SkinnedPose::new(demo_skeleton(), bend_animation_2kf()));
+
+    // Advance the pose (dt=0 leaves it at the rest/bind pose).
+    update_skinned_poses(&mut world, anim_time);
+    propagate_transforms(&mut world);
+
+    let camera = Camera::new(Vec3::new(0.0, 1.0, 5.0), width as f32 / height as f32);
+    let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+        label: Some("capture skinned_runtime"),
+    });
+    renderer.render(
+        queue,
+        &mut encoder,
+        &target.color_view,
+        &target.depth_view,
+        wgpu::Color { r: 0.05, g: 0.05, b: 0.08, a: 1.0 },
+        &mut world,
+        &assets,
+        camera.view_projection(),
+        camera.position,
+        LightUniform::new(),
+    );
+    queue.submit(Some(encoder.finish()));
+    target.read_rgba8(device, queue)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -241,6 +311,32 @@ mod tests {
                     || (pa[2] as i32 - pb[2] as i32).abs() > tol
             })
             .count()
+    }
+
+    #[test]
+    #[ignore = "requires a GPU adapter"]
+    fn runtime_basic_renderer_skins_and_animates() {
+        let gpu = match HeadlessGpu::new() {
+            Ok(g) => g,
+            Err(e) => {
+                eprintln!("skipping: no GPU adapter ({e})");
+                return;
+            }
+        };
+        let (w, h) = (256, 256);
+        // Drive the skinned strip through BasicRenderer (the runtime path) at
+        // rest vs animated — the GPU-skinned geometry must differ.
+        let rest = render_skinned_runtime(&gpu, w, h, 0.0);
+        let posed = render_skinned_runtime(&gpu, w, h, 1.0);
+        assert!(
+            !ImageStats::analyze(&rest).looks_blank(),
+            "runtime skinned strip should render"
+        );
+        let changed = diff_pixels(&rest, &posed, 16);
+        assert!(
+            changed > 150,
+            "animating the runtime skinned entity should change pixels, got {changed}"
+        );
     }
 
     #[test]
