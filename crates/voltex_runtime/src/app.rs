@@ -449,6 +449,9 @@ impl RuntimeApp {
         if let Some(audio) = self.audio.as_ref() {
             crate::audio_sync::audio_sync_system(&mut self.world, audio, self.audio_listener);
         }
+        // Despawn expired-lifetime entities after user systems have observed
+        // them on their final frame (no-op if no Lifetime entities).
+        crate::lifetime::update_lifetimes(&mut self.world, dt);
     }
 
     /// Take over the calling thread with a winit event loop until the window

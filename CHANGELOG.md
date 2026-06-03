@@ -81,6 +81,10 @@ v1.0.59 데모(game_ready_demo)를 실제로 돌려보며 드러난 엔진 갭�
   px)` — bind-group 레이아웃 생성 보일러플레이트 제거. gpu_init에서 스프라이트/
   메시 텍스처를 한 줄로 로딩. 캡처 회귀
   `render_assets_png_loader_roundtrips_into_a_sprite`.
+- **Lifetime 자동 despawn**: `voltex_runtime::Lifetime { remaining }` 컴포넌트 +
+  `update_lifetimes`(tick 마지막 단계, 사용자 시스템 관측 후 만료 시
+  `despawn_recursive`). 발사체·타임드 픽업·임시 이펙트·스폰 적 등 자기정리 엔티티용.
+  단위 테스트(카운트다운→despawn / 빈 월드 no-op).
 
 - **그림자**: `RuntimeConfig::with_shadows(true)` — BasicRenderer directional
   shadow mapping (depth pre-pass + mesh_colored 3×3 PCF, group 3). 기본 off

@@ -25,6 +25,7 @@ pub mod debug_draw;
 pub mod error;
 pub(crate) mod handler;
 pub mod hud;
+pub mod lifetime;
 pub mod log;
 
 pub use app::RuntimeApp;
@@ -32,6 +33,7 @@ pub use audio_sync::audio_sync_system;
 pub use config::RuntimeConfig;
 pub use crash::{crash_filename, format_crash_report, install_panic_hook};
 pub use debug_draw::DebugLines;
+pub use lifetime::{update_lifetimes, Lifetime};
 pub use error::{RuntimeError, RuntimeResult};
 pub use hud::Hud;
 pub use voltex_asset::Vfs;

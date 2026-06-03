@@ -46,7 +46,8 @@
 3. `script_start_all(world, pool)` + `script_update_all(world, pool, dt)` + `pool.poll_reload(watcher)` (enable_scripts 시)
 4. 사용자 등록 시스템 (등록 순서, `add_system` 으로 추가)
 5. 입력 시스템 (`add_input_system`)
-6. `audio_sync_system` (enable_audio 시) — 마지막. 같은 프레임의 playback 토글/listener 이동 반영
+6. `audio_sync_system` (enable_audio 시) — 같은 프레임의 playback 토글/listener 이동 반영
+7. `update_lifetimes` — 마지막. `Lifetime` 엔티티를 카운트다운 후 만료 시 `despawn_recursive` (사용자 시스템이 마지막 프레임을 관측한 뒤 제거). no-op if 없음
 
 매 프레임 `run()` 의 winit handler 가 `tick_systems_only` 호출 후 `BasicRenderer::render` (+ enable_hud 시 UI 오버레이) 로 화면 출력.
 
