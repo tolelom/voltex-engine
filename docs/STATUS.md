@@ -173,6 +173,12 @@
 
 v1.0.9 부터는 **서비스 배포 완성도** 로드맵 (`docs/superpowers/specs/2026-05-21-service-readiness-roadmap.md`) 기준으로 진행.
 
+### 2026-06-03 — 이벤트/메시징 (v1.0.74, 자율 세션)
+
+기초 워크플로 격차 9번째(시스템 간 통신 부재). 사이클 8 리소스 위에 `Events<T>` +
+`World::send_event`/`drain_events` — producer/consumer 디커플. single-buffer drain
+(producer 먼저 등록). facade prelude 노출. 단위 5 + 변이 테스트. build/clippy/test 그린.
+
 ### 2026-06-03 — World 리소스 (v1.0.73, 자율 세션)
 
 기초 워크플로 격차 8번째(엔티티 무관 공유 상태 부재). `World::insert_resource`/`resource`/

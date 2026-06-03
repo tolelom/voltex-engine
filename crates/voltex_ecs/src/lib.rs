@@ -26,6 +26,7 @@ pub mod component_registry;
 pub mod dependency_scheduler;
 pub mod entity;
 pub mod error;
+pub mod events;
 pub mod hierarchy;
 pub mod json;
 pub mod prefab;
@@ -46,6 +47,7 @@ pub use prefab::Prefabs;
 pub use dependency_scheduler::{DependencyScheduler, SystemAccess};
 pub use entity::{Entity, EntityAllocator};
 pub use error::{EcsError, Result};
+pub use events::Events;
 pub use hierarchy::{
     add_child, despawn_recursive, remove_child, roots, validate_hierarchy, Children, Parent,
 };

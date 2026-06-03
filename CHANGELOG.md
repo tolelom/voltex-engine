@@ -10,6 +10,28 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## [v1.0.74] — 2026-06-03 — Events / messaging (decoupled systems on top of resources)
+
+기초 워크플로 격차 9번째: 시스템 간 통신 수단 부재(적 사망 → 점수·오디오·파티클을
+직접 호출로 엮어야 했다). 사이클 8(World 리소스) 위에 이벤트 큐를 올려 producer/
+consumer 를 분리.
+
+### Additive — `voltex_ecs::events`
+
+- **`Events<T>`** (`send`/`drain`/`len`/`is_empty`) — `Events<T>` 가 World 리소스로
+  저장됨.
+- **`World::send_event::<T>(event)`** / **`drain_events::<T>() -> Vec<T>`** — 시스템은
+  `&mut World` 만으로 이벤트를 쏘고 받음(배선 불필요). single-buffer drain:
+  consumer 는 같은 프레임에 *먼저 보내진* 이벤트만 봄 → producer 를 consumer 보다
+  먼저 등록. (order-independent double-buffer reader 는 후속.)
+- facade prelude 에 `Events` 추가.
+
+### 검증
+
+- 단위 5개(순서 보존 drain, drain 이 큐 비움, 빈 이벤트, 타입별 독립, Events 직접 send/drain) +
+  변이 테스트(drain 이 빈 Vec 반환하도록 깨면 순서 테스트 RED→GREEN).
+- workspace build / clippy(`-D warnings`) / lib test 전부 그린.
+
 ## [v1.0.73] — 2026-06-03 — World resources (entity-less shared state)
 
 기초 워크플로 격차 8번째: World 에 **엔티티에 매이지 않는 공유 상태**(점수/설정/RNG/
