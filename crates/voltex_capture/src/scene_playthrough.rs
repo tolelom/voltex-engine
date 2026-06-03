@@ -27,11 +27,28 @@ pub fn render_demo_frame(
     player_x: f32,
     chaser_pos: Vec3,
 ) -> Vec<u8> {
+    render_demo_frame_mode(gpu, width, height, t, player_x, chaser_pos, false)
+}
+
+/// Like [`render_demo_frame`] but renders the demo scene through the colored
+/// (`pbr=false`) or full PBR (`pbr=true`) runtime path — what a user gets by
+/// flipping `RuntimeConfig::with_pbr`.
+#[allow(clippy::too_many_arguments)]
+pub fn render_demo_frame_mode(
+    gpu: &HeadlessGpu,
+    width: u32,
+    height: u32,
+    t: f32,
+    player_x: f32,
+    chaser_pos: Vec3,
+    pbr: bool,
+) -> Vec<u8> {
     let device = &gpu.device;
     let queue = &gpu.queue;
     let target = OffscreenTarget::new(device, width, height);
     let mut renderer = BasicRenderer::new(device, queue, CAPTURE_FORMAT, 64);
     renderer.set_shadows(true); // demo enables directional shadows
+    renderer.set_pbr_enabled(pbr);
 
     let mut assets = RenderAssets::new();
     let cube = assets.add_mesh(unit_cube(device));
@@ -176,5 +193,33 @@ mod tests {
             .filter(|(p, q)| (p[0] as i32 - q[0] as i32).abs() > 16)
             .count();
         assert!(diff > 500, "frames should differ across the playthrough: {diff}");
+    }
+
+    #[test]
+    #[ignore = "requires a GPU adapter"]
+    fn demo_renders_under_pbr_runtime_path() {
+        let gpu = match HeadlessGpu::new() {
+            Ok(g) => g,
+            Err(e) => {
+                eprintln!("skip: {e}");
+                return;
+            }
+        };
+        // The full demo scene (ground + player + chaser + skinned totem +
+        // sprites + sun + point/spot lights + shadows) rendered through the PBR
+        // runtime path — what a user gets from RuntimeConfig::with_pbr(true).
+        let colored = render_demo_frame_mode(&gpu, 640, 360, 1.0, 5.0, Vec3::new(3.0, 0.5, 3.0), false);
+        let pbr = render_demo_frame_mode(&gpu, 640, 360, 1.0, 5.0, Vec3::new(3.0, 0.5, 3.0), true);
+        let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../../docs/visual/");
+        crate::save_png(&format!("{dir}demo_frame_pbr.png"), 640, 360, &pbr).unwrap();
+
+        assert!(!ImageStats::analyze(&pbr).looks_blank(), "PBR demo frame blank");
+        // PBR shading should differ from the colored path on the same scene.
+        let diff = colored
+            .chunks_exact(4)
+            .zip(pbr.chunks_exact(4))
+            .filter(|(p, q)| (p[0] as i32 - q[0] as i32).abs() > 16)
+            .count();
+        assert!(diff > 500, "PBR demo should shade differently than colored: {diff}");
     }
 }

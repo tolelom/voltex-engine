@@ -72,6 +72,8 @@ regressions in `voltex_capture/src/scene.rs` (run `cargo test -p voltex_capture
 | `particle_burst.png` (`particles_spread_outward_over_time`) | `Particle` + `update_particles` + sprite pass | ✅ mean radius grows over time |
 | (`orthographic_footprint_is_depth_independent`) | `Camera::orthographic` | ✅ footprint depth-independent (vs perspective foreshortening) |
 | `demo_frame_{a,b}.png` (`demo_frames_render_nonblank`) | full `game_ready_demo` (sun + 2 point + spot + shadows + sprites + gizmos + skinned totem) | ✅ all features composite correctly |
+| `pbr_runtime.png` / `skinned_pbr.png` (`basic_renderer_pbr_path_shades_differently_than_colored`, `runtime_skinned_pbr_path_renders_and_animates`, `pbr_normal_map_perturbs_shading`) | runtime PBR (Cook-Torrance + multi-light + maps + IBL) for static + skinned meshes | ✅ metallic gradient, normal maps perturb shading, skinned meshes PBR-lit |
+| `demo_frame_pbr.png` (`demo_renders_under_pbr_runtime_path`) | the whole demo scene through `with_pbr(true)` | ✅ all features composite under PBR |
 
 ## Runtime-verified on real hardware (no offscreen PNG)
 
