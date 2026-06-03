@@ -109,7 +109,8 @@ v1.0.59 데모(game_ready_demo)를 실제로 돌려보며 드러난 엔진 갭�
   `pbr_enabled` 시 PBR 스킨드 파이프라인 사용(멀티라이트+IBL+그림자). 스킨드
   메시도 이제 정적 메시와 동일한 PBR 라이팅. 캡처 회귀
   `runtime_skinned_pbr_path_renders_and_animates` + `docs/visual/skinned_pbr.png`.
-  한계: per-skinned 머티리얼/텍스처는 v1 공유 기본값(후속).
+  스킨드 엔티티도 `MaterialHandle`/`TextureHandle`/`PbrTextures`를 정적 메시와
+  동일하게 반영(per-entity 머티리얼 + 4-맵 텍스처).
 - **선형 텍스처 로더 + 노멀맵**: `GpuTexture::from_rgba_linear` +
   `RenderAssets::add_texture_png_linear`/`add_texture_rgba_linear` — 노멀/ORM
   맵을 sRGB 디코드 없이 linear `Rgba8Unorm`로 업로드. 컬러/알베도는 기존 sRGB

@@ -3,7 +3,7 @@
 //! pipeline + per-entity dynamic UBO + light buffer + 1×1 default texture
 //! 를 모두 owning. `render(...)` 한 메서드로 World 를 그린다.
 
-use voltex_ecs::{World, WorldTransform};
+use voltex_ecs::{MaterialHandle, World, WorldTransform};
 use voltex_math::{Mat4, Vec3, Vec4, AABB};
 use voltex_renderer::{
     create_line_pipeline, create_pbr_full_texture_bind_group, create_pbr_pipeline,
@@ -35,6 +35,16 @@ use crate::skinned::{SkinnedMeshHandle, SkinnedPose};
 /// Max skinned entities drawn per frame. Each needs an 8 KB bone-palette slot,
 /// so this is kept small + independent of `max_entities` to bound VRAM.
 const MAX_SKINNED: usize = 64;
+
+/// Per-skinned-entity render data gathered for one frame.
+struct SkinnedItem {
+    model: Mat4,
+    handle: SkinnedMeshHandle,
+    palette: BonePalette,
+    material: MaterialUniform,
+    texture: Option<crate::assets::TextureHandle>,
+    pbr: Option<crate::assets::PbrTextures>,
+}
 
 /// World-driven mesh renderer — Blinn-Phong shader, per-entity dynamic UBO,
 /// camera + light shared bind group. Owns the wgpu pipeline objects.
@@ -109,6 +119,8 @@ pub struct BasicRenderer {
     pbr_skinned_cam_buffer: wgpu::Buffer,
     pbr_skinned_cam_aligned: u32,
     pbr_skinned_g0_bind_group: wgpu::BindGroup,
+    pbr_skinned_material_buffer: wgpu::Buffer,
+    pbr_skinned_material_aligned: u32,
     pbr_skinned_material_bind_group: wgpu::BindGroup,
 }
 
@@ -537,19 +549,15 @@ impl BasicRenderer {
                 },
             ],
         });
-        // A single shared material for skinned PBR (per-skinned material is a
-        // follow-up). Mid roughness, non-metal, white.
+        // Per-skinned-entity material (dynamic offset, MAX_SKINNED slots).
+        let pbr_skinned_material_aligned =
+            (std::mem::size_of::<MaterialUniform>() as u32).div_ceil(alignment) * alignment;
         let pbr_skinned_material_buffer = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("BasicRenderer PBR Skinned Material UBO"),
-            size: std::mem::size_of::<MaterialUniform>() as u64,
+            label: Some("BasicRenderer PBR Skinned Material Dynamic UBO"),
+            size: (pbr_skinned_material_aligned as usize * MAX_SKINNED) as u64,
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
-        queue.write_buffer(
-            &pbr_skinned_material_buffer,
-            0,
-            bytemuck::bytes_of(&MaterialUniform::with_params([0.8, 0.8, 0.82, 1.0], 0.0, 0.6)),
-        );
         let pbr_skinned_material_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("BasicRenderer PBR Skinned Material BG"),
             layout: &pbr_mat_layout,
@@ -620,6 +628,8 @@ impl BasicRenderer {
             pbr_skinned_cam_buffer,
             pbr_skinned_cam_aligned,
             pbr_skinned_g0_bind_group,
+            pbr_skinned_material_buffer,
+            pbr_skinned_material_aligned,
             pbr_skinned_material_bind_group,
         }
     }
@@ -1169,11 +1179,27 @@ impl BasicRenderer {
         view_proj: Mat4,
         cam_pos: Vec3,
     ) {
-        // (model matrix, mesh handle, bone palette) per skinned entity.
-        let items: Vec<(Mat4, SkinnedMeshHandle, BonePalette)> = world
+        // Per skinned entity: model, mesh, palette, + (PBR only) material maps.
+        let pbr = self.pbr_enabled;
+        let items: Vec<SkinnedItem> = world
             .query3::<WorldTransform, SkinnedMeshHandle, SkinnedPose>()
             .filter(|(e, _, _, _)| world.get::<crate::items::Hidden>(*e).is_none())
-            .map(|(_, wt, handle, pose)| (wt.0, *handle, pose.palette()))
+            .map(|(e, wt, handle, pose)| {
+                let material = world
+                    .get::<MaterialHandle>(e)
+                    .and_then(|h| assets.material(*h).copied())
+                    .unwrap_or_else(|| {
+                        MaterialUniform::with_params([0.8, 0.8, 0.82, 1.0], 0.0, 0.6)
+                    });
+                SkinnedItem {
+                    model: wt.0,
+                    handle: *handle,
+                    palette: pose.palette(),
+                    material,
+                    texture: world.get::<crate::assets::TextureHandle>(e).copied(),
+                    pbr: if pbr { world.get::<crate::assets::PbrTextures>(e).copied() } else { None },
+                }
+            })
             .collect();
         let n = items.len().min(MAX_SKINNED);
         if n == 0 {
@@ -1183,21 +1209,21 @@ impl BasicRenderer {
         // Palettes are shared by both skinned paths.
         let pal_aligned = self.palette_aligned as usize;
         let mut pal_staging = vec![0u8; n * pal_aligned];
-        for (i, (_, _, palette)) in items.iter().take(n).enumerate() {
-            let pb = bytemuck::bytes_of(palette);
+        for (i, it) in items.iter().take(n).enumerate() {
+            let pb = bytemuck::bytes_of(&it.palette);
             pal_staging[i * pal_aligned..i * pal_aligned + pb.len()].copy_from_slice(pb);
         }
         queue.write_buffer(&self.palette_buffer, 0, &pal_staging);
 
         // Per-entity camera uniform: PBR uses CameraUniform (w/ camera_pos), the
         // colored path uses SkinnedCameraUniform.
-        let (cam_aligned, cam_buffer) = if self.pbr_enabled {
+        let cam_aligned = if self.pbr_enabled {
             let a = self.pbr_skinned_cam_aligned as usize;
             let mut staging = vec![0u8; n * a];
-            for (i, (model, _, _)) in items.iter().take(n).enumerate() {
+            for (i, it) in items.iter().take(n).enumerate() {
                 let cam = CameraUniform {
                     view_proj: view_proj.cols,
-                    model: model.cols,
+                    model: it.model.cols,
                     camera_pos: [cam_pos.x, cam_pos.y, cam_pos.z],
                     _padding: 0.0,
                 };
@@ -1205,22 +1231,63 @@ impl BasicRenderer {
                 staging[i * a..i * a + cb.len()].copy_from_slice(cb);
             }
             queue.write_buffer(&self.pbr_skinned_cam_buffer, 0, &staging);
-            (a, &self.pbr_skinned_cam_buffer)
+            a
         } else {
             let a = self.skinned_cam_aligned as usize;
             let mut staging = vec![0u8; n * a];
-            for (i, (model, _, _)) in items.iter().take(n).enumerate() {
+            for (i, it) in items.iter().take(n).enumerate() {
                 let cam = SkinnedCameraUniform {
                     view_proj: view_proj.cols,
-                    model: model.cols,
+                    model: it.model.cols,
                 };
                 let cb = bytemuck::bytes_of(&cam);
                 staging[i * a..i * a + cb.len()].copy_from_slice(cb);
             }
             queue.write_buffer(&self.skinned_cam_buffer, 0, &staging);
-            (a, &self.skinned_cam_buffer)
+            a
         };
-        let _ = cam_buffer; // bound via the prebuilt bind groups below
+
+        // PBR skinned: stage per-entity material + build per-entity texture
+        // bind groups (defaults for absent maps), mirroring the static pass.
+        let mat_aligned = self.pbr_skinned_material_aligned as usize;
+        let skinned_tex_bgs: Vec<Option<wgpu::BindGroup>> = if self.pbr_enabled {
+            let mut mat_staging = vec![0u8; n * mat_aligned];
+            for (i, it) in items.iter().take(n).enumerate() {
+                let mb = bytemuck::bytes_of(&it.material);
+                mat_staging[i * mat_aligned..i * mat_aligned + mb.len()].copy_from_slice(mb);
+            }
+            queue.write_buffer(&self.pbr_skinned_material_buffer, 0, &mat_staging);
+
+            let resolve = |h: Option<crate::assets::TextureHandle>| {
+                h.and_then(|h| assets.texture(h)).map(|t| (&t.view, &t.sampler))
+            };
+            items
+                .iter()
+                .take(n)
+                .map(|it| {
+                    let has_maps = it.texture.is_some()
+                        || it.pbr.map(|p| p.normal.or(p.orm).or(p.emissive).is_some())
+                            == Some(true);
+                    if !has_maps {
+                        return None;
+                    }
+                    let (av, asamp) = resolve(it.texture)
+                        .unwrap_or((&self.default_texture.view, &self.default_texture.sampler));
+                    let (nv, nsamp) = resolve(it.pbr.and_then(|p| p.normal))
+                        .unwrap_or((&self.pbr_flat_normal.1, &self.pbr_flat_normal.2));
+                    let (ov, osamp) = resolve(it.pbr.and_then(|p| p.orm))
+                        .unwrap_or((&self.default_texture.view, &self.default_texture.sampler));
+                    let (ev, esamp) = resolve(it.pbr.and_then(|p| p.emissive))
+                        .unwrap_or((&self.pbr_black.view, &self.pbr_black.sampler));
+                    Some(create_pbr_full_texture_bind_group(
+                        &self.device, &self.pbr_tex_layout, av, asamp, nv, nsamp, ov, osamp, ev,
+                        esamp,
+                    ))
+                })
+                .collect()
+        } else {
+            Vec::new()
+        };
 
         let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: Some("BasicRenderer Skinned Pass"),
@@ -1248,25 +1315,29 @@ impl BasicRenderer {
 
         if self.pbr_enabled {
             pass.set_pipeline(&self.pbr_skinned_pipeline);
-            pass.set_bind_group(1, &self.pbr_default_texture_bind_group, &[]);
-            pass.set_bind_group(2, &self.pbr_skinned_material_bind_group, &[0]);
             pass.set_bind_group(3, &self.pbr_shadow_bind_group, &[]);
-            for (i, (_, handle, _)) in items.iter().take(n).enumerate() {
-                let Some(mesh) = assets.skinned_mesh(*handle) else {
+            for (i, it) in items.iter().take(n).enumerate() {
+                let Some(mesh) = assets.skinned_mesh(it.handle) else {
                     continue;
                 };
                 let cam_off = (i * cam_aligned) as u32;
                 let pal_off = (i * pal_aligned) as u32;
+                let mat_off = (i * mat_aligned) as u32;
                 // g0 has two dynamic bindings (camera @0, palette @2).
                 pass.set_bind_group(0, &self.pbr_skinned_g0_bind_group, &[cam_off, pal_off]);
+                let tex_bg = skinned_tex_bgs[i]
+                    .as_ref()
+                    .unwrap_or(&self.pbr_default_texture_bind_group);
+                pass.set_bind_group(1, tex_bg, &[]);
+                pass.set_bind_group(2, &self.pbr_skinned_material_bind_group, &[mat_off]);
                 pass.set_vertex_buffer(0, mesh.vertex_buffer.slice(..));
                 pass.set_index_buffer(mesh.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
                 pass.draw_indexed(0..mesh.num_indices, 0, 0..1);
             }
         } else {
             pass.set_pipeline(&self.skinned_pipeline);
-            for (i, (_, handle, _)) in items.iter().take(n).enumerate() {
-                let Some(mesh) = assets.skinned_mesh(*handle) else {
+            for (i, it) in items.iter().take(n).enumerate() {
+                let Some(mesh) = assets.skinned_mesh(it.handle) else {
                     continue;
                 };
                 let cam_off = (i * cam_aligned) as u32;
