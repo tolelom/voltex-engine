@@ -620,6 +620,7 @@ dependencies = [
  "voltex_ai",
  "voltex_audio",
  "voltex_renderer",
+ "voltex_renderer_ecs",
  "voltex_runtime",
  "wgpu",
 ]

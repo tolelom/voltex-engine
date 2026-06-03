@@ -12,6 +12,7 @@ license.workspace = true
 voltex.workspace = true
 voltex_runtime.workspace = true
 voltex_renderer.workspace = true
+voltex_renderer_ecs.workspace = true
 voltex_ai.workspace = true
 voltex_audio.workspace = true
 wgpu = { workspace = true }

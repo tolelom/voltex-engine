@@ -15,6 +15,8 @@ cargo run -p game_ready_demo
 | **audio_sync_system** | The chaser carries a spatial `AudioSource` that beeps the moment it catches you (listener = player). |
 | **HUD runtime API** | `set_hud_fn` draws distance / `RUN!` vs `CAUGHT!` / counters on screen. |
 | **Camera control** | `set_camera_fn` keeps a follow-camera framed on the player (the default runtime camera sits far back, leaving a 1-unit cube a tiny speck). |
+| **Lighting** | `with_light` (warm angled sun) + `set_light_fn` (slowly rotating it). |
+| **Skeletal animation** | A GPU-skinned "totem" strip (off to the left) waves via `SkinnedPose` + `BasicRenderer`'s skinned pass. |
 
 ## Controls
 
@@ -27,10 +29,9 @@ ground (per-object colors via `MaterialUniform.base_color`). The player
 (speed 6) is faster than the chaser (speed 3.5), so you can escape and get
 caught repeatedly — each catch fires a fresh beep and bumps the counter.
 
-## Not included
+## Notes
 
-Skinned mesh animation is **not** shown here: the runtime render path
-(`BasicRenderer`) does not yet do GPU skinning (deferred ECS-skinning
-integration, v1.1). The skinning core is verified separately — see
-`docs/visual/skinned_rest.png` / `skinned_bent.png` and
-`voltex_capture::scene_skinned`.
+The skinned totem uses a single directional light + the Blinn-Phong runtime
+path. Full **PBR** materials (textures/normal maps) and **multi-light** still
+require the dedicated PBR pipeline (see `survivor_game`) — runtime integration
+of those is future work.

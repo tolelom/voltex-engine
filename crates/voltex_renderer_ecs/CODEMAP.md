@@ -17,7 +17,10 @@ ECS World ↔ voltex_renderer 브릿지. C0a 의 `MeshHandle` / `MaterialHandle`
 | `RenderItem { entity, model, mesh, material }` | `items.rs` | per-frame 데이터 단위 |
 | `collect_render_items(&mut World, &RenderAssets) -> Vec<RenderItem>` | `items.rs` | `propagate_transforms` 자동 호출 |
 | `BasicRenderer::new(device, queue, target_format, max_entities)` | `basic_renderer.rs` | mesh_shader.wgsl pipeline 소유 |
-| `BasicRenderer::render(queue, encoder, target_view, depth_view, clear_color, &mut World, &RenderAssets, view_proj, cam_pos, light)` | `basic_renderer.rs` | dynamic-offset draw |
+| `BasicRenderer::render(queue, encoder, target_view, depth_view, clear_color, &mut World, &RenderAssets, view_proj, cam_pos, light)` | `basic_renderer.rs` | 비스킨(colored Blinn-Phong) 패스 + 스킨드 2차 패스 |
+| `RenderAssets::add_skinned_mesh(SkinnedMesh) -> SkinnedMeshHandle` / `skinned_mesh(h)` | `assets.rs` | 스킨드 메시 저장 |
+| `SkinnedMeshHandle(Handle<SkinnedMesh>)`, `SkinnedPose{skeleton,animation,player}` | `skinned.rs` | 스킨드 ECS 컴포넌트 |
+| `update_skinned_poses(&mut World, dt)`, `animation_duration(&GltfAnimation)` | `skinned.rs` | 포즈 진행 시스템 (RuntimeApp tick 호출) |
 | `RendererEcsError`, `Result<T>` | `error.rs` | M4 표준 패턴 |
 
 ## 의존성
@@ -36,7 +39,8 @@ src/
 ├── error.rs            # RendererEcsError + Result<T>
 ├── assets.rs           # RenderAssets
 ├── items.rs            # RenderItem + collect_render_items
-└── basic_renderer.rs   # BasicRenderer
+├── basic_renderer.rs   # BasicRenderer (비스킨 + 스킨드 패스)
+└── skinned.rs          # SkinnedMeshHandle / SkinnedPose / update_skinned_poses
 ```
 
 각 파일 300줄 미만. lib.rs 는 module/use 만.
@@ -47,5 +51,6 @@ src/
 - `BasicRenderer::new(max_entities)` 보다 많은 엔티티가 World 에 있으면 초과분은 silently drop. v1 한도 (수십~수백) 에서는 무시 가능하지만 외부 사용 시 `max_entities` 적절히 설정.
 - `BasicRenderer` 의 pipeline 은 mesh_shader.wgsl (Blinn-Phong). PBR / 멀티라이트 / 그림자 사용 시 자체 pipeline + `collect_render_items` 패턴 사용 (survivor_game 참조).
 - `propagate_transforms` 가 매 `collect_render_items` 호출마다 실행. 한 프레임에 여러 번 부르면 비용 누적 → 매 프레임 한 번만 호출 권장.
-- max_bind_groups=4 제약: BasicRenderer 는 2개 (cam+light, texture). 외부 추가 bind group 시점 점검.
+- max_bind_groups=4 제약: BasicRenderer 비스킨 패스는 2개 (cam+light, texture), 스킨드 패스는 2개 (skinned cam, bone palette). 외부 추가 bind group 시점 점검.
+- 스킨드 패스: `SkinnedMeshHandle`+`SkinnedPose`+`WorldTransform` 엔티티를 `LoadOp::Load` 2차 패스로. per-entity palette(8KB)/cam dynamic-offset UBO, `MAX_SKINNED=64` 캡(VRAM 바운드). 포즈 진행은 `update_skinned_poses`(런타임 tick)가 담당 — 렌더는 `palette()` 만 읽음. PBR 스키닝은 미구현.
 - headless 단위 테스트는 GPU device 가 필요해서 `add_mesh` 라운드트립 / `collect_render_items` 의 emit 케이스 직접 검증 불가 → editor_demo 시각 검증으로 위임.

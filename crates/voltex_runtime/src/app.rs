@@ -311,6 +311,8 @@ impl RuntimeApp {
     /// don't need a window.
     pub fn tick_systems_only(&mut self, dt: f32) {
         propagate_transforms(&mut self.world);
+        // Advance skeletal animations (no-op if no SkinnedPose entities).
+        voltex_renderer_ecs::update_skinned_poses(&mut self.world, dt);
         if self.config.enable_physics {
             voltex_physics::physics_step(&mut self.world, &self.physics_config);
         }

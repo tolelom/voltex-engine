@@ -24,11 +24,19 @@ use voltex::math::{Vec3, AABB};
 use voltex::prelude::*;
 use voltex_ai::{nav_agent_system, NavAgent, NavMesh, NavTriangle};
 use voltex_audio::{AudioClip, AudioSource};
-use voltex_renderer::{material::MaterialUniform, mesh::Mesh, vertex::MeshVertex};
+use voltex_renderer::gltf::{
+    AnimationPath, GltfAnimation, GltfChannel, GltfNode, GltfSkin, Interpolation,
+};
+use voltex_renderer::{
+    material::MaterialUniform, mesh::Mesh, vertex::MeshVertex, Skeleton, SkinnedMesh,
+    SkinnedMeshVertex,
+};
+use voltex_renderer_ecs::SkinnedPose;
 use voltex_runtime::{RuntimeApp, RuntimeConfig, RuntimeResult};
 
 const PLAYER_TAG: &str = "player";
 const CHASER_TAG: &str = "chaser";
+const TOTEM_TAG: &str = "totem";
 const CATCH_RADIUS: f32 = 1.2;
 
 /// The player-movement Lua script (written to a temp file at startup so the
@@ -103,6 +111,14 @@ fn setup_scene(world: &mut World, _registry: &mut ComponentRegistry, script_path
     world.add(chaser, Tag(CHASER_TAG.to_string()));
     world.add(chaser, NavAgent::new(3.5));
     world.add(chaser, AudioSource::new(0u32).spatial());
+
+    // Totem: a stationary GPU-skinned strip that waves — shows skeletal
+    // animation in the live runtime (mesh + pose added in gpu_init).
+    let totem = world.spawn();
+    let mut tt = Transform::from_position(Vec3::new(-5.0, 0.0, -3.0));
+    tt.scale = Vec3::new(1.5, 1.5, 1.5);
+    world.add(totem, tt);
+    world.add(totem, Tag(TOTEM_TAG.to_string()));
 }
 
 fn upload_meshes(app: &mut RuntimeApp, device: &wgpu::Device, queue: &wgpu::Queue) {
@@ -123,22 +139,112 @@ fn upload_meshes(app: &mut RuntimeApp, device: &wgpu::Device, queue: &wgpu::Queu
         Vec3::new(-0.5, -0.5, -0.5),
         Vec3::new(0.5, 0.5, 0.5),
     ));
+    // Cube mesh for ground/player/chaser; the totem gets a skinned mesh below.
     let assignments: Vec<(Entity, MaterialHandle)> = app
         .world
         .query::<Tag>()
-        .map(|(e, tag)| {
-            let mat = match tag.0.as_str() {
-                PLAYER_TAG => player_mat,
-                CHASER_TAG => chaser_mat,
-                _ => ground_mat,
-            };
-            (e, mat)
+        .filter_map(|(e, tag)| match tag.0.as_str() {
+            PLAYER_TAG => Some((e, player_mat)),
+            CHASER_TAG => Some((e, chaser_mat)),
+            TOTEM_TAG => None, // skinned, handled separately
+            _ => Some((e, ground_mat)),
         })
         .collect();
     for (e, mat) in assignments {
         app.world.add(e, MeshHandle(mesh_h.0));
         app.world.add(e, MaterialHandle(mat.0));
         app.world.add(e, bounds);
+    }
+
+    // Skinned totem: GPU vertex-skinned strip + a looping wave animation.
+    let strip_h = app.assets.add_skinned_mesh(skinned_strip(device));
+    let totem = app
+        .world
+        .query::<Tag>()
+        .find(|(_, t)| t.0 == TOTEM_TAG)
+        .map(|(e, _)| e);
+    if let Some(e) = totem {
+        app.world.add(e, strip_h);
+        app.world
+            .add(e, SkinnedPose::new(two_bone_skeleton(), wave_animation()));
+    }
+}
+
+/// A 4-vertex vertical strip (y 0→2): bottom edge bound to joint 0, top edge to
+/// joint 1. Front face +Z.
+fn skinned_strip(device: &wgpu::Device) -> SkinnedMesh {
+    let mk = |x: f32, y: f32, joint: u32| SkinnedMeshVertex {
+        position: [x, y, 0.0],
+        normal: [0.0, 0.0, 1.0],
+        uv: [0.0, 0.0],
+        tangent: [1.0, 0.0, 0.0, 1.0],
+        joints: [joint, 0, 0, 0],
+        weights: [1.0, 0.0, 0.0, 0.0],
+    };
+    let verts = [
+        mk(-0.5, 0.0, 0),
+        mk(0.5, 0.0, 0),
+        mk(0.5, 2.0, 1),
+        mk(-0.5, 2.0, 1),
+    ];
+    let indices = [0u32, 1, 2, 0, 2, 3];
+    SkinnedMesh::new(device, &verts, &indices)
+}
+
+/// Two-joint skeleton: root at origin, child pivot at y=1 (inverse-bind = the
+/// inverse of its bind world, so the rest pose is undeformed).
+fn two_bone_skeleton() -> Skeleton {
+    let node = |t: [f32; 3], children: Vec<usize>| GltfNode {
+        name: None,
+        children,
+        translation: t,
+        rotation: [0.0, 0.0, 0.0, 1.0],
+        scale: [1.0, 1.0, 1.0],
+        mesh: None,
+        skin: None,
+    };
+    let nodes = vec![node([0.0, 0.0, 0.0], vec![1]), node([0.0, 1.0, 0.0], vec![])];
+    let skin = GltfSkin {
+        name: None,
+        joints: vec![0, 1],
+        inverse_bind_matrices: vec![
+            [
+                [1.0, 0.0, 0.0, 0.0],
+                [0.0, 1.0, 0.0, 0.0],
+                [0.0, 0.0, 1.0, 0.0],
+                [0.0, 0.0, 0.0, 1.0],
+            ],
+            [
+                [1.0, 0.0, 0.0, 0.0],
+                [0.0, 1.0, 0.0, 0.0],
+                [0.0, 0.0, 1.0, 0.0],
+                [0.0, -1.0, 0.0, 1.0],
+            ],
+        ],
+        skeleton: None,
+    };
+    Skeleton::from_skin(&skin, &nodes)
+}
+
+/// Looping wave: child joint rotates -35° → +35° → -35° about Z over 2s.
+fn wave_animation() -> GltfAnimation {
+    let q = |deg: f32| {
+        let a = deg.to_radians() * 0.5;
+        [0.0, 0.0, a.sin(), a.cos()]
+    };
+    let a = q(-35.0);
+    let b = q(35.0);
+    GltfAnimation {
+        name: None,
+        channels: vec![GltfChannel {
+            target_node: 1,
+            target_path: AnimationPath::Rotation,
+            interpolation: Interpolation::Linear,
+            times: vec![0.0, 1.0, 2.0],
+            values: vec![
+                a[0], a[1], a[2], a[3], b[0], b[1], b[2], b[3], a[0], a[1], a[2], a[3],
+            ],
+        }],
     }
 }
 
