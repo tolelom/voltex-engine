@@ -12,8 +12,23 @@ use crate::skinned::SkinnedMeshHandle;
 
 /// ECS component: the GPU texture an entity samples in `BasicRenderer`'s mesh
 /// shader. Absent / stale → the renderer falls back to its white default.
+/// In the PBR path this is the **albedo** map.
 #[derive(Debug, Clone, Copy)]
 pub struct TextureHandle(pub Handle<GpuTexture>);
+
+/// ECS component: extra PBR material maps for the runtime PBR pass (used only
+/// when `BasicRenderer` has PBR enabled). Each is optional; an absent map falls
+/// back to a sensible default (flat normal, white ORM = unoccluded/rough/
+/// non-metal, black emissive). The albedo map is the entity's [`TextureHandle`].
+#[derive(Debug, Clone, Copy, Default)]
+pub struct PbrTextures {
+    /// Tangent-space normal map (linear). Absent → flat `(0,0,1)`.
+    pub normal: Option<TextureHandle>,
+    /// Packed occlusion(R)/roughness(G)/metallic(B) map (linear). Absent → white.
+    pub orm: Option<TextureHandle>,
+    /// Emissive map. Absent → black (no emission).
+    pub emissive: Option<TextureHandle>,
+}
 
 /// GPU-resident mesh + material storage. Hands out the phantom-typed
 /// [`MeshHandle`] / [`MaterialHandle`] ECS components while keeping the

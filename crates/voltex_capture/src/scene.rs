@@ -789,6 +789,56 @@ pub fn render_particle_burst(
     target.read_rgba8(&gpu.device, &gpu.queue)
 }
 
+/// Render a row of 3 spheres (metallic 0.0 / 0.5 / 1.0, fixed roughness)
+/// through `BasicRenderer` with PBR `pbr` on/off, under one directional light.
+/// Exercises the runtime PBR path end-to-end. Returns RGBA8.
+pub fn render_pbr_basic_renderer(gpu: &HeadlessGpu, width: u32, height: u32, pbr: bool) -> Vec<u8> {
+    let target = OffscreenTarget::new(&gpu.device, width, height);
+    let mut renderer = BasicRenderer::new(&gpu.device, &gpu.queue, CAPTURE_FORMAT, 8);
+    renderer.set_pbr_enabled(pbr);
+    let mut assets = RenderAssets::new();
+    let (sv, si) = generate_sphere(0.8, 32, 16);
+    let mesh = assets.add_mesh(Mesh::new(&gpu.device, &sv, &si));
+
+    let mut world = World::new();
+    for (i, metallic) in [0.0f32, 0.5, 1.0].into_iter().enumerate() {
+        let mat = assets.add_material(MaterialUniform::with_params(
+            [0.85, 0.20, 0.15, 1.0],
+            metallic,
+            0.3,
+        ));
+        let e = world.spawn();
+        world.add(e, Transform::from_position(Vec3::new(i as f32 * 2.0 - 2.0, 0.0, 0.0)));
+        world.add(e, MeshHandle(mesh.0));
+        world.add(e, MaterialHandle(mat.0));
+    }
+    voltex_ecs::propagate_transforms(&mut world);
+
+    let camera = Camera::new(Vec3::new(0.0, 0.0, 6.0), width as f32 / height as f32);
+    let mut light = LightUniform::new();
+    light.direction = [-0.4, -0.5, -1.0];
+    light.color = [1.0, 1.0, 1.0];
+    light.ambient_strength = 0.1;
+
+    let mut encoder = gpu
+        .device
+        .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("capture pbr-br") });
+    renderer.render(
+        &gpu.queue,
+        &mut encoder,
+        &target.color_view,
+        &target.depth_view,
+        wgpu::Color { r: 0.05, g: 0.05, b: 0.08, a: 1.0 },
+        &mut world,
+        &assets,
+        camera.view_projection(),
+        camera.position,
+        light,
+    );
+    gpu.queue.submit(Some(encoder.finish()));
+    target.read_rgba8(&gpu.device, &gpu.queue)
+}
+
 /// Render one white cube at world `depth` (more negative = farther from the
 /// camera at z=8) under either an orthographic or perspective projection.
 /// Returns RGBA8. Used to show that orthographic footprints are
@@ -1362,6 +1412,33 @@ mod tests {
             rl > re + 10.0,
             "particles should spread outward over time: early r={re:.1} late r={rl:.1}"
         );
+    }
+
+    #[test]
+    #[ignore = "requires a GPU adapter"]
+    fn basic_renderer_pbr_path_shades_differently_than_colored() {
+        let gpu = match HeadlessGpu::new() {
+            Ok(g) => g,
+            Err(e) => {
+                eprintln!("skip: {e}");
+                return;
+            }
+        };
+        let colored = render_pbr_basic_renderer(&gpu, 256, 256, false);
+        let pbr = render_pbr_basic_renderer(&gpu, 256, 256, true);
+        let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../../docs/visual/");
+        crate::save_png(&format!("{dir}pbr_runtime.png"), 256, 256, &pbr).unwrap();
+
+        assert!(!crate::ImageStats::analyze(&pbr).looks_blank(), "PBR frame blank");
+        // Enabling PBR must visibly change shading vs the Blinn-Phong path.
+        let mut diff = 0u64;
+        for (a, b) in colored.chunks_exact(4).zip(pbr.chunks_exact(4)) {
+            diff += (a[0] as i64 - b[0] as i64).unsigned_abs();
+            diff += (a[1] as i64 - b[1] as i64).unsigned_abs();
+            diff += (a[2] as i64 - b[2] as i64).unsigned_abs();
+        }
+        let mean = diff as f64 / (256.0 * 256.0 * 3.0);
+        assert!(mean > 4.0, "PBR shading should differ from colored, mean channel diff={mean:.2}");
     }
 
     #[test]

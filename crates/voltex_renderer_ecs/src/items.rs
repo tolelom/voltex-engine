@@ -6,7 +6,7 @@ use voltex_ecs::{
 use voltex_math::Mat4;
 use voltex_renderer::MaterialUniform;
 
-use crate::assets::{RenderAssets, TextureHandle};
+use crate::assets::{PbrTextures, RenderAssets, TextureHandle};
 
 /// ECS marker: when present on an entity, `BasicRenderer` skips drawing it
 /// (both the regular and skinned passes). Add/remove to hide/show without
@@ -24,8 +24,11 @@ pub struct RenderItem {
     pub mesh: MeshHandle,
     /// Per-entity material uniform (already resolved from `MaterialHandle`).
     pub material: MaterialUniform,
-    /// Optional diffuse texture; `None` → renderer's white default.
+    /// Optional diffuse/albedo texture; `None` → renderer's white default.
     pub texture: Option<TextureHandle>,
+    /// Optional extra PBR maps (normal/ORM/emissive). Only consulted by the PBR
+    /// pass; the colored pass ignores it.
+    pub pbr: Option<PbrTextures>,
 }
 
 /// `propagate_transforms` 를 먼저 호출한 뒤 WorldTransform + MeshHandle 이 있는
@@ -58,12 +61,15 @@ pub fn collect_render_items(world: &mut World, assets: &RenderAssets) -> Vec<Ren
             .copied()
             .filter(|h| assets.texture(*h).is_some());
 
+        let pbr = world.get::<PbrTextures>(entity).copied();
+
         items.push(RenderItem {
             entity,
             model: wt.0,
             mesh: mh,
             material,
             texture,
+            pbr,
         });
     }
 

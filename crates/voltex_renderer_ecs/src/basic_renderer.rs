@@ -6,17 +6,19 @@
 use voltex_ecs::{World, WorldTransform};
 use voltex_math::{Mat4, Vec3, Vec4, AABB};
 use voltex_renderer::{
-    create_line_pipeline, create_shadow_pipeline, create_sprite_pipeline,
-    line_camera_bind_group_layout,
+    create_line_pipeline, create_pbr_full_texture_bind_group, create_pbr_pipeline,
+    create_shadow_pipeline, create_sprite_pipeline, line_camera_bind_group_layout,
+    pbr_full_texture_bind_group_layout,
     pipeline::{create_colored_mesh_pipeline, create_skinned_mesh_pipeline},
     shadow_main_bind_group_layout, shadow_pass_bind_group_layout, sprite_uniform_bind_group_layout,
-    BonePalette, ColoredCameraUniform, GpuTexture, LightUniform, LineCameraUniform, LineVertex,
-    PointLight, PointLightsUniform, ShadowMainUniform, ShadowMap, ShadowPassUniform,
+    BonePalette, CameraUniform, ColoredCameraUniform, GpuTexture, IblResources, LightData,
+    LightUniform, LightsUniform, LineCameraUniform, LineVertex, MaterialUniform, PointLight,
+    PointLightsUniform, ShadowMainUniform, ShadowMap, ShadowPassUniform, ShadowUniform,
     SkinnedCameraUniform, SpriteUniform, SPRITE_INDICES, SPRITE_QUAD, SHADOW_MAP_SIZE,
 };
 
 use crate::sprite::Sprite;
-use std::cell::Cell;
+use std::cell::{Cell, RefCell};
 
 /// Max debug-line vertices uploaded per frame (2 per segment). Fixed-capacity
 /// so `set_debug_lines` can stay `&self` (mirrors `set_point_lights`).
@@ -78,6 +80,29 @@ pub struct BasicRenderer {
     sprite_uniform_buffer: wgpu::Buffer,
     sprite_uniform_bind_group: wgpu::BindGroup,
     sprite_uniform_aligned: u32,
+    // ── Full PBR mesh path (opt-in via set_pbr_enabled) ─────────────────────
+    pbr_enabled: bool,
+    pbr_pipeline: wgpu::RenderPipeline,
+    pbr_tex_layout: wgpu::BindGroupLayout,
+    pbr_camera_buffer: wgpu::Buffer,
+    pbr_camera_aligned: u32,
+    pbr_lights_buffer: wgpu::Buffer,
+    pbr_camera_light_bind_group: wgpu::BindGroup,
+    pbr_material_buffer: wgpu::Buffer,
+    pbr_material_aligned: u32,
+    pbr_material_bind_group: wgpu::BindGroup,
+    pbr_shadow_uniform_buffer: wgpu::Buffer,
+    pbr_shadow_bind_group: wgpu::BindGroup,
+    // Default 1×1 maps for absent PBR slots (flat normal / white ORM / black emissive).
+    pbr_flat_normal: (wgpu::Texture, wgpu::TextureView, wgpu::Sampler),
+    pbr_black: GpuTexture,
+    pbr_default_texture_bind_group: wgpu::BindGroup,
+    // Last-set point lights, kept CPU-side so the PBR pass can fold them into
+    // the multi-light `LightsUniform` (the colored pass uses the GPU buffer).
+    point_lights_cpu: RefCell<Vec<PointLight>>,
+    // Device handle (cheap Arc clone) so the PBR pass can build per-entity
+    // 4-map texture bind groups, which need the device at build time.
+    device: wgpu::Device,
 }
 
 impl BasicRenderer {
@@ -355,6 +380,112 @@ impl BasicRenderer {
             }],
         });
 
+        // ── Full PBR mesh path resources (dormant until set_pbr_enabled) ────
+        let pbr_cl_layout = pbr_camera_light_layout(device);
+        let pbr_tex_layout = pbr_full_texture_bind_group_layout(device);
+        let pbr_mat_layout = MaterialUniform::bind_group_layout(device);
+        let pbr_shadow_layout = ShadowMap::bind_group_layout(device);
+        let pbr_pipeline = create_pbr_pipeline(
+            device,
+            target_format,
+            &pbr_cl_layout,
+            &pbr_tex_layout,
+            &pbr_mat_layout,
+            &pbr_shadow_layout,
+        );
+
+        let pbr_camera_aligned =
+            (std::mem::size_of::<CameraUniform>() as u32).div_ceil(alignment) * alignment;
+        let pbr_camera_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("BasicRenderer PBR Camera Dynamic UBO"),
+            size: (pbr_camera_aligned as usize * max_entities) as u64,
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+        let pbr_lights_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("BasicRenderer PBR Lights UBO"),
+            size: std::mem::size_of::<LightsUniform>() as u64,
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+        queue.write_buffer(&pbr_lights_buffer, 0, bytemuck::bytes_of(&LightsUniform::new()));
+        let pbr_camera_light_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("BasicRenderer PBR Camera+Light BG"),
+            layout: &pbr_cl_layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
+                        buffer: &pbr_camera_buffer,
+                        offset: 0,
+                        size: wgpu::BufferSize::new(std::mem::size_of::<CameraUniform>() as u64),
+                    }),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: pbr_lights_buffer.as_entire_binding(),
+                },
+            ],
+        });
+
+        let pbr_material_aligned =
+            (std::mem::size_of::<MaterialUniform>() as u32).div_ceil(alignment) * alignment;
+        let pbr_material_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("BasicRenderer PBR Material Dynamic UBO"),
+            size: (pbr_material_aligned as usize * max_entities) as u64,
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+        let pbr_material_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("BasicRenderer PBR Material BG"),
+            layout: &pbr_mat_layout,
+            entries: &[wgpu::BindGroupEntry {
+                binding: 0,
+                resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
+                    buffer: &pbr_material_buffer,
+                    offset: 0,
+                    size: wgpu::BufferSize::new(std::mem::size_of::<MaterialUniform>() as u64),
+                }),
+            }],
+        });
+
+        // IBL BRDF LUT + default PBR maps.
+        let ibl = IblResources::new(device, queue);
+        let pbr_flat_normal = GpuTexture::flat_normal_1x1(device, queue);
+        let pbr_black = GpuTexture::black_1x1(device, queue, &tex_layout);
+        let pbr_default_texture_bind_group = create_pbr_full_texture_bind_group(
+            device,
+            &pbr_tex_layout,
+            &default_texture.view, // white albedo
+            &default_texture.sampler,
+            &pbr_flat_normal.1,
+            &pbr_flat_normal.2,
+            &default_texture.view, // white ORM
+            &default_texture.sampler,
+            &pbr_black.view, // black emissive
+            &pbr_black.sampler,
+        );
+
+        // PBR shadow group: depth map + comparison sampler + ShadowUniform + BRDF LUT.
+        let pbr_shadow_uniform_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("BasicRenderer PBR Shadow UBO"),
+            size: std::mem::size_of::<ShadowUniform>() as u64,
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+        queue.write_buffer(
+            &pbr_shadow_uniform_buffer,
+            0,
+            bytemuck::bytes_of(&pbr_shadow_disabled()),
+        );
+        let pbr_shadow_bind_group = shadow_map.create_bind_group(
+            device,
+            &pbr_shadow_layout,
+            &pbr_shadow_uniform_buffer,
+            &ibl.brdf_lut_view,
+            &ibl.brdf_lut_sampler,
+        );
+
         Self {
             pipeline,
             camera_buffer,
@@ -391,7 +522,32 @@ impl BasicRenderer {
             sprite_uniform_buffer,
             sprite_uniform_bind_group,
             sprite_uniform_aligned,
+            pbr_enabled: false,
+            pbr_pipeline,
+            pbr_tex_layout,
+            pbr_camera_buffer,
+            pbr_camera_aligned,
+            pbr_lights_buffer,
+            pbr_camera_light_bind_group,
+            pbr_material_buffer,
+            pbr_material_aligned,
+            pbr_material_bind_group,
+            pbr_shadow_uniform_buffer,
+            pbr_shadow_bind_group,
+            pbr_flat_normal,
+            pbr_black,
+            pbr_default_texture_bind_group,
+            point_lights_cpu: RefCell::new(Vec::new()),
+            device: device.clone(),
         }
+    }
+
+    /// Enable the full PBR mesh path (Cook-Torrance + multi-light + material
+    /// maps + IBL) instead of the default colored Blinn-Phong pass. Off by
+    /// default; the colored path is byte-identical when disabled. Sprites,
+    /// particles, debug lines, skinned, and shadow passes are unaffected.
+    pub fn set_pbr_enabled(&mut self, enabled: bool) {
+        self.pbr_enabled = enabled;
     }
 
     /// Enable/disable directional shadow mapping for the non-skinned pass.
@@ -407,6 +563,9 @@ impl BasicRenderer {
     pub fn set_point_lights(&self, queue: &wgpu::Queue, lights: &[PointLight]) {
         let uniform = PointLightsUniform::from_slice(lights);
         queue.write_buffer(&self.point_lights_buffer, 0, bytemuck::bytes_of(&uniform));
+        // Keep a CPU copy so the PBR pass can fold them into its multi-light
+        // LightsUniform (the colored pass reads only the GPU buffer above).
+        *self.point_lights_cpu.borrow_mut() = lights.to_vec();
     }
 
     /// Set the immediate-mode debug line segments for the next frame. `verts`
@@ -513,76 +672,29 @@ impl BasicRenderer {
             );
         }
 
-        let aligned = self.aligned_size as usize;
-
-        // staging: one CameraUniform per entity, padded to alignment.
-        let mut staging = vec![0u8; n * aligned];
-        for (i, item) in items.iter().take(n).enumerate() {
-            let uniform = ColoredCameraUniform {
-                view_proj: view_proj.cols,
-                model: item.model.cols,
-                camera_pos: [cam_pos.x, cam_pos.y, cam_pos.z],
-                _padding: 0.0,
-                base_color: item.material.base_color,
+        if self.pbr_enabled {
+            // PBR shadow group uses the full ShadowUniform (also carries the sky
+            // direction + zeroed SH → shader falls back to procedural ambient).
+            let su = ShadowUniform {
+                light_view_proj: directional_light_vp(light.direction).cols,
+                shadow_map_size: if self.shadows_enabled { SHADOW_MAP_SIZE as f32 } else { 0.0 },
+                shadow_bias: 0.003,
+                _padding: [0.0; 2],
+                sun_direction: light.direction,
+                turbidity: 3.0,
+                sh_coefficients: [[0.0; 4]; 7],
             };
-            let bytes = bytemuck::bytes_of(&uniform);
-            let offset = i * aligned;
-            staging[offset..offset + bytes.len()].copy_from_slice(bytes);
+            queue.write_buffer(&self.pbr_shadow_uniform_buffer, 0, bytemuck::bytes_of(&su));
+            self.pbr_color_pass(
+                queue, encoder, target_view, depth_view, clear_color, &items, n, view_proj,
+                cam_pos, light, assets,
+            );
+        } else {
+            self.colored_color_pass(
+                queue, encoder, target_view, depth_view, clear_color, &items, n, view_proj,
+                cam_pos, light, assets,
+            );
         }
-        if n > 0 {
-            queue.write_buffer(&self.camera_buffer, 0, &staging);
-        }
-        queue.write_buffer(&self.light_buffer, 0, bytemuck::cast_slice(&[light]));
-
-        // ── Non-skinned (colored Blinn-Phong) pass ──────────────────────────
-        {
-        let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-            label: Some("BasicRenderer Pass"),
-            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                view: target_view,
-                resolve_target: None,
-                depth_slice: None,
-                ops: wgpu::Operations {
-                    load: wgpu::LoadOp::Clear(clear_color),
-                    store: wgpu::StoreOp::Store,
-                },
-            })],
-            depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
-                view: depth_view,
-                depth_ops: Some(wgpu::Operations {
-                    load: wgpu::LoadOp::Clear(1.0),
-                    store: wgpu::StoreOp::Store,
-                }),
-                stencil_ops: None,
-            }),
-            occlusion_query_set: None,
-            timestamp_writes: None,
-            multiview_mask: None,
-        });
-
-        pass.set_pipeline(&self.pipeline);
-        // Point lights (group 2) + shadow map (group 3) are shared across draws.
-        pass.set_bind_group(2, &self.point_lights_bind_group, &[]);
-        pass.set_bind_group(3, &self.shadow_main_bind_group, &[]);
-
-        for (i, item) in items.iter().take(n).enumerate() {
-            let mesh = assets
-                .mesh(item.mesh)
-                .expect("collect_render_items already skipped stale handles");
-            // Per-entity diffuse texture, or the white default.
-            let tex_bg = item
-                .texture
-                .and_then(|h| assets.texture(h))
-                .map(|t| &t.bind_group)
-                .unwrap_or(&self.default_texture.bind_group);
-            pass.set_bind_group(1, tex_bg, &[]);
-            let dynamic_offset = (i as u32) * self.aligned_size;
-            pass.set_bind_group(0, &self.camera_light_bind_group, &[dynamic_offset]);
-            pass.set_vertex_buffer(0, mesh.vertex_buffer.slice(..));
-            pass.set_index_buffer(mesh.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
-            pass.draw_indexed(0..mesh.num_indices, 0, 0..1);
-        }
-        } // end non-skinned pass
 
         self.render_skinned(queue, encoder, target_view, depth_view, world, assets, view_proj);
         self.render_sprites(queue, encoder, target_view, depth_view, world, assets, view_proj, cam_pos);
@@ -744,6 +856,221 @@ impl BasicRenderer {
         pass.draw(0..count, 0..1);
     }
 
+    /// The default colored Blinn-Phong mesh pass (clears the frame). Extracted
+    /// so `render` can pick it or the PBR pass.
+    #[allow(clippy::too_many_arguments)]
+    fn colored_color_pass(
+        &self,
+        queue: &wgpu::Queue,
+        encoder: &mut wgpu::CommandEncoder,
+        target_view: &wgpu::TextureView,
+        depth_view: &wgpu::TextureView,
+        clear_color: wgpu::Color,
+        items: &[crate::items::RenderItem],
+        n: usize,
+        view_proj: Mat4,
+        cam_pos: Vec3,
+        light: LightUniform,
+        assets: &RenderAssets,
+    ) {
+        let aligned = self.aligned_size as usize;
+        let mut staging = vec![0u8; n * aligned];
+        for (i, item) in items.iter().take(n).enumerate() {
+            let uniform = ColoredCameraUniform {
+                view_proj: view_proj.cols,
+                model: item.model.cols,
+                camera_pos: [cam_pos.x, cam_pos.y, cam_pos.z],
+                _padding: 0.0,
+                base_color: item.material.base_color,
+            };
+            let bytes = bytemuck::bytes_of(&uniform);
+            let offset = i * aligned;
+            staging[offset..offset + bytes.len()].copy_from_slice(bytes);
+        }
+        if n > 0 {
+            queue.write_buffer(&self.camera_buffer, 0, &staging);
+        }
+        queue.write_buffer(&self.light_buffer, 0, bytemuck::cast_slice(&[light]));
+
+        let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            label: Some("BasicRenderer Pass"),
+            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                view: target_view,
+                resolve_target: None,
+                depth_slice: None,
+                ops: wgpu::Operations {
+                    load: wgpu::LoadOp::Clear(clear_color),
+                    store: wgpu::StoreOp::Store,
+                },
+            })],
+            depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                view: depth_view,
+                depth_ops: Some(wgpu::Operations {
+                    load: wgpu::LoadOp::Clear(1.0),
+                    store: wgpu::StoreOp::Store,
+                }),
+                stencil_ops: None,
+            }),
+            occlusion_query_set: None,
+            timestamp_writes: None,
+            multiview_mask: None,
+        });
+        pass.set_pipeline(&self.pipeline);
+        pass.set_bind_group(2, &self.point_lights_bind_group, &[]);
+        pass.set_bind_group(3, &self.shadow_main_bind_group, &[]);
+        for (i, item) in items.iter().take(n).enumerate() {
+            let mesh = assets
+                .mesh(item.mesh)
+                .expect("collect_render_items already skipped stale handles");
+            let tex_bg = item
+                .texture
+                .and_then(|h| assets.texture(h))
+                .map(|t| &t.bind_group)
+                .unwrap_or(&self.default_texture.bind_group);
+            pass.set_bind_group(1, tex_bg, &[]);
+            let dynamic_offset = (i as u32) * self.aligned_size;
+            pass.set_bind_group(0, &self.camera_light_bind_group, &[dynamic_offset]);
+            pass.set_vertex_buffer(0, mesh.vertex_buffer.slice(..));
+            pass.set_index_buffer(mesh.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
+            pass.draw_indexed(0..mesh.num_indices, 0, 0..1);
+        }
+    }
+
+    /// The full PBR (Cook-Torrance + multi-light + material maps + IBL) mesh
+    /// pass (clears the frame). Folds the directional `light` + the CPU copy of
+    /// the point lights into a multi-light `LightsUniform`, stages per-entity
+    /// `CameraUniform`/`MaterialUniform`, builds a 4-map texture bind group per
+    /// entity (defaults for absent slots), and draws.
+    #[allow(clippy::too_many_arguments)]
+    fn pbr_color_pass(
+        &self,
+        queue: &wgpu::Queue,
+        encoder: &mut wgpu::CommandEncoder,
+        target_view: &wgpu::TextureView,
+        depth_view: &wgpu::TextureView,
+        clear_color: wgpu::Color,
+        items: &[crate::items::RenderItem],
+        n: usize,
+        view_proj: Mat4,
+        cam_pos: Vec3,
+        light: LightUniform,
+        assets: &RenderAssets,
+    ) {
+        // ── Multi-light uniform: directional sun + folded point/spot lights ──
+        let mut lights = LightsUniform::new();
+        lights.add_light(LightData::directional(light.direction, light.color, 1.0));
+        for pl in self.point_lights_cpu.borrow().iter() {
+            if pl.spot_cos_outer < -1.5 {
+                lights.add_light(LightData::point(pl.position, pl.color, pl.intensity, pl.range));
+            } else {
+                let outer_deg = pl.spot_cos_outer.clamp(-1.0, 1.0).acos().to_degrees();
+                let inner_deg = (outer_deg - 5.0).max(0.0);
+                lights.add_light(LightData::spot(
+                    pl.position, pl.direction, pl.color, pl.intensity, pl.range, inner_deg,
+                    outer_deg,
+                ));
+            }
+        }
+        lights.ambient_color = [
+            light.color[0] * light.ambient_strength,
+            light.color[1] * light.ambient_strength,
+            light.color[2] * light.ambient_strength,
+        ];
+        queue.write_buffer(&self.pbr_lights_buffer, 0, bytemuck::bytes_of(&lights));
+
+        // ── Per-entity camera + material staging ────────────────────────────
+        let cam_aligned = self.pbr_camera_aligned as usize;
+        let mat_aligned = self.pbr_material_aligned as usize;
+        let mut cam_staging = vec![0u8; n * cam_aligned];
+        let mut mat_staging = vec![0u8; n * mat_aligned];
+        for (i, item) in items.iter().take(n).enumerate() {
+            let cam = CameraUniform {
+                view_proj: view_proj.cols,
+                model: item.model.cols,
+                camera_pos: [cam_pos.x, cam_pos.y, cam_pos.z],
+                _padding: 0.0,
+            };
+            let cb = bytemuck::bytes_of(&cam);
+            cam_staging[i * cam_aligned..i * cam_aligned + cb.len()].copy_from_slice(cb);
+            let mb = bytemuck::bytes_of(&item.material);
+            mat_staging[i * mat_aligned..i * mat_aligned + mb.len()].copy_from_slice(mb);
+        }
+        if n > 0 {
+            queue.write_buffer(&self.pbr_camera_buffer, 0, &cam_staging);
+            queue.write_buffer(&self.pbr_material_buffer, 0, &mat_staging);
+        }
+
+        // ── Build a 4-map texture bind group per entity (defaults per slot) ──
+        // `None` ⇒ the entity has no custom maps → bind the shared default group
+        // (avoids a per-frame allocation for the common untextured case).
+        let resolve = |h: Option<crate::assets::TextureHandle>| {
+            h.and_then(|h| assets.texture(h)).map(|t| (&t.view, &t.sampler))
+        };
+        let tex_bgs: Vec<Option<wgpu::BindGroup>> = items
+            .iter()
+            .take(n)
+            .map(|item| {
+                let has_maps = item.texture.is_some()
+                    || item.pbr.map(|p| p.normal.or(p.orm).or(p.emissive).is_some())
+                        == Some(true);
+                if !has_maps {
+                    return None;
+                }
+                let (av, asamp) = resolve(item.texture)
+                    .unwrap_or((&self.default_texture.view, &self.default_texture.sampler));
+                let (nv, nsamp) = resolve(item.pbr.and_then(|p| p.normal))
+                    .unwrap_or((&self.pbr_flat_normal.1, &self.pbr_flat_normal.2));
+                let (ov, osamp) = resolve(item.pbr.and_then(|p| p.orm))
+                    .unwrap_or((&self.default_texture.view, &self.default_texture.sampler));
+                let (ev, esamp) = resolve(item.pbr.and_then(|p| p.emissive))
+                    .unwrap_or((&self.pbr_black.view, &self.pbr_black.sampler));
+                Some(create_pbr_full_texture_bind_group(
+                    &self.device,
+                    &self.pbr_tex_layout,
+                    av, asamp, nv, nsamp, ov, osamp, ev, esamp,
+                ))
+            })
+            .collect();
+
+        let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            label: Some("BasicRenderer PBR Pass"),
+            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                view: target_view,
+                resolve_target: None,
+                depth_slice: None,
+                ops: wgpu::Operations {
+                    load: wgpu::LoadOp::Clear(clear_color),
+                    store: wgpu::StoreOp::Store,
+                },
+            })],
+            depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                view: depth_view,
+                depth_ops: Some(wgpu::Operations {
+                    load: wgpu::LoadOp::Clear(1.0),
+                    store: wgpu::StoreOp::Store,
+                }),
+                stencil_ops: None,
+            }),
+            occlusion_query_set: None,
+            timestamp_writes: None,
+            multiview_mask: None,
+        });
+        pass.set_pipeline(&self.pbr_pipeline);
+        pass.set_bind_group(3, &self.pbr_shadow_bind_group, &[]);
+        for (i, item) in items.iter().take(n).enumerate() {
+            let mesh = assets
+                .mesh(item.mesh)
+                .expect("collect_render_items already skipped stale handles");
+            pass.set_bind_group(0, &self.pbr_camera_light_bind_group, &[(i as u32) * self.pbr_camera_aligned]);
+            let tex_bg = tex_bgs[i].as_ref().unwrap_or(&self.pbr_default_texture_bind_group);
+            pass.set_bind_group(1, tex_bg, &[]);
+            pass.set_bind_group(2, &self.pbr_material_bind_group, &[(i as u32) * self.pbr_material_aligned]);
+            pass.set_vertex_buffer(0, mesh.vertex_buffer.slice(..));
+            pass.set_index_buffer(mesh.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
+            pass.draw_indexed(0..mesh.num_indices, 0, 0..1);
+        }
+    }
+
     /// Second pass: GPU vertex skinning for entities carrying both a
     /// [`SkinnedMeshHandle`] and a [`SkinnedPose`]. Draws over the 3D scene
     /// with `LoadOp::Load` (color + depth), so it composes with the
@@ -885,6 +1212,52 @@ fn dynamic_uniform_layout(
             count: None,
         }],
     })
+}
+
+/// PBR group-0 layout: dynamic-offset `CameraUniform` (binding 0, vertex +
+/// fragment) + a shared `LightsUniform` (binding 1, fragment). Mirrors the
+/// layout `create_pbr_pipeline` expects.
+fn pbr_camera_light_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
+    device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+        label: Some("BasicRenderer PBR Camera+Light BGL"),
+        entries: &[
+            wgpu::BindGroupLayoutEntry {
+                binding: 0,
+                visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
+                ty: wgpu::BindingType::Buffer {
+                    ty: wgpu::BufferBindingType::Uniform,
+                    has_dynamic_offset: true,
+                    min_binding_size: wgpu::BufferSize::new(
+                        std::mem::size_of::<CameraUniform>() as u64,
+                    ),
+                },
+                count: None,
+            },
+            wgpu::BindGroupLayoutEntry {
+                binding: 1,
+                visibility: wgpu::ShaderStages::FRAGMENT,
+                ty: wgpu::BindingType::Buffer {
+                    ty: wgpu::BufferBindingType::Uniform,
+                    has_dynamic_offset: false,
+                    min_binding_size: None,
+                },
+                count: None,
+            },
+        ],
+    })
+}
+
+/// A `ShadowUniform` with shadows off (`shadow_map_size = 0`) for the PBR pass.
+fn pbr_shadow_disabled() -> ShadowUniform {
+    ShadowUniform {
+        light_view_proj: Mat4::IDENTITY.cols,
+        shadow_map_size: 0.0,
+        shadow_bias: 0.0,
+        _padding: [0.0; 2],
+        sun_direction: [0.5, -0.7, 0.5],
+        turbidity: 3.0,
+        sh_coefficients: [[0.0; 4]; 7],
+    }
 }
 
 fn camera_light_bind_group_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {

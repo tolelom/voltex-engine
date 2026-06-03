@@ -18,7 +18,7 @@ pub mod skinned;
 pub mod sprite;
 
 pub use error::{RendererEcsError, Result};
-pub use assets::{RenderAssets, TextureHandle};
+pub use assets::{PbrTextures, RenderAssets, TextureHandle};
 pub use items::{collect_render_items, Hidden, RenderItem};
 pub use basic_renderer::BasicRenderer;
 pub use skinned::{
