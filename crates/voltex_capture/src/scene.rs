@@ -770,6 +770,60 @@ pub fn render_cube_with_texture(
     target.read_rgba8(&gpu.device, &gpu.queue)
 }
 
+/// Render a single cube whose diffuse texture is decoded from **PNG bytes**
+/// via [`RenderAssets::add_texture_png`] — the exact path the editor asset
+/// pipeline uses when a `.png` is opened from the browser (file bytes →
+/// decode → `TextureHandle` → `BasicRenderer`). Distinct from
+/// [`render_cube_with_texture`], which takes a pre-built `GpuTexture` and so
+/// skips the PNG decode + sRGB upload. Returns RGBA8, or `Err` if decode fails.
+pub fn render_cube_with_png(
+    gpu: &HeadlessGpu,
+    width: u32,
+    height: u32,
+    png_bytes: &[u8],
+) -> Result<Vec<u8>, String> {
+    let target = OffscreenTarget::new(&gpu.device, width, height);
+    let renderer = BasicRenderer::new(&gpu.device, &gpu.queue, CAPTURE_FORMAT, 8);
+    let mut assets = RenderAssets::new();
+    let mesh_h = assets.add_mesh(unit_cube(&gpu.device));
+    let mat_h = assets.add_material(MaterialUniform::new()); // white → texture shows through
+    let tex_h = assets
+        .add_texture_png(&gpu.device, &gpu.queue, png_bytes)
+        .map_err(|e| format!("add_texture_png failed: {e}"))?;
+
+    let mut world = World::new();
+    let e = world.spawn();
+    let mut t = Transform::from_position(Vec3::ZERO);
+    t.rotation = Quat::from_euler_yxz(Vec3::new(0.3, 0.6, 0.0));
+    world.add(e, t);
+    world.add(e, MeshHandle(mesh_h.0));
+    world.add(e, MaterialHandle(mat_h.0));
+    world.add(e, tex_h);
+    voltex_ecs::propagate_transforms(&mut world);
+
+    let mut camera = Camera::new(Vec3::new(2.0, 1.5, 2.5), width as f32 / height as f32);
+    camera.yaw = -0.7;
+    camera.pitch = -0.4;
+
+    let mut encoder = gpu
+        .device
+        .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("capture png tex") });
+    renderer.render(
+        &gpu.queue,
+        &mut encoder,
+        &target.color_view,
+        &target.depth_view,
+        wgpu::Color { r: 0.05, g: 0.05, b: 0.08, a: 1.0 },
+        &mut world,
+        &assets,
+        camera.view_projection(),
+        camera.position,
+        LightUniform::new(),
+    );
+    gpu.queue.submit(Some(encoder.finish()));
+    Ok(target.read_rgba8(&gpu.device, &gpu.queue))
+}
+
 /// Render a ground slab + a floating occluder cube lit by one angled
 /// directional light, with shadow mapping `shadows` on/off. With shadows on,
 /// the occluder casts a shadow onto the ground. Returns RGBA8.
@@ -1420,6 +1474,56 @@ mod tests {
         let (br, bb) = mean_rb(&blue);
         assert!(rr > rb, "red-textured cube should be red-dominant: R={rr} B={rb}");
         assert!(bb > br, "blue-textured cube should be blue-dominant: R={br} B={bb}");
+    }
+
+    /// Editor asset-pipeline regression: opening a `.png` from the browser
+    /// loads it via `RenderAssets::add_texture_png` (decode + sRGB upload) and
+    /// attaches a `TextureHandle`. This guards that exact decode path renders —
+    /// the part that could silently fail where the solid-RGBA test above can't.
+    #[test]
+    #[ignore = "requires a GPU adapter"]
+    fn editor_pipeline_loaded_png_texture_renders() {
+        let gpu = match HeadlessGpu::new() {
+            Ok(g) => g,
+            Err(e) => {
+                eprintln!("skip: {e}");
+                return;
+            }
+        };
+
+        // 2×2 magenta/green checker → encode to PNG (the bytes a browser would read).
+        let m = [220u8, 30, 220, 255]; // magenta
+        let g = [30u8, 200, 60, 255]; // green
+        let pixels: Vec<u8> = [m, g, g, m].concat();
+        let png = crate::encode_rgba8(2, 2, &pixels);
+
+        let rgba = render_cube_with_png(&gpu, 256, 256, &png)
+            .expect("PNG-textured cube should render");
+
+        // Non-blank, and both checker colors must be present on the cube.
+        assert!(!ImageStats::analyze(&rgba).looks_blank(), "textured cube frame is blank");
+        let bg = [rgba[0], rgba[1], rgba[2]];
+        let (mut magenta_px, mut green_px) = (0u32, 0u32);
+        for p in rgba.chunks_exact(4) {
+            let off_bg = (p[0] as i32 - bg[0] as i32).abs()
+                + (p[1] as i32 - bg[1] as i32).abs()
+                + (p[2] as i32 - bg[2] as i32).abs()
+                > 40;
+            if !off_bg {
+                continue;
+            }
+            if p[0] > 120 && p[2] > 120 && p[1] < 120 {
+                magenta_px += 1;
+            } else if p[1] > 120 && p[0] < 120 {
+                green_px += 1;
+            }
+        }
+        assert!(magenta_px > 50, "expected magenta checker texels, got {magenta_px}");
+        assert!(green_px > 50, "expected green checker texels, got {green_px}");
+
+        // Persist a visual artifact for manual inspection.
+        let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../../docs/visual/");
+        let _ = std::fs::write(format!("{dir}textured_entity.png"), crate::encode_rgba8(256, 256, &rgba));
     }
 
     /// Minimal GLB (one triangle, POSITION + indices) — mirrors the

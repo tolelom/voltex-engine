@@ -58,6 +58,8 @@ struct AppState {
     physics_config: PhysicsConfig,
     // Asset browser
     asset_browser: AssetBrowser,
+    // Last asset-pipeline action result, shown in the toolbar.
+    status: String,
     // Mouse tracking
     prev_mouse: (f32, f32),
     left_dragging: bool,
@@ -267,6 +269,7 @@ impl ApplicationHandler for EditorDemoApp {
             viewport_tex,
             viewport_renderer,
             render_assets,
+            status: String::new(),
             basic_renderer,
             cube_mesh_h,
             ground_mesh_h,
@@ -441,6 +444,11 @@ impl ApplicationHandler for EditorDemoApp {
                     state.ui.same_line();
                     if state.ui.button("Scale") { state.gizmo_state.set_mode(GizmoMode::Scale); }
                 }
+                // Asset-pipeline status (set when a file is opened from the browser).
+                if !state.status.is_empty() {
+                    state.ui.same_line();
+                    state.ui.text(&state.status);
+                }
                 state.ui.end_panel();
 
                 let areas = state.dock.layout(Rect { x: 0.0, y: TOOLBAR_H, w: screen_w, h: screen_h - TOOLBAR_H });
@@ -475,6 +483,52 @@ impl ApplicationHandler for EditorDemoApp {
                 }
 
                 state.ui.end_frame();
+
+                // ── Asset pipeline: consume a browser "Open" activation ──
+                // The editor crate is GPU-free, so the actual load/apply happens
+                // here in the integration layer (it owns gpu + render_assets).
+                if let Some((path, kind)) = state.asset_browser.take_activated() {
+                    let name = path
+                        .file_name()
+                        .map(|n| n.to_string_lossy().into_owned())
+                        .unwrap_or_default();
+                    match kind {
+                        voltex_editor::AssetKind::Scene => {
+                            let path_str = path.to_string_lossy().into_owned();
+                            match state.session.dispatch(EditorCommand::LoadScene { path: path_str }) {
+                                Ok(_) => {
+                                    state.session.selected = None;
+                                    state.status = format!("Loaded scene: {}", name);
+                                }
+                                Err(e) => state.status = format!("Load failed: {}", e),
+                            }
+                        }
+                        voltex_editor::AssetKind::Texture => {
+                            match std::fs::read(&path) {
+                                Ok(bytes) => match state.render_assets.add_texture_png(
+                                    &state.gpu.device,
+                                    &state.gpu.queue,
+                                    &bytes,
+                                ) {
+                                    Ok(handle) => {
+                                        if let Some(sel) = state.session.selected {
+                                            state.session.world.add(sel, handle);
+                                            state.status = format!("Applied texture: {}", name);
+                                        } else {
+                                            state.status = "Select an entity first".to_string();
+                                        }
+                                    }
+                                    Err(e) => state.status = format!("Texture decode failed: {}", e),
+                                },
+                                Err(e) => state.status = format!("Read failed: {}", e),
+                            }
+                        }
+                        other => {
+                            state.status = format!("{:?} import not yet wired", other);
+                        }
+                    }
+                    eprintln!("[asset] {}", state.status);
+                }
 
                 // Orbit camera input (only when mouse is over viewport).
                 // Gizmo dragging preempts orbit so the camera doesn't fight the gizmo.

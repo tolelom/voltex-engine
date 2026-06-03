@@ -30,7 +30,7 @@ Immediate-mode UI 에디터 — 도킹/플로팅/뷰포트/인스펙터/에셋 �
 - `panels::hierarchy::hierarchy_panel` — 트리 뷰, click 으로 `session.selected` 설정 (src/panels/hierarchy.rs)
 - `panels::inspector::inspector_panel` + `InspectorState` — 슬라이더(transform) + text_input(tag) → 모든 변경이 EditorCommand 로 dispatch (src/panels/inspector.rs)
 - `count_entity_nodes(world, entity)` — 서브트리 노드 수 (re-exported)
-- `AssetBrowser`, `asset_browser_panel` (src/asset_browser.rs)
+- `AssetBrowser`, `asset_browser_panel`, `AssetKind` (src/asset_browser.rs) — 파일 트리 뷰 + 종류 분류(`AssetKind::from_path`: Texture/Scene/Mesh/Audio/Other) + "Open" 활성화. `selected_full_path()` / `selected_kind()` / `take_activated() -> Option<(PathBuf, AssetKind)>` 로 통합 레이어가 로드/적용(GPU 동작은 에디터 밖, editor_demo 가 수행 — 레이어링 유지)
 
 ### Editor Command / Error
 - `EditorCommand` — Spawn / Despawn / SetTransform / SetTag / **AddChild** / **RemoveChild** / SaveScene / LoadScene (src/command.rs)
@@ -77,5 +77,5 @@ Immediate-mode UI 에디터 — 도킹/플로팅/뷰포트/인스펙터/에셋 �
 ## 테스트
 - 단위 테스트: src/**/*.rs `#[cfg(test)]`
 - 실행: `cargo test -p voltex_editor --lib`
-- 현재 테스트 개수: 177개 (UiContext::progress_bar +3 포함)
+- 현재 테스트 개수: 182개 (AssetBrowser AssetKind/활성화 +6 포함)
 - `UiContext::progress_bar(x,y,w,h,fraction,fg,bg)` / `draw_rect` — HUD 체력/진행 바 헬퍼 (runtime `set_hud_fn` 에서 사용)
