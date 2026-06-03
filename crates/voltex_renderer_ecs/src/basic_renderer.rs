@@ -7,7 +7,8 @@ use voltex_ecs::{World, WorldTransform};
 use voltex_math::{Mat4, Vec3, Vec4, AABB};
 use voltex_renderer::{
     create_line_pipeline, create_pbr_full_texture_bind_group, create_pbr_pipeline,
-    create_shadow_pipeline, create_sprite_pipeline, line_camera_bind_group_layout,
+    create_pbr_skinned_pipeline, create_shadow_pipeline, create_sprite_pipeline,
+    line_camera_bind_group_layout,
     pbr_full_texture_bind_group_layout,
     pipeline::{create_colored_mesh_pipeline, create_skinned_mesh_pipeline},
     shadow_main_bind_group_layout, shadow_pass_bind_group_layout, sprite_uniform_bind_group_layout,
@@ -103,6 +104,12 @@ pub struct BasicRenderer {
     // Device handle (cheap Arc clone) so the PBR pass can build per-entity
     // 4-map texture bind groups, which need the device at build time.
     device: wgpu::Device,
+    // ── Skinned PBR (used when both pbr_enabled and skinned entities exist) ──
+    pbr_skinned_pipeline: wgpu::RenderPipeline,
+    pbr_skinned_cam_buffer: wgpu::Buffer,
+    pbr_skinned_cam_aligned: u32,
+    pbr_skinned_g0_bind_group: wgpu::BindGroup,
+    pbr_skinned_material_bind_group: wgpu::BindGroup,
 }
 
 impl BasicRenderer {
@@ -486,6 +493,76 @@ impl BasicRenderer {
             &ibl.brdf_lut_sampler,
         );
 
+        // ── Skinned PBR: g0 = camera(dyn) + lights(static) + palette(dyn) ────
+        let pbr_skinned_g0_layout = pbr_skinned_g0_layout(device);
+        let pbr_skinned_pipeline = create_pbr_skinned_pipeline(
+            device,
+            target_format,
+            &pbr_skinned_g0_layout,
+            &pbr_tex_layout,
+            &pbr_mat_layout,
+            &pbr_shadow_layout,
+        );
+        let pbr_skinned_cam_aligned =
+            (std::mem::size_of::<CameraUniform>() as u32).div_ceil(alignment) * alignment;
+        let pbr_skinned_cam_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("BasicRenderer PBR Skinned Camera UBO"),
+            size: (pbr_skinned_cam_aligned as usize * MAX_SKINNED) as u64,
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+        let pbr_skinned_g0_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("BasicRenderer PBR Skinned g0 BG"),
+            layout: &pbr_skinned_g0_layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
+                        buffer: &pbr_skinned_cam_buffer,
+                        offset: 0,
+                        size: wgpu::BufferSize::new(std::mem::size_of::<CameraUniform>() as u64),
+                    }),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: pbr_lights_buffer.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 2,
+                    resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
+                        buffer: &palette_buffer,
+                        offset: 0,
+                        size: wgpu::BufferSize::new(std::mem::size_of::<BonePalette>() as u64),
+                    }),
+                },
+            ],
+        });
+        // A single shared material for skinned PBR (per-skinned material is a
+        // follow-up). Mid roughness, non-metal, white.
+        let pbr_skinned_material_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("BasicRenderer PBR Skinned Material UBO"),
+            size: std::mem::size_of::<MaterialUniform>() as u64,
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+        queue.write_buffer(
+            &pbr_skinned_material_buffer,
+            0,
+            bytemuck::bytes_of(&MaterialUniform::with_params([0.8, 0.8, 0.82, 1.0], 0.0, 0.6)),
+        );
+        let pbr_skinned_material_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("BasicRenderer PBR Skinned Material BG"),
+            layout: &pbr_mat_layout,
+            entries: &[wgpu::BindGroupEntry {
+                binding: 0,
+                resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
+                    buffer: &pbr_skinned_material_buffer,
+                    offset: 0,
+                    size: wgpu::BufferSize::new(std::mem::size_of::<MaterialUniform>() as u64),
+                }),
+            }],
+        });
+
         Self {
             pipeline,
             camera_buffer,
@@ -539,6 +616,11 @@ impl BasicRenderer {
             pbr_default_texture_bind_group,
             point_lights_cpu: RefCell::new(Vec::new()),
             device: device.clone(),
+            pbr_skinned_pipeline,
+            pbr_skinned_cam_buffer,
+            pbr_skinned_cam_aligned,
+            pbr_skinned_g0_bind_group,
+            pbr_skinned_material_bind_group,
         }
     }
 
@@ -696,7 +778,7 @@ impl BasicRenderer {
             );
         }
 
-        self.render_skinned(queue, encoder, target_view, depth_view, world, assets, view_proj);
+        self.render_skinned(queue, encoder, target_view, depth_view, world, assets, view_proj, cam_pos);
         self.render_sprites(queue, encoder, target_view, depth_view, world, assets, view_proj, cam_pos);
         self.render_debug_lines(queue, encoder, target_view, depth_view, view_proj);
     }
@@ -1085,6 +1167,7 @@ impl BasicRenderer {
         world: &mut World,
         assets: &RenderAssets,
         view_proj: Mat4,
+        cam_pos: Vec3,
     ) {
         // (model matrix, mesh handle, bone palette) per skinned entity.
         let items: Vec<(Mat4, SkinnedMeshHandle, BonePalette)> = world
@@ -1097,22 +1180,47 @@ impl BasicRenderer {
             return;
         }
 
-        let cam_aligned = self.skinned_cam_aligned as usize;
+        // Palettes are shared by both skinned paths.
         let pal_aligned = self.palette_aligned as usize;
-        let mut cam_staging = vec![0u8; n * cam_aligned];
         let mut pal_staging = vec![0u8; n * pal_aligned];
-        for (i, (model, _, palette)) in items.iter().take(n).enumerate() {
-            let cam = SkinnedCameraUniform {
-                view_proj: view_proj.cols,
-                model: model.cols,
-            };
-            let cb = bytemuck::bytes_of(&cam);
-            cam_staging[i * cam_aligned..i * cam_aligned + cb.len()].copy_from_slice(cb);
+        for (i, (_, _, palette)) in items.iter().take(n).enumerate() {
             let pb = bytemuck::bytes_of(palette);
             pal_staging[i * pal_aligned..i * pal_aligned + pb.len()].copy_from_slice(pb);
         }
-        queue.write_buffer(&self.skinned_cam_buffer, 0, &cam_staging);
         queue.write_buffer(&self.palette_buffer, 0, &pal_staging);
+
+        // Per-entity camera uniform: PBR uses CameraUniform (w/ camera_pos), the
+        // colored path uses SkinnedCameraUniform.
+        let (cam_aligned, cam_buffer) = if self.pbr_enabled {
+            let a = self.pbr_skinned_cam_aligned as usize;
+            let mut staging = vec![0u8; n * a];
+            for (i, (model, _, _)) in items.iter().take(n).enumerate() {
+                let cam = CameraUniform {
+                    view_proj: view_proj.cols,
+                    model: model.cols,
+                    camera_pos: [cam_pos.x, cam_pos.y, cam_pos.z],
+                    _padding: 0.0,
+                };
+                let cb = bytemuck::bytes_of(&cam);
+                staging[i * a..i * a + cb.len()].copy_from_slice(cb);
+            }
+            queue.write_buffer(&self.pbr_skinned_cam_buffer, 0, &staging);
+            (a, &self.pbr_skinned_cam_buffer)
+        } else {
+            let a = self.skinned_cam_aligned as usize;
+            let mut staging = vec![0u8; n * a];
+            for (i, (model, _, _)) in items.iter().take(n).enumerate() {
+                let cam = SkinnedCameraUniform {
+                    view_proj: view_proj.cols,
+                    model: model.cols,
+                };
+                let cb = bytemuck::bytes_of(&cam);
+                staging[i * a..i * a + cb.len()].copy_from_slice(cb);
+            }
+            queue.write_buffer(&self.skinned_cam_buffer, 0, &staging);
+            (a, &self.skinned_cam_buffer)
+        };
+        let _ = cam_buffer; // bound via the prebuilt bind groups below
 
         let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: Some("BasicRenderer Skinned Pass"),
@@ -1137,18 +1245,38 @@ impl BasicRenderer {
             timestamp_writes: None,
             multiview_mask: None,
         });
-        pass.set_pipeline(&self.skinned_pipeline);
-        for (i, (_, handle, _)) in items.iter().take(n).enumerate() {
-            let Some(mesh) = assets.skinned_mesh(*handle) else {
-                continue;
-            };
-            let cam_off = (i * cam_aligned) as u32;
-            let pal_off = (i * pal_aligned) as u32;
-            pass.set_bind_group(0, &self.skinned_cam_bind_group, &[cam_off]);
-            pass.set_bind_group(1, &self.palette_bind_group, &[pal_off]);
-            pass.set_vertex_buffer(0, mesh.vertex_buffer.slice(..));
-            pass.set_index_buffer(mesh.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
-            pass.draw_indexed(0..mesh.num_indices, 0, 0..1);
+
+        if self.pbr_enabled {
+            pass.set_pipeline(&self.pbr_skinned_pipeline);
+            pass.set_bind_group(1, &self.pbr_default_texture_bind_group, &[]);
+            pass.set_bind_group(2, &self.pbr_skinned_material_bind_group, &[0]);
+            pass.set_bind_group(3, &self.pbr_shadow_bind_group, &[]);
+            for (i, (_, handle, _)) in items.iter().take(n).enumerate() {
+                let Some(mesh) = assets.skinned_mesh(*handle) else {
+                    continue;
+                };
+                let cam_off = (i * cam_aligned) as u32;
+                let pal_off = (i * pal_aligned) as u32;
+                // g0 has two dynamic bindings (camera @0, palette @2).
+                pass.set_bind_group(0, &self.pbr_skinned_g0_bind_group, &[cam_off, pal_off]);
+                pass.set_vertex_buffer(0, mesh.vertex_buffer.slice(..));
+                pass.set_index_buffer(mesh.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
+                pass.draw_indexed(0..mesh.num_indices, 0, 0..1);
+            }
+        } else {
+            pass.set_pipeline(&self.skinned_pipeline);
+            for (i, (_, handle, _)) in items.iter().take(n).enumerate() {
+                let Some(mesh) = assets.skinned_mesh(*handle) else {
+                    continue;
+                };
+                let cam_off = (i * cam_aligned) as u32;
+                let pal_off = (i * pal_aligned) as u32;
+                pass.set_bind_group(0, &self.skinned_cam_bind_group, &[cam_off]);
+                pass.set_bind_group(1, &self.palette_bind_group, &[pal_off]);
+                pass.set_vertex_buffer(0, mesh.vertex_buffer.slice(..));
+                pass.set_index_buffer(mesh.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
+                pass.draw_indexed(0..mesh.num_indices, 0, 0..1);
+            }
         }
     }
 }
@@ -1240,6 +1368,50 @@ fn pbr_camera_light_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
                     ty: wgpu::BufferBindingType::Uniform,
                     has_dynamic_offset: false,
                     min_binding_size: None,
+                },
+                count: None,
+            },
+        ],
+    })
+}
+
+/// Skinned-PBR group-0 layout: camera (binding 0, dynamic, vertex+fragment) +
+/// lights (binding 1, fragment) + bone palette (binding 2, dynamic, vertex).
+fn pbr_skinned_g0_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
+    device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+        label: Some("BasicRenderer PBR Skinned g0 BGL"),
+        entries: &[
+            wgpu::BindGroupLayoutEntry {
+                binding: 0,
+                visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
+                ty: wgpu::BindingType::Buffer {
+                    ty: wgpu::BufferBindingType::Uniform,
+                    has_dynamic_offset: true,
+                    min_binding_size: wgpu::BufferSize::new(
+                        std::mem::size_of::<CameraUniform>() as u64,
+                    ),
+                },
+                count: None,
+            },
+            wgpu::BindGroupLayoutEntry {
+                binding: 1,
+                visibility: wgpu::ShaderStages::FRAGMENT,
+                ty: wgpu::BindingType::Buffer {
+                    ty: wgpu::BufferBindingType::Uniform,
+                    has_dynamic_offset: false,
+                    min_binding_size: None,
+                },
+                count: None,
+            },
+            wgpu::BindGroupLayoutEntry {
+                binding: 2,
+                visibility: wgpu::ShaderStages::VERTEX,
+                ty: wgpu::BindingType::Buffer {
+                    ty: wgpu::BufferBindingType::Uniform,
+                    has_dynamic_offset: true,
+                    min_binding_size: wgpu::BufferSize::new(
+                        std::mem::size_of::<BonePalette>() as u64,
+                    ),
                 },
                 count: None,
             },

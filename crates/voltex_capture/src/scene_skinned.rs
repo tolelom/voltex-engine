@@ -276,6 +276,18 @@ pub fn render_skinned_runtime(
     height: u32,
     anim_time: f32,
 ) -> Vec<u8> {
+    render_skinned_runtime_mode(gpu, width, height, anim_time, false)
+}
+
+/// Like [`render_skinned_runtime`] but selects the colored (`pbr=false`) or
+/// full PBR (`pbr=true`) skinned path.
+pub fn render_skinned_runtime_mode(
+    gpu: &HeadlessGpu,
+    width: u32,
+    height: u32,
+    anim_time: f32,
+    pbr: bool,
+) -> Vec<u8> {
     use voltex_ecs::{propagate_transforms, Transform, World};
     use voltex_renderer::{LightUniform, SkinnedMesh};
     use voltex_renderer_ecs::{update_skinned_poses, BasicRenderer, RenderAssets, SkinnedPose};
@@ -283,7 +295,8 @@ pub fn render_skinned_runtime(
     let device = &gpu.device;
     let queue = &gpu.queue;
     let target = OffscreenTarget::new(device, width, height);
-    let renderer = BasicRenderer::new(device, queue, CAPTURE_FORMAT, 16);
+    let mut renderer = BasicRenderer::new(device, queue, CAPTURE_FORMAT, 16);
+    renderer.set_pbr_enabled(pbr);
 
     let mut assets = RenderAssets::new();
     let (verts, indices) = strip_vertices();
@@ -413,6 +426,40 @@ mod tests {
         assert!(
             changed > 150,
             "animating the runtime skinned entity should change pixels, got {changed}"
+        );
+    }
+
+    #[test]
+    #[ignore = "requires a GPU adapter"]
+    fn runtime_skinned_pbr_path_renders_and_animates() {
+        let gpu = match HeadlessGpu::new() {
+            Ok(g) => g,
+            Err(e) => {
+                eprintln!("skipping: no GPU adapter ({e})");
+                return;
+            }
+        };
+        let (w, h) = (256, 256);
+        // The PBR skinned pipeline must compile + render, deform with the pose,
+        // and shade differently from the colored skinned path.
+        let pbr_rest = render_skinned_runtime_mode(&gpu, w, h, 0.0, true);
+        let pbr_posed = render_skinned_runtime_mode(&gpu, w, h, 1.0, true);
+        let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../../docs/visual/");
+        crate::save_png(&format!("{dir}skinned_pbr.png"), w, h, &pbr_posed).unwrap();
+
+        assert!(
+            !ImageStats::analyze(&pbr_rest).looks_blank(),
+            "PBR skinned strip should render"
+        );
+        assert!(
+            diff_pixels(&pbr_rest, &pbr_posed, 16) > 150,
+            "PBR skinned entity should deform with the pose"
+        );
+        // PBR shading should differ from the colored skinned path on the same pose.
+        let colored_posed = render_skinned_runtime_mode(&gpu, w, h, 1.0, false);
+        assert!(
+            diff_pixels(&colored_posed, &pbr_posed, 16) > 100,
+            "PBR skinned shading should differ from the colored skinned path"
         );
     }
 

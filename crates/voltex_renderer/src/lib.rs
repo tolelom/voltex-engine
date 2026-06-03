@@ -98,7 +98,7 @@ pub use light::{
 pub use material::MaterialUniform;
 pub use mesh::Mesh;
 pub use motion_blur::MotionBlur;
-pub use pbr_pipeline::create_pbr_pipeline;
+pub use pbr_pipeline::{create_pbr_pipeline, create_pbr_skinned_pipeline};
 pub use pipeline::{
     bone_palette_bind_group_layout, create_colored_mesh_pipeline, create_skinned_mesh_pipeline,
     skinned_camera_bind_group_layout,

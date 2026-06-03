@@ -102,7 +102,14 @@ v1.0.59 데모(game_ready_demo)를 실제로 돌려보며 드러난 엔진 갭�
   (기본 off → byte-identical). 캡처 회귀
   `basic_renderer_pbr_path_shades_differently_than_colored` +
   `docs/visual/pbr_runtime.png`(metallic 그래디언트 + 스페큘러 + 환경 반사).
-  한계: 스킨드 메시 PBR은 여전히 colored(후속), env는 procedural sky(SH 0).
+  env는 procedural sky(SH 0).
+- **스킨드 메시 PBR**: `pbr_skinned.wgsl` — GPU 버텍스 스키닝 + 풀 Cook-Torrance
+  프래그먼트. bone palette를 group 0(camera+lights)에 합쳐 max_bind_groups=4
+  유지. `create_pbr_skinned_pipeline` + `BasicRenderer` skinned 패스가
+  `pbr_enabled` 시 PBR 스킨드 파이프라인 사용(멀티라이트+IBL+그림자). 스킨드
+  메시도 이제 정적 메시와 동일한 PBR 라이팅. 캡처 회귀
+  `runtime_skinned_pbr_path_renders_and_animates` + `docs/visual/skinned_pbr.png`.
+  한계: per-skinned 머티리얼/텍스처는 v1 공유 기본값(후속).
 - **선형 텍스처 로더 + 노멀맵**: `GpuTexture::from_rgba_linear` +
   `RenderAssets::add_texture_png_linear`/`add_texture_rgba_linear` — 노멀/ORM
   맵을 sRGB 디코드 없이 linear `Rgba8Unorm`로 업로드. 컬러/알베도는 기존 sRGB
