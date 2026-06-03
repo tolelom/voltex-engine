@@ -332,6 +332,95 @@ pub fn render_skinned_runtime_mode(
     target.read_rgba8(device, queue)
 }
 
+/// Render a skinned strip hovering over a ground plane with directional shadow
+/// mapping, to verify skinned meshes cast into the shadow map. The ground is
+/// the only static mesh (the shadow *receiver*); the bent skinned strip is the
+/// only *caster*. With `shadows` on, the strip darkens a band of ground; with
+/// it off, the ground is uniformly lit. `hide_caster` adds a `Hidden` component
+/// so the strip neither draws nor casts — the control that proves any ground
+/// darkening comes from the skinned caster specifically.
+pub fn render_skinned_shadow_scene(
+    gpu: &HeadlessGpu,
+    width: u32,
+    height: u32,
+    shadows: bool,
+    hide_caster: bool,
+) -> Vec<u8> {
+    use voltex_ecs::{propagate_transforms, MaterialHandle, MeshHandle, Transform, World};
+    use voltex_renderer::{LightUniform, MaterialUniform, MeshVertex, SkinnedMesh};
+    use voltex_renderer_ecs::{update_skinned_poses, BasicRenderer, Hidden, RenderAssets, SkinnedPose};
+
+    let device = &gpu.device;
+    let queue = &gpu.queue;
+    let target = OffscreenTarget::new(device, width, height);
+    let mut renderer = BasicRenderer::new(device, queue, CAPTURE_FORMAT, 8);
+    renderer.set_shadows(shadows);
+
+    let mut assets = RenderAssets::new();
+
+    // Up-facing ground quad (receiver).
+    let mk = |x: f32, z: f32| MeshVertex {
+        position: [x, 0.0, z],
+        normal: [0.0, 1.0, 0.0],
+        uv: [0.0, 0.0],
+        tangent: [1.0, 0.0, 0.0, 1.0],
+    };
+    let gverts = [mk(-12.0, -12.0), mk(12.0, -12.0), mk(12.0, 12.0), mk(-12.0, 12.0)];
+    let gidx = [0u32, 2, 1, 0, 3, 2];
+    let ground_mesh = assets.add_mesh(voltex_renderer::Mesh::new(device, &gverts, &gidx));
+    let gray = assets.add_material(MaterialUniform::with_params([0.7, 0.7, 0.7, 1.0], 0.0, 1.0));
+
+    // Skinned strip (caster), scaled up and lifted above the ground, bent so it
+    // is clearly a deformed shape.
+    let (verts, indices) = strip_vertices();
+    let mesh_h = assets.add_skinned_mesh(SkinnedMesh::new(device, &verts, &indices));
+
+    let mut world = World::new();
+    let ground = world.spawn();
+    world.add(ground, Transform::from_position(Vec3::ZERO));
+    world.add(ground, MeshHandle(ground_mesh.0));
+    world.add(ground, MaterialHandle(gray.0));
+
+    let strip = world.spawn();
+    let mut st = Transform::from_position(Vec3::new(0.0, 2.0, 0.0));
+    st.scale = Vec3::new(3.0, 3.0, 3.0);
+    world.add(strip, st);
+    world.add(strip, mesh_h);
+    world.add(strip, SkinnedPose::new(demo_skeleton(), bend_animation_2kf()));
+    if hide_caster {
+        world.add(strip, Hidden);
+    }
+
+    update_skinned_poses(&mut world, 1.0);
+    propagate_transforms(&mut world);
+
+    // Camera looks down at the ground from a corner; light angled so the strip's
+    // shadow falls beside it onto open ground.
+    let mut camera = Camera::new(Vec3::new(7.0, 7.0, 7.0), width as f32 / height as f32);
+    camera.yaw = -0.785;
+    camera.pitch = -0.615;
+    let mut light = LightUniform::new();
+    light.direction = [-0.4, -1.0, -0.2];
+    light.ambient_strength = 0.12;
+
+    let mut encoder =
+        device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("skinned shadow") });
+    renderer.render(
+        queue,
+        &mut encoder,
+        &target.color_view,
+        &target.depth_view,
+        wgpu::Color { r: 0.1, g: 0.1, b: 0.15, a: 1.0 },
+        &mut world,
+        &assets,
+        camera.view_projection(),
+        camera.position,
+        light,
+    );
+    queue.submit(Some(encoder.finish()));
+    target.read_rgba8(device, queue)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -460,6 +549,54 @@ mod tests {
         assert!(
             diff_pixels(&colored_posed, &pbr_posed, 16) > 100,
             "PBR skinned shading should differ from the colored skinned path"
+        );
+    }
+
+    /// Count pixels that got darker (in luminance) in `a` vs `b` by more than
+    /// `tol` — i.e. where a shadow fell.
+    fn darkened_pixels(a: &[u8], b: &[u8], tol: i32) -> usize {
+        let lum = |p: &[u8]| p[0] as i32 + p[1] as i32 + p[2] as i32;
+        a.chunks_exact(4)
+            .zip(b.chunks_exact(4))
+            .filter(|(pa, pb)| lum(pb) - lum(pa) > tol)
+            .count()
+    }
+
+    #[test]
+    #[ignore = "requires a GPU adapter"]
+    fn skinned_mesh_casts_shadow() {
+        let gpu = match HeadlessGpu::new() {
+            Ok(g) => g,
+            Err(e) => {
+                eprintln!("skipping: no GPU adapter ({e})");
+                return;
+            }
+        };
+        let (w, h) = (512, 512);
+
+        // Strip present: shadows on vs off. The strip's own pixels don't receive
+        // shadow (the skinned shader ignores the shadow map), so the darkening is
+        // the ground shadow cast BY the skinned strip.
+        let on = render_skinned_shadow_scene(&gpu, w, h, true, false);
+        let off = render_skinned_shadow_scene(&gpu, w, h, false, false);
+        let cast = darkened_pixels(&on, &off, 40);
+
+        // Control: strip hidden → no caster. Any residual darkening (flat-ground
+        // self-shadow) must be far smaller than the strip's cast shadow.
+        let on_ctrl = render_skinned_shadow_scene(&gpu, w, h, true, true);
+        let off_ctrl = render_skinned_shadow_scene(&gpu, w, h, false, true);
+        let baseline = darkened_pixels(&on_ctrl, &off_ctrl, 40);
+
+        let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../../docs/visual/");
+        crate::save_png(&format!("{dir}skinned_shadow.png"), w, h, &on).unwrap();
+
+        assert!(
+            cast > 500,
+            "skinned strip should cast a visible ground shadow, got {cast} darkened px"
+        );
+        assert!(
+            cast > baseline * 4,
+            "skinned cast shadow ({cast}) should dominate flat-ground baseline ({baseline})"
         );
     }
 

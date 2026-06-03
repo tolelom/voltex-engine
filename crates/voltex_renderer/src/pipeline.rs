@@ -1,6 +1,7 @@
 #![allow(missing_docs)]
 
 use crate::gpu::DEPTH_FORMAT;
+use crate::shadow::SHADOW_FORMAT;
 use crate::skinned_vertex::{BonePalette, SkinnedMeshVertex};
 use crate::vertex::{Vertex, MESH_VERTEX_LAYOUT};
 
@@ -289,6 +290,71 @@ pub fn create_mesh_pipeline(
             depth_compare: wgpu::CompareFunction::Less,
             stencil: wgpu::StencilState::default(),
             bias: wgpu::DepthBiasState::default(),
+        }),
+        multisample: wgpu::MultisampleState {
+            count: 1,
+            mask: !0,
+            alpha_to_coverage_enabled: false,
+        },
+        multiview_mask: None,
+        cache: None,
+    })
+}
+
+/// Depth-only skinned shadow caster pipeline. Mirrors [`create_shadow_pipeline`]
+/// (no fragment stage, [`SHADOW_FORMAT`] depth, front-face cull + slope bias to
+/// curb shadow acne) but takes the skinned vertex layout and the colored skinned
+/// bind-group layouts (`camera_layout` = [`crate::SkinnedCameraUniform`],
+/// `palette_layout` = [`BonePalette`]). The caller writes the light
+/// view-projection into the camera UBO's `view_proj` slot so skinned meshes
+/// write into the directional shadow map. Uses `skinned_shadow_shader.wgsl`.
+pub fn create_skinned_shadow_pipeline(
+    device: &wgpu::Device,
+    camera_layout: &wgpu::BindGroupLayout,
+    palette_layout: &wgpu::BindGroupLayout,
+) -> wgpu::RenderPipeline {
+    let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+        label: Some("Skinned Shadow Shader"),
+        source: wgpu::ShaderSource::Wgsl(include_str!("skinned_shadow_shader.wgsl").into()),
+    });
+
+    let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+        label: Some("Skinned Shadow Pipeline Layout"),
+        bind_group_layouts: &[camera_layout, palette_layout],
+        immediate_size: 0,
+    });
+
+    device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+        label: Some("Skinned Shadow Pipeline"),
+        layout: Some(&layout),
+        vertex: wgpu::VertexState {
+            module: &shader,
+            entry_point: Some("vs_main"),
+            buffers: &[SkinnedMeshVertex::LAYOUT],
+            compilation_options: wgpu::PipelineCompilationOptions::default(),
+        },
+        fragment: None,
+        primitive: wgpu::PrimitiveState {
+            topology: wgpu::PrimitiveTopology::TriangleList,
+            strip_index_format: None,
+            front_face: wgpu::FrontFace::Ccw,
+            // Skinning can flip winding under extreme poses; don't cull so a
+            // deformed limb never drops out of the shadow map.
+            cull_mode: None,
+            polygon_mode: wgpu::PolygonMode::Fill,
+            unclipped_depth: false,
+            conservative: false,
+        },
+        depth_stencil: Some(wgpu::DepthStencilState {
+            format: SHADOW_FORMAT,
+            depth_write_enabled: true,
+            depth_compare: wgpu::CompareFunction::Less,
+            stencil: wgpu::StencilState::default(),
+            bias: wgpu::DepthBiasState {
+                constant: 2,
+                slope_scale: 2.0,
+                clamp: 0.0,
+            },
         }),
         multisample: wgpu::MultisampleState {
             count: 1,

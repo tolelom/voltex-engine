@@ -157,7 +157,7 @@
 
 ## 렌더링 한계
 
-- ~~**런타임 그림자 없음**~~ ✅ 2026-06-03 — BasicRenderer directional shadow mapping (`RuntimeConfig::with_shadows(true)`): shadow depth pre-pass + mesh_colored 3x3 PCF (group 3). 기본 off. 한계: 스킨드 메시 caster 아님, ortho 고정(30), 바닥 접촉 오브젝트 self-occlusion. 캡처 검증 docs/visual/shadow_on.png.
+- ~~**런타임 그림자 없음**~~ ✅ 2026-06-03 — BasicRenderer directional shadow mapping (`RuntimeConfig::with_shadows(true)`): shadow depth pre-pass + mesh_colored 3x3 PCF (group 3). 기본 off. 한계: ortho 고정(30), 바닥 접촉 오브젝트 self-occlusion. 캡처 검증 docs/visual/shadow_on.png. ~~스킨드 메시 caster 아님~~ ✅ 2026-06-03 (v1.0.61) — `create_skinned_shadow_pipeline` + `skinned_shadow_shader.wgsl`(depth-only GPU 스키닝, 기존 skinned camera/palette 레이아웃 재사용, light-space cam UBO만 추가). BasicRenderer shadow pre-pass가 정적 메시 후 스킨드 메시도 깊이에 렌더. 캡처 회귀 `skinned_mesh_casts_shadow`(strip이 바닥에 그림자 투사, Hidden 대조군 대비 압도) + docs/visual/skinned_shadow.png.
 
 - ~~**per-entity dynamic UBO**~~ ✅ GPU 인스턴싱 (InstanceData, InstanceBuffer, instanced pipeline) 완료.
 - **max_bind_groups=4** — 리소스 합치기로 해결 중.

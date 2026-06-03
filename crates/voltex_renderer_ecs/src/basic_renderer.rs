@@ -7,7 +7,8 @@ use voltex_ecs::{MaterialHandle, World, WorldTransform};
 use voltex_math::{Mat4, Vec3, Vec4, AABB};
 use voltex_renderer::{
     create_line_pipeline, create_pbr_full_texture_bind_group, create_pbr_pipeline,
-    create_pbr_skinned_pipeline, create_shadow_pipeline, create_sprite_pipeline,
+    create_pbr_skinned_pipeline, create_shadow_pipeline, create_skinned_shadow_pipeline,
+    create_sprite_pipeline,
     line_camera_bind_group_layout,
     pbr_full_texture_bind_group_layout,
     pipeline::{create_colored_mesh_pipeline, create_skinned_mesh_pipeline},
@@ -67,6 +68,12 @@ pub struct BasicRenderer {
     palette_bind_group: wgpu::BindGroup,
     skinned_cam_aligned: u32,
     palette_aligned: u32,
+    // Skinned shadow caster: depth-only skinning pipeline + a light-space camera
+    // UBO (reuses the palette buffer + skinned_cam/palette layouts). Lets skinned
+    // meshes write into the directional shadow map alongside static meshes.
+    skinned_shadow_pipeline: wgpu::RenderPipeline,
+    skinned_shadow_cam_buffer: wgpu::Buffer,
+    skinned_shadow_cam_bind_group: wgpu::BindGroup,
     // Directional shadow mapping (off by default; enable with set_shadows).
     shadows_enabled: bool,
     shadow_map: ShadowMap,
@@ -341,6 +348,31 @@ impl BasicRenderer {
             }],
         });
 
+        // Skinned shadow caster: depth-only pipeline (reuses the skinned camera +
+        // palette layouts) and a dedicated light-space camera UBO. The palette
+        // buffer is shared — render() uploads identical pose data for the shadow
+        // pass and the main skinned pass each frame.
+        let skinned_shadow_pipeline =
+            create_skinned_shadow_pipeline(device, &skinned_cam_layout, &palette_layout);
+        let skinned_shadow_cam_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("BasicRenderer Skinned Shadow Camera Dynamic UBO"),
+            size: (skinned_cam_aligned as usize * MAX_SKINNED) as u64,
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+        let skinned_shadow_cam_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("BasicRenderer Skinned Shadow Camera BG"),
+            layout: &skinned_cam_layout,
+            entries: &[wgpu::BindGroupEntry {
+                binding: 0,
+                resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
+                    buffer: &skinned_shadow_cam_buffer,
+                    offset: 0,
+                    size: wgpu::BufferSize::new(std::mem::size_of::<SkinnedCameraUniform>() as u64),
+                }),
+            }],
+        });
+
         // ── Debug line resources ────────────────────────────────────────────
         let line_cam_layout = line_camera_bind_group_layout(device);
         let line_pipeline = create_line_pipeline(device, target_format, &line_cam_layout);
@@ -593,6 +625,9 @@ impl BasicRenderer {
             palette_bind_group,
             skinned_cam_aligned,
             palette_aligned,
+            skinned_shadow_pipeline,
+            skinned_shadow_cam_buffer,
+            skinned_shadow_cam_bind_group,
             shadows_enabled: false,
             shadow_map,
             shadow_pipeline,
@@ -732,6 +767,9 @@ impl BasicRenderer {
             if n > 0 {
                 queue.write_buffer(&self.shadow_pass_buffer, 0, &sp_staging);
             }
+            // Skinned casters: upload light-space camera + shared palette, then
+            // draw into the same depth map after the static meshes.
+            let skinned_casters = self.gather_skinned_shadow(queue, world, light_vp);
             {
                 let mut dpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                     label: Some("BasicRenderer Shadow Depth Pass"),
@@ -756,6 +794,21 @@ impl BasicRenderer {
                     dpass.set_vertex_buffer(0, mesh.vertex_buffer.slice(..));
                     dpass.set_index_buffer(mesh.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
                     dpass.draw_indexed(0..mesh.num_indices, 0, 0..1);
+                }
+                if !skinned_casters.is_empty() {
+                    dpass.set_pipeline(&self.skinned_shadow_pipeline);
+                    for (i, handle) in skinned_casters.iter().enumerate() {
+                        let Some(mesh) = assets.skinned_mesh(*handle) else {
+                            continue;
+                        };
+                        let cam_off = (i as u32) * self.skinned_cam_aligned;
+                        let pal_off = (i as u32) * self.palette_aligned;
+                        dpass.set_bind_group(0, &self.skinned_shadow_cam_bind_group, &[cam_off]);
+                        dpass.set_bind_group(1, &self.palette_bind_group, &[pal_off]);
+                        dpass.set_vertex_buffer(0, mesh.vertex_buffer.slice(..));
+                        dpass.set_index_buffer(mesh.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
+                        dpass.draw_indexed(0..mesh.num_indices, 0, 0..1);
+                    }
                 }
             }
             let su = ShadowMainUniform {
@@ -1171,6 +1224,43 @@ impl BasicRenderer {
             pass.set_index_buffer(mesh.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
             pass.draw_indexed(0..mesh.num_indices, 0, 0..1);
         }
+    }
+
+    /// Upload skinned shadow-caster data (light-space camera + shared palette)
+    /// and return the per-entity mesh handles in draw order (capped at
+    /// [`MAX_SKINNED`]). Mirrors the query in [`Self::render_skinned`] so the
+    /// same entities both cast and receive. The palette buffer is shared with
+    /// the main skinned pass; both upload identical pose data each frame, so the
+    /// last write (whichever pass runs second) is byte-identical.
+    fn gather_skinned_shadow(
+        &self,
+        queue: &wgpu::Queue,
+        world: &World,
+        light_vp: Mat4,
+    ) -> Vec<SkinnedMeshHandle> {
+        let items: Vec<(SkinnedMeshHandle, Mat4, voltex_renderer::BonePalette)> = world
+            .query3::<WorldTransform, SkinnedMeshHandle, SkinnedPose>()
+            .filter(|(e, _, _, _)| world.get::<crate::items::Hidden>(*e).is_none())
+            .map(|(_, wt, handle, pose)| (*handle, wt.0, pose.palette()))
+            .collect();
+        let n = items.len().min(MAX_SKINNED);
+        if n == 0 {
+            return Vec::new();
+        }
+        let cam_aligned = self.skinned_cam_aligned as usize;
+        let pal_aligned = self.palette_aligned as usize;
+        let mut cam_staging = vec![0u8; n * cam_aligned];
+        let mut pal_staging = vec![0u8; n * pal_aligned];
+        for (i, (_, model, palette)) in items.iter().take(n).enumerate() {
+            let cam = SkinnedCameraUniform { view_proj: light_vp.cols, model: model.cols };
+            let cb = bytemuck::bytes_of(&cam);
+            cam_staging[i * cam_aligned..i * cam_aligned + cb.len()].copy_from_slice(cb);
+            let pb = bytemuck::bytes_of(palette);
+            pal_staging[i * pal_aligned..i * pal_aligned + pb.len()].copy_from_slice(pb);
+        }
+        queue.write_buffer(&self.skinned_shadow_cam_buffer, 0, &cam_staging);
+        queue.write_buffer(&self.palette_buffer, 0, &pal_staging);
+        items.into_iter().take(n).map(|(h, _, _)| h).collect()
     }
 
     /// Second pass: GPU vertex skinning for entities carrying both a
