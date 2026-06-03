@@ -29,6 +29,16 @@ v1.0.59 데모(game_ready_demo)를 실제로 돌려보며 드러난 엔진 갭�
 - **충돌/트리거 이벤트**: `RuntimeApp::set_collision_fn(\|contacts, world, dt\|)`,
   `enable_physics` 무관 실행(트리거 존). 데모의 "잡힘"을 거리 계산 → 실제 Collider
   충돌로 교체.
+- **점광원**: `RuntimeApp::set_point_lights(Vec<PointLight>)` — mesh_colored가
+  additive point light (MAX_POINT_LIGHTS=8). 단일 directional을 보강.
+- **HUD 바**: `UiContext::progress_bar` / `draw_rect` (체력/진행 바). 데모에
+  danger meter 추가.
+
+### Fixed
+
+- **generate_sphere winding**: 구가 CW-from-outside로 감겨 카메라 향한 반구가
+  컬링되고 먼 안쪽 반구가 비쳐 앞면이 어둡게 렌더되던 버그(PBR 데모/IBL/모든
+  sphere 영향). CCW-from-outside로 수정 → 앞 반구 정상 라이팅.
 
 ### Additive — 에셋 로딩 (핸드코딩 큐브 탈피)
 
@@ -36,6 +46,8 @@ v1.0.59 데모(game_ready_demo)를 실제로 돌려보며 드러난 엔진 갭�
 - **텍스처**: `RenderAssets::add_texture` + `TextureHandle` 컴포넌트 (BasicRenderer
   per-entity 디퓨즈 텍스처), `GpuTexture::from_png(bytes)`.
 - **씬 저장/로드**: `RuntimeApp::save_scene_json(path)` / `load_scene(path)`.
+- **스킨드 glTF**: `skinned_vertices_from_gltf` + `load_skinned_gltf(device,
+  assets, &GltfData)` → 애니메이션 캐릭터를 glTF에서 바로 조립.
 
 ### Additive — 스킨드 애니메이션 런타임 통합
 
