@@ -19,7 +19,8 @@
 use std::time::Duration;
 
 use voltex_asset::FileWatcher;
-use voltex_ecs::{propagate_transforms, ComponentRegistry, World};
+use voltex_audio::AudioSystem;
+use voltex_ecs::{propagate_transforms, ComponentRegistry, Entity, World};
 use voltex_physics::PhysicsConfig;
 use voltex_platform::{GameTimer, InputState};
 use voltex_editor::UiContext;
@@ -79,6 +80,12 @@ pub struct RuntimeApp {
     /// Per-frame input snapshot published to Lua scripts (`input` table).
     /// Re-filled from [`Self::input`] before scripts run each frame.
     pub(crate) script_input: voltex_script::ScriptInput,
+    /// Audio mixer, present only when `config.enable_audio` and init succeeded.
+    /// Driven each frame by `audio_sync_system` from `AudioSource` components.
+    pub audio: Option<AudioSystem>,
+    /// Entity whose `Transform` positions the 3D audio listener (camera/player).
+    /// `None` leaves the listener unchanged.
+    pub audio_listener: Option<Entity>,
     /// GPU-resident mesh + material storage shared with the renderer.
     pub assets: RenderAssets,
     /// Component registry used for scene (de)serialisation.
@@ -138,6 +145,20 @@ impl RuntimeApp {
             build(&mut world, &mut registry);
         }
 
+        // Build the audio mixer up front (it only spawns a thread, no GPU /
+        // window needed). Failure degrades to silent rather than aborting boot.
+        let audio = if config.enable_audio {
+            match AudioSystem::new(std::mem::take(&mut config.audio_clips)) {
+                Ok(a) => Some(a),
+                Err(e) => {
+                    crate::log_error!("voltex_runtime: audio init failed: {e}");
+                    None
+                }
+            }
+        } else {
+            None
+        };
+
         let hud = crate::Hud::new(config.window.title.clone());
         let mut app = Self {
             runtime_state: None,
@@ -150,6 +171,8 @@ impl RuntimeApp {
             physics_config: PhysicsConfig::default(),
             script_pool: ScriptInstancePool::new(),
             script_input: voltex_script::ScriptInput::new(),
+            audio,
+            audio_listener: None,
             assets: RenderAssets::new(),
             registry,
             world,
@@ -214,6 +237,12 @@ impl RuntimeApp {
         self.hud_fn.is_some()
     }
 
+    /// Set the entity whose `Transform` positions the 3D audio listener
+    /// (typically the camera or player). Only meaningful when audio is enabled.
+    pub fn set_audio_listener(&mut self, entity: Entity) {
+        self.audio_listener = Some(entity);
+    }
+
     /// Run one frame's worth of non-rendering systems. Used internally by the
     /// winit handler and directly by unit tests / headless harnesses that
     /// don't need a window.
@@ -238,6 +267,11 @@ impl RuntimeApp {
         }
         for sys in self.input_systems.iter_mut() {
             sys(&mut self.world, &self.input, dt);
+        }
+        // Audio runs last so it observes playback toggles / listener moves made
+        // by user systems this same frame (lowest latency).
+        if let Some(audio) = self.audio.as_ref() {
+            crate::audio_sync::audio_sync_system(&mut self.world, audio, self.audio_listener);
         }
     }
 

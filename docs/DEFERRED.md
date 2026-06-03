@@ -72,7 +72,7 @@
 - ~~**macOS/Linux 백엔드**~~ ✅ Cycle 10 (ALSA) + Cycle 11 (CoreAudio) 코드 완료. 실 머신 runtime 검증 v1.1.
 - ~~**OGG/Vorbis 디코더**~~ ✅ OGG 컨테이너 + Vorbis 디코더 완료.
 - ~~**24-bit/32-bit WAV**~~ ✅ 완료.
-- ~~**ECS 통합**~~ ✅ AudioSource 컴포넌트 완료. audio_sync_system 미구현.
+- ~~**ECS 통합**~~ ✅ AudioSource 컴포넌트 완료. ~~audio_sync_system 미구현~~ ✅ 2026-06-03 — `voltex_runtime::audio_sync_system` 가 AudioSource→AudioSystem 브릿지 (playing 엣지에서 play/play_3d/stop, listener Transform 동기화). 한계: SpatialParams min/max 고정, 씬 직렬화 미등록 — v1.1.
 - ~~**비동기 로딩**~~ ✅ AsyncAudioLoader (스레드 기반) 완료.
 
 ## Phase 6-2
@@ -126,7 +126,7 @@
 - ~~**자동 내비메시 생성**~~ ✅ 복셀화 기반 NavMeshBuilder 완료.
 - ~~**String Pulling (Funnel)**~~ ✅ SSF 알고리즘 완료. **apex-restart 버그 fix (확인됨, 수정 완료)**: apex 갱신 시 현 구현이 현재 인덱스에서 `continue` 만 해 정석 SSF (Mononen) 의 `i = apex_idx` 재시작을 누락 → 지그재그 corridor 에서 내부 코너 절단. randomized corridor + max-penetration oracle 로 재현 확인 (3-band 지그재그에서 경로가 corridor 밖 ~0.41 단위 이탈). `funnel_smooth` 를 `for` → `while` 루프로 바꾸고 apex 갱신 시 `i = apex_idx` 재시작으로 fix (공개 시그니처 불변, `find_path` 영향 없음). 회귀 테스트 `test_funnel_zigzag_stays_inside_corridor` 추가 (max-penetration < 1e-3 검증, fix 전 코드에서 fail 확인). 기존 funnel/path 테스트도 정확한 삼각형 시퀀스·waypoint·corner 검증으로 강화 (endpoint/len 만 검증하던 한계 해소).
 - ~~**동적 장애물 회피**~~ ✅ velocity obstacle 기반 완료.
-- ~~**ECS 통합**~~ ✅ NavAgent 컴포넌트 완료. nav_agent_system 미구현.
+- ~~**ECS 통합**~~ ✅ NavAgent 컴포넌트 완료. ~~nav_agent_system 미구현~~ ✅ 2026-06-03 — `voltex_ai::nav_agent_system(world, navmesh, dt)` 가 find_path + follow_path 로 NavAgent 엔티티 이동 (kinematic, reached 처리). NavMesh 호출자 주입.
 - ~~**내비메시 직렬화**~~ ✅ VNAV 바이너리 포맷 serialize/deserialize 완료.
 
 ## Phase 8-2

@@ -47,6 +47,13 @@ pub struct RuntimeConfig {
     /// the callback registered with [`crate::RuntimeApp::set_hud_fn`]. Default
     /// `false` (no overlay; the title-bar [`crate::Hud`] is always available).
     pub enable_hud: bool,
+    /// When `true`, the runtime owns an [`voltex_audio::AudioSystem`] built from
+    /// [`Self::audio_clips`] and runs `audio_sync_system` each frame to drive 3D
+    /// playback from `AudioSource` components. Set via [`Self::with_audio`].
+    pub enable_audio: bool,
+    /// Pre-loaded clips handed to the [`voltex_audio::AudioSystem`] when
+    /// `enable_audio` is set. `AudioSource::clip_id` indexes into this list.
+    pub audio_clips: Vec<voltex_audio::AudioClip>,
     /// Optional virtual filesystem to consult first when loading scenes /
     /// scripts. When `None`, paths are read directly from disk.
     pub vfs: Option<voltex_asset::Vfs>,
@@ -73,6 +80,8 @@ impl Default for RuntimeConfig {
             enable_physics: true,
             enable_scripts: true,
             enable_hud: false,
+            enable_audio: false,
+            audio_clips: Vec::new(),
             vfs: None,
             enable_crash_log: true,
             crash_log_dir: None,
@@ -168,6 +177,15 @@ impl RuntimeConfig {
         self
     }
 
+    /// Enable audio: the runtime builds an `AudioSystem` from `clips` and runs
+    /// `audio_sync_system` each frame. `AudioSource::clip_id` indexes `clips`.
+    /// Set the listener entity with [`crate::RuntimeApp::set_audio_listener`].
+    pub fn with_audio(mut self, clips: Vec<voltex_audio::AudioClip>) -> Self {
+        self.enable_audio = true;
+        self.audio_clips = clips;
+        self
+    }
+
     /// Attach a `Vfs` (filesystem-rooted or embedded `.vpkg`). When set, the
     /// runtime reads scene / script files through the Vfs first; fs path
     /// fallback still applies for paths the Vfs cannot resolve.
@@ -253,6 +271,14 @@ mod tests {
     fn hud_is_off_by_default_and_toggleable() {
         assert!(!RuntimeConfig::default().enable_hud);
         assert!(RuntimeConfig::new().with_hud(true).enable_hud);
+    }
+
+    #[test]
+    fn audio_is_off_by_default_and_with_audio_enables() {
+        assert!(!RuntimeConfig::default().enable_audio);
+        let c = RuntimeConfig::new().with_audio(Vec::new());
+        assert!(c.enable_audio);
+        assert!(c.audio_clips.is_empty());
     }
 
     #[test]

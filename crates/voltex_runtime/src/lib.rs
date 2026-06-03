@@ -18,6 +18,7 @@
 //! ```
 
 pub mod app;
+pub mod audio_sync;
 pub mod config;
 pub mod crash;
 pub mod error;
@@ -26,6 +27,7 @@ pub mod hud;
 pub mod log;
 
 pub use app::RuntimeApp;
+pub use audio_sync::audio_sync_system;
 pub use config::RuntimeConfig;
 pub use crash::{crash_filename, format_crash_report, install_panic_hook};
 pub use error::{RuntimeError, RuntimeResult};

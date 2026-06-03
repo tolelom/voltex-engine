@@ -28,11 +28,16 @@ pub struct AudioSource {
     pub spatial: bool,
     /// If `true`, the clip restarts from the beginning when it ends.
     pub looping: bool,
-    /// Active playback flag — set to `true` to start, `false` to stop.
+    /// Desired playback flag — set to `true` to start, `false` to stop.
     pub playing: bool,
     /// Internal flag: set by the mixer once the clip has finished once
     /// (relevant for non-looping one-shot detection).
     pub played_once: bool,
+    /// Edge-tracking flag owned by the `audio_sync_system`: `true` once a Play
+    /// command has been issued for the current `playing == true` state. The
+    /// sync system issues Play on the `playing` false→true edge and Stop on the
+    /// true→false edge by comparing `playing` against this. Not set by users.
+    pub active: bool,
 }
 
 impl AudioSource {
@@ -45,6 +50,7 @@ impl AudioSource {
             looping: false,
             playing: false,
             played_once: false,
+            active: false,
         }
     }
 
@@ -78,6 +84,7 @@ mod tests {
         assert!(!src.looping);
         assert!(!src.playing);
         assert!(!src.played_once);
+        assert!(!src.active);
     }
 
     #[test]

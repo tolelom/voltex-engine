@@ -2258,6 +2258,7 @@ dependencies = [
  "bytemuck",
  "thiserror 2.0.18",
  "voltex_asset",
+ "voltex_audio",
  "voltex_ecs",
  "voltex_editor",
  "voltex_math",

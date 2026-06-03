@@ -12,10 +12,11 @@
 - `app` — RuntimeApp (모든 subsystem 보관 + `tick_systems_only` + `set_hud_fn` + Lua `script_input` 발행) (src/app.rs)
 - `config` — RuntimeConfig + 14개 builder 메서드 + 4개 callback 타입 (RegistrySetupFn, SceneBuilderFn, SystemSetupFn, GpuInitFn) (src/config.rs)
 - `error` — RuntimeError enum + Result alias (src/error.rs)
+- `audio_sync` — `audio_sync_system` (AudioSource→AudioSystem 브릿지) + 순수 `decide_action` 엣지 로직 (src/audio_sync.rs)
 - `handler` (crate-private) — winit ApplicationHandler 구현 (src/handler.rs)
 
 ## 의존성
-- voltex crate: voltex_math, voltex_platform, voltex_ecs, voltex_asset, voltex_renderer, voltex_renderer_ecs, voltex_physics, voltex_script, voltex_editor (HUD UiContext/UiRenderer)
+- voltex crate: voltex_math, voltex_platform, voltex_ecs, voltex_asset, voltex_renderer, voltex_renderer_ecs, voltex_physics, voltex_script, voltex_editor (HUD UiContext/UiRenderer), voltex_audio (AudioSystem)
 - 외부 crate: winit, wgpu, bytemuck, thiserror
 
 ## RuntimeConfig 빌더 메서드 (13개)
@@ -41,8 +42,10 @@
 2. `physics_step(world, &config)` (enable_physics 시)
 3. `script_start_all(world, pool)` + `script_update_all(world, pool, dt)` + `pool.poll_reload(watcher)` (enable_scripts 시)
 4. 사용자 등록 시스템 (등록 순서, `add_system` 으로 추가)
+5. 입력 시스템 (`add_input_system`)
+6. `audio_sync_system` (enable_audio 시) — 마지막. 같은 프레임의 playback 토글/listener 이동 반영
 
-매 프레임 `run()` 의 winit handler 가 `tick_systems_only` 호출 후 `BasicRenderer::render` 로 화면 출력.
+매 프레임 `run()` 의 winit handler 가 `tick_systems_only` 호출 후 `BasicRenderer::render` (+ enable_hud 시 UI 오버레이) 로 화면 출력.
 
 ## 변경 시 주의점
 - **Drop 순서**: `RuntimeApp` 의 필드 선언 순서가 곧 drop 순서. `runtime_state` (GPU) → `user_systems` → `file_watcher`/`timer`/`input`/`physics_config` → `script_pool` (LuaState 의 `__voltex_world` light userdata 가 World 보다 먼저 drop) → `assets`/`registry`/`world` → `config`. 이 순서는 LuaState use-after-free 회피용. 필드 추가/순서 변경 시 LuaState 가 World 보다 먼저 drop 됨을 유지.
@@ -52,12 +55,13 @@
 - **사용자 시스템 시그너처**: `FnMut(&mut World, f32) + 'static`. dt 는 호출 프레임의 dt (fixed_dt 가 Some 면 그 값).
 - **HUD 오버레이**: `with_hud(true)` + `set_hud_fn(|ui, world| ...)`. UiContext/UiRenderer 는 `RuntimeState`(GPU) 에 보관, `resumed` 에서 생성. `redraw` 가 BasicRenderer 다음 같은 encoder 로 `LoadOp::Load` UI 패스. 콜백은 `take()` 로 꺼내 `app.world` 와 disjoint-field 借用 충돌 회피.
 - **Lua input 발행**: `enable_scripts` 시 매 프레임 `fill_script_input` 으로 `script_input` 갱신 → `voltex_script::set_current_input(ptr)` (실행 후 null). 키 이름↔winit keycode 매핑 `SCRIPT_KEY_NAMES` 가 여기 소유.
+- **audio**: `with_audio(clips)` 시 `RuntimeApp::new` 에서 `AudioSystem::new` (스레드 spawn, GPU 무관, 실패 시 silent None). `set_audio_listener(entity)` 로 리스너 지정. `audio_sync_system` 이 `AudioSource::playing` 의 엣지(`active` 플래그)에서만 play/stop 발행 — held playing 이 매 프레임 voice 를 새로 만들지 않음. 한계: SpatialParams min/max 고정(1.0/50.0), AudioSource 씬 직렬화 미등록 — v1.1.
 - **single-window only**: winit `run_app` 자체가 single window 지원. multi-window 는 v1.1+.
 
 ## 테스트
 - 단위 테스트: src/**/*.rs `#[cfg(test)]`
 - 실행: `cargo test -p voltex_runtime --lib`
-- 현재 테스트 개수: 50개 (Lua input 매핑/전체체인 + HUD 등록 + config 포함)
+- 현재 테스트 개수: 54개 (audio_sync ×3 + audio config ×1 추가)
 - GPU/winit 의존 테스트는 직접 검증 불가 → examples/runtime_demo 수동 실행 검증
 
 ## 예제
