@@ -493,6 +493,57 @@ pub fn render_demo_like_cam(
     target.read_rgba8(&gpu.device, &gpu.queue)
 }
 
+/// Render a single cube textured with a solid `color` (RGBA) via a runtime
+/// `TextureHandle` + `BasicRenderer`. Proves per-entity textures are sampled.
+pub fn render_textured_cube(gpu: &HeadlessGpu, width: u32, height: u32, color: [u8; 4]) -> Vec<u8> {
+    use voltex_renderer::GpuTexture;
+    use voltex_renderer_ecs::TextureHandle;
+
+    let target = OffscreenTarget::new(&gpu.device, width, height);
+    let renderer = BasicRenderer::new(&gpu.device, &gpu.queue, CAPTURE_FORMAT, 8);
+    let mut assets = RenderAssets::new();
+    let mesh_h = assets.add_mesh(unit_cube(&gpu.device));
+    let mat_h = assets.add_material(MaterialUniform::new()); // white → texture shows through
+
+    // 2×2 solid-color texture.
+    let layout = GpuTexture::bind_group_layout(&gpu.device);
+    let pixels: Vec<u8> = color.iter().cycle().take(2 * 2 * 4).copied().collect();
+    let tex = GpuTexture::from_rgba(&gpu.device, &gpu.queue, 2, 2, &pixels, &layout);
+    let tex_h: TextureHandle = assets.add_texture(tex);
+
+    let mut world = World::new();
+    let e = world.spawn();
+    let mut t = Transform::from_position(Vec3::ZERO);
+    t.rotation = Quat::from_euler_yxz(Vec3::new(0.3, 0.6, 0.0));
+    world.add(e, t);
+    world.add(e, MeshHandle(mesh_h.0));
+    world.add(e, MaterialHandle(mat_h.0));
+    world.add(e, tex_h);
+    voltex_ecs::propagate_transforms(&mut world);
+
+    let mut camera = Camera::new(Vec3::new(2.0, 1.5, 2.5), width as f32 / height as f32);
+    camera.yaw = -0.7;
+    camera.pitch = -0.4;
+
+    let mut encoder = gpu
+        .device
+        .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("capture tex") });
+    renderer.render(
+        &gpu.queue,
+        &mut encoder,
+        &target.color_view,
+        &target.depth_view,
+        wgpu::Color { r: 0.05, g: 0.05, b: 0.08, a: 1.0 },
+        &mut world,
+        &assets,
+        camera.view_projection(),
+        camera.position,
+        LightUniform::new(),
+    );
+    gpu.queue.submit(Some(encoder.finish()));
+    target.read_rgba8(&gpu.device, &gpu.queue)
+}
+
 /// Load a Wavefront OBJ source via `Mesh::from_obj` and render it as a single
 /// centered model through `BasicRenderer`. Returns RGBA8.
 pub fn render_obj_model(gpu: &HeadlessGpu, width: u32, height: u32, obj_src: &str) -> Vec<u8> {
@@ -543,6 +594,43 @@ mod tests {
 
     /// The repo's `assets/cube.obj`, embedded for the loader regression.
     const CUBE_OBJ: &str = include_str!("../../../assets/cube.obj");
+
+    #[test]
+    #[ignore = "requires a GPU adapter"]
+    fn basic_renderer_samples_per_entity_texture() {
+        let gpu = match HeadlessGpu::new() {
+            Ok(g) => g,
+            Err(e) => {
+                eprintln!("skip: {e}");
+                return;
+            }
+        };
+        // mean (R, B) over non-background pixels.
+        fn mean_rb(rgba: &[u8]) -> (f64, f64) {
+            let bg = [rgba[0], rgba[1], rgba[2]];
+            let mut r = 0u64;
+            let mut b = 0u64;
+            let mut n = 0u64;
+            for p in rgba.chunks_exact(4) {
+                if (p[0] as i32 - bg[0] as i32).abs() > 20
+                    || (p[2] as i32 - bg[2] as i32).abs() > 20
+                {
+                    r += p[0] as u64;
+                    b += p[2] as u64;
+                    n += 1;
+                }
+            }
+            let n = n.max(1) as f64;
+            (r as f64 / n, b as f64 / n)
+        }
+
+        let red = render_textured_cube(&gpu, 256, 256, [220, 30, 30, 255]);
+        let blue = render_textured_cube(&gpu, 256, 256, [30, 30, 220, 255]);
+        let (rr, rb) = mean_rb(&red);
+        let (br, bb) = mean_rb(&blue);
+        assert!(rr > rb, "red-textured cube should be red-dominant: R={rr} B={rb}");
+        assert!(bb > br, "blue-textured cube should be blue-dominant: R={br} B={bb}");
+    }
 
     #[test]
     #[ignore = "requires a GPU adapter"]

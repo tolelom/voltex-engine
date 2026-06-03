@@ -233,12 +233,18 @@ impl BasicRenderer {
         });
 
         pass.set_pipeline(&self.pipeline);
-        pass.set_bind_group(1, &self.default_texture.bind_group, &[]);
 
         for (i, item) in items.iter().take(n).enumerate() {
             let mesh = assets
                 .mesh(item.mesh)
                 .expect("collect_render_items already skipped stale handles");
+            // Per-entity diffuse texture, or the white default.
+            let tex_bg = item
+                .texture
+                .and_then(|h| assets.texture(h))
+                .map(|t| &t.bind_group)
+                .unwrap_or(&self.default_texture.bind_group);
+            pass.set_bind_group(1, tex_bg, &[]);
             let dynamic_offset = (i as u32) * self.aligned_size;
             pass.set_bind_group(0, &self.camera_light_bind_group, &[dynamic_offset]);
             pass.set_vertex_buffer(0, mesh.vertex_buffer.slice(..));

@@ -6,9 +6,14 @@
 
 use voltex_asset::{Assets, Handle};
 use voltex_ecs::{MaterialHandle, MeshHandle};
-use voltex_renderer::{MaterialUniform, Mesh, SkinnedMesh};
+use voltex_renderer::{GpuTexture, MaterialUniform, Mesh, SkinnedMesh};
 
 use crate::skinned::SkinnedMeshHandle;
+
+/// ECS component: the GPU texture an entity samples in `BasicRenderer`'s mesh
+/// shader. Absent / stale → the renderer falls back to its white default.
+#[derive(Debug, Clone, Copy)]
+pub struct TextureHandle(pub Handle<GpuTexture>);
 
 /// GPU-resident mesh + material storage. Hands out the phantom-typed
 /// [`MeshHandle`] / [`MaterialHandle`] ECS components while keeping the
@@ -55,6 +60,17 @@ impl RenderAssets {
 
     /// Borrows the underlying `SkinnedMesh` for `h`, or `None` if stale.
     pub fn skinned_mesh(&self, h: SkinnedMeshHandle) -> Option<&SkinnedMesh> {
+        self.assets.get(h.0)
+    }
+
+    /// Register a GPU texture (built against [`GpuTexture::bind_group_layout`])
+    /// and return its [`TextureHandle`].
+    pub fn add_texture(&mut self, texture: GpuTexture) -> TextureHandle {
+        TextureHandle(self.assets.insert(texture))
+    }
+
+    /// Borrows the underlying `GpuTexture` for `h`, or `None` if stale.
+    pub fn texture(&self, h: TextureHandle) -> Option<&GpuTexture> {
         self.assets.get(h.0)
     }
 }

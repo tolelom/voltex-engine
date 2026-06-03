@@ -16,7 +16,7 @@ pub mod basic_renderer;
 pub mod skinned;
 
 pub use error::{RendererEcsError, Result};
-pub use assets::RenderAssets;
+pub use assets::{RenderAssets, TextureHandle};
 pub use items::{RenderItem, collect_render_items};
 pub use basic_renderer::BasicRenderer;
 pub use skinned::{animation_duration, update_skinned_poses, SkinnedMeshHandle, SkinnedPose};

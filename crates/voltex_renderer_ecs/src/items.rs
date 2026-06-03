@@ -6,7 +6,7 @@ use voltex_ecs::{
 use voltex_math::Mat4;
 use voltex_renderer::MaterialUniform;
 
-use crate::assets::RenderAssets;
+use crate::assets::{RenderAssets, TextureHandle};
 
 /// 한 엔티티의 한 프레임 렌더 데이터.
 pub struct RenderItem {
@@ -18,6 +18,8 @@ pub struct RenderItem {
     pub mesh: MeshHandle,
     /// Per-entity material uniform (already resolved from `MaterialHandle`).
     pub material: MaterialUniform,
+    /// Optional diffuse texture; `None` → renderer's white default.
+    pub texture: Option<TextureHandle>,
 }
 
 /// `propagate_transforms` 를 먼저 호출한 뒤 WorldTransform + MeshHandle 이 있는
@@ -41,11 +43,18 @@ pub fn collect_render_items(world: &mut World, assets: &RenderAssets) -> Vec<Ren
             .and_then(|h| assets.material(*h).copied())
             .unwrap_or_default();
 
+        // Texture is optional; keep the handle only if it resolves.
+        let texture = world
+            .get::<TextureHandle>(entity)
+            .copied()
+            .filter(|h| assets.texture(*h).is_some());
+
         items.push(RenderItem {
             entity,
             model: wt.0,
             mesh: mh,
             material,
+            texture,
         });
     }
 
