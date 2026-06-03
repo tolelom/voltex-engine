@@ -48,6 +48,7 @@ pub mod shadow;
 pub mod shadow_pipeline;
 pub mod sphere;
 pub mod spot_shadow;
+pub mod sprite;
 pub mod ssgi;
 pub mod ssr;
 pub mod taa;
@@ -119,6 +120,10 @@ pub use shadow::{
 pub use shadow_pipeline::{create_shadow_pipeline, shadow_pass_bind_group_layout};
 pub use sphere::generate_sphere;
 pub use spot_shadow::{spot_shadow_matrix, SpotShadowMap};
+pub use sprite::{
+    create_sprite_pipeline, sprite_uniform_bind_group_layout, SpriteUniform, SpriteVertex,
+    SPRITE_INDICES, SPRITE_QUAD, SPRITE_VERTEX_LAYOUT,
+};
 pub use ssgi::{SsgiResources, SsgiUniform, SSGI_OUTPUT_FORMAT};
 pub use ssr::Ssr;
 pub use taa::Taa;

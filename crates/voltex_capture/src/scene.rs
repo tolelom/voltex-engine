@@ -735,6 +735,51 @@ pub fn render_spot_lit(
     target.read_rgba8(&gpu.device, &gpu.queue)
 }
 
+/// Render a single magenta billboard [`Sprite`] at the world origin, viewed
+/// from `cam_pos` with the given `yaw` (pitch 0). A camera-facing quad should
+/// present the same footprint from any orbit angle. Returns RGBA8.
+pub fn render_billboard_sprite(
+    gpu: &HeadlessGpu,
+    width: u32,
+    height: u32,
+    cam_pos: Vec3,
+    yaw: f32,
+) -> Vec<u8> {
+    use voltex_renderer_ecs::Sprite;
+    let target = OffscreenTarget::new(&gpu.device, width, height);
+    let renderer = BasicRenderer::new(&gpu.device, &gpu.queue, CAPTURE_FORMAT, 8);
+    let assets = RenderAssets::new();
+
+    let mut world = World::new();
+    let e = world.spawn();
+    world.add(e, Transform::from_position(Vec3::ZERO));
+    world.add(e, Sprite::solid([1.5, 1.5], [1.0, 0.0, 1.0, 1.0]));
+    voltex_ecs::propagate_transforms(&mut world);
+
+    let mut camera = Camera::new(cam_pos, width as f32 / height as f32);
+    camera.yaw = yaw;
+    camera.pitch = 0.0;
+    let light = LightUniform::new();
+
+    let mut encoder = gpu
+        .device
+        .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("capture sprite") });
+    renderer.render(
+        &gpu.queue,
+        &mut encoder,
+        &target.color_view,
+        &target.depth_view,
+        wgpu::Color { r: 0.0, g: 0.0, b: 0.0, a: 1.0 },
+        &mut world,
+        &assets,
+        camera.view_projection(),
+        camera.position,
+        light,
+    );
+    gpu.queue.submit(Some(encoder.finish()));
+    target.read_rgba8(&gpu.device, &gpu.queue)
+}
+
 /// Render only the given debug line segments (no meshes) on a black background,
 /// viewed by a fixed front camera. Exercises `BasicRenderer::set_debug_lines` +
 /// the line pipeline. Returns RGBA8.
@@ -1101,6 +1146,41 @@ mod tests {
         assert!(
             center_off + 60 < center,
             "aiming the spot away from the ground should darken the center: aimed-down={center} aimed-away={center_off}"
+        );
+    }
+
+    #[test]
+    #[ignore = "requires a GPU adapter"]
+    fn billboard_sprite_faces_camera_from_any_angle() {
+        let gpu = match HeadlessGpu::new() {
+            Ok(g) => g,
+            Err(e) => {
+                eprintln!("skip: {e}");
+                return;
+            }
+        };
+        // Count magenta pixels (the sprite color).
+        let magenta = |rgba: &[u8]| -> u32 {
+            rgba.chunks_exact(4)
+                .filter(|p| p[0] > 120 && p[2] > 120 && p[1] < 80)
+                .count() as u32
+        };
+        use std::f32::consts::FRAC_PI_2;
+        // Front: camera on +Z looking -Z. Side: camera on +X looking -X. Same
+        // distance (4) → a true billboard keeps the same on-screen footprint.
+        let front = render_billboard_sprite(&gpu, 256, 256, Vec3::new(0.0, 0.0, 4.0), 0.0);
+        let side = render_billboard_sprite(&gpu, 256, 256, Vec3::new(4.0, 0.0, 0.0), -FRAC_PI_2);
+        let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../../docs/visual/");
+        crate::save_png(&format!("{dir}sprite_billboard.png"), 256, 256, &front).unwrap();
+
+        let (cf, cs) = (magenta(&front), magenta(&side));
+        assert!(cf > 1500, "front view should show the sprite, got {cf} px");
+        assert!(cs > 1500, "side view should show the sprite, got {cs} px");
+        // Footprint should be nearly identical (it always faces the camera).
+        let ratio = cf.min(cs) as f64 / cf.max(cs) as f64;
+        assert!(
+            ratio > 0.8,
+            "billboard footprint must match across angles: front={cf} side={cs} ratio={ratio:.2}"
         );
     }
 

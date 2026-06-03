@@ -14,6 +14,7 @@ pub mod assets;
 pub mod items;
 pub mod basic_renderer;
 pub mod skinned;
+pub mod sprite;
 
 pub use error::{RendererEcsError, Result};
 pub use assets::{RenderAssets, TextureHandle};
@@ -22,3 +23,4 @@ pub use basic_renderer::BasicRenderer;
 pub use skinned::{
     animation_duration, load_skinned_gltf, update_skinned_poses, SkinnedMeshHandle, SkinnedPose,
 };
+pub use sprite::Sprite;

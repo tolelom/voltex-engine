@@ -32,7 +32,7 @@ use voltex_renderer::{
     material::MaterialUniform, mesh::Mesh, vertex::MeshVertex, PointLight, Skeleton, SkinnedMesh,
     SkinnedMeshVertex,
 };
-use voltex_renderer_ecs::SkinnedPose;
+use voltex_renderer_ecs::{Sprite, SkinnedPose};
 use voltex_runtime::{RuntimeApp, RuntimeConfig, RuntimeResult};
 
 const PLAYER_TAG: &str = "player";
@@ -125,6 +125,19 @@ fn setup_scene(world: &mut World, _registry: &mut ComponentRegistry, script_path
     tt.scale = Vec3::new(1.5, 1.5, 1.5);
     world.add(totem, tt);
     world.add(totem, Tag(TOTEM_TAG.to_string()));
+
+    // Floating billboard "pickups": camera-facing colored sprites scattered
+    // around the arena (no texture → solid color via Sprite::solid).
+    let pickups = [
+        (Vec3::new(4.0, 1.2, -4.0), [1.0, 0.85, 0.1, 1.0]),
+        (Vec3::new(-4.0, 1.2, 4.0), [0.1, 1.0, 0.4, 1.0]),
+        (Vec3::new(6.0, 1.2, 2.0), [0.3, 0.7, 1.0, 1.0]),
+    ];
+    for (pos, color) in pickups {
+        let p = world.spawn();
+        world.add(p, Transform::from_position(pos));
+        world.add(p, Sprite::solid([0.8, 0.8], color));
+    }
 }
 
 fn upload_meshes(app: &mut RuntimeApp, device: &wgpu::Device, queue: &wgpu::Queue) {

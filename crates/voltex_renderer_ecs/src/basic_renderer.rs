@@ -6,18 +6,24 @@
 use voltex_ecs::{World, WorldTransform};
 use voltex_math::{Mat4, Vec3, Vec4, AABB};
 use voltex_renderer::{
-    create_line_pipeline, create_shadow_pipeline, line_camera_bind_group_layout,
+    create_line_pipeline, create_shadow_pipeline, create_sprite_pipeline,
+    line_camera_bind_group_layout,
     pipeline::{create_colored_mesh_pipeline, create_skinned_mesh_pipeline},
-    shadow_main_bind_group_layout, shadow_pass_bind_group_layout, BonePalette, ColoredCameraUniform,
-    GpuTexture, LightUniform, LineCameraUniform, LineVertex, PointLight, PointLightsUniform,
-    ShadowMainUniform, ShadowMap, ShadowPassUniform, SkinnedCameraUniform, SHADOW_MAP_SIZE,
+    shadow_main_bind_group_layout, shadow_pass_bind_group_layout, sprite_uniform_bind_group_layout,
+    BonePalette, ColoredCameraUniform, GpuTexture, LightUniform, LineCameraUniform, LineVertex,
+    PointLight, PointLightsUniform, ShadowMainUniform, ShadowMap, ShadowPassUniform,
+    SkinnedCameraUniform, SpriteUniform, SPRITE_INDICES, SPRITE_QUAD, SHADOW_MAP_SIZE,
 };
 
+use crate::sprite::Sprite;
 use std::cell::Cell;
 
 /// Max debug-line vertices uploaded per frame (2 per segment). Fixed-capacity
 /// so `set_debug_lines` can stay `&self` (mirrors `set_point_lights`).
 const MAX_DEBUG_LINE_VERTICES: usize = 8192;
+
+/// Max billboard sprites drawn per frame (each needs one dynamic-UBO slot).
+const MAX_SPRITES: usize = 256;
 
 use crate::assets::RenderAssets;
 use crate::items::collect_render_items;
@@ -64,6 +70,14 @@ pub struct BasicRenderer {
     line_camera_bind_group: wgpu::BindGroup,
     line_vertex_buffer: wgpu::Buffer,
     line_vertex_count: Cell<u32>,
+    // Billboard sprites (camera-facing quads). Drawn after meshes + lines,
+    // alpha-blended, depth-tested but not depth-writing.
+    sprite_pipeline: wgpu::RenderPipeline,
+    sprite_quad_vbuf: wgpu::Buffer,
+    sprite_quad_ibuf: wgpu::Buffer,
+    sprite_uniform_buffer: wgpu::Buffer,
+    sprite_uniform_bind_group: wgpu::BindGroup,
+    sprite_uniform_aligned: u32,
 }
 
 impl BasicRenderer {
@@ -302,6 +316,45 @@ impl BasicRenderer {
             mapped_at_creation: false,
         });
 
+        // ── Billboard sprite resources ──────────────────────────────────────
+        let sprite_uniform_layout = sprite_uniform_bind_group_layout(device);
+        let sprite_pipeline =
+            create_sprite_pipeline(device, target_format, &sprite_uniform_layout, &tex_layout);
+        let sprite_quad_vbuf = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("BasicRenderer Sprite Quad VB"),
+            size: std::mem::size_of_val(&SPRITE_QUAD) as u64,
+            usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+        queue.write_buffer(&sprite_quad_vbuf, 0, bytemuck::cast_slice(&SPRITE_QUAD));
+        let sprite_quad_ibuf = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("BasicRenderer Sprite Quad IB"),
+            size: std::mem::size_of_val(&SPRITE_INDICES) as u64,
+            usage: wgpu::BufferUsages::INDEX | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+        queue.write_buffer(&sprite_quad_ibuf, 0, bytemuck::cast_slice(&SPRITE_INDICES));
+        let sprite_uniform_aligned =
+            (std::mem::size_of::<SpriteUniform>() as u32).div_ceil(alignment) * alignment;
+        let sprite_uniform_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("BasicRenderer Sprite Uniform Dynamic UBO"),
+            size: (sprite_uniform_aligned as usize * MAX_SPRITES) as u64,
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+        let sprite_uniform_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("BasicRenderer Sprite Uniform BG"),
+            layout: &sprite_uniform_layout,
+            entries: &[wgpu::BindGroupEntry {
+                binding: 0,
+                resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
+                    buffer: &sprite_uniform_buffer,
+                    offset: 0,
+                    size: wgpu::BufferSize::new(std::mem::size_of::<SpriteUniform>() as u64),
+                }),
+            }],
+        });
+
         Self {
             pipeline,
             camera_buffer,
@@ -332,6 +385,12 @@ impl BasicRenderer {
             line_camera_bind_group,
             line_vertex_buffer,
             line_vertex_count: Cell::new(0),
+            sprite_pipeline,
+            sprite_quad_vbuf,
+            sprite_quad_ibuf,
+            sprite_uniform_buffer,
+            sprite_uniform_bind_group,
+            sprite_uniform_aligned,
         }
     }
 
@@ -526,7 +585,103 @@ impl BasicRenderer {
         } // end non-skinned pass
 
         self.render_skinned(queue, encoder, target_view, depth_view, world, assets, view_proj);
+        self.render_sprites(queue, encoder, target_view, depth_view, world, assets, view_proj);
         self.render_debug_lines(queue, encoder, target_view, depth_view, view_proj);
+    }
+
+    /// Billboard pass: draws every entity carrying a [`WorldTransform`] + a
+    /// [`Sprite`] as a camera-facing quad at its world position (alpha-blended,
+    /// depth-tested, no depth write). Camera right/up are recovered from the
+    /// inverse view-projection, so no extra camera state is threaded in. Capped
+    /// at [`MAX_SPRITES`] per frame.
+    #[allow(clippy::too_many_arguments)]
+    fn render_sprites(
+        &self,
+        queue: &wgpu::Queue,
+        encoder: &mut wgpu::CommandEncoder,
+        target_view: &wgpu::TextureView,
+        depth_view: &wgpu::TextureView,
+        world: &mut World,
+        assets: &RenderAssets,
+        view_proj: Mat4,
+    ) {
+        // (world position, sprite) for each visible sprite entity.
+        let items: Vec<(Vec3, Sprite)> = world
+            .query2::<WorldTransform, Sprite>()
+            .filter(|(e, _, _)| world.get::<crate::items::Hidden>(*e).is_none())
+            .map(|(_, wt, s)| {
+                let c = wt.0.cols[3];
+                (Vec3::new(c[0], c[1], c[2]), *s)
+            })
+            .collect();
+        let n = items.len().min(MAX_SPRITES);
+        if n == 0 {
+            return;
+        }
+
+        // World-space camera right/up from the inverse VP (clip-x/clip-y axes
+        // map back to camera right/up for a shear-free perspective/ortho proj).
+        let inv = view_proj.inverse().unwrap_or(Mat4::IDENTITY);
+        let dir = |v: Vec4| {
+            let r = inv * v;
+            Vec3::new(r.x, r.y, r.z).normalize_or_zero()
+        };
+        let right = dir(Vec4::new(1.0, 0.0, 0.0, 0.0));
+        let up = dir(Vec4::new(0.0, 1.0, 0.0, 0.0));
+
+        let aligned = self.sprite_uniform_aligned as usize;
+        let mut staging = vec![0u8; n * aligned];
+        for (i, (pos, sprite)) in items.iter().take(n).enumerate() {
+            let u = SpriteUniform {
+                view_proj: view_proj.cols,
+                camera_right: [right.x, right.y, right.z, 0.0],
+                camera_up: [up.x, up.y, up.z, 0.0],
+                center: [pos.x, pos.y, pos.z, 0.0],
+                color: sprite.color,
+                size: [sprite.size[0], sprite.size[1], 0.0, 0.0],
+            };
+            let b = bytemuck::bytes_of(&u);
+            staging[i * aligned..i * aligned + b.len()].copy_from_slice(b);
+        }
+        queue.write_buffer(&self.sprite_uniform_buffer, 0, &staging);
+
+        let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            label: Some("BasicRenderer Sprite Pass"),
+            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                view: target_view,
+                resolve_target: None,
+                depth_slice: None,
+                ops: wgpu::Operations {
+                    load: wgpu::LoadOp::Load,
+                    store: wgpu::StoreOp::Store,
+                },
+            })],
+            depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                view: depth_view,
+                depth_ops: Some(wgpu::Operations {
+                    load: wgpu::LoadOp::Load,
+                    store: wgpu::StoreOp::Store,
+                }),
+                stencil_ops: None,
+            }),
+            occlusion_query_set: None,
+            timestamp_writes: None,
+            multiview_mask: None,
+        });
+        pass.set_pipeline(&self.sprite_pipeline);
+        pass.set_vertex_buffer(0, self.sprite_quad_vbuf.slice(..));
+        pass.set_index_buffer(self.sprite_quad_ibuf.slice(..), wgpu::IndexFormat::Uint16);
+        for (i, (_, sprite)) in items.iter().take(n).enumerate() {
+            let tex_bg = sprite
+                .texture
+                .and_then(|h| assets.texture(h))
+                .map(|t| &t.bind_group)
+                .unwrap_or(&self.default_texture.bind_group);
+            pass.set_bind_group(1, tex_bg, &[]);
+            let off = (i as u32) * self.sprite_uniform_aligned;
+            pass.set_bind_group(0, &self.sprite_uniform_bind_group, &[off]);
+            pass.draw_indexed(0..SPRITE_INDICES.len() as u32, 0, 0..1);
+        }
     }
 
     /// Final pass: draw the debug line segments set via [`set_debug_lines`]

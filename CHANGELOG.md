@@ -46,6 +46,14 @@ v1.0.59 데모(game_ready_demo)를 실제로 돌려보며 드러난 엔진 갭�
   3D 위에 렌더(depth-test, no write). 캡처 회귀
   `debug_lines_draw_colored_segments` + `docs/visual/debug_lines.png`. 데모에
   chase 벡터 + 플레이어/추적자 cross + 아레나 AABB 추가.
+- **빌보드 스프라이트**: `voltex_renderer::sprite`(SpriteUniform +
+  alpha-blended·depth-tested 파이프라인, 정점 셰이더에서 카메라 right/up으로
+  쿼드 확장) + `voltex_renderer_ecs::Sprite` 컴포넌트
+  (`Sprite::solid`/`textured`). `WorldTransform`+`Sprite` 엔티티를 mesh 패스 후
+  카메라-facing 쿼드로 렌더(카메라 축은 inverse VP 복원, MAX 256/frame). 픽업·
+  파티클·월드 마커·간단한 2D-in-3D 적에 사용. 캡처 회귀
+  `billboard_sprite_faces_camera_from_any_angle`(정면/측면 footprint 일치) +
+  `docs/visual/sprite_billboard.png`. 데모에 떠다니는 픽업 3개 추가.
 
 - **그림자**: `RuntimeConfig::with_shadows(true)` — BasicRenderer directional
   shadow mapping (depth pre-pass + mesh_colored 3×3 PCF, group 3). 기본 off
