@@ -68,6 +68,12 @@ type CameraFn = Box<dyn FnMut(&mut Camera, &World, f32) + 'static>;
 /// after the systems tick with the live [`LightUniform`] and read-only World,
 /// for day/night cycles, flicker, etc.
 type LightFn = Box<dyn FnMut(&mut LightUniform, &World, f32) + 'static>;
+/// Per-frame point/spot-light updater (see [`RuntimeApp::set_point_lights_fn`]).
+/// Runs after the systems tick with the live point-light `Vec` and read-only
+/// World, for moving torches, flickering lamps, projectile glows, etc. The
+/// resulting set is uploaded to the renderer (capped at `MAX_LIGHTS`) the same
+/// way a static [`RuntimeApp::set_point_lights`] call would be.
+type PointLightsFn = Box<dyn FnMut(&mut Vec<PointLight>, &World, f32) + 'static>;
 /// Per-frame collision callback (see [`RuntimeApp::set_collision_fn`]). Receives
 /// the frame's contact pairs (between entities carrying a
 /// [`Collider`](voltex_physics::Collider) and a Transform) plus the mutable
@@ -100,6 +106,8 @@ pub struct RuntimeApp {
     pub(crate) debug_lines: DebugLines,
     /// Additive point lights uploaded to the renderer each frame.
     pub(crate) point_lights: Vec<PointLight>,
+    /// Optional per-frame point/spot-light updater (see [`Self::set_point_lights_fn`]).
+    pub(crate) point_lights_fn: Option<PointLightsFn>,
     /// Polling file watcher used for script / scene hot reload.
     pub file_watcher: FileWatcher,
     /// Fixed-step timer driving update / render dt.
@@ -204,6 +212,7 @@ impl RuntimeApp {
             debug_fn: None,
             debug_lines: DebugLines::new(),
             point_lights: Vec::new(),
+            point_lights_fn: None,
             file_watcher: FileWatcher::new(Duration::from_millis(500)),
             timer: GameTimer::new(60),
             input: InputState::new(),
@@ -382,6 +391,37 @@ impl RuntimeApp {
     /// ignored by the renderer.
     pub fn set_point_lights(&mut self, lights: Vec<PointLight>) {
         self.point_lights = lights;
+    }
+
+    /// Register a per-frame point/spot-light updater (moving torches, flickering
+    /// lamps, projectile glows, …). Runs each frame after the systems tick with
+    /// the live point-light `Vec` and read-only World; whatever it leaves in the
+    /// `Vec` is uploaded to the renderer (capped at
+    /// [`MAX_POINT_LIGHTS`](voltex_renderer::MAX_POINT_LIGHTS)). Mirrors
+    /// [`Self::set_light_fn`] for the directional sun.
+    ///
+    /// ```no_run
+    /// # use voltex_runtime::{RuntimeApp, RuntimeConfig};
+    /// # use voltex_renderer::PointLight;
+    /// # let mut app = RuntimeApp::new(RuntimeConfig::new()).unwrap();
+    /// app.set_point_lights_fn(|lights, _world, dt| {
+    ///     // single torch (position, color, range, intensity) that flickers
+    ///     lights.clear();
+    ///     let mut torch = PointLight::new([0.0, 2.0, 0.0], [1.0, 0.6, 0.2], 3.0, 8.0);
+    ///     torch.intensity *= 0.9 + 0.1 * dt.sin();
+    ///     lights.push(torch);
+    /// });
+    /// ```
+    pub fn set_point_lights_fn<F>(&mut self, f: F)
+    where
+        F: FnMut(&mut Vec<PointLight>, &World, f32) + 'static,
+    {
+        self.point_lights_fn = Some(Box::new(f));
+    }
+
+    /// `true` if a per-frame point-light updater has been registered.
+    pub fn has_point_lights_fn(&self) -> bool {
+        self.point_lights_fn.is_some()
     }
 
     /// Serialize the current World to a JSON scene file. Only components
@@ -829,6 +869,29 @@ mod tests {
         let mut light = voltex_renderer::LightUniform::new();
         fnc(&mut light, &app.world, 0.016);
         assert_eq!(light.color, [0.0, 1.0, 0.0]);
+    }
+
+    #[test]
+    fn set_point_lights_fn_registers_and_mutates_set() {
+        let cfg = RuntimeConfig::new().disable_physics().disable_scripts().disable_crash_log();
+        let mut app = RuntimeApp::new(cfg).unwrap();
+        assert!(!app.has_point_lights_fn());
+        app.set_point_lights_fn(|lights, _world, _dt| {
+            lights.clear();
+            lights.push(voltex_renderer::PointLight::new(
+                [1.0, 2.0, 3.0],
+                [1.0, 0.5, 0.0],
+                2.0,
+                8.0,
+            ));
+        });
+        assert!(app.has_point_lights_fn());
+        let mut fnc = app.point_lights_fn.take().unwrap();
+        fnc(&mut app.point_lights, &app.world, 0.016);
+        assert_eq!(app.point_lights.len(), 1);
+        assert_eq!(app.point_lights[0].position, [1.0, 2.0, 3.0]);
+        assert_eq!(app.point_lights[0].range, 2.0);
+        assert_eq!(app.point_lights[0].intensity, 8.0);
     }
 
     #[test]

@@ -213,6 +213,13 @@ fn redraw(app: &mut RuntimeApp, event_loop: &ActiveEventLoop) {
         app.light_fn = Some(light_fn);
     }
 
+    // Game-controlled point/spot lights (moving torches, flicker), if
+    // registered. Mutates the same `point_lights` Vec that's uploaded below.
+    if let Some(mut pl_fn) = app.point_lights_fn.take() {
+        pl_fn(&mut app.point_lights, &app.world, dt);
+        app.point_lights_fn = Some(pl_fn);
+    }
+
     // Game-controlled debug gizmos: clear the shared buffer, let the game
     // queue segments against this frame's world, then it's uploaded below.
     if let Some(mut debug_fn) = app.debug_fn.take() {
