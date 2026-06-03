@@ -168,6 +168,9 @@ impl RuntimeApp {
 
         let mut registry = ComponentRegistry::new();
         registry.register_defaults();
+        // AudioSource lives in voltex_audio (no ECS dep), so it is registered
+        // here via the register_raw escape hatch rather than register_defaults.
+        crate::audio_sync::register_audio_source(&mut registry);
         if let Some(setup) = config.register_components.take() {
             setup(&mut registry);
         }

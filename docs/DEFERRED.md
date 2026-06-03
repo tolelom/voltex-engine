@@ -72,7 +72,7 @@
 - ~~**macOS/Linux 백엔드**~~ ✅ Cycle 10 (ALSA) + Cycle 11 (CoreAudio) 코드 완료. 실 머신 runtime 검증 v1.1.
 - ~~**OGG/Vorbis 디코더**~~ ✅ OGG 컨테이너 + Vorbis 디코더 완료.
 - ~~**24-bit/32-bit WAV**~~ ✅ 완료.
-- ~~**ECS 통합**~~ ✅ AudioSource 컴포넌트 완료. ~~audio_sync_system 미구현~~ ✅ 2026-06-03 — `voltex_runtime::audio_sync_system` 가 AudioSource→AudioSystem 브릿지 (playing 엣지에서 play/play_3d/stop, listener Transform 동기화). 한계: SpatialParams min/max 고정, 씬 직렬화 미등록 — v1.1.
+- ~~**ECS 통합**~~ ✅ AudioSource 컴포넌트 완료. ~~audio_sync_system 미구현~~ ✅ 2026-06-03 — `voltex_runtime::audio_sync_system` 가 AudioSource→AudioSystem 브릿지 (playing 엣지에서 play/play_3d/stop, listener Transform 동기화). 한계: SpatialParams min/max 고정. ~~씬 직렬화 미등록 — v1.1.~~ ✅ 2026-06-03 (v1.0.61) — `voltex_runtime::audio_sync::register_audio_source` 가 `register_raw` escape hatch 로 AudioSource 직렬화 등록 (clip_id+volume+spatial/looping/playing 11바이트; transient played_once/active 는 미저장). RuntimeApp 이 `register_defaults()` 직후 자동 등록. JSON/binary 씬 round-trip.
 - ~~**비동기 로딩**~~ ✅ AsyncAudioLoader (스레드 기반) 완료.
 
 ## Phase 6-2
