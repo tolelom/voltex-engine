@@ -76,6 +76,14 @@ pub struct RuntimeConfig {
     pub camera_pitch: f32,
     /// Vertical field of view (radians). Default 45°.
     pub camera_fov_y: f32,
+    /// Directional light direction (the way light travels). Default
+    /// `(0, -1, -1)`. Set with [`Self::with_light`]; animate it per-frame with
+    /// [`crate::RuntimeApp::set_light_fn`].
+    pub light_direction: [f32; 3],
+    /// Directional light RGB color. Default white `(1, 1, 1)`.
+    pub light_color: [f32; 3],
+    /// Ambient light strength `[0, 1]`. Default `0.1`.
+    pub light_ambient: f32,
 }
 
 impl Default for RuntimeConfig {
@@ -101,6 +109,10 @@ impl Default for RuntimeConfig {
             camera_yaw: 0.0,
             camera_pitch: -0.4,
             camera_fov_y: std::f32::consts::FRAC_PI_4,
+            // Matches the historical hardcoded LightUniform::new() defaults.
+            light_direction: [0.0, -1.0, -1.0],
+            light_color: [1.0, 1.0, 1.0],
+            light_ambient: 0.1,
         }
     }
 }
@@ -209,6 +221,17 @@ impl RuntimeConfig {
         self
     }
 
+    /// Set the directional light: `direction` is the way light travels,
+    /// `color` is RGB, `ambient` is the ambient floor `[0, 1]`. Animate it
+    /// per-frame (day/night, flicker) with
+    /// [`crate::RuntimeApp::set_light_fn`].
+    pub fn with_light(mut self, direction: Vec3, color: Vec3, ambient: f32) -> Self {
+        self.light_direction = [direction.x, direction.y, direction.z];
+        self.light_color = [color.x, color.y, color.z];
+        self.light_ambient = ambient;
+        self
+    }
+
     /// Enable audio: the runtime builds an `AudioSystem` from `clips` and runs
     /// `audio_sync_system` each frame. `AudioSource::clip_id` indexes `clips`.
     /// Set the listener entity with [`crate::RuntimeApp::set_audio_listener`].
@@ -303,6 +326,22 @@ mod tests {
     fn hud_is_off_by_default_and_toggleable() {
         assert!(!RuntimeConfig::default().enable_hud);
         assert!(RuntimeConfig::new().with_hud(true).enable_hud);
+    }
+
+    #[test]
+    fn light_defaults_and_builder() {
+        let d = RuntimeConfig::default();
+        assert_eq!(d.light_direction, [0.0, -1.0, -1.0]);
+        assert_eq!(d.light_color, [1.0, 1.0, 1.0]);
+        assert!((d.light_ambient - 0.1).abs() < 1e-6);
+        let c = RuntimeConfig::new().with_light(
+            Vec3::new(1.0, -2.0, 0.5),
+            Vec3::new(0.9, 0.8, 0.7),
+            0.25,
+        );
+        assert_eq!(c.light_direction, [1.0, -2.0, 0.5]);
+        assert_eq!(c.light_color, [0.9, 0.8, 0.7]);
+        assert!((c.light_ambient - 0.25).abs() < 1e-6);
     }
 
     #[test]

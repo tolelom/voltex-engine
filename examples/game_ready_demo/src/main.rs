@@ -66,6 +66,13 @@ fn main() -> RuntimeResult<()> {
             .with_window_title("Voltex Game-Ready Demo — WASD to move, chase by nav AI")
             .with_window_size(1280, 720)
             .with_hud(true)
+            // Warm, angled sun so faces shade distinctly (vs the default
+            // straight-down-ish white light).
+            .with_light(
+                Vec3::new(-0.5, -1.0, -0.4),
+                Vec3::new(1.0, 0.95, 0.85),
+                0.15,
+            )
             .with_audio(vec![beep_clip()])
             .with_scene_builder(move |world, reg| setup_scene(world, reg, &script_path))
             .with_gpu_init(upload_meshes)
@@ -206,6 +213,15 @@ fn register_systems(app: &mut RuntimeApp) {
             cam.yaw = 0.0;
             cam.pitch = -0.55;
         }
+    });
+
+    // Slowly rotate the sun around Y (day/night feel) — shows the per-frame
+    // light hook driving shading live.
+    app.set_light_fn(|light, _world, dt| {
+        let a = 0.3 * dt;
+        let (s, c) = a.sin_cos();
+        let d = light.direction;
+        light.direction = [c * d[0] + s * d[2], d[1], -s * d[0] + c * d[2]];
     });
 
     // HUD: read the shared readout each frame.

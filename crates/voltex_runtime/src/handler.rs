@@ -41,7 +41,12 @@ impl ApplicationHandler for RuntimeHandler {
         camera.pitch = app.config.camera_pitch;
         camera.fov_y = app.config.camera_fov_y;
         let fps_controller = FpsController::new();
-        let light = LightUniform::new();
+        let light = LightUniform {
+            direction: app.config.light_direction,
+            _padding1: 0.0,
+            color: app.config.light_color,
+            ambient_strength: app.config.light_ambient,
+        };
         // Construct the in-window HUD context + GPU renderer only when enabled.
         let (ui_context, ui_renderer) = if app.config.enable_hud {
             let ui = voltex_editor::UiContext::new(
@@ -189,6 +194,14 @@ fn redraw(app: &mut RuntimeApp, event_loop: &ActiveEventLoop) {
             cam_fn(&mut state.camera, &app.world, dt);
         }
         app.camera_fn = Some(cam_fn);
+    }
+
+    // Game-controlled directional light (day/night, flicker), if registered.
+    if let Some(mut light_fn) = app.light_fn.take() {
+        if let Some(state) = app.runtime_state.as_mut() {
+            light_fn(&mut state.light, &app.world, dt);
+        }
+        app.light_fn = Some(light_fn);
     }
 
     // HUD: feed the per-frame dt, push a new window title when the update

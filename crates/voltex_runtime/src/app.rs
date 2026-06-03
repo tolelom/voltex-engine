@@ -24,7 +24,7 @@ use voltex_ecs::{propagate_transforms, ComponentRegistry, Entity, World};
 use voltex_physics::PhysicsConfig;
 use voltex_platform::{GameTimer, InputState};
 use voltex_editor::UiContext;
-use voltex_renderer::Camera;
+use voltex_renderer::{Camera, LightUniform};
 use voltex_renderer_ecs::RenderAssets;
 use voltex_script::ScriptInstancePool;
 
@@ -63,6 +63,10 @@ type HudFn = Box<dyn FnMut(&mut UiContext, &World) + 'static>;
 /// implement follow / orbit / cinematic cameras. Overrides the default RMB
 /// fly-camera for the frame.
 type CameraFn = Box<dyn FnMut(&mut Camera, &World, f32) + 'static>;
+/// Per-frame directional-light updater (see [`RuntimeApp::set_light_fn`]). Runs
+/// after the systems tick with the live [`LightUniform`] and read-only World,
+/// for day/night cycles, flicker, etc.
+type LightFn = Box<dyn FnMut(&mut LightUniform, &World, f32) + 'static>;
 
 /// The runtime's top-level application object. Owns the ECS world, asset
 /// stores, schedulers, and the main loop integration with `winit`/`wgpu`.
@@ -75,6 +79,8 @@ pub struct RuntimeApp {
     pub(crate) hud_fn: Option<HudFn>,
     /// Optional per-frame camera updater (see [`Self::set_camera_fn`]).
     pub(crate) camera_fn: Option<CameraFn>,
+    /// Optional per-frame directional-light updater (see [`Self::set_light_fn`]).
+    pub(crate) light_fn: Option<LightFn>,
     /// Polling file watcher used for script / scene hot reload.
     pub file_watcher: FileWatcher,
     /// Fixed-step timer driving update / render dt.
@@ -174,6 +180,7 @@ impl RuntimeApp {
             input_systems: Vec::new(),
             hud_fn: None,
             camera_fn: None,
+            light_fn: None,
             file_watcher: FileWatcher::new(Duration::from_millis(500)),
             timer: GameTimer::new(60),
             input: InputState::new(),
@@ -275,6 +282,28 @@ impl RuntimeApp {
     /// `true` if a per-frame camera updater has been registered.
     pub fn has_camera_fn(&self) -> bool {
         self.camera_fn.is_some()
+    }
+
+    /// Register a per-frame directional-light updater (day/night, flicker, …).
+    /// Runs each frame after the systems tick with the live [`LightUniform`]
+    /// and read-only World. Replaces any previously set updater.
+    ///
+    /// ```ignore
+    /// app.set_light_fn(|light, _world, dt| {
+    ///     // slowly rotate the sun
+    ///     light.direction = rotate_y(light.direction, 0.1 * dt);
+    /// });
+    /// ```
+    pub fn set_light_fn<F>(&mut self, f: F)
+    where
+        F: FnMut(&mut LightUniform, &World, f32) + 'static,
+    {
+        self.light_fn = Some(Box::new(f));
+    }
+
+    /// `true` if a per-frame light updater has been registered.
+    pub fn has_light_fn(&self) -> bool {
+        self.light_fn.is_some()
     }
 
     /// Run one frame's worth of non-rendering systems. Used internally by the
@@ -596,6 +625,21 @@ mod tests {
         fnc(&mut cam, &app.world, 0.016);
         assert!(seen.get(), "camera_fn should have run");
         assert_eq!(cam.position, Vec3::new(3.0, 3.0, 3.0));
+    }
+
+    #[test]
+    fn set_light_fn_registers_and_runs_on_light() {
+        let cfg = RuntimeConfig::new().disable_physics().disable_scripts().disable_crash_log();
+        let mut app = RuntimeApp::new(cfg).unwrap();
+        assert!(!app.has_light_fn());
+        app.set_light_fn(|light, _world, _dt| {
+            light.color = [0.0, 1.0, 0.0];
+        });
+        assert!(app.has_light_fn());
+        let mut fnc = app.light_fn.take().unwrap();
+        let mut light = voltex_renderer::LightUniform::new();
+        fnc(&mut light, &app.world, 0.016);
+        assert_eq!(light.color, [0.0, 1.0, 0.0]);
     }
 
     #[test]
