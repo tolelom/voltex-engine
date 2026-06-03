@@ -173,6 +173,15 @@
 
 v1.0.9 부터는 **서비스 배포 완성도** 로드맵 (`docs/superpowers/specs/2026-05-21-service-readiness-roadmap.md`) 기준으로 진행.
 
+### 2026-06-03 — spawn-as-child + 세션 검증 (v1.0.71~72, 자율 세션)
+
+- **v1.0.72 spawn-as-child**: `World::spawn_child_bundle(parent, bundle)` +
+  `Prefabs::spawn_child(world, name, parent)` — 부모 하위로 스폰(포탑·장비·UI). 단위 4 +
+  변이 테스트. spawn/번들/프리팹/계층 스토리 완성.
+- **v1.0.71 검증**: 세션 라이브 렌더 경로 자동 검증 — `declarative_scene_renders_distinct_per_object_colors`
+  (RTX 4080, 초록 player/빨강 enemy 픽셀 단언) + `survivor_seed.png`. 전체 GPU 캡처 37개 그린.
+  flagship + game_ready_demo 8초 스모크 런 0 에러(Lua 게임플레이 실행 확인).
+
 ### 2026-06-03 — flagship voltex_survivor 현대화 (v1.0.70, 자율 세션)
 
 사이클 1~8 API 를 flagship 에 적용. hand-written `make_unit_cube` + `upload_meshes`

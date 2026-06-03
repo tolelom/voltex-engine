@@ -57,6 +57,14 @@ impl Prefabs {
         Some(factory(world))
     }
 
+    /// Instantiate the prefab named `name` as a child of `parent` (links it via
+    /// [`add_child`](crate::add_child)). `None` if the prefab is unregistered.
+    pub fn spawn_child(&self, world: &mut World, name: &str, parent: Entity) -> Option<Entity> {
+        let child = self.spawn(world, name)?;
+        crate::hierarchy::add_child(world, parent, child);
+        Some(child)
+    }
+
     /// True if a prefab named `name` is registered.
     pub fn contains(&self, name: &str) -> bool {
         self.factories.contains_key(name)
@@ -125,6 +133,28 @@ mod tests {
         let e = prefabs.spawn(&mut world, "enemy").unwrap();
         world.get_mut::<Transform>(e).unwrap().position = Vec3::new(5.0, 0.0, 0.0);
         assert_eq!(world.get::<Transform>(e).unwrap().position, Vec3::new(5.0, 0.0, 0.0));
+    }
+
+    #[test]
+    fn spawn_child_links_instance_to_parent() {
+        use crate::hierarchy::{Children, Parent};
+
+        let prefabs = enemy_registry();
+        let mut world = World::new();
+        let parent = world.spawn();
+        let child = prefabs.spawn_child(&mut world, "enemy", parent).unwrap();
+
+        assert_eq!(world.get::<Health>(child), Some(&Health(30)));
+        assert_eq!(world.get::<Parent>(child).map(|p| p.0), Some(parent));
+        assert!(world.get::<Children>(parent).unwrap().0.contains(&child));
+    }
+
+    #[test]
+    fn spawn_child_unknown_prefab_returns_none() {
+        let prefabs = enemy_registry();
+        let mut world = World::new();
+        let parent = world.spawn();
+        assert_eq!(prefabs.spawn_child(&mut world, "boss", parent), None);
     }
 
     #[test]

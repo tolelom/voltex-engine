@@ -10,6 +10,25 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## [v1.0.72] — 2026-06-03 — Spawn-as-child (`spawn_child_bundle` / `Prefabs::spawn_child`)
+
+기초 워크플로 격차 7번째: 부모에 부착된 엔티티(포탑·장비·UI 중첩)를 만들려면
+spawn → add_child 를 손으로 엮어야 했다. spawn/번들/프리팹/계층 스토리를 완성.
+
+### Additive — `voltex_ecs`
+
+- **`World::spawn_child_bundle(parent, (A, B, ..)) -> Entity`** — `spawn_bundle` +
+  `add_child` 한 번에. `despawn_recursive(parent)` 가 자식도 제거, WorldTransform
+  propagation 이 자식으로 취급.
+- **`Prefabs::spawn_child(&mut World, name, parent) -> Option<Entity>`** — 프리팹
+  인스턴스를 부모 하위로.
+
+### 검증
+
+- 단위 4개(자식 컴포넌트+양방향 링크, despawn_recursive 가 자식 제거, prefab spawn_child
+  링크, 미등록 None) + 변이 테스트(add_child 생략 시 링크 테스트 RED→GREEN).
+- workspace build / clippy(`-D warnings`) / lib test 전부 그린.
+
 ## [v1.0.71] — 2026-06-03 — Automated visual + smoke verification of the new authoring stack
 
 이 세션(v1.0.62~70)의 작업, 특히 라이브 렌더 경로(per-frame materialize + flagship

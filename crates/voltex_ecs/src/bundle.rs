@@ -68,6 +68,19 @@ impl World {
     pub fn insert_bundle<B: Bundle>(&mut self, entity: Entity, bundle: B) {
         bundle.insert(self, entity);
     }
+
+    /// Spawn a bundle as a child of `parent`: like [`spawn_bundle`] but also
+    /// links the new entity into `parent`'s hierarchy via
+    /// [`add_child`](crate::add_child) (so `despawn_recursive(parent)` removes
+    /// it, and `WorldTransform` propagation treats it as a child). Returns the
+    /// new child entity.
+    ///
+    /// [`spawn_bundle`]: World::spawn_bundle
+    pub fn spawn_child_bundle<B: Bundle>(&mut self, parent: Entity, bundle: B) -> Entity {
+        let child = self.spawn_bundle(bundle);
+        crate::hierarchy::add_child(self, parent, child);
+        child
+    }
 }
 
 #[cfg(test)]
@@ -124,6 +137,34 @@ mod tests {
         // Two Health values in one bundle: the last one wins, matching repeated add().
         let e = world.spawn_bundle((Health(1), Name("x"), Health(2)));
         assert_eq!(world.get::<Health>(e), Some(&Health(2)));
+    }
+
+    #[test]
+    fn spawn_child_bundle_links_into_parent_hierarchy() {
+        use crate::hierarchy::{Children, Parent};
+
+        let mut world = World::new();
+        let parent = world.spawn_bundle((Health(100),));
+        let child = world.spawn_child_bundle(parent, (Name("turret"), Speed(0.0)));
+
+        // Child has its own components…
+        assert_eq!(world.get::<Name>(child), Some(&Name("turret")));
+        // …and is linked to the parent both ways.
+        assert_eq!(world.get::<Parent>(child).map(|p| p.0), Some(parent));
+        let kids = &world.get::<Children>(parent).expect("parent has Children").0;
+        assert!(kids.contains(&child));
+    }
+
+    #[test]
+    fn despawn_recursive_removes_a_spawn_child_bundle_child() {
+        let mut world = World::new();
+        let parent = world.spawn_bundle((Health(1),));
+        let child = world.spawn_child_bundle(parent, (Name("attached"),));
+        assert!(world.is_alive(child));
+
+        crate::hierarchy::despawn_recursive(&mut world, parent);
+        assert!(!world.is_alive(parent));
+        assert!(!world.is_alive(child), "despawning the parent must take the child");
     }
 
     #[test]

@@ -5,9 +5,9 @@ ECS 코어 — Entity/Component/World/Query + Hierarchy + Scene 직렬화 + Syst
 
 ## 공개 API 진입점
 - `World` — type-erased 저장소 + query, `clear()` 로 전체 리셋 (src/world.rs)
-- `Bundle` + `World::spawn_bundle((A,B,..))` / `insert_bundle` — 컴포넌트 튜플(1~12)을 한 번에 첨부 (src/bundle.rs). spawn() + N add() 대체. 같은 타입 중복 시 뒤쪽이 덮어씀
+- `Bundle` + `World::spawn_bundle((A,B,..))` / `insert_bundle` / `spawn_child_bundle(parent, ..)` — 컴포넌트 튜플(1~12)을 한 번에 첨부 (src/bundle.rs). spawn() + N add() 대체. `spawn_child_bundle` 은 add_child 로 부모 하위 연결
 - `World::find_by_tag(&str) -> Option<Entity>` / `iter_by_tag(&str)` — Tag 로 엔티티 조회 (src/scene.rs). `query::<Tag>().find(..)` 보일러플레이트 대체
-- `Prefabs` + `register(name, \|&mut World\|->Entity)` / `spawn(&mut World, name) -> Option<Entity>` / `contains` — 명명된 엔티티 템플릿 (src/prefab.rs). spawn_bundle 위에 "한 번 정의, 이름으로 N개 인스턴스화"(Unity Prefab). 팩토리 컴포넌트-무관
+- `Prefabs` + `register(name, \|&mut World\|->Entity)` / `spawn(&mut World, name)` / `spawn_child(&mut World, name, parent)` / `contains` — 명명된 엔티티 템플릿 (src/prefab.rs). spawn_bundle 위에 "한 번 정의, 이름으로 N개 인스턴스화"(Unity Prefab). 팩토리 컴포넌트-무관. `spawn_child` 는 부모 하위로 인스턴스화
 - `Entity` — id + generation (src/entity.rs)
 - `SparseSet<T>` — 컴포넌트 저장소 (src/sparse_set.rs)
 - `Transform` — 위치/회전/스케일 컴포넌트 (src/transform.rs)
