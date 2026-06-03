@@ -415,6 +415,8 @@ impl RuntimeApp {
         voltex_renderer_ecs::update_skinned_poses(&mut self.world, dt);
         // Advance CPU particles: move, fade, despawn (no-op if none).
         voltex_renderer_ecs::update_particles(&mut self.world, dt);
+        // Advance sprite-sheet animations (no-op if no SpriteAnimation entities).
+        voltex_renderer_ecs::update_sprite_animations(&mut self.world, dt);
         if self.config.enable_physics {
             voltex_physics::physics_step(&mut self.world, &self.physics_config);
         }

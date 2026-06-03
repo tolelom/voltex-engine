@@ -25,4 +25,4 @@ pub use skinned::{
     animation_duration, load_skinned_gltf, update_skinned_poses, SkinnedMeshHandle, SkinnedPose,
 };
 pub use particle::{spawn_particle, update_particles, Particle};
-pub use sprite::Sprite;
+pub use sprite::{update_sprite_animations, Sprite, SpriteAnimation};

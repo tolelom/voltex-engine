@@ -72,6 +72,10 @@ v1.0.59 데모(game_ready_demo)를 실제로 돌려보며 드러난 엔진 갭�
   서브렉트로 remap. 2D 캐릭터 애니메이션·아틀라스용. 단위 테스트(프레임→uv_rect)
   + 캡처 회귀 `sprite_sheet_frame_selects_atlas_cell`(4색 2×2 아틀라스 각 프레임
   정확 샘플).
+- **스프라이트 애니메이션**: `SpriteAnimation` 컴포넌트(cols/rows/frame_count/
+  fps/looping) + `update_sprite_animations`(RuntimeApp tick 자동 호출) — Sprite의
+  `uv_rect`를 시간에 따라 진행. loop=wrap, non-loop=마지막 프레임 clamp+정지.
+  단위 테스트(프레임 진행/wrap/clamp+stop).
 
 - **그림자**: `RuntimeConfig::with_shadows(true)` — BasicRenderer directional
   shadow mapping (depth pre-pass + mesh_colored 3×3 PCF, group 3). 기본 off
