@@ -9,6 +9,7 @@ AI 기초 — NavMesh (수동 + 자동 voxelization), A* + Funnel, steering, 동
 - `find_path` — A* + String Pulling (Funnel) (src/pathfinding.rs)
 - Steering — `seek`, `flee`, `arrive`, `wander` (src/steering.rs)
 - `NavAgent` — ECS 컴포넌트 (src/nav_agent.rs)
+- `nav_agent_system(world, navmesh, dt)` — NavAgent 엔티티 경로 추적 ECS 시스템 (src/nav_agent_system.rs)
 - `Obstacle`, velocity obstacle 회피 (src/obstacle.rs)
 - `AiError`, `Result` — thiserror 기반 에러 (Generic/Io) (src/error.rs)
 
@@ -18,6 +19,7 @@ AI 기초 — NavMesh (수동 + 자동 voxelization), A* + Funnel, steering, 동
 - `pathfinding` — A* + Funnel (src/pathfinding.rs)
 - `steering` — steering behaviors (src/steering.rs)
 - `nav_agent` — ECS 컴포넌트 (src/nav_agent.rs)
+- `nav_agent_system` — NavAgent 경로 추적 시스템 (src/nav_agent_system.rs)
 - `obstacle` — 동적 장애물 회피 (src/obstacle.rs)
 
 ## 의존성
@@ -28,9 +30,9 @@ AI 기초 — NavMesh (수동 + 자동 voxelization), A* + Funnel, steering, 동
 - navmesh_builder는 src/navmesh_builder/ 디렉토리로 분리됨 (M3 완료)
 - navmesh.rs는 497줄
 - VNAV 바이너리 포맷 변경 시 저장된 내비메시 호환 깨짐
-- nav_agent_system은 ECS 미구현 (DEFERRED)
+- nav_agent_system은 kinematic(위치 적분) — RigidBody velocity 커플링은 호출자/후속 사이클. NavMesh는 호출자 소유로 매 프레임 주입
 
 ## 테스트
 - 단위 테스트: src/**/*.rs `#[cfg(test)]`
 - 실행: `cargo test -p voltex_ai --lib`
-- 현재 테스트 개수: 34개
+- 현재 테스트 개수: 48개
