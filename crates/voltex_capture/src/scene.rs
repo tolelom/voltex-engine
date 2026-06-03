@@ -281,6 +281,72 @@ pub fn render_data_authored_scene(gpu: &HeadlessGpu, width: u32, height: u32) ->
     target.read_rgba8(&gpu.device, &gpu.queue)
 }
 
+/// Render `voltex_survivor`'s seed scene through the *declarative* path it now
+/// uses (v1.0.70): a gray ground, a green player, and a red enemy declared with
+/// `PrimitiveMesh` + `MaterialDesc`, materialized, and drawn with the runtime's
+/// elevated camera. Proves the flagship's per-object colors survive
+/// materialize→render (they were all white before the modernization). RGBA8.
+pub fn render_declarative_colored_scene(gpu: &HeadlessGpu, width: u32, height: u32) -> Vec<u8> {
+    use voltex_renderer_ecs::{materialize_renderables, MaterialDesc, PrimitiveMesh};
+
+    let target = OffscreenTarget::new(&gpu.device, width, height);
+    let renderer = BasicRenderer::new(&gpu.device, &gpu.queue, CAPTURE_FORMAT, 16);
+    let mut assets = RenderAssets::new();
+    let mut world = World::new();
+
+    // Mirror voltex_survivor::setup_scene roles (gray ground, green player) plus
+    // a runtime-spawned-style red enemy.
+    let mut ground_t = Transform::from_position(Vec3::new(0.0, -0.5, 0.0));
+    ground_t.scale = Vec3::new(20.0, 0.1, 20.0);
+    world.spawn_bundle((
+        ground_t,
+        PrimitiveMesh::cube(1.0),
+        MaterialDesc::color([0.30, 0.32, 0.35, 1.0]),
+    ));
+    world.spawn_bundle((
+        Transform::from_position(Vec3::new(0.0, 0.5, 0.0)),
+        PrimitiveMesh::cube(1.0),
+        MaterialDesc::color([0.20, 0.80, 0.30, 1.0]),
+    ));
+    world.spawn_bundle((
+        Transform::from_position(Vec3::new(2.0, 0.5, 0.0)),
+        PrimitiveMesh::cube(1.0),
+        MaterialDesc::color([0.90, 0.25, 0.20, 1.0]),
+    ));
+    materialize_renderables(&mut world, &mut assets, &gpu.device);
+
+    let mut camera = Camera::new(Vec3::new(0.0, 4.0, 8.0), width as f32 / height as f32);
+    camera.pitch = -0.45;
+    let view_proj = camera.view_projection();
+    let mut light = LightUniform::new();
+    light.direction = [-0.4, -1.0, -0.6];
+
+    let mut encoder = gpu
+        .device
+        .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+            label: Some("capture declarative_colored_scene"),
+        });
+    renderer.render(
+        &gpu.queue,
+        &mut encoder,
+        &target.color_view,
+        &target.depth_view,
+        wgpu::Color {
+            r: 0.05,
+            g: 0.05,
+            b: 0.08,
+            a: 1.0,
+        },
+        &mut world,
+        &assets,
+        view_proj,
+        camera.position,
+        light,
+    );
+    gpu.queue.submit(Some(encoder.finish()));
+    target.read_rgba8(&gpu.device, &gpu.queue)
+}
+
 /// Render the canonical PBR test: a 7×7 grid of spheres with metallic varying
 /// left→right and roughness varying bottom→top, lit by one directional light.
 /// Exercises the full Cook-Torrance pipeline (`create_pbr_pipeline`) plus the
@@ -2107,6 +2173,42 @@ mod tests {
              render path is broken: {stats:?}"
         );
         assert!(stats.mean_luminance > 0.01, "frame too dark: {stats:?}");
+    }
+
+    #[test]
+    #[ignore]
+    fn declarative_scene_renders_distinct_per_object_colors() {
+        // voltex_survivor (v1.0.70) renders its objects via PrimitiveMesh +
+        // MaterialDesc. This proves those per-object colors actually reach the
+        // screen distinctly — a green player pixel and a red enemy pixel both
+        // exist (everything was white before the material-color path).
+        let gpu = match HeadlessGpu::new() {
+            Ok(g) => g,
+            Err(e) => {
+                eprintln!("skipping: {e}");
+                return;
+            }
+        };
+        let rgba = render_declarative_colored_scene(&gpu, 320, 200);
+        let stats = ImageStats::analyze(&rgba);
+        assert!(
+            stats.distinct_colors >= 3,
+            "ground/player/enemy must shade distinctly, not all one color: {stats:?}"
+        );
+
+        let mut has_green = false;
+        let mut has_red = false;
+        for p in rgba.chunks_exact(4) {
+            let (r, g, b) = (p[0] as i32, p[1] as i32, p[2] as i32);
+            if g > r + 30 && g > b + 30 {
+                has_green = true;
+            }
+            if r > g + 30 && r > b + 30 {
+                has_red = true;
+            }
+        }
+        assert!(has_green, "the green player should produce green-dominant pixels");
+        assert!(has_red, "the red enemy should produce red-dominant pixels");
     }
 
     #[test]

@@ -43,6 +43,12 @@ fn main() {
             512,
             512,
         ),
+        (
+            "survivor_seed",
+            scene::render_declarative_colored_scene,
+            512,
+            320,
+        ),
         ("pbr_grid", scene::render_pbr_grid, 768, 768),
         ("shadow_scene", scene_shadow::render_shadow_scene, 800, 600),
         ("multi_light", scene_lights::render_multi_light, 800, 600),

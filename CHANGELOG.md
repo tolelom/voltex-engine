@@ -10,6 +10,28 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## [v1.0.71] — 2026-06-03 — Automated visual + smoke verification of the new authoring stack
+
+이 세션(v1.0.62~70)의 작업, 특히 라이브 렌더 경로(per-frame materialize + flagship
+현대화)를 자동 검증.
+
+### Additive — 검증
+
+- **`render_declarative_colored_scene`** + capture 회귀
+  `declarative_scene_renders_distinct_per_object_colors`(RTX 4080): flagship 의 선언적
+  경로(`PrimitiveMesh`+`MaterialDesc`)로 회색 바닥/초록 player/빨강 enemy 를 렌더 →
+  `distinct_colors >= 3` + **초록-우세 픽셀 + 빨강-우세 픽셀 존재**를 픽셀 단위로 단언
+  (모더나이즈 전엔 전부 흰색이었음). 시각 기록 `docs/visual/survivor_seed.png`.
+- capture bin 에 `survivor_seed` shot 추가.
+
+### 검증 결과 (이 커밋 + 세션 누적)
+
+- 전체 GPU capture 회귀 **37개** RTX 4080 그린(신규 5개 포함: 선언적 렌더 non-blank /
+  dedup+bounds / 데이터씬 / 런타임-스폰 materialize / flagship 색).
+- flagship `voltex_survivor` + `game_ready_demo` **8초 스모크 런**: exit 124(완주),
+  panic/validation/error 0, Lua 게임플레이 실행 확인(survivor 웨이브·라이프·적 스폰).
+- workspace build / clippy(`-D warnings`) / lib test 전부 그린.
+
 ## [v1.0.70] — 2026-06-03 — Flagship `voltex_survivor` modernized to the new authoring stack
 
 사이클 1~8 로 추가한 워크플로 API 를 flagship 게임에 적용해 그 가치를 실증 + 검증.
