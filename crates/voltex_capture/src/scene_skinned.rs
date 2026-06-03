@@ -37,7 +37,7 @@ const IDENTITY4: [[f32; 4]; 4] = [
 
 /// A 4-vertex vertical strip from y=0 (bound to joint 0) to y=2 (bound to
 /// joint 1). Front face points +Z.
-fn strip_vertices() -> ([SkinnedMeshVertex; 4], [u32; 6]) {
+pub(crate) fn strip_vertices() -> ([SkinnedMeshVertex; 4], [u32; 6]) {
     let mk = |x: f32, y: f32, joint: u32| SkinnedMeshVertex {
         position: [x, y, 0.0],
         normal: [0.0, 0.0, 1.0],
@@ -59,7 +59,7 @@ fn strip_vertices() -> ([SkinnedMeshVertex; 4], [u32; 6]) {
 /// Two-joint skeleton: root at the origin, child joint pivoting at y=1. The
 /// child's inverse-bind matrix is the inverse of its bind world (T(0,1,0)), so
 /// the rest pose produces identity palettes (no deformation).
-fn demo_skeleton() -> Skeleton {
+pub(crate) fn demo_skeleton() -> Skeleton {
     fn node(t: [f32; 3], children: Vec<usize>) -> GltfNode {
         GltfNode {
             name: None,
@@ -239,6 +239,29 @@ fn bend_animation_2kf() -> GltfAnimation {
             interpolation: Interpolation::Linear,
             times: vec![0.0, 1.0],
             values: vec![0.0, 0.0, 0.0, 1.0, 0.0, 0.0, s, c],
+        }],
+    }
+}
+
+/// Looping wave for the demo totem: child joint rotates -35° → +35° → -35°
+/// about Z over 2s.
+pub(crate) fn wave_animation() -> GltfAnimation {
+    let q = |deg: f32| {
+        let a = deg.to_radians() * 0.5;
+        [0.0f32, 0.0, a.sin(), a.cos()]
+    };
+    let a = q(-35.0);
+    let b = q(35.0);
+    GltfAnimation {
+        name: None,
+        channels: vec![GltfChannel {
+            target_node: 1,
+            target_path: AnimationPath::Rotation,
+            interpolation: Interpolation::Linear,
+            times: vec![0.0, 1.0, 2.0],
+            values: vec![
+                a[0], a[1], a[2], a[3], b[0], b[1], b[2], b[3], a[0], a[1], a[2], a[3],
+            ],
         }],
     }
 }

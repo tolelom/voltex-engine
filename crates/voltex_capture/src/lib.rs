@@ -20,6 +20,7 @@ mod headless;
 pub mod scene;
 pub mod scene_gizmo;
 pub mod scene_lights;
+pub mod scene_playthrough;
 pub mod scene_shadow;
 pub mod scene_skinned;
 pub mod scene_ui;
