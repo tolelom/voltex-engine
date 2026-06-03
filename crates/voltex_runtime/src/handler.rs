@@ -41,6 +41,13 @@ impl ApplicationHandler for RuntimeHandler {
         camera.yaw = app.config.camera_yaw;
         camera.pitch = app.config.camera_pitch;
         camera.fov_y = app.config.camera_fov_y;
+        camera.ortho_height = app.config.camera_ortho_height;
+        if camera.ortho_height.is_some() {
+            // Generous symmetric depth range so objects on either side of the
+            // eye plane stay visible under the parallel projection.
+            camera.near = -100.0;
+            camera.far = 100.0;
+        }
         let fps_controller = FpsController::new();
         let light = LightUniform {
             direction: app.config.light_direction,

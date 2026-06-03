@@ -46,6 +46,12 @@ v1.0.59 데모(game_ready_demo)를 실제로 돌려보며 드러난 엔진 갭�
   3D 위에 렌더(depth-test, no write). 캡처 회귀
   `debug_lines_draw_colored_segments` + `docs/visual/debug_lines.png`. 데모에
   chase 벡터 + 플레이어/추적자 cross + 아레나 AABB 추가.
+- **직교(2D/탑다운) 카메라**: `Camera::ortho_height: Option<f32>` +
+  `Camera::orthographic(pos, aspect, height)` (parallel 투영) +
+  `RuntimeConfig::with_orthographic(height)`. 2D·탑다운·아이소메트릭 게임용 —
+  깊이에 무관한 footprint(원근 단축 없음). 캡처 회귀
+  `orthographic_footprint_is_depth_independent`(near≈far) + 단위 테스트
+  (ortho는 깊이 무관, perspective는 단축). 기존 perspective 기본값 불변.
 - **빌보드 스프라이트**: `voltex_renderer::sprite`(SpriteUniform +
   alpha-blended·depth-tested 파이프라인, 정점 셰이더에서 카메라 right/up으로
   쿼드 확장) + `voltex_renderer_ecs::Sprite` 컴포넌트

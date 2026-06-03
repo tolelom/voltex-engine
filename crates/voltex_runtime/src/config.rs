@@ -74,8 +74,13 @@ pub struct RuntimeConfig {
     pub camera_yaw: f32,
     /// Initial camera pitch (radians). Default `-0.4` (looking slightly down).
     pub camera_pitch: f32,
-    /// Vertical field of view (radians). Default 45°.
+    /// Vertical field of view (radians). Default 45°. Ignored when
+    /// `camera_ortho_height` is set.
     pub camera_fov_y: f32,
+    /// When `Some(h)`, the camera uses an orthographic projection with view
+    /// height `h` (for 2D / top-down games). `None` (default) = perspective.
+    /// Set with [`Self::with_orthographic`].
+    pub camera_ortho_height: Option<f32>,
     /// Directional light direction (the way light travels). Default
     /// `(0, -1, -1)`. Set with [`Self::with_light`]; animate it per-frame with
     /// [`crate::RuntimeApp::set_light_fn`].
@@ -111,6 +116,7 @@ impl Default for RuntimeConfig {
             camera_yaw: 0.0,
             camera_pitch: -0.4,
             camera_fov_y: std::f32::consts::FRAC_PI_4,
+            camera_ortho_height: None,
             // Matches the historical hardcoded LightUniform::new() defaults.
             light_direction: [0.0, -1.0, -1.0],
             light_color: [1.0, 1.0, 1.0],
@@ -221,6 +227,14 @@ impl RuntimeConfig {
     /// Override the camera vertical field of view (radians).
     pub fn with_camera_fov(mut self, fov_y: f32) -> Self {
         self.camera_fov_y = fov_y;
+        self
+    }
+
+    /// Use an orthographic camera with view height `height` world units
+    /// (width = `height * aspect`) instead of perspective — for 2D / top-down
+    /// games. Combine with [`Self::with_camera`] to position/aim it.
+    pub fn with_orthographic(mut self, height: f32) -> Self {
+        self.camera_ortho_height = Some(height);
         self
     }
 

@@ -735,6 +735,59 @@ pub fn render_spot_lit(
     target.read_rgba8(&gpu.device, &gpu.queue)
 }
 
+/// Render one white cube at world `depth` (more negative = farther from the
+/// camera at z=8) under either an orthographic or perspective projection.
+/// Returns RGBA8. Used to show that orthographic footprints are
+/// depth-independent while perspective foreshortens.
+pub fn render_cube_at_depth(
+    gpu: &HeadlessGpu,
+    width: u32,
+    height: u32,
+    ortho: bool,
+    depth: f32,
+) -> Vec<u8> {
+    let target = OffscreenTarget::new(&gpu.device, width, height);
+    let renderer = BasicRenderer::new(&gpu.device, &gpu.queue, CAPTURE_FORMAT, 8);
+    let mut assets = RenderAssets::new();
+    let cube = assets.add_mesh(unit_cube(&gpu.device));
+    let mat = assets.add_material(MaterialUniform::with_params([1.0, 1.0, 1.0, 1.0], 0.0, 1.0));
+
+    let mut world = World::new();
+    let e = world.spawn();
+    world.add(e, Transform::from_position(Vec3::new(0.0, 0.0, depth)));
+    world.add(e, MeshHandle(cube.0));
+    world.add(e, MaterialHandle(mat.0));
+    voltex_ecs::propagate_transforms(&mut world);
+
+    let aspect = width as f32 / height as f32;
+    let camera = if ortho {
+        Camera::orthographic(Vec3::new(0.0, 0.0, 8.0), aspect, 10.0)
+    } else {
+        Camera::new(Vec3::new(0.0, 0.0, 8.0), aspect)
+    };
+    let mut light = LightUniform::new();
+    light.direction = [0.2, -0.3, -1.0];
+    light.ambient_strength = 0.3;
+
+    let mut encoder = gpu
+        .device
+        .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("capture proj") });
+    renderer.render(
+        &gpu.queue,
+        &mut encoder,
+        &target.color_view,
+        &target.depth_view,
+        wgpu::Color { r: 0.0, g: 0.0, b: 0.0, a: 1.0 },
+        &mut world,
+        &assets,
+        camera.view_projection(),
+        camera.position,
+        light,
+    );
+    gpu.queue.submit(Some(encoder.finish()));
+    target.read_rgba8(&gpu.device, &gpu.queue)
+}
+
 /// Render a single magenta billboard [`Sprite`] at the world origin, viewed
 /// from `cam_pos` with the given `yaw` (pitch 0). A camera-facing quad should
 /// present the same footprint from any orbit angle. Returns RGBA8.
@@ -1146,6 +1199,41 @@ mod tests {
         assert!(
             center_off + 60 < center,
             "aiming the spot away from the ground should darken the center: aimed-down={center} aimed-away={center_off}"
+        );
+    }
+
+    #[test]
+    #[ignore = "requires a GPU adapter"]
+    fn orthographic_footprint_is_depth_independent() {
+        let gpu = match HeadlessGpu::new() {
+            Ok(g) => g,
+            Err(e) => {
+                eprintln!("skip: {e}");
+                return;
+            }
+        };
+        // Count lit (non-near-black) pixels — the cube's on-screen footprint.
+        let footprint = |rgba: &[u8]| -> u32 {
+            rgba.chunks_exact(4)
+                .filter(|p| p[0] as u32 + p[1] as u32 + p[2] as u32 > 30)
+                .count() as u32
+        };
+
+        // Orthographic: a cube at z=0 vs z=-5 should cover ~the same pixels.
+        let o_near = footprint(&render_cube_at_depth(&gpu, 256, 256, true, 0.0));
+        let o_far = footprint(&render_cube_at_depth(&gpu, 256, 256, true, -5.0));
+        let o_ratio = o_near.min(o_far) as f64 / o_near.max(o_far) as f64;
+        assert!(
+            o_near > 400 && o_ratio > 0.9,
+            "orthographic footprint must be depth-independent: near={o_near} far={o_far} ratio={o_ratio:.2}"
+        );
+
+        // Perspective: the farther cube must be clearly smaller.
+        let p_near = footprint(&render_cube_at_depth(&gpu, 256, 256, false, 0.0));
+        let p_far = footprint(&render_cube_at_depth(&gpu, 256, 256, false, -5.0));
+        assert!(
+            (p_far as f64) < (p_near as f64) * 0.7,
+            "perspective should foreshorten the farther cube: near={p_near} far={p_far}"
         );
     }
 
