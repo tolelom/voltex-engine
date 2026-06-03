@@ -173,6 +173,13 @@
 
 v1.0.9 부터는 **서비스 배포 완성도** 로드맵 (`docs/superpowers/specs/2026-05-21-service-readiness-roadmap.md`) 기준으로 진행.
 
+### 2026-06-03 — flagship voltex_survivor 현대화 (v1.0.70, 자율 세션)
+
+사이클 1~8 API 를 flagship 에 적용. hand-written `make_unit_cube` + `upload_meshes`
+제거 → setup_scene 이 `spawn_bundle`+선언적 렌더러블, 런타임 enemy/projectile 도
+`insert_bundle`+`PrimitiveMesh`/`MaterialDesc`(역할별 색, per-frame materialize). 204→127줄.
+build/clippy/test 그린. 라이브 렌더는 수동 확인 영역.
+
 ### 2026-06-03 — 프레임별 materialize (v1.0.69, 자율 세션)
 
 사이클 1 한계 수정: `materialize_renderables`가 gpu_init 1회만 실행돼 런타임 스폰

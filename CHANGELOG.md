@@ -10,6 +10,30 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## [v1.0.70] — 2026-06-03 — Flagship `voltex_survivor` modernized to the new authoring stack
+
+사이클 1~8 로 추가한 워크플로 API 를 flagship 게임에 적용해 그 가치를 실증 + 검증.
+이전엔 hand-written 24-vertex `make_unit_cube` + 별도 `upload_meshes`(GPU 단계에서
+모든 Transform 엔티티에 공유 핸들/Bounds 수동 부착) + 런타임 enemy/projectile 에
+핸들을 매 프레임 샘플링해 붙이는 코드를 갖고 있었다.
+
+### Refactor — `games/voltex_survivor`
+
+- **setup_scene**: ground/player 가 `spawn_bundle((Transform, Tag, PrimitiveMesh,
+  MaterialDesc))` 로 선언적. ground 회색, player 초록 (이전엔 전부 흰색).
+- **`upload_meshes` + `make_unit_cube` 제거**: `with_gpu_init` 제거. 런타임이 매 프레임
+  materialize (v1.0.69) 하므로 GPU 업로드 단계 불필요.
+- **런타임 enemy/projectile**: Lua 가 스폰한 bare 엔티티에 `MeshHandle` 샘플링 대신
+  `insert_bundle((PrimitiveMesh, MaterialDesc, ScriptComponent))` — 역할별 색(enemy 빨강,
+  projectile 노랑) + per-frame materialize 가 GPU 자원 부여. 이전엔 전부 player 와 같은 흰색.
+- **204 → 127 줄** (-77). winit/`voltex_renderer` 직접 import 제거(전부 prelude).
+
+### 검증
+
+- workspace build / clippy(`-D warnings`) / lib test 전부 그린. 런타임 렌더 경로는
+  독립 검증된 서브시스템(per-frame materialize capture 회귀 + BasicRenderer base_color)에
+  의존 — 라이브 게임 화면은 수동 확인 영역.
+
 ## [v1.0.69] — 2026-06-03 — Per-frame materialization (runtime-spawned renderables become visible)
 
 사이클 1(v1.0.62)의 실제 한계 수정: `materialize_renderables` 가 `gpu_init` 에서 **한 번만**
