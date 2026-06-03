@@ -493,10 +493,14 @@ pub fn render_demo_like_cam(
     target.read_rgba8(&gpu.device, &gpu.queue)
 }
 
-/// Render a single cube textured with a solid `color` (RGBA) via a runtime
+/// Render a single cube with a pre-built [`GpuTexture`] via a runtime
 /// `TextureHandle` + `BasicRenderer`. Proves per-entity textures are sampled.
-pub fn render_textured_cube(gpu: &HeadlessGpu, width: u32, height: u32, color: [u8; 4]) -> Vec<u8> {
-    use voltex_renderer::GpuTexture;
+pub fn render_cube_with_texture(
+    gpu: &HeadlessGpu,
+    width: u32,
+    height: u32,
+    tex: voltex_renderer::GpuTexture,
+) -> Vec<u8> {
     use voltex_renderer_ecs::TextureHandle;
 
     let target = OffscreenTarget::new(&gpu.device, width, height);
@@ -504,11 +508,6 @@ pub fn render_textured_cube(gpu: &HeadlessGpu, width: u32, height: u32, color: [
     let mut assets = RenderAssets::new();
     let mesh_h = assets.add_mesh(unit_cube(&gpu.device));
     let mat_h = assets.add_material(MaterialUniform::new()); // white → texture shows through
-
-    // 2×2 solid-color texture.
-    let layout = GpuTexture::bind_group_layout(&gpu.device);
-    let pixels: Vec<u8> = color.iter().cycle().take(2 * 2 * 4).copied().collect();
-    let tex = GpuTexture::from_rgba(&gpu.device, &gpu.queue, 2, 2, &pixels, &layout);
     let tex_h: TextureHandle = assets.add_texture(tex);
 
     let mut world = World::new();
@@ -542,6 +541,15 @@ pub fn render_textured_cube(gpu: &HeadlessGpu, width: u32, height: u32, color: [
     );
     gpu.queue.submit(Some(encoder.finish()));
     target.read_rgba8(&gpu.device, &gpu.queue)
+}
+
+/// Render a cube textured with a 2×2 solid `color` (RGBA).
+pub fn render_textured_cube(gpu: &HeadlessGpu, width: u32, height: u32, color: [u8; 4]) -> Vec<u8> {
+    use voltex_renderer::GpuTexture;
+    let layout = GpuTexture::bind_group_layout(&gpu.device);
+    let pixels: Vec<u8> = color.iter().cycle().take(2 * 2 * 4).copied().collect();
+    let tex = GpuTexture::from_rgba(&gpu.device, &gpu.queue, 2, 2, &pixels, &layout);
+    render_cube_with_texture(gpu, width, height, tex)
 }
 
 /// Load a Wavefront OBJ source via `Mesh::from_obj` and render it as a single
@@ -630,6 +638,38 @@ mod tests {
         let (br, bb) = mean_rb(&blue);
         assert!(rr > rb, "red-textured cube should be red-dominant: R={rr} B={rb}");
         assert!(bb > br, "blue-textured cube should be blue-dominant: R={br} B={bb}");
+    }
+
+    #[test]
+    #[ignore = "requires a GPU adapter"]
+    fn loads_png_into_texture_and_renders() {
+        let gpu = match HeadlessGpu::new() {
+            Ok(g) => g,
+            Err(e) => {
+                eprintln!("skip: {e}");
+                return;
+            }
+        };
+        // Encode a 4×4 red image to PNG, decode via GpuTexture::from_png, render.
+        let red: Vec<u8> = [200u8, 40, 40, 255].iter().cycle().take(4 * 4 * 4).copied().collect();
+        let png = voltex_image::png_encode::encode_rgba8(4, 4, &red);
+        let layout = voltex_renderer::GpuTexture::bind_group_layout(&gpu.device);
+        let tex = voltex_renderer::GpuTexture::from_png(&gpu.device, &gpu.queue, &png, &layout)
+            .expect("decode PNG");
+        let rgba = render_cube_with_texture(&gpu, 256, 256, tex);
+
+        // The cube should be red-dominant (texture sampled through the runtime).
+        let bg = [rgba[0], rgba[1], rgba[2]];
+        let (mut r, mut b, mut n) = (0u64, 0u64, 0u64);
+        for p in rgba.chunks_exact(4) {
+            if (p[0] as i32 - bg[0] as i32).abs() > 20 || (p[2] as i32 - bg[2] as i32).abs() > 20 {
+                r += p[0] as u64;
+                b += p[2] as u64;
+                n += 1;
+            }
+        }
+        let n = n.max(1);
+        assert!(r / n > b / n, "PNG-textured cube should be red-dominant: R={} B={}", r / n, b / n);
     }
 
     #[test]
