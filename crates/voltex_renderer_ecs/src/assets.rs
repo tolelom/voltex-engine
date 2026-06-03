@@ -6,7 +6,9 @@
 
 use voltex_asset::{Assets, Handle};
 use voltex_ecs::{MaterialHandle, MeshHandle};
-use voltex_renderer::{MaterialUniform, Mesh};
+use voltex_renderer::{MaterialUniform, Mesh, SkinnedMesh};
+
+use crate::skinned::SkinnedMeshHandle;
 
 /// GPU-resident mesh + material storage. Hands out the phantom-typed
 /// [`MeshHandle`] / [`MaterialHandle`] ECS components while keeping the
@@ -44,6 +46,16 @@ impl RenderAssets {
     pub fn material(&self, h: MaterialHandle) -> Option<&MaterialUniform> {
         let raw: Handle<MaterialUniform> = Handle::from_raw_parts(h.0.id(), h.0.generation());
         self.assets.get(raw)
+    }
+
+    /// Register a GPU [`SkinnedMesh`] and return its [`SkinnedMeshHandle`].
+    pub fn add_skinned_mesh(&mut self, mesh: SkinnedMesh) -> SkinnedMeshHandle {
+        SkinnedMeshHandle(self.assets.insert(mesh))
+    }
+
+    /// Borrows the underlying `SkinnedMesh` for `h`, or `None` if stale.
+    pub fn skinned_mesh(&self, h: SkinnedMeshHandle) -> Option<&SkinnedMesh> {
+        self.assets.get(h.0)
     }
 }
 
