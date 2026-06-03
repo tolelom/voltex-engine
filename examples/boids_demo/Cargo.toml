@@ -1,0 +1,16 @@
+[package]
+name = "boids_demo"
+version = "0.1.0"
+edition = "2021"
+license.workspace = true
+
+# Capstone for the v1.0.62–80 authoring/runtime stack: a boids swarm built from
+# declarative renderables (PrimitiveMesh + MaterialDesc), randomly seeded with
+# Rng, and steered every frame by flocking_system over a SpatialGrid.
+# Run: `cargo run -p boids_demo`.
+
+[dependencies]
+voltex.workspace = true
+voltex_runtime.workspace = true
+voltex_ai.workspace = true
+env_logger = { workspace = true }

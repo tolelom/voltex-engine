@@ -173,6 +173,13 @@
 
 v1.0.9 부터는 **서비스 배포 완성도** 로드맵 (`docs/superpowers/specs/2026-05-21-service-readiness-roadmap.md`) 기준으로 진행.
 
+### 2026-06-03 — 캡스톤 boids 데모 (v1.0.81, 자율 세션)
+
+세션 프리미티브를 실행 가능한 군집 게임으로 조합. `examples/boids_demo` — Rng 랜덤
+시드 + 선언적 렌더러블 spawn_bundle + 매 프레임 flocking_system(SpatialGrid) + toroidal
+wrap. 8초 스모크 런 0 에러, capture 회귀 `boids_swarm_renders_many_objects`(556색) +
+`docs/visual/boids_swarm.png` + per-example README. build/clippy/test 그린.
+
 ### 2026-06-03 — Timer (v1.0.80, 자율 세션)
 
 쿨다운·스폰 간격·능력 재충전 토대. `voltex_runtime::Timer`/`TimerMode` — `once`/`repeating`

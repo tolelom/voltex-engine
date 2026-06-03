@@ -34,6 +34,7 @@ members = [
     "examples/runtime_demo",
     "examples/tutorial_minigame",
     "examples/game_ready_demo",
+    "examples/boids_demo",
     "games/voltex_survivor",
 ]
 

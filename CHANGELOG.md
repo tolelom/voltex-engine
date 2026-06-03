@@ -10,6 +10,26 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## [v1.0.81] — 2026-06-03 — Capstone: boids swarm demo (the new stack, composed)
+
+이번 세션(v1.0.62~80)의 프리미티브들이 **하나의 실행 가능한 게임으로 조합됨**을 보이는
+캡스톤 — 단일 기능이 아니라 culmination.
+
+### Additive — `examples/boids_demo`
+
+- 군집 데모: `Rng` 로 랜덤 위치/헤딩/색 시드 → `spawn_bundle((Transform, PrimitiveMesh,
+  MaterialDesc, Boid))` 선언적 스폰 → 매 프레임 `flocking_system`(SpatialGrid 이웃) +
+  toroidal wrap. 탑다운 카메라. `cargo run -p boids_demo`.
+- 사용 스택: Rng · 선언적 렌더러블 · spawn_bundle · Boid/flocking_system · SpatialGrid ·
+  per-frame materialize · RuntimeApp 카메라/라이트 config.
+
+### 검증
+
+- **실 하드웨어 스모크 런**: 8초 완주, panic/validation/error 0(120 boid flocking 매 프레임).
+- RTX 4080 capture 회귀 `boids_swarm_renders_many_objects`(declarative 스웜 non-blank +
+  556 distinct colors) + 시각 기록 `docs/visual/boids_swarm.png`.
+- per-example README. workspace build / clippy(`-D warnings`) / lib test 전부 그린.
+
 ## [v1.0.80] — 2026-06-03 — Timer (cooldowns / intervals)
 
 쿨다운·스폰 간격·능력 재충전·타임드 상태 — 거의 모든 게임이 손으로 `elapsed += dt;

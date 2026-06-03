@@ -281,6 +281,72 @@ pub fn render_data_authored_scene(gpu: &HeadlessGpu, width: u32, height: u32) ->
     target.read_rgba8(&gpu.device, &gpu.queue)
 }
 
+/// Render a top-down boids-style swarm: many small, randomly-placed,
+/// individually-colored cubes declared with `PrimitiveMesh` + `MaterialDesc`
+/// (seeded by `Rng`), materialized, and drawn from above — the visual of
+/// `examples/boids_demo` (steady-state flocking is exercised by voltex_ai's
+/// unit tests; this validates the declarative render at swarm scale). RGBA8.
+pub fn render_boids_swarm(gpu: &HeadlessGpu, width: u32, height: u32) -> Vec<u8> {
+    use voltex_math::Rng;
+    use voltex_renderer_ecs::{materialize_renderables, MaterialDesc, PrimitiveMesh};
+
+    const ARENA: f32 = 14.0;
+    let target = OffscreenTarget::new(&gpu.device, width, height);
+    let renderer = BasicRenderer::new(&gpu.device, &gpu.queue, CAPTURE_FORMAT, 256);
+    let mut assets = RenderAssets::new();
+    let mut world = World::new();
+    let mut rng = Rng::seeded(0xB0_1D5);
+
+    let mut ground = Transform::from_position(Vec3::new(0.0, -0.2, 0.0));
+    ground.scale = Vec3::new(ARENA * 2.2, 0.2, ARENA * 2.2);
+    world.spawn_bundle((
+        ground,
+        PrimitiveMesh::cube(1.0),
+        MaterialDesc::color([0.12, 0.13, 0.16, 1.0]),
+    ));
+    for _ in 0..120 {
+        let pos = Vec3::new(rng.range_f32(-ARENA, ARENA), 0.5, rng.range_f32(-ARENA, ARENA));
+        let color = [
+            rng.range_f32(0.5, 1.0),
+            rng.range_f32(0.4, 0.8),
+            rng.range_f32(0.2, 0.5),
+            1.0,
+        ];
+        world.spawn_bundle((
+            Transform::from_position(pos),
+            PrimitiveMesh::cube(0.5),
+            MaterialDesc::color(color),
+        ));
+    }
+    materialize_renderables(&mut world, &mut assets, &gpu.device);
+
+    let mut camera = Camera::new(Vec3::new(0.0, 36.0, 0.01), width as f32 / height as f32);
+    camera.pitch = -std::f32::consts::FRAC_PI_2;
+    let view_proj = camera.view_projection();
+    let mut light = LightUniform::new();
+    light.direction = [-0.3, -1.0, -0.2];
+
+    let mut encoder = gpu
+        .device
+        .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+            label: Some("capture boids_swarm"),
+        });
+    renderer.render(
+        &gpu.queue,
+        &mut encoder,
+        &target.color_view,
+        &target.depth_view,
+        wgpu::Color { r: 0.02, g: 0.02, b: 0.04, a: 1.0 },
+        &mut world,
+        &assets,
+        view_proj,
+        camera.position,
+        light,
+    );
+    gpu.queue.submit(Some(encoder.finish()));
+    target.read_rgba8(&gpu.device, &gpu.queue)
+}
+
 /// Render `voltex_survivor`'s seed scene through the *declarative* path it now
 /// uses (v1.0.70): a gray ground, a green player, and a red enemy declared with
 /// `PrimitiveMesh` + `MaterialDesc`, materialized, and drawn with the runtime's
@@ -2209,6 +2275,27 @@ mod tests {
         }
         assert!(has_green, "the green player should produce green-dominant pixels");
         assert!(has_red, "the red enemy should produce red-dominant pixels");
+    }
+
+    #[test]
+    #[ignore]
+    fn boids_swarm_renders_many_objects() {
+        let gpu = match HeadlessGpu::new() {
+            Ok(g) => g,
+            Err(e) => {
+                eprintln!("skipping: {e}");
+                return;
+            }
+        };
+        let rgba = render_boids_swarm(&gpu, 400, 400);
+        let stats = ImageStats::analyze(&rgba);
+        assert!(!stats.looks_blank(), "swarm frame is blank: {stats:?}");
+        // A 120-cube swarm should paint a lot of distinct colors over the ground.
+        assert!(
+            stats.distinct_colors > 50,
+            "expected a colorful swarm, got {} colors",
+            stats.distinct_colors
+        );
     }
 
     #[test]

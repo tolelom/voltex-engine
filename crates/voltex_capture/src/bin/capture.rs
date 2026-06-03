@@ -43,6 +43,7 @@ fn main() {
             512,
             512,
         ),
+        ("boids_swarm", scene::render_boids_swarm, 512, 512),
         (
             "survivor_seed",
             scene::render_declarative_colored_scene,
