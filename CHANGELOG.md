@@ -10,6 +10,55 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## [v1.0.59] — 2026-06-03 — Game-ready: wire up nav / Lua input / HUD / audio / skinning
+
+"기능은 있는데 연결이 안 된" 다섯 구멍을 메워 엔진을 실사용 가능(game-ready)
+상태로. 설계: `docs/superpowers/specs/2026-06-03-engine-game-ready-upgrade-design.md`.
+
+### Additive — nav_agent_system (voltex_ai)
+
+`nav_agent_system(world, navmesh, dt)` — NavAgent+Transform 엔티티를 매 프레임
+`find_path` → `follow_path` 스티어링으로 이동(kinematic), 최종 waypoint 도달 시
+goal에 snap + `reached`. 도달 불가 target은 idle 전환. NavMesh는 호출자 주입. +5 테스트.
+
+### Additive — Lua 입력 API (voltex_script)
+
+스크립트에서 입력 읽기: `input.is_key_pressed("W")` / `is_key_just_pressed` /
+`mouse_position` / `mouse_delta` / `is_mouse_button_pressed("left")` / `scroll`.
+`voltex_script`는 winit 무의존 유지 — POD `ScriptInput` 스냅샷 + thread-local
+포인터(`set_current_input`), 키 이름↔keycode 매핑은 `voltex_runtime`이 소유.
+런타임이 매 프레임 스냅샷 발행/실행 후 클리어. +5 단위 +2 런타임(전체 체인) 테스트.
+
+### Additive — HUD 런타임 API (voltex_runtime → voltex_editor)
+
+`RuntimeConfig::with_hud(true)` + `RuntimeApp::set_hud_fn(|ui, world| ...)`.
+editor UiContext/UiRenderer를 GPU 초기화 시 생성, redraw에서 BasicRenderer 다음
+같은 encoder로 `LoadOp::Load` 인-윈도우 오버레이 패스. 점수·체력 등 콘솔 print 탈피.
+runtime_demo가 인-윈도우 HUD 데모로 전환. +2 테스트.
+
+### Additive — audio_sync_system (voltex_runtime → voltex_audio)
+
+`RuntimeConfig::with_audio(clips)` + `RuntimeApp::set_audio_listener(entity)`.
+RuntimeApp이 `Option<AudioSystem>` 소유(실패 시 silent None). `audio_sync_system`이
+listener Transform 동기화 + `AudioSource::playing` 엣지(`active` 플래그)에서만
+play/play_3d/stop — held playing이 매 프레임 voice를 새로 만들지 않음.
+순수 `decide_action`으로 엣지 로직 분리. +3 +1 테스트.
+
+### Additive — 스킨드 메시 애니메이션 (Blinn-Phong 한정)
+
+`voltex_renderer::Skeleton`(from_skin/apply_animation/compute_palette) — glTF
+skin/animation을 GPU 스키닝 행렬(`world_j · inverse_bind_j`)로. `create_skinned_mesh_pipeline`
++ `mesh_skinned.wgsl`(group0 camera, group1 bone palette, 4 joint/weight 블렌딩).
+`voltex_capture::scene_skinned`가 RTX 4080(Vulkan)에서 rest(직선)↔bent(굽힘) 2프레임
+렌더 + 픽셀 차이로 시각 검증 (`docs/visual/skinned_{rest,bent}.png`). +6 단위 +1 GPU 테스트.
+**미완(v1.1)**: PBR 경로 스키닝(bind group 재배치), ECS SkinnedMesh 컴포넌트/자동 재생.
+
+### 검증
+
+`cargo build --workspace` / `clippy --all-targets -D warnings` / `test --workspace --lib`
+전부 그린. 워크스페이스 테스트 ~1180 → ~1202. 의존성 그래프: voltex_runtime이
+editor/audio 추가 의존(L3.5 → L3/L1, 방향 유효).
+
 ## [v1.0.58] — 2026-05-28 — Quat Transform + fuzz + coverage gate + audio smoke (E3b/F4/F5/F6/F7)
 
 Closes every remaining item in `docs/AUDIT-BACKLOG.md`.
