@@ -318,3 +318,77 @@ fn test_entity_count() {
     world.despawn(e1);
     assert_eq!(world.entity_count(), 0);
 }
+
+// ── Resources (type-erased world-global singletons) ─────────────────────
+
+#[derive(Debug, PartialEq)]
+struct Score(u32);
+
+#[derive(Debug, PartialEq)]
+struct Difficulty(f32);
+
+#[test]
+fn insert_and_read_resource() {
+    let mut world = World::new();
+    assert!(!world.has_resource::<Score>());
+    world.insert_resource(Score(10));
+    assert!(world.has_resource::<Score>());
+    assert_eq!(world.resource::<Score>(), Some(&Score(10)));
+}
+
+#[test]
+fn absent_resource_is_none() {
+    let world = World::new();
+    assert_eq!(world.resource::<Score>(), None);
+}
+
+#[test]
+fn resource_mut_mutates_in_place() {
+    let mut world = World::new();
+    world.insert_resource(Score(1));
+    world.resource_mut::<Score>().unwrap().0 += 41;
+    assert_eq!(world.resource::<Score>(), Some(&Score(42)));
+}
+
+#[test]
+fn insert_resource_overwrites() {
+    let mut world = World::new();
+    world.insert_resource(Score(1));
+    world.insert_resource(Score(2));
+    assert_eq!(world.resource::<Score>(), Some(&Score(2)));
+}
+
+#[test]
+fn remove_resource_returns_and_clears() {
+    let mut world = World::new();
+    world.insert_resource(Score(7));
+    assert_eq!(world.remove_resource::<Score>(), Some(Score(7)));
+    assert_eq!(world.resource::<Score>(), None);
+    assert_eq!(world.remove_resource::<Score>(), None);
+}
+
+#[test]
+fn resources_of_different_types_are_independent() {
+    let mut world = World::new();
+    world.insert_resource(Score(3));
+    world.insert_resource(Difficulty(1.5));
+    assert_eq!(world.resource::<Score>(), Some(&Score(3)));
+    assert_eq!(world.resource::<Difficulty>(), Some(&Difficulty(1.5)));
+}
+
+#[test]
+fn resource_or_insert_with_inserts_then_reuses() {
+    let mut world = World::new();
+    assert_eq!(world.resource_or_insert_with(|| Score(100)).0, 100);
+    // Second call must NOT re-run the default; it returns the existing value.
+    world.resource_or_insert_with(|| Score(999)).0 += 1;
+    assert_eq!(world.resource::<Score>(), Some(&Score(101)));
+}
+
+#[test]
+fn clear_drops_resources() {
+    let mut world = World::new();
+    world.insert_resource(Score(5));
+    world.clear();
+    assert!(!world.has_resource::<Score>());
+}

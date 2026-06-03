@@ -4,7 +4,8 @@
 ECS 코어 — Entity/Component/World/Query + Hierarchy + Scene 직렬화 + System Scheduler.
 
 ## 공개 API 진입점
-- `World` — type-erased 저장소 + query, `clear()` 로 전체 리셋 (src/world.rs)
+- `World` — type-erased 저장소 + query, `clear()` 로 전체 리셋 (src/world/mod.rs)
+- `World::insert_resource::<T>` / `resource::<T>()` / `resource_mut` / `remove_resource` / `resource_or_insert_with` / `has_resource` — 엔티티 무관 싱글턴 공유 상태(게임 점수/설정/이벤트 큐/RNG). 시스템이 이미 `&mut World` 를 받아 추가 배선 없이 접근. `clear()` 시 함께 제거
 - `Bundle` + `World::spawn_bundle((A,B,..))` / `insert_bundle` / `spawn_child_bundle(parent, ..)` — 컴포넌트 튜플(1~12)을 한 번에 첨부 (src/bundle.rs). spawn() + N add() 대체. `spawn_child_bundle` 은 add_child 로 부모 하위 연결
 - `World::find_by_tag(&str) -> Option<Entity>` / `iter_by_tag(&str)` — Tag 로 엔티티 조회 (src/scene.rs). `query::<Tag>().find(..)` 보일러플레이트 대체
 - `Prefabs` + `register(name, \|&mut World\|->Entity)` / `spawn(&mut World, name)` / `spawn_child(&mut World, name, parent)` / `contains` — 명명된 엔티티 템플릿 (src/prefab.rs). spawn_bundle 위에 "한 번 정의, 이름으로 N개 인스턴스화"(Unity Prefab). 팩토리 컴포넌트-무관. `spawn_child` 는 부모 하위로 인스턴스화

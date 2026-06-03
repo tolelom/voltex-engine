@@ -2,7 +2,7 @@
 
 use crate::entity::{Entity, EntityAllocator};
 use crate::sparse_set::{ComponentStorage, SparseSet};
-use std::any::TypeId;
+use std::any::{Any, TypeId};
 use std::collections::HashMap;
 
 /// The container that owns every entity and every component storage.
@@ -14,6 +14,9 @@ use std::collections::HashMap;
 pub struct World {
     allocator: EntityAllocator,
     storages: HashMap<TypeId, Box<dyn ComponentStorage>>,
+    /// Type-erased singleton resources (one value per type) — shared state that
+    /// isn't tied to an entity: game config, score, event queues, RNG, etc.
+    resources: HashMap<TypeId, Box<dyn Any>>,
 }
 
 impl World {
@@ -22,7 +25,51 @@ impl World {
         Self {
             allocator: EntityAllocator::new(),
             storages: HashMap::new(),
+            resources: HashMap::new(),
         }
+    }
+
+    /// Insert (or replace) the singleton resource of type `T`. Resources are
+    /// world-global shared state not attached to any entity — every system has
+    /// `&mut World`, so any system can read/write them without extra plumbing.
+    pub fn insert_resource<T: 'static>(&mut self, value: T) {
+        self.resources.insert(TypeId::of::<T>(), Box::new(value));
+    }
+
+    /// Borrow the singleton resource of type `T`, or `None` if not present.
+    pub fn resource<T: 'static>(&self) -> Option<&T> {
+        self.resources
+            .get(&TypeId::of::<T>())
+            .and_then(|b| b.downcast_ref::<T>())
+    }
+
+    /// Mutably borrow the singleton resource of type `T`, or `None` if absent.
+    pub fn resource_mut<T: 'static>(&mut self) -> Option<&mut T> {
+        self.resources
+            .get_mut(&TypeId::of::<T>())
+            .and_then(|b| b.downcast_mut::<T>())
+    }
+
+    /// Remove and return the singleton resource of type `T`, if present.
+    pub fn remove_resource<T: 'static>(&mut self) -> Option<T> {
+        self.resources
+            .remove(&TypeId::of::<T>())
+            .and_then(|b| b.downcast::<T>().ok())
+            .map(|b| *b)
+    }
+
+    /// Borrow the resource of type `T`, inserting `default` first if absent.
+    pub fn resource_or_insert_with<T: 'static>(&mut self, default: impl FnOnce() -> T) -> &mut T {
+        self.resources
+            .entry(TypeId::of::<T>())
+            .or_insert_with(|| Box::new(default()))
+            .downcast_mut::<T>()
+            .expect("resource TypeId maps to its own type")
+    }
+
+    /// True if a resource of type `T` is present.
+    pub fn has_resource<T: 'static>(&self) -> bool {
+        self.resources.contains_key(&TypeId::of::<T>())
     }
 
     /// Allocate a fresh entity. Reuses freed slots with bumped generations

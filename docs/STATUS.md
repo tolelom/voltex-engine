@@ -173,6 +173,13 @@
 
 v1.0.9 부터는 **서비스 배포 완성도** 로드맵 (`docs/superpowers/specs/2026-05-21-service-readiness-roadmap.md`) 기준으로 진행.
 
+### 2026-06-03 — World 리소스 (v1.0.73, 자율 세션)
+
+기초 워크플로 격차 8번째(엔티티 무관 공유 상태 부재). `World::insert_resource`/`resource`/
+`resource_mut`/`remove_resource`/`resource_or_insert_with`/`has_resource` — 타입당 싱글턴,
+기존 type-erased 패턴 재사용, `clear()` 시 제거. 시스템이 `&mut World`로 직접 접근(배선 불필요).
+점수/설정/RNG/이벤트 큐 토대. 단위 8 + 변이 테스트. build/clippy/test 그린.
+
 ### 2026-06-03 — spawn-as-child + 세션 검증 (v1.0.71~72, 자율 세션)
 
 - **v1.0.72 spawn-as-child**: `World::spawn_child_bundle(parent, bundle)` +

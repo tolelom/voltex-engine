@@ -10,6 +10,27 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## [v1.0.73] — 2026-06-03 — World resources (entity-less shared state)
+
+기초 워크플로 격차 8번째: World 에 **엔티티에 매이지 않는 공유 상태**(점수/설정/RNG/
+이벤트 큐) 개념이 없었다. 이전 사이클(Time/InputMap)에서 반복된 "시스템에 어떻게
+전달하나" 문제의 근본 원인 — 시스템은 이미 `&mut World` 를 받으므로, World 에 리소스를
+두면 추가 배선 없이 어느 시스템에서든 접근 가능. 이벤트/메시징 등의 토대.
+
+### Additive — `voltex_ecs::World`
+
+- **`insert_resource::<T>(value)`** / **`resource::<T>() -> Option<&T>`** /
+  **`resource_mut`** / **`remove_resource`** / **`resource_or_insert_with`** /
+  **`has_resource`** — 타입당 싱글턴, World 의 기존 type-erased 패턴(`Box<dyn Any>`)
+  재사용. `clear()`(씬 로드) 시 함께 리셋. 컴포넌트 저장소와 독립.
+
+### 검증
+
+- 단위 8개(insert/read, 부재 None, mut 변형, 덮어쓰기, remove, 타입별 독립,
+  or_insert_with 재사용, clear 제거) + 변이 테스트(or_insert_with 가 default 재실행
+  하도록 깨면 reuse 테스트 RED→GREEN). voltex_ecs 188→195.
+- workspace build / clippy(`-D warnings`) / lib test 전부 그린.
+
 ## [v1.0.72] — 2026-06-03 — Spawn-as-child (`spawn_child_bundle` / `Prefabs::spawn_child`)
 
 기초 워크플로 격차 7번째: 부모에 부착된 엔티티(포탑·장비·UI 중첩)를 만들려면
