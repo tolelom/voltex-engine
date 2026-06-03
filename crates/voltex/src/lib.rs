@@ -81,7 +81,7 @@ pub mod prelude {
     pub use voltex_runtime::{DebugLines, Lifetime};
 
     // 런타임 부트스트랩 — main 본문에서 가장 흔하게 쓰인다
-    pub use voltex_runtime::{RuntimeApp, RuntimeConfig, Time};
+    pub use voltex_runtime::{RuntimeApp, RuntimeConfig, Time, Timer, TimerMode};
 }
 
 #[cfg(test)]

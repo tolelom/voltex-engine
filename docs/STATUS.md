@@ -173,6 +173,13 @@
 
 v1.0.9 부터는 **서비스 배포 완성도** 로드맵 (`docs/superpowers/specs/2026-05-21-service-readiness-roadmap.md`) 기준으로 진행.
 
+### 2026-06-03 — Timer (v1.0.80, 자율 세션)
+
+쿨다운·스폰 간격·능력 재충전 토대. `voltex_runtime::Timer`/`TimerMode` — `once`/`repeating`
++ `tick(dt)` → `just_finished`/`finished`/`fraction`/`reset`. Repeating dt>period wrap,
+duration<=0 즉시 발사. 순수, 외부 dep 0. facade prelude 노출. 단위 6 + 변이 테스트.
+build/clippy/test 그린.
+
 ### 2026-06-03 — 결정론적 RNG (v1.0.79, 자율 세션)
 
 게임 무작위성 토대. `voltex_math::Rng`(SplitMix64, 외부 dep 0) — `seeded`/`next_*`/

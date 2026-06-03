@@ -10,6 +10,27 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## [v1.0.80] — 2026-06-03 — Timer (cooldowns / intervals)
+
+쿨다운·스폰 간격·능력 재충전·타임드 상태 — 거의 모든 게임이 손으로 `elapsed += dt;
+if elapsed > x` 를 반복하던 것을 1급 타입으로 (Unity/Godot/Bevy Timer 대응). v1.0.66
+`Time` 옆에 추가.
+
+### Additive — `voltex_runtime::time`
+
+- **`Timer`** + **`TimerMode`**(Once/Repeating): `once(dur)`/`repeating(dur)` +
+  `tick(dt) -> &mut Self`(체인) + `just_finished`/`finished`/`elapsed`/`duration`/
+  `fraction`(0..1)/`reset`. Repeating 은 dt>period 시 leftover wrap. duration<=0 은
+  즉시 발사(once 는 latch, repeating 은 매 틱). 순수 — 외부 dep 0.
+- facade prelude 에 `Timer`/`TimerMode` 추가.
+
+### 검증
+
+- 단위 6개(once 정확히 1회, repeating 매 사이클+wrap, dt>period 발사, fraction,
+  reset 후 재발사, zero-duration) + 변이 테스트(발사 신호 무력화 RED→GREEN).
+  voltex_runtime time 5→11.
+- workspace build / clippy(`-D warnings`) / lib test 전부 그린.
+
 ## [v1.0.79] — 2026-06-03 — Deterministic RNG (`voltex_math::Rng`)
 
 게임은 무작위성(스폰 jitter·전리품·절차 배치)이 필요하지만 엔진엔 없었고, 프로젝트의

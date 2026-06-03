@@ -51,6 +51,8 @@
 8. `audio_sync_system` (enable_audio 시) — 같은 프레임의 playback 토글/listener 이동 반영
 9. `update_lifetimes` — 마지막. `Lifetime` 엔티티를 카운트다운 후 만료 시 `despawn_recursive` (사용자 시스템이 마지막 프레임을 관측한 뒤 제거). no-op if 없음
 
+`Time` 외 `Timer`/`TimerMode`(src/time.rs): `Timer::once`/`repeating(dur)` + `tick(dt)` → `just_finished`/`finished`/`fraction`/`reset`. 쿨다운·스폰 간격·능력 재충전용 순수 카운트다운. 0/음수 duration 즉시 발사, 반복은 dt>period 시 wrap.
+
 매 프레임 `run()` 의 winit handler 가 `tick_systems_only` 호출 → `materialize_renderables`(이번 프레임에 스폰된 `PrimitiveMesh`/`MaterialDesc` 엔티티를 GPU 메시/머티리얼로, device 필요해 handler 에서 실행) → `BasicRenderer::render` (+ enable_hud 시 UI 오버레이) 로 화면 출력. materialize 는 idempotent + pending 없으면 저렴.
 
 ## 변경 시 주의점
