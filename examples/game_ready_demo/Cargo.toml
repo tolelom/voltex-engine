@@ -1,0 +1,18 @@
+[package]
+name = "game_ready_demo"
+version = "0.1.0"
+edition = "2021"
+license.workspace = true
+
+# Hands-on demo exercising the v1.0.59 "game-ready" wiring in one window:
+# Lua-driven player movement, a nav-mesh chaser, 3D audio on catch, and the
+# in-window HUD. Run: `cargo run -p game_ready_demo`.
+
+[dependencies]
+voltex.workspace = true
+voltex_runtime.workspace = true
+voltex_renderer.workspace = true
+voltex_ai.workspace = true
+voltex_audio.workspace = true
+wgpu = { workspace = true }
+env_logger = { workspace = true }
