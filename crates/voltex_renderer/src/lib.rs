@@ -137,6 +137,8 @@ pub mod skinned_vertex;
 pub use skinned_vertex::{BonePalette, SkinnedMeshVertex, MAX_BONES};
 pub mod animation;
 pub use animation::{build_trs, mat4_mul, sample_channel, AnimationPlayer};
+pub mod skeleton;
+pub use skeleton::{JointPose, Skeleton};
 // `Quat` was historically defined in `animation.rs`; it now lives in
 // `voltex_math` (E3a). Keep the `voltex_renderer::Quat` path for back-compat
 // — animation.rs and external callers (skinning, glTF) keep working.
