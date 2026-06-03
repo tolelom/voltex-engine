@@ -173,6 +173,23 @@
 
 v1.0.9 부터는 **서비스 배포 완성도** 로드맵 (`docs/superpowers/specs/2026-05-21-service-readiness-roadmap.md`) 기준으로 진행.
 
+### 2026-06-03 — Game-ready 2D 스택 + 게임플레이 빌트인 (자율 세션)
+
+`game_ready_demo`를 실제로 돌려보며 드러난 "기능 연결" 갭을 메우는 자율 세션
+(상세는 CHANGELOG v1.0.60). 모두 헤드리스 검증(단위 + RTX 4080 capture 회귀,
+`voltex_capture/src/scene.rs`의 `#[ignore]` 테스트) + 역호환 유지.
+
+- **렌더링**: 스폿라이트(`PointLight::spot`), 디버그 라인/기즈모
+  (`DebugLines`, `set_debug_draw_fn`), 빌보드 스프라이트(`Sprite`), 직교 카메라
+  (`with_orthographic`, 2D/탑다운), 스프라이트시트 UV(`set_sheet_frame`).
+- **게임플레이**: CPU 파티클(`Particle`/`spawn_particle`), 스프라이트 애니메이션
+  (`SpriteAnimation`), 자동 despawn(`Lifetime`).
+- **편의**: `RenderAssets::add_texture_png/_rgba`(런타임 텍스처 로딩), prelude에
+  게임 컴포넌트 추가(Sprite/Particle/SpriteAnimation/TextureHandle/Lifetime/
+  DebugLines).
+- 이 스택으로 직교 카메라 + 텍스처/아틀라스/애니메이션 스프라이트 + 파티클 +
+  디버그 기즈모를 갖춘 2D 게임 빌드 가능. capture 회귀 26개 전부 green.
+
 ### v1.0.57 (2026-05-28) — voltex_image crate 분리 완료 (E1 + C1)
 
 신규 L0 crate `voltex_image` — PNG/JPG/glTF/OBJ/JSON 디코더 + PNG 인코더 + `MeshVertex` POD. `voltex_renderer`는 `pub use` 재export로 역호환 유지, `voltex_capture`의 중복 CRC32/Adler32 제거(C1 해소). facade `voltex`에 `image` 모듈 추가. 테스트 91개 이관, 워크스페이스 전체 그린.
