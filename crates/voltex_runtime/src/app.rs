@@ -339,6 +339,28 @@ impl RuntimeApp {
         self.collision_fn.is_some()
     }
 
+    /// Serialize the current World to a JSON scene file. Only components
+    /// registered on the runtime's `registry` (see `register_defaults` +
+    /// `with_registry_setup`) are included.
+    pub fn save_scene_json(&self, path: &str) -> RuntimeResult<()> {
+        let json = voltex_ecs::serialize_scene_json(&self.world, &self.registry);
+        std::fs::write(path, json)?;
+        Ok(())
+    }
+
+    /// Replace the World with a scene loaded from `path` (binary VSCN first,
+    /// then JSON; via the configured `Vfs` if any, else disk). Existing
+    /// entities are cleared first.
+    pub fn load_scene(&mut self, path: &str) -> RuntimeResult<()> {
+        self.world.clear();
+        load_scene_via_vfs_or_disk(
+            &mut self.world,
+            &self.registry,
+            path,
+            self.config.vfs.as_ref(),
+        )
+    }
+
     /// Run one frame's worth of non-rendering systems. Used internally by the
     /// winit handler and directly by unit tests / headless harnesses that
     /// don't need a window.
@@ -667,6 +689,45 @@ mod tests {
         fnc(&mut cam, &app.world, 0.016);
         assert!(seen.get(), "camera_fn should have run");
         assert_eq!(cam.position, Vec3::new(3.0, 3.0, 3.0));
+    }
+
+    #[test]
+    fn save_and_load_scene_roundtrips_entities() {
+        let dir = std::env::temp_dir().join("voltex_runtime_scene_test");
+        let _ = std::fs::create_dir_all(&dir);
+        let path = dir.join("scene.json");
+        let p = path.to_str().unwrap();
+
+        let cfg = RuntimeConfig::new()
+            .disable_physics()
+            .disable_scripts()
+            .disable_crash_log();
+        let mut app = RuntimeApp::new(cfg).unwrap();
+        let e = app.world.spawn();
+        app.world
+            .add(e, Transform::from_position(Vec3::new(3.0, 4.0, 5.0)));
+        app.save_scene_json(p).unwrap();
+
+        let mut app2 = RuntimeApp::new(
+            RuntimeConfig::new()
+                .disable_physics()
+                .disable_scripts()
+                .disable_crash_log(),
+        )
+        .unwrap();
+        app2.load_scene(p).unwrap();
+
+        assert_eq!(app2.world.entity_count(), 1);
+        let pos = app2
+            .world
+            .query::<Transform>()
+            .next()
+            .map(|(_, t)| t.position)
+            .expect("loaded Transform");
+        assert!(
+            (pos.x - 3.0).abs() < 1e-4 && (pos.y - 4.0).abs() < 1e-4 && (pos.z - 5.0).abs() < 1e-4,
+            "position should roundtrip, got {pos:?}"
+        );
     }
 
     #[test]
