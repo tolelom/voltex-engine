@@ -283,6 +283,24 @@ fn register_systems(app: &mut RuntimeApp) {
         ),
     ]);
 
+    // Debug gizmos: a yellow chase vector from the chaser to the player, a
+    // cyan cross marking the player, magenta for the chaser, and the arena
+    // bounds in dim green. Toggle-free; always on in this demo.
+    app.set_debug_draw_fn(|d, world, _dt| {
+        let player = tagged_position(world, PLAYER_TAG);
+        let chaser = tagged_position(world, CHASER_TAG);
+        if let (Some(p), Some(c)) = (player, chaser) {
+            d.line(c, p, [1.0, 1.0, 0.0]);
+            d.cross(p, 0.6, [0.0, 1.0, 1.0]);
+            d.cross(c, 0.5, [1.0, 0.0, 1.0]);
+        }
+        d.aabb(
+            Vec3::new(-12.0, 0.0, -12.0),
+            Vec3::new(12.0, 0.01, 12.0),
+            [0.2, 0.5, 0.2],
+        );
+    });
+
     let stats = Rc::new(RefCell::new(DemoState::default()));
 
     // Chase system: target the player, run nav, track distance + elapsed time.

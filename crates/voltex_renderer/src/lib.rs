@@ -27,6 +27,7 @@ pub mod fullscreen_quad;
 pub mod gbuffer;
 pub mod gbuffer_compress;
 pub mod gpu;
+pub mod debug_line;
 pub mod hdr;
 pub mod ibl;
 pub mod instancing;
@@ -84,6 +85,10 @@ pub use gbuffer::GBuffer;
 pub use gpu::{GpuContext, DEPTH_FORMAT};
 pub use hdr::{HdrTarget, HDR_FORMAT};
 pub use ibl::IblResources;
+pub use debug_line::{
+    create_line_pipeline, line_camera_bind_group_layout, LineCameraUniform, LineVertex,
+    LINE_VERTEX_LAYOUT,
+};
 pub use instancing::{create_instanced_pipeline, InstanceBuffer, InstanceData};
 pub use light::{
     CameraUniform, ColoredCameraUniform, LightData, LightUniform, LightsUniform, PointLight,

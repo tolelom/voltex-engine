@@ -735,6 +735,43 @@ pub fn render_spot_lit(
     target.read_rgba8(&gpu.device, &gpu.queue)
 }
 
+/// Render only the given debug line segments (no meshes) on a black background,
+/// viewed by a fixed front camera. Exercises `BasicRenderer::set_debug_lines` +
+/// the line pipeline. Returns RGBA8.
+pub fn render_debug_lines(
+    gpu: &HeadlessGpu,
+    width: u32,
+    height: u32,
+    verts: &[voltex_renderer::LineVertex],
+) -> Vec<u8> {
+    let target = OffscreenTarget::new(&gpu.device, width, height);
+    let renderer = BasicRenderer::new(&gpu.device, &gpu.queue, CAPTURE_FORMAT, 8);
+    let assets = RenderAssets::new();
+    let mut world = World::new();
+
+    let camera = Camera::new(Vec3::new(0.0, 0.0, 4.0), width as f32 / height as f32);
+    let light = LightUniform::new();
+
+    renderer.set_debug_lines(&gpu.queue, verts);
+    let mut encoder = gpu
+        .device
+        .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("capture lines") });
+    renderer.render(
+        &gpu.queue,
+        &mut encoder,
+        &target.color_view,
+        &target.depth_view,
+        wgpu::Color { r: 0.0, g: 0.0, b: 0.0, a: 1.0 },
+        &mut world,
+        &assets,
+        camera.view_projection(),
+        camera.position,
+        light,
+    );
+    gpu.queue.submit(Some(encoder.finish()));
+    target.read_rgba8(&gpu.device, &gpu.queue)
+}
+
 /// Render a cube textured with a 2×2 solid `color` (RGBA).
 pub fn render_textured_cube(gpu: &HeadlessGpu, width: u32, height: u32, color: [u8; 4]) -> Vec<u8> {
     use voltex_renderer::GpuTexture;
@@ -1064,6 +1101,80 @@ mod tests {
         assert!(
             center_off + 60 < center,
             "aiming the spot away from the ground should darken the center: aimed-down={center} aimed-away={center_off}"
+        );
+    }
+
+    #[test]
+    #[ignore = "requires a GPU adapter"]
+    fn debug_lines_draw_colored_segments() {
+        let gpu = match HeadlessGpu::new() {
+            Ok(g) => g,
+            Err(e) => {
+                eprintln!("skip: {e}");
+                return;
+            }
+        };
+        let px = |rgba: &[u8], x: usize, y: usize| -> [u8; 3] {
+            let i = (y * 256 + x) * 4;
+            [rgba[i], rgba[i + 1], rgba[i + 2]]
+        };
+
+        // No lines → black frame (control).
+        let empty = render_debug_lines(&gpu, 256, 256, &[]);
+        let c0 = px(&empty, 128, 128);
+        assert!(
+            c0[0] < 12 && c0[1] < 12 && c0[2] < 12,
+            "no lines should leave the center black, got {c0:?}"
+        );
+
+        // A red horizontal segment through the world origin crosses screen
+        // center; a green vertical one shares the center pixel.
+        use voltex_renderer::LineVertex;
+        let red = [1.0, 0.0, 0.0];
+        let green = [0.0, 1.0, 0.0];
+        let verts = [
+            LineVertex::new([-1.5, 0.0, 0.0], red),
+            LineVertex::new([1.5, 0.0, 0.0], red),
+            LineVertex::new([0.0, -1.5, 0.0], green),
+            LineVertex::new([0.0, 1.5, 0.0], green),
+        ];
+        let lit = render_debug_lines(&gpu, 256, 256, &verts);
+        let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../../docs/visual/");
+        crate::save_png(&format!("{dir}debug_lines.png"), 256, 256, &lit).unwrap();
+
+        // The horizontal line sits at world y=0 → near the center row; a 1px
+        // line straddles the row boundary, so scan a small band for it.
+        let brightest_in = |xs: std::ops::Range<usize>, ys: std::ops::Range<usize>| -> [u8; 3] {
+            let mut best = [0u8; 3];
+            for y in ys {
+                for x in xs.clone() {
+                    let p = px(&lit, x, y);
+                    if p.iter().map(|&c| c as u32).sum::<u32>()
+                        > best.iter().map(|&c| c as u32).sum::<u32>()
+                    {
+                        best = p;
+                    }
+                }
+            }
+            best
+        };
+        // A point on the red horizontal line, well left of the vertical one.
+        let on_red = brightest_in(55..66, 120..137);
+        assert!(
+            on_red[0] > 150 && on_red[1] < 90 && on_red[2] < 90,
+            "the horizontal segment should paint a red row, got {on_red:?}"
+        );
+        // A point on the green vertical line, well above the horizontal one.
+        let on_green = brightest_in(120..137, 55..66);
+        assert!(
+            on_green[1] > 150 && on_green[0] < 90 && on_green[2] < 90,
+            "the vertical segment should paint a green column, got {on_green:?}"
+        );
+        // A corner away from both lines stays black.
+        let corner = px(&lit, 20, 20);
+        assert!(
+            corner.iter().all(|&c| c < 12),
+            "corners away from the lines should stay black, got {corner:?}"
         );
     }
 

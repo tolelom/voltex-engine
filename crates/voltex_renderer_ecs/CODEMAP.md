@@ -17,7 +17,8 @@ ECS World ↔ voltex_renderer 브릿지. C0a 의 `MeshHandle` / `MaterialHandle`
 | `RenderItem { entity, model, mesh, material, texture }` | `items.rs` | per-frame 데이터 단위 (texture: Option<TextureHandle>) |
 | `collect_render_items(&mut World, &RenderAssets) -> Vec<RenderItem>` | `items.rs` | `propagate_transforms` 자동 호출 |
 | `BasicRenderer::new(device, queue, target_format, max_entities)` | `basic_renderer.rs` | mesh_shader.wgsl pipeline 소유 |
-| `BasicRenderer::render(queue, encoder, target_view, depth_view, clear_color, &mut World, &RenderAssets, view_proj, cam_pos, light)` | `basic_renderer.rs` | 비스킨(colored Blinn-Phong) 패스 + 스킨드 2차 패스 |
+| `BasicRenderer::render(queue, encoder, target_view, depth_view, clear_color, &mut World, &RenderAssets, view_proj, cam_pos, light)` | `basic_renderer.rs` | 비스킨(colored Blinn-Phong) 패스 + 스킨드 2차 패스 + 디버그 라인 패스 |
+| `BasicRenderer::set_point_lights(&queue, &[PointLight])` / `set_shadows(bool)` / `set_debug_lines(&queue, &[LineVertex])` | `basic_renderer.rs` | 매 프레임 호출(`&self`). 디버그 라인은 `LineList` depth-tested 마지막 패스 (MAX 8192 verts, 초과 drop) |
 | `RenderAssets::add_skinned_mesh(SkinnedMesh) -> SkinnedMeshHandle` / `skinned_mesh(h)` | `assets.rs` | 스킨드 메시 저장 |
 | `RenderAssets::add_texture(GpuTexture) -> TextureHandle` / `texture(h)`, `TextureHandle` 컴포넌트 | `assets.rs` | per-entity 디퓨즈 텍스처 (없으면 흰색 기본) |
 | `SkinnedMeshHandle(Handle<SkinnedMesh>)`, `SkinnedPose{skeleton,animation,player}` | `skinned.rs` | 스킨드 ECS 컴포넌트 |

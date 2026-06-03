@@ -39,6 +39,13 @@ v1.0.59 데모(game_ready_demo)를 실제로 돌려보며 드러난 엔진 갭�
   `docs/visual/spot_cone.png`. 데모 아레나 중앙에 흰 스폿 추가.
 - **HUD 바**: `UiContext::progress_bar` / `draw_rect` (체력/진행 바). 데모에
   danger meter 추가.
+- **디버그 드로우(gizmo 라인)**: `voltex_renderer::debug_line`(LineVertex +
+  `LineList` depth-tested 파이프라인) + `BasicRenderer::set_debug_lines` +
+  `RuntimeApp::set_debug_draw_fn(\|d: &mut DebugLines, world, dt\|)`.
+  `DebugLines` 빌더(line/ray/aabb/cross)로 콜라이더·내비·레이 시각화. 매 프레임
+  3D 위에 렌더(depth-test, no write). 캡처 회귀
+  `debug_lines_draw_colored_segments` + `docs/visual/debug_lines.png`. 데모에
+  chase 벡터 + 플레이어/추적자 cross + 아레나 AABB 추가.
 
 - **그림자**: `RuntimeConfig::with_shadows(true)` — BasicRenderer directional
   shadow mapping (depth pre-pass + mesh_colored 3×3 PCF, group 3). 기본 off

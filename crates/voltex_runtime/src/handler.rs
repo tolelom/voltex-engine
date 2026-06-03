@@ -205,6 +205,14 @@ fn redraw(app: &mut RuntimeApp, event_loop: &ActiveEventLoop) {
         app.light_fn = Some(light_fn);
     }
 
+    // Game-controlled debug gizmos: clear the shared buffer, let the game
+    // queue segments against this frame's world, then it's uploaded below.
+    if let Some(mut debug_fn) = app.debug_fn.take() {
+        app.debug_lines.clear();
+        debug_fn(&mut app.debug_lines, &app.world, dt);
+        app.debug_fn = Some(debug_fn);
+    }
+
     // HUD: feed the per-frame dt, push a new window title when the update
     // interval elapses. The HUD's tick() returns None either when the
     // interval has not elapsed or when fps_in_title is disabled — both
@@ -245,6 +253,7 @@ fn redraw(app: &mut RuntimeApp, event_loop: &ActiveEventLoop) {
     let cam_pos = state.camera.position;
 
     state.renderer.set_point_lights(&state.gpu.queue, &app.point_lights);
+    state.renderer.set_debug_lines(&state.gpu.queue, app.debug_lines.vertices());
     state.renderer.render(
         &state.gpu.queue,
         &mut encoder,

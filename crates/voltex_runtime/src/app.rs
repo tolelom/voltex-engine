@@ -29,6 +29,7 @@ use voltex_renderer_ecs::RenderAssets;
 use voltex_script::ScriptInstancePool;
 
 use crate::config::RuntimeConfig;
+use crate::debug_draw::DebugLines;
 use crate::error::{RuntimeError, RuntimeResult};
 
 /// Live GPU state initialised in winit's `resumed` callback. Held in an
@@ -73,6 +74,10 @@ type LightFn = Box<dyn FnMut(&mut LightUniform, &World, f32) + 'static>;
 /// World, for trigger/hit reactions. Runs regardless of `enable_physics`, so it
 /// doubles as a trigger-zone detector.
 type CollisionFn = Box<dyn FnMut(&[ContactPoint], &mut World, f32) + 'static>;
+/// Per-frame debug-draw callback (see [`RuntimeApp::set_debug_draw_fn`]). The
+/// passed [`DebugLines`] is cleared each frame before the call; whatever the
+/// game queues is rendered as `LineList` gizmos over the 3D scene.
+type DebugFn = Box<dyn FnMut(&mut DebugLines, &World, f32) + 'static>;
 
 /// The runtime's top-level application object. Owns the ECS world, asset
 /// stores, schedulers, and the main loop integration with `winit`/`wgpu`.
@@ -89,6 +94,10 @@ pub struct RuntimeApp {
     pub(crate) light_fn: Option<LightFn>,
     /// Optional per-frame collision/trigger callback (see [`Self::set_collision_fn`]).
     collision_fn: Option<CollisionFn>,
+    /// Optional per-frame debug-draw callback (see [`Self::set_debug_draw_fn`]).
+    pub(crate) debug_fn: Option<DebugFn>,
+    /// Reused debug-line buffer (cleared + refilled by `debug_fn` each frame).
+    pub(crate) debug_lines: DebugLines,
     /// Additive point lights uploaded to the renderer each frame.
     pub(crate) point_lights: Vec<PointLight>,
     /// Polling file watcher used for script / scene hot reload.
@@ -192,6 +201,8 @@ impl RuntimeApp {
             camera_fn: None,
             light_fn: None,
             collision_fn: None,
+            debug_fn: None,
+            debug_lines: DebugLines::new(),
             point_lights: Vec::new(),
             file_watcher: FileWatcher::new(Duration::from_millis(500)),
             timer: GameTimer::new(60),
@@ -340,6 +351,30 @@ impl RuntimeApp {
     /// `true` if a collision callback has been registered.
     pub fn has_collision_fn(&self) -> bool {
         self.collision_fn.is_some()
+    }
+
+    /// Register a per-frame debug-draw callback. Each frame the runtime clears
+    /// a shared [`DebugLines`] buffer, calls `f` (with the read-only World and
+    /// frame dt) to queue gizmo segments, then renders them as depth-tested
+    /// `LineList` over the 3D scene. Replaces any previous callback.
+    ///
+    /// ```ignore
+    /// app.set_debug_draw_fn(|d, world, _dt| {
+    ///     for (_, t) in world.query::<Transform>() {
+    ///         d.cross(t.position, 0.3, [1.0, 1.0, 0.0]); // mark every entity
+    ///     }
+    /// });
+    /// ```
+    pub fn set_debug_draw_fn<F>(&mut self, f: F)
+    where
+        F: FnMut(&mut DebugLines, &World, f32) + 'static,
+    {
+        self.debug_fn = Some(Box::new(f));
+    }
+
+    /// `true` if a debug-draw callback has been registered.
+    pub fn has_debug_fn(&self) -> bool {
+        self.debug_fn.is_some()
     }
 
     /// Replace the additive point lights (uploaded to the renderer each frame).
