@@ -10,6 +10,28 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## [v1.0.77] — 2026-06-03 — Boid flocking steering (uses the spatial grid)
+
+v1.0.76 의 `SpatialGrid` 를 실제로 활용: voltex_ai 에 이웃 기반 스티어링이 전혀 없었다
+(steering 은 단일-에이전트 함수, `avoid_obstacles` 는 에이전트당 전체 장애물 O(N·M)).
+boid 3법칙 추가 + 이웃 수집을 그리드로.
+
+### Additive — `voltex_ai::flocking`
+
+- **`separation(position, &[neighbour_pos])`** (역거리 가중 회피), **`cohesion(position,
+  &[neighbour_pos])`** (그룹 중심으로), **`alignment(&[neighbour_vel])`** (평균 heading).
+  모두 unit 방향 반환(이웃 없으면 zero). 입력 이웃 리스트는 호출자가
+  `SpatialGrid::query_radius` 로 한 번에 수집 → O(n²) 전수 스캔 회피.
+- domain-특화라 prelude 제외 — `voltex::ai::{separation,cohesion,alignment}`.
+
+### 검증
+
+- 단위 9개(분리 방향/대칭상쇄/근접우세/빈, 응집 중심/빈, 정렬 평균/빈) +
+  **그리드=brute-force 등가 테스트**(`grid_gathered_neighbours_match_brute_force_separation`:
+  in/out-of-range 혼재 군중에서 SpatialGrid 수집 이웃이 전수 스캔과 동일 집합·동일 힘) +
+  변이 테스트(away 방향 부호 RED→GREEN).
+- workspace build / clippy(`-D warnings`) / lib test 전부 그린.
+
 ## [v1.0.76] — 2026-06-03 — Spatial grid (gameplay proximity queries)
 
 기초를 넘어 깊이로: 서바이버류(flagship)·AoE·어그로·이웃 탐색이 늘 필요로 하는

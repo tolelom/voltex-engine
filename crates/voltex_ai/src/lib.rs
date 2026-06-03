@@ -13,6 +13,7 @@
 #![warn(missing_docs)]
 
 pub mod error;
+pub mod flocking;
 pub mod nav_agent;
 pub mod nav_agent_system;
 pub mod navmesh;
@@ -20,6 +21,7 @@ pub mod pathfinding;
 pub mod steering;
 
 pub use error::{AiError, Result};
+pub use flocking::{alignment, cohesion, separation};
 pub use nav_agent::NavAgent;
 pub use nav_agent_system::nav_agent_system;
 pub use navmesh::{deserialize_navmesh, serialize_navmesh, NavMesh, NavTriangle};

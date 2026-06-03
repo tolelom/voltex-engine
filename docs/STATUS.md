@@ -173,6 +173,13 @@
 
 v1.0.9 부터는 **서비스 배포 완성도** 로드맵 (`docs/superpowers/specs/2026-05-21-service-readiness-roadmap.md`) 기준으로 진행.
 
+### 2026-06-03 — boid flocking 스티어링 (v1.0.77, 자율 세션)
+
+v1.0.76 SpatialGrid 활용. `voltex_ai::flocking` — boid 3법칙 `separation`/`cohesion`/
+`alignment`(이웃 리스트 입력 → unit 방향). 이웃 수집은 `SpatialGrid::query_radius`로
+(O(n²) 회피). 단위 9 + **그리드=brute-force 등가 테스트** + 변이 테스트. domain-특화라
+`voltex::ai` 경로. build/clippy/test 그린.
+
 ### 2026-06-03 — 공간 그리드 (v1.0.76, 자율 세션)
 
 기초를 넘어 깊이로. `voltex_ecs::SpatialGrid` — 균일 그리드 공간 해시로 게임플레이
