@@ -10,6 +10,24 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## [v1.0.65] — 2026-06-03 — Tag lookup helpers (`find_by_tag` / `iter_by_tag`)
+
+기초 워크플로 격차 4번째: 데모마다 반복되던
+`world.query::<Tag>().find(\|(_, t)\| t.0 == "player").map(\|(e,_)\| e)` 보일러플레이트.
+
+### Additive — `voltex_ecs`
+
+- **`World::find_by_tag(&str) -> Option<Entity>`** — Tag 가 일치하는 첫 live 엔티티.
+- **`World::iter_by_tag(&str) -> impl Iterator<Item = Entity>`** — 일치하는 모든 엔티티.
+- `impl World` 를 `scene.rs`(Tag 가 사는 곳)에 둬서 World 코어 모듈은 Tag-free 유지.
+
+### 검증
+
+- 단위 3개(조회 성공/부재/다중).
+- **실증**: flagship `voltex_survivor`(player 조회 2곳) + `game_ready_demo`(totem/chaser
+  조회 2곳)의 `query::<Tag>().find(..).map(..)` 4-라인 패턴 → `find_by_tag(..)` 1줄.
+- workspace build / clippy(`-D warnings`) / lib test 전부 그린.
+
 ## [v1.0.64] — 2026-06-03 — Component bundles (`spawn_bundle`)
 
 기초 워크플로 격차 3번째: 엔티티 하나 만들 때마다 `world.spawn()` 후 컴포넌트를

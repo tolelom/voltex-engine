@@ -155,11 +155,7 @@ fn upload_meshes(app: &mut RuntimeApp, device: &wgpu::Device, queue: &wgpu::Queu
     // totem still needs the device directly — skinned meshes aren't part of the
     // declarative-primitive path.
     let strip_h = app.assets.add_skinned_mesh(skinned_strip(device));
-    let totem = app
-        .world
-        .query::<Tag>()
-        .find(|(_, t)| t.0 == TOTEM_TAG)
-        .map(|(e, _)| e);
+    let totem = app.world.find_by_tag(TOTEM_TAG);
     if let Some(e) = totem {
         app.world.add(e, strip_h);
         app.world
@@ -339,10 +335,7 @@ fn register_systems(app: &mut RuntimeApp) {
             }
         }
         // Beep the chaser on the catch (rising edge handled by audio_sync).
-        let chaser = world
-            .query::<Tag>()
-            .find(|(_, t)| t.0 == CHASER_TAG)
-            .map(|(e, _)| e);
+        let chaser = world.find_by_tag(CHASER_TAG);
         if let Some(e) = chaser {
             if let Some(src) = world.get_mut::<AudioSource>(e) {
                 src.playing = caught;

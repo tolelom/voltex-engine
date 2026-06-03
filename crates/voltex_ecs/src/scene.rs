@@ -14,6 +14,25 @@ use voltex_math::{Quat, Vec3};
 #[derive(Debug, Clone)]
 pub struct Tag(pub String);
 
+impl World {
+    /// The first live entity whose [`Tag`] equals `tag`, or `None`. Replaces the
+    /// ubiquitous `world.query::<Tag>().find(|(_, t)| t.0 == name).map(..)`
+    /// one-liner. O(n) over tagged entities — fine for the handful of named
+    /// singletons (player, camera target) games look up each frame.
+    pub fn find_by_tag(&self, tag: &str) -> Option<Entity> {
+        self.query::<Tag>()
+            .find(|(_, t)| t.0 == tag)
+            .map(|(e, _)| e)
+    }
+
+    /// Every live entity whose [`Tag`] equals `tag`, in iteration order.
+    pub fn iter_by_tag<'a>(&'a self, tag: &'a str) -> impl Iterator<Item = Entity> + 'a {
+        self.query::<Tag>()
+            .filter(move |(_, t)| t.0 == tag)
+            .map(|(e, _)| e)
+    }
+}
+
 /// Parse three space-separated f32 values into a Vec3.
 fn parse_vec3(s: &str) -> Option<Vec3> {
     let parts: Vec<&str> = s.split_whitespace().collect();
@@ -408,6 +427,42 @@ mod tests {
     use crate::component_registry::ComponentRegistry;
     use crate::hierarchy::{add_child, roots, Parent};
     use voltex_math::{Quat, Vec3};
+
+    #[test]
+    fn find_by_tag_returns_the_tagged_entity() {
+        let mut world = World::new();
+        let player = world.spawn();
+        world.add(player, Tag("player".to_string()));
+        let other = world.spawn();
+        world.add(other, Tag("enemy".to_string()));
+
+        assert_eq!(world.find_by_tag("player"), Some(player));
+        assert_eq!(world.find_by_tag("enemy"), Some(other));
+    }
+
+    #[test]
+    fn find_by_tag_returns_none_when_absent() {
+        let mut world = World::new();
+        let e = world.spawn();
+        world.add(e, Tag("player".to_string()));
+        assert_eq!(world.find_by_tag("missing"), None);
+    }
+
+    #[test]
+    fn iter_by_tag_yields_all_matching_entities() {
+        let mut world = World::new();
+        let a = world.spawn();
+        world.add(a, Tag("enemy".to_string()));
+        let b = world.spawn();
+        world.add(b, Tag("enemy".to_string()));
+        let c = world.spawn();
+        world.add(c, Tag("player".to_string()));
+
+        let enemies: std::collections::HashSet<_> = world.iter_by_tag("enemy").collect();
+        assert_eq!(enemies, std::collections::HashSet::from([a, b]));
+        assert_eq!(world.iter_by_tag("player").count(), 1);
+        assert_eq!(world.iter_by_tag("none").count(), 0);
+    }
 
     #[test]
     fn test_serialize_single_entity() {

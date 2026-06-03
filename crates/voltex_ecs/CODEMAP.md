@@ -6,6 +6,7 @@ ECS 코어 — Entity/Component/World/Query + Hierarchy + Scene 직렬화 + Syst
 ## 공개 API 진입점
 - `World` — type-erased 저장소 + query, `clear()` 로 전체 리셋 (src/world.rs)
 - `Bundle` + `World::spawn_bundle((A,B,..))` / `insert_bundle` — 컴포넌트 튜플(1~12)을 한 번에 첨부 (src/bundle.rs). spawn() + N add() 대체. 같은 타입 중복 시 뒤쪽이 덮어씀
+- `World::find_by_tag(&str) -> Option<Entity>` / `iter_by_tag(&str)` — Tag 로 엔티티 조회 (src/scene.rs). `query::<Tag>().find(..)` 보일러플레이트 대체
 - `Entity` — id + generation (src/entity.rs)
 - `SparseSet<T>` — 컴포넌트 저장소 (src/sparse_set.rs)
 - `Transform` — 위치/회전/스케일 컴포넌트 (src/transform.rs)

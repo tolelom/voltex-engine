@@ -103,11 +103,7 @@ fn register_systems(app: &mut RuntimeApp) {
         }
         let step = PLAYER_SPEED * dt;
 
-        let player: Option<Entity> = world
-            .query::<Tag>()
-            .find(|(_, t)| t.0 == "player")
-            .map(|(e, _)| e);
-        if let Some(p) = player {
+        if let Some(p) = world.find_by_tag("player") {
             if let Some(t) = world.get_mut::<Transform>(p) {
                 t.position.x += dir.x * step;
                 t.position.z += dir.z * step;
@@ -124,11 +120,7 @@ fn register_systems(app: &mut RuntimeApp) {
     //    and have no script to run.
     app.add_system(|world, _dt| {
         // Find a shared mesh/material handle by sampling the player's.
-        let sample = world
-            .query::<Tag>()
-            .find(|(_, t)| t.0 == "player")
-            .map(|(e, _)| e);
-        let Some(sample_player) = sample else { return };
+        let Some(sample_player) = world.find_by_tag("player") else { return };
         let mesh = world.get::<MeshHandle>(sample_player).copied();
         let mat = world.get::<MaterialHandle>(sample_player).copied();
         let (Some(mesh), Some(mat)) = (mesh, mat) else { return };

@@ -173,6 +173,12 @@
 
 v1.0.9 부터는 **서비스 배포 완성도** 로드맵 (`docs/superpowers/specs/2026-05-21-service-readiness-roadmap.md`) 기준으로 진행.
 
+### 2026-06-03 — 태그 조회 헬퍼 (v1.0.65, 자율 세션)
+
+기초 워크플로 격차 4번째(`query::<Tag>().find(..).map(..)` 반복). `World::find_by_tag`/
+`iter_by_tag` 추가 (scene.rs, World 코어는 Tag-free 유지). flagship + game_ready_demo
+4곳 정리. 단위 3 + build/clippy/test 그린.
+
 ### 2026-06-03 — 컴포넌트 번들 (v1.0.64, 자율 세션)
 
 기초 워크플로 격차 3번째(엔티티마다 spawn + N×add 보일러플레이트). Bevy Bundle /
