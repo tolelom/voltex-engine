@@ -1,14 +1,15 @@
 //! Headless "playthrough" of `examples/game_ready_demo` — composes the same
 //! scene (ground + blue player + red chaser + skinned totem + warm sun + two
-//! colored point lights + follow camera) and renders a single frame through the
-//! real `BasicRenderer`, with the skeleton advanced to time `t` and the
-//! player/chaser positions scripted. This is what lets the demo's *visual*
-//! output be verified offscreen (PNG) without running the interactive window.
+//! colored point lights + a center spotlight + sprite pickups + debug gizmos +
+//! follow camera) and renders a single frame through the real `BasicRenderer`,
+//! with the skeleton advanced to time `t` and the player/chaser positions
+//! scripted. This is what lets the demo's *visual* output be verified offscreen
+//! (PNG) without running the interactive window.
 
 use voltex_ecs::{propagate_transforms, MaterialHandle, MeshHandle, Transform, World};
 use voltex_math::Vec3;
-use voltex_renderer::{Camera, LightUniform, MaterialUniform, PointLight, SkinnedMesh};
-use voltex_renderer_ecs::{update_skinned_poses, BasicRenderer, RenderAssets, SkinnedPose};
+use voltex_renderer::{Camera, LightUniform, LineVertex, MaterialUniform, PointLight, SkinnedMesh};
+use voltex_renderer_ecs::{update_skinned_poses, BasicRenderer, RenderAssets, Sprite, SkinnedPose};
 
 use crate::headless::HeadlessGpu;
 use crate::scene::unit_cube;
@@ -72,6 +73,17 @@ pub fn render_demo_frame(
     world.add(totem, strip);
     world.add(totem, SkinnedPose::new(demo_skeleton(), wave_animation()));
 
+    // Floating sprite pickups (as in the demo).
+    for (pos, color) in [
+        (Vec3::new(4.0, 1.2, -4.0), [1.0, 0.85, 0.1, 1.0]),
+        (Vec3::new(-4.0, 1.2, 4.0), [0.1, 1.0, 0.4, 1.0]),
+        (Vec3::new(6.0, 1.2, 2.0), [0.3, 0.7, 1.0, 1.0]),
+    ] {
+        let p = world.spawn();
+        world.add(p, Transform::from_position(pos));
+        world.add(p, Sprite::solid([0.8, 0.8], color));
+    }
+
     // Advance the skeleton to time t.
     update_skinned_poses(&mut world, t);
     propagate_transforms(&mut world);
@@ -94,8 +106,26 @@ pub fn render_demo_frame(
         &[
             PointLight::new([6.0, 4.0, 6.0], [1.0, 0.6, 0.3], 18.0, 2.5),
             PointLight::new([-6.0, 4.0, -6.0], [0.3, 0.5, 1.0], 18.0, 2.5),
+            PointLight::spot([0.0, 9.0, 0.0], [0.0, -1.0, 0.0], [1.0, 1.0, 0.95], 22.0, 4.0, 28.0),
         ],
     );
+
+    // Debug gizmos (as in the demo's set_debug_draw_fn): yellow chase vector +
+    // crosses on player/chaser. Built as raw LineVertex pairs here (this crate
+    // doesn't depend on voltex_runtime's DebugLines helper).
+    let player_pos = Vec3::new(player_x, 0.5, 0.0);
+    let cross = |c: Vec3, h: f32, col: [f32; 3], out: &mut Vec<LineVertex>| {
+        for d in [Vec3::new(h, 0.0, 0.0), Vec3::new(0.0, h, 0.0), Vec3::new(0.0, 0.0, h)] {
+            out.push(LineVertex::new([(c - d).x, (c - d).y, (c - d).z], col));
+            out.push(LineVertex::new([(c + d).x, (c + d).y, (c + d).z], col));
+        }
+    };
+    let mut lines = Vec::new();
+    lines.push(LineVertex::new([chaser_pos.x, chaser_pos.y, chaser_pos.z], [1.0, 1.0, 0.0]));
+    lines.push(LineVertex::new([player_pos.x, player_pos.y, player_pos.z], [1.0, 1.0, 0.0]));
+    cross(player_pos, 0.6, [0.0, 1.0, 1.0], &mut lines);
+    cross(chaser_pos, 0.5, [1.0, 0.0, 1.0], &mut lines);
+    renderer.set_debug_lines(queue, &lines);
 
     let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
         label: Some("demo playthrough frame"),
