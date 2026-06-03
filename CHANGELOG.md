@@ -10,6 +10,53 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## [v1.0.60] — 2026-06-03 — Scene control + asset loading + deeper game-ready wiring
+
+v1.0.59 데모(game_ready_demo)를 실제로 돌려보며 드러난 엔진 갭들을 연달아 메운
+세션. 모두 헤드리스 검증(단위 테스트 + RTX 4080 capture 회귀) + 역호환 유지.
+
+### Additive — 씬 제어 (게임이 화면을 통제 가능하게)
+
+- **카메라**: `RuntimeConfig::with_camera(pos, yaw, pitch)` / `with_camera_fov` +
+  `RuntimeApp::set_camera_fn(\|cam, world, dt\|)` (follow/orbit). 근본 원인은
+  렌더 버그가 아니라 하드코딩 카메라(0,10,20)에 1-unit 오브젝트가 ~15px 점으로
+  보였던 것 — capture로 재현 확인.
+- **머티리얼 색상**: BasicRenderer가 `MaterialUniform.base_color`를 적용
+  (`ColoredCameraUniform` + `mesh_colored.wgsl`, 격리 — shared CameraUniform/PBR/
+  레거시 예제 무영향). 모든 오브젝트가 같은 회색이라 바닥에 묻히던 문제 해결.
+- **조명**: `RuntimeConfig::with_light(dir, color, ambient)` + `set_light_fn`
+  (day/night).
+- **충돌/트리거 이벤트**: `RuntimeApp::set_collision_fn(\|contacts, world, dt\|)`,
+  `enable_physics` 무관 실행(트리거 존). 데모의 "잡힘"을 거리 계산 → 실제 Collider
+  충돌로 교체.
+
+### Additive — 에셋 로딩 (핸드코딩 큐브 탈피)
+
+- **모델**: `Mesh::from_obj(device, src)`, `Mesh::from_gltf(device, bytes)`.
+- **텍스처**: `RenderAssets::add_texture` + `TextureHandle` 컴포넌트 (BasicRenderer
+  per-entity 디퓨즈 텍스처), `GpuTexture::from_png(bytes)`.
+- **씬 저장/로드**: `RuntimeApp::save_scene_json(path)` / `load_scene(path)`.
+
+### Additive — 스킨드 애니메이션 런타임 통합
+
+- `SkinnedMesh` 에셋 + `SkinnedMeshHandle`/`SkinnedPose` 컴포넌트 +
+  `update_skinned_poses`(tick 자동) + BasicRenderer 2차 스킨드 패스
+  (per-entity bone palette dynamic UBO, MAX_SKINNED=64).
+- `skinned_vertices_from_gltf` + `load_skinned_gltf(device, assets, &GltfData)`
+  → 애니메이션 캐릭터를 glTF에서 바로 조립.
+- game_ready_demo에 흔드는 스킨드 totem.
+
+### Additive — Lua 게임 로직
+
+- `nav_set_target` / `nav_clear_target` / `nav_reached`, `audio_play` /
+  `audio_stop` (engine_api → voltex_ai/voltex_audio 의존).
+
+### 검증
+
+워크스페이스 build / clippy(-D warnings) / test 그린. 런타임/렌더 경로는 `voltex_capture`
+헤드리스 GPU 회귀로 픽셀 검증(카메라 프레이밍, base_color, 텍스처 샘플, 스킨드 변형,
+OBJ/glTF/PNG 로드). **남은 visual 검증**: 라이브 창에서의 데모 외형은 사용자 디버깅 패스.
+
 ## [v1.0.59] — 2026-06-03 — Game-ready: wire up nav / Lua input / HUD / audio / skinning
 
 "기능은 있는데 연결이 안 된" 다섯 구멍을 메워 엔진을 실사용 가능(game-ready)
