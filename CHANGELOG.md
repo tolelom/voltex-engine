@@ -85,6 +85,10 @@ v1.0.59 데모(game_ready_demo)를 실제로 돌려보며 드러난 엔진 갭�
   `update_lifetimes`(tick 마지막 단계, 사용자 시스템 관측 후 만료 시
   `despawn_recursive`). 발사체·타임드 픽업·임시 이펙트·스폰 적 등 자기정리 엔티티용.
   단위 테스트(카운트다운→despawn / 빈 월드 no-op).
+- **prelude 확장**: `voltex::prelude`에 게임플레이 컴포넌트 추가 — `Sprite`,
+  `Particle`, `SpriteAnimation`, `TextureHandle`, `Lifetime`, `DebugLines`.
+  거의 모든 게임이 쓰므로 Transform처럼 prelude에 포함(도메인 특화 타입은 여전히
+  명시 경로). prelude 컴파일 테스트 갱신.
 
 - **그림자**: `RuntimeConfig::with_shadows(true)` — BasicRenderer directional
   shadow mapping (depth pre-pass + mesh_colored 3×3 PCF, group 3). 기본 off

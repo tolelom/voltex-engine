@@ -67,6 +67,11 @@ pub mod prelude {
     // 자원 핸들 + VFS (B2)
     pub use voltex_asset::{Assets, Handle, Vfs};
 
+    // 게임에서 자주 붙이는 렌더링/게임플레이 컴포넌트
+    // (2D 스택 + 자기정리 엔티티). 도메인 특화 타입과 달리 거의 모든 게임이 쓴다.
+    pub use voltex_renderer_ecs::{Particle, Sprite, SpriteAnimation, TextureHandle};
+    pub use voltex_runtime::{DebugLines, Lifetime};
+
     // 런타임 부트스트랩 — main 본문에서 가장 흔하게 쓰인다
     pub use voltex_runtime::{RuntimeApp, RuntimeConfig};
 }
@@ -88,6 +93,13 @@ mod tests {
         let _script: Option<ScriptComponent> = None;
         let _cfg = RuntimeConfig::new();
         let _vfs: Option<Vfs> = None;
+        // 2D stack + gameplay components reachable via prelude:
+        let _sprite: Option<Sprite> = None;
+        let _part: Option<Particle> = None;
+        let _anim: Option<SpriteAnimation> = None;
+        let _tex: Option<TextureHandle> = None;
+        let _life: Option<Lifetime> = None;
+        let _dbg: Option<DebugLines> = None;
     }
 
     /// 모듈 경로 re-export가 작동하는지 검증.

@@ -32,7 +32,9 @@ use voltex_renderer::{
     material::MaterialUniform, mesh::Mesh, vertex::MeshVertex, PointLight, Skeleton, SkinnedMesh,
     SkinnedMeshVertex,
 };
-use voltex_renderer_ecs::{spawn_particle, Particle, SkinnedPose, Sprite};
+// Sprite + Particle now come from voltex::prelude; only the free fn + the
+// skinned-pose type need explicit paths here.
+use voltex_renderer_ecs::{spawn_particle, SkinnedPose};
 use voltex_runtime::{RuntimeApp, RuntimeConfig, RuntimeResult};
 
 const PLAYER_TAG: &str = "player";
