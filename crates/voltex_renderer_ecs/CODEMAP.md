@@ -22,6 +22,7 @@ ECS World ↔ voltex_renderer 브릿지. C0a 의 `MeshHandle` / `MaterialHandle`
 | `RenderAssets::add_texture(GpuTexture) -> TextureHandle` / `texture(h)`, `TextureHandle` 컴포넌트 | `assets.rs` | per-entity 디퓨즈 텍스처 (없으면 흰색 기본) |
 | `SkinnedMeshHandle(Handle<SkinnedMesh>)`, `SkinnedPose{skeleton,animation,player}` | `skinned.rs` | 스킨드 ECS 컴포넌트 |
 | `update_skinned_poses(&mut World, dt)`, `animation_duration(&GltfAnimation)` | `skinned.rs` | 포즈 진행 시스템 (RuntimeApp tick 호출) |
+| `load_skinned_gltf(device, &mut assets, &GltfData) -> Option<(SkinnedMeshHandle, SkinnedPose)>` | `skinned.rs` | glTF(첫 mesh+skin+anim) → 스킨드 엔티티 컴포넌트 |
 | `RendererEcsError`, `Result<T>` | `error.rs` | M4 표준 패턴 |
 
 ## 의존성

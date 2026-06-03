@@ -315,6 +315,60 @@ mod tests {
 
     #[test]
     #[ignore = "requires a GPU adapter"]
+    fn load_skinned_gltf_builds_mesh_and_pose() {
+        let gpu = match HeadlessGpu::new() {
+            Ok(g) => g,
+            Err(e) => {
+                eprintln!("skip: {e}");
+                return;
+            }
+        };
+        use voltex_renderer::gltf::{GltfData, GltfMesh, GltfNode, GltfSkin};
+        use voltex_renderer::MeshVertex;
+        use voltex_renderer_ecs::{load_skinned_gltf, RenderAssets};
+
+        let node = |t: [f32; 3], children: Vec<usize>| GltfNode {
+            name: None,
+            children,
+            translation: t,
+            rotation: [0.0, 0.0, 0.0, 1.0],
+            scale: [1.0, 1.0, 1.0],
+            mesh: None,
+            skin: None,
+        };
+        let data = GltfData {
+            meshes: vec![GltfMesh {
+                vertices: vec![MeshVertex {
+                    position: [0.0, 0.0, 0.0],
+                    normal: [0.0, 0.0, 1.0],
+                    uv: [0.0, 0.0],
+                    tangent: [1.0, 0.0, 0.0, 1.0],
+                }],
+                indices: vec![0],
+                name: None,
+                material: None,
+                joints: Some(vec![[1u16, 0, 0, 0]]),
+                weights: Some(vec![[1.0f32, 0.0, 0.0, 0.0]]),
+            }],
+            nodes: vec![node([0.0, 0.0, 0.0], vec![1]), node([0.0, 1.0, 0.0], vec![])],
+            skins: vec![GltfSkin {
+                name: None,
+                joints: vec![0, 1],
+                inverse_bind_matrices: vec![IDENTITY4, IDENTITY4],
+                skeleton: None,
+            }],
+            animations: vec![],
+        };
+
+        let mut assets = RenderAssets::new();
+        let (handle, pose) =
+            load_skinned_gltf(&gpu.device, &mut assets, &data).expect("skinned glTF loads");
+        assert_eq!(pose.skeleton.joint_count(), 2, "two joints");
+        assert!(assets.skinned_mesh(handle).is_some(), "skinned mesh uploaded");
+    }
+
+    #[test]
+    #[ignore = "requires a GPU adapter"]
     fn runtime_basic_renderer_skins_and_animates() {
         let gpu = match HeadlessGpu::new() {
             Ok(g) => g,

@@ -12,8 +12,12 @@
 
 use voltex_asset::Handle;
 use voltex_ecs::{Entity, World};
-use voltex_renderer::gltf::GltfAnimation;
-use voltex_renderer::{AnimationPlayer, BonePalette, Skeleton, SkinnedMesh};
+use voltex_renderer::gltf::{GltfAnimation, GltfData};
+use voltex_renderer::{
+    skinned_vertices_from_gltf, AnimationPlayer, BonePalette, Skeleton, SkinnedMesh,
+};
+
+use crate::assets::RenderAssets;
 
 /// ECS component: the GPU skinned mesh an entity renders.
 #[derive(Debug, Clone, Copy)]
@@ -54,6 +58,38 @@ pub fn animation_duration(anim: &GltfAnimation) -> f32 {
         .iter()
         .filter_map(|c| c.times.last().copied())
         .fold(0.0_f32, f32::max)
+}
+
+/// Build a renderable skinned entity from parsed glTF: upload the first mesh
+/// primitive (with joints/weights) into `assets` and assemble a [`SkinnedPose`]
+/// from the first skin + first animation. Returns the handle + pose to attach
+/// to an entity, or `None` if the glTF has no mesh or no skin.
+///
+/// ```ignore
+/// let data = voltex_renderer::parse_gltf(bytes)?;
+/// if let Some((mesh, pose)) = load_skinned_gltf(device, &mut app.assets, &data) {
+///     let e = app.world.spawn();
+///     app.world.add(e, Transform::new());
+///     app.world.add(e, mesh);
+///     app.world.add(e, pose);
+/// }
+/// ```
+pub fn load_skinned_gltf(
+    device: &wgpu::Device,
+    assets: &mut RenderAssets,
+    data: &GltfData,
+) -> Option<(SkinnedMeshHandle, SkinnedPose)> {
+    let mesh = data.meshes.first()?;
+    let skin = data.skins.first()?;
+    let verts = skinned_vertices_from_gltf(mesh);
+    let handle = assets.add_skinned_mesh(SkinnedMesh::new(device, &verts, &mesh.indices));
+    let skeleton = Skeleton::from_skin(skin, &data.nodes);
+    // No animation → an empty track leaves the skeleton at its bind pose.
+    let animation = data.animations.first().cloned().unwrap_or(GltfAnimation {
+        name: None,
+        channels: Vec::new(),
+    });
+    Some((handle, SkinnedPose::new(skeleton, animation)))
 }
 
 /// Advance every [`SkinnedPose`] by `dt`: tick its player, then sample the

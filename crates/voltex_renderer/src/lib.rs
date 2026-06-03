@@ -139,7 +139,8 @@ pub mod light_volumes;
 pub use light_volumes::LightVolume;
 pub mod skinned_vertex;
 pub use skinned_vertex::{
-    BonePalette, SkinnedCameraUniform, SkinnedMesh, SkinnedMeshVertex, MAX_BONES,
+    skinned_vertices_from_gltf, BonePalette, SkinnedCameraUniform, SkinnedMesh, SkinnedMeshVertex,
+    MAX_BONES,
 };
 pub mod animation;
 pub use animation::{build_trs, mat4_mul, sample_channel, AnimationPlayer};

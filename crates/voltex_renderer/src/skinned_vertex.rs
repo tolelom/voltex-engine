@@ -54,6 +54,39 @@ impl SkinnedMeshVertex {
     };
 }
 
+/// Assemble [`SkinnedMeshVertex`]es from a parsed glTF mesh primitive: combine
+/// its base vertices with the `JOINTS_0` / `WEIGHTS_0` attributes. Vertices
+/// without joint data default to "fully bound to joint 0" (weight 1), so a
+/// non-skinned mesh renders undeformed through the skinned pipeline.
+pub fn skinned_vertices_from_gltf(mesh: &crate::gltf::GltfMesh) -> Vec<SkinnedMeshVertex> {
+    mesh.vertices
+        .iter()
+        .enumerate()
+        .map(|(i, v)| {
+            let j = mesh
+                .joints
+                .as_ref()
+                .and_then(|js| js.get(i))
+                .copied()
+                .unwrap_or([0, 0, 0, 0]);
+            let w = mesh
+                .weights
+                .as_ref()
+                .and_then(|ws| ws.get(i))
+                .copied()
+                .unwrap_or([1.0, 0.0, 0.0, 0.0]);
+            SkinnedMeshVertex {
+                position: v.position,
+                normal: v.normal,
+                uv: v.uv,
+                tangent: v.tangent,
+                joints: [j[0] as u32, j[1] as u32, j[2] as u32, j[3] as u32],
+                weights: w,
+            }
+        })
+        .collect()
+}
+
 /// GPU-resident skinned mesh — interleaved [`SkinnedMeshVertex`] buffer + 32-bit
 /// index buffer. The skinned analogue of [`crate::Mesh`].
 pub struct SkinnedMesh {
@@ -139,6 +172,53 @@ mod tests {
     #[test]
     fn test_skinned_vertex_size() {
         assert_eq!(std::mem::size_of::<SkinnedMeshVertex>(), 80);
+    }
+
+    #[test]
+    fn skinned_vertices_from_gltf_combines_joints_and_weights() {
+        use crate::gltf::GltfMesh;
+        use crate::MeshVertex;
+        let mesh = GltfMesh {
+            vertices: vec![MeshVertex {
+                position: [1.0, 2.0, 3.0],
+                normal: [0.0, 1.0, 0.0],
+                uv: [0.25, 0.75],
+                tangent: [1.0, 0.0, 0.0, 1.0],
+            }],
+            indices: vec![0],
+            name: None,
+            material: None,
+            joints: Some(vec![[0u16, 1, 2, 3]]),
+            weights: Some(vec![[0.5f32, 0.3, 0.2, 0.0]]),
+        };
+        let sv = skinned_vertices_from_gltf(&mesh);
+        assert_eq!(sv.len(), 1);
+        assert_eq!(sv[0].joints, [0, 1, 2, 3]);
+        assert_eq!(sv[0].position, [1.0, 2.0, 3.0]);
+        assert_eq!(sv[0].uv, [0.25, 0.75]);
+        assert!((sv[0].weights[0] - 0.5).abs() < 1e-6);
+    }
+
+    #[test]
+    fn skinned_vertices_default_when_no_joint_data() {
+        use crate::gltf::GltfMesh;
+        use crate::MeshVertex;
+        let mesh = GltfMesh {
+            vertices: vec![MeshVertex {
+                position: [0.0; 3],
+                normal: [0.0, 1.0, 0.0],
+                uv: [0.0; 2],
+                tangent: [1.0, 0.0, 0.0, 1.0],
+            }],
+            indices: vec![0],
+            name: None,
+            material: None,
+            joints: None,
+            weights: None,
+        };
+        let sv = skinned_vertices_from_gltf(&mesh);
+        assert_eq!(sv[0].joints, [0, 0, 0, 0]);
+        assert_eq!(sv[0].weights, [1.0, 0.0, 0.0, 0.0]);
     }
 
     #[test]
