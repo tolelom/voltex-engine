@@ -40,6 +40,22 @@ impl ApplicationHandler for RuntimeHandler {
         camera.pitch = -0.4;
         let fps_controller = FpsController::new();
         let light = LightUniform::new();
+        // Construct the in-window HUD context + GPU renderer only when enabled.
+        let (ui_context, ui_renderer) = if app.config.enable_hud {
+            let ui = voltex_editor::UiContext::new(
+                gpu.config.width as f32,
+                gpu.config.height as f32,
+            );
+            let ui_r = voltex_editor::UiRenderer::new(
+                &gpu.device,
+                &gpu.queue,
+                gpu.surface_format,
+                &ui.font,
+            );
+            (Some(ui), Some(ui_r))
+        } else {
+            (None, None)
+        };
         app.runtime_state = Some(RuntimeState {
             window,
             gpu,
@@ -47,6 +63,8 @@ impl ApplicationHandler for RuntimeHandler {
             camera,
             fps_controller,
             light,
+            ui_context,
+            ui_renderer,
         });
         // Run one-shot gpu_init callback now that the GPU exists. We have to
         // hand the device/queue out of runtime_state, but a re-borrow of the
@@ -211,6 +229,35 @@ fn redraw(app: &mut RuntimeApp, event_loop: &ActiveEventLoop) {
         cam_pos,
         state.light,
     );
+
+    // In-window HUD overlay pass — drawn over the 3D scene (LoadOp::Load),
+    // before present. Take the callback out so it can borrow `app.world`
+    // while `state` mutably borrows `app.runtime_state` (disjoint fields).
+    if app.config.enable_hud {
+        if let Some(mut hud_fn) = app.hud_fn.take() {
+            let (mx, my) = app.input.mouse_position();
+            let mouse_down = app.input.is_mouse_button_pressed(MouseButton::Left);
+            let sw = state.gpu.config.width as f32;
+            let sh = state.gpu.config.height as f32;
+            if let (Some(ui), Some(ui_r)) =
+                (state.ui_context.as_mut(), state.ui_renderer.as_mut())
+            {
+                ui.begin_frame(mx as f32, my as f32, mouse_down);
+                hud_fn(ui, &app.world);
+                ui.end_frame();
+                ui_r.render(
+                    &state.gpu.device,
+                    &state.gpu.queue,
+                    &mut encoder,
+                    &view,
+                    &ui.draw_list,
+                    sw,
+                    sh,
+                );
+            }
+            app.hud_fn = Some(hud_fn);
+        }
+    }
 
     state.gpu.queue.submit(std::iter::once(encoder.finish()));
     output.present();

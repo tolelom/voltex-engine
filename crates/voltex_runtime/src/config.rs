@@ -42,6 +42,11 @@ pub struct RuntimeConfig {
     pub enable_physics: bool,
     /// Enable Lua script start/update systems in the default schedule.
     pub enable_scripts: bool,
+    /// When `true`, the runtime constructs an immediate-mode UI context +
+    /// renderer on GPU init and draws an in-window HUD overlay each frame via
+    /// the callback registered with [`crate::RuntimeApp::set_hud_fn`]. Default
+    /// `false` (no overlay; the title-bar [`crate::Hud`] is always available).
+    pub enable_hud: bool,
     /// Optional virtual filesystem to consult first when loading scenes /
     /// scripts. When `None`, paths are read directly from disk.
     pub vfs: Option<voltex_asset::Vfs>,
@@ -67,6 +72,7 @@ impl Default for RuntimeConfig {
             fixed_dt: None,
             enable_physics: true,
             enable_scripts: true,
+            enable_hud: false,
             vfs: None,
             enable_crash_log: true,
             crash_log_dir: None,
@@ -155,6 +161,13 @@ impl RuntimeConfig {
         self
     }
 
+    /// Enable the in-window HUD overlay. Combine with
+    /// [`crate::RuntimeApp::set_hud_fn`] to draw text / bars over the 3D scene.
+    pub fn with_hud(mut self, enabled: bool) -> Self {
+        self.enable_hud = enabled;
+        self
+    }
+
     /// Attach a `Vfs` (filesystem-rooted or embedded `.vpkg`). When set, the
     /// runtime reads scene / script files through the Vfs first; fs path
     /// fallback still applies for paths the Vfs cannot resolve.
@@ -234,6 +247,12 @@ mod tests {
     fn builder_disable_crash_log() {
         let c = RuntimeConfig::new().disable_crash_log();
         assert!(!c.enable_crash_log);
+    }
+
+    #[test]
+    fn hud_is_off_by_default_and_toggleable() {
+        assert!(!RuntimeConfig::default().enable_hud);
+        assert!(RuntimeConfig::new().with_hud(true).enable_hud);
     }
 
     #[test]

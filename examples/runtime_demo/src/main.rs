@@ -21,6 +21,7 @@ fn main() -> RuntimeResult<()> {
         RuntimeConfig::new()
             .with_window_title("Voltex Runtime Demo - Solar System")
             .with_window_size(1280, 720)
+            .with_hud(true)
             .with_scene_builder(setup_solar_system)
             .with_gpu_init(upload_meshes_and_handles)
             .with_system_setup(register_orbit_system),
@@ -103,6 +104,16 @@ fn register_orbit_system(app: &mut RuntimeApp) {
         planets,
         bodies - planets
     )));
+
+    // In-window HUD overlay (the new runtime HUD API): draw live counts on
+    // screen, not just in the title bar. Hold RMB + WASD to fly the camera.
+    let moons = bodies - planets;
+    app.set_hud_fn(move |ui, world| {
+        ui.text("Voltex Solar System");
+        ui.text(&format!("Planets: {planets}   Moons: {moons}"));
+        ui.text(&format!("Entities: {}", world.entity_count()));
+        ui.text("RMB + WASD to fly camera");
+    });
 
     // Sun spins slowly; planets faster; moons fastest. Two-pass to avoid
     // overlapping borrows: collect (entity, delta) then mutate Transforms.

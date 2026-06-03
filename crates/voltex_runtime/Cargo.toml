@@ -13,6 +13,7 @@ voltex_renderer.workspace = true
 voltex_renderer_ecs.workspace = true
 voltex_physics.workspace = true
 voltex_script.workspace = true
+voltex_editor.workspace = true
 winit = { workspace = true }
 wgpu = { workspace = true }
 bytemuck = { workspace = true }

@@ -9,16 +9,14 @@
 - `RuntimeError`, `RuntimeResult` — thiserror 기반 에러 (src/error.rs)
 
 ## 모듈 구조
-- `app` — RuntimeApp (모든 subsystem 보관 + `tick_systems_only`) (src/app.rs)
-- `config` — RuntimeConfig + 13개 builder 메서드 + 4개 callback 타입 (RegistrySetupFn, SceneBuilderFn, SystemSetupFn, GpuInitFn) (src/config.rs)
+- `app` — RuntimeApp (모든 subsystem 보관 + `tick_systems_only` + `set_hud_fn` + Lua `script_input` 발행) (src/app.rs)
+- `config` — RuntimeConfig + 14개 builder 메서드 + 4개 callback 타입 (RegistrySetupFn, SceneBuilderFn, SystemSetupFn, GpuInitFn) (src/config.rs)
 - `error` — RuntimeError enum + Result alias (src/error.rs)
 - `handler` (crate-private) — winit ApplicationHandler 구현 (src/handler.rs)
 
 ## 의존성
-- voltex crate: voltex_math, voltex_platform, voltex_ecs, voltex_asset, voltex_renderer, voltex_renderer_ecs, voltex_physics, voltex_script
+- voltex crate: voltex_math, voltex_platform, voltex_ecs, voltex_asset, voltex_renderer, voltex_renderer_ecs, voltex_physics, voltex_script, voltex_editor (HUD UiContext/UiRenderer)
 - 외부 crate: winit, wgpu, bytemuck, thiserror
-
-(voltex_audio 는 v1 에서는 사용자가 직접 관리 — RuntimeApp 가 통합하지 않음. v1.1+ 에서 audio_sync_system 으로 통합 예정.)
 
 ## RuntimeConfig 빌더 메서드 (13개)
 | 메서드 | 시점 | 인자 |
@@ -36,6 +34,7 @@
 | `with_vfs(Vfs)` | new 직후 | 가상 파일시스템 (`.vpkg` 아카이브 지원) |
 | `with_crash_log_dir(path)` | new 직후 | crash log 저장 경로 |
 | `disable_crash_log()` | new 직후 | panic hook 비활성화 (headless/테스트 용) |
+| `with_hud(bool)` | new 직후 | 인-윈도우 HUD 오버레이 활성화 (`set_hud_fn` 과 함께) |
 
 ## RuntimeApp::tick_systems_only(dt) 실행 순서
 1. `propagate_transforms(world)` (항상)
@@ -51,13 +50,14 @@
 - **BasicRenderer 시그너처**: handler.rs 의 `redraw` 가 직접 호출. `voltex_renderer_ecs::BasicRenderer::render` 인자가 바뀌면 함께 갱신.
 - **카메라/조명 정책**: v1 에서는 고정 — `Camera::new(Vec3::new(0,10,20), aspect)` + pitch=-0.4, `LightUniform::new()` 기본값. 사용자가 RuntimeState 직접 접근 못 함 (private). 향후 v1.1 에서 카메라 커스터마이즈 API 추가 예정.
 - **사용자 시스템 시그너처**: `FnMut(&mut World, f32) + 'static`. dt 는 호출 프레임의 dt (fixed_dt 가 Some 면 그 값).
-- **audio_sync_system 미통합**: v1 에서는 voltex_audio 가 RuntimeApp 의 일부가 아님. 사용자가 직접 `AudioSystem` 생성/관리. Cycle 13 (A) 이후 통합 가능.
+- **HUD 오버레이**: `with_hud(true)` + `set_hud_fn(|ui, world| ...)`. UiContext/UiRenderer 는 `RuntimeState`(GPU) 에 보관, `resumed` 에서 생성. `redraw` 가 BasicRenderer 다음 같은 encoder 로 `LoadOp::Load` UI 패스. 콜백은 `take()` 로 꺼내 `app.world` 와 disjoint-field 借用 충돌 회피.
+- **Lua input 발행**: `enable_scripts` 시 매 프레임 `fill_script_input` 으로 `script_input` 갱신 → `voltex_script::set_current_input(ptr)` (실행 후 null). 키 이름↔winit keycode 매핑 `SCRIPT_KEY_NAMES` 가 여기 소유.
 - **single-window only**: winit `run_app` 자체가 single window 지원. multi-window 는 v1.1+.
 
 ## 테스트
 - 단위 테스트: src/**/*.rs `#[cfg(test)]`
 - 실행: `cargo test -p voltex_runtime --lib`
-- 현재 테스트 개수: 11개 (config ×5, error ×2, app ×4)
+- 현재 테스트 개수: 50개 (Lua input 매핑/전체체인 + HUD 등록 + config 포함)
 - GPU/winit 의존 테스트는 직접 검증 불가 → examples/runtime_demo 수동 실행 검증
 
 ## 예제

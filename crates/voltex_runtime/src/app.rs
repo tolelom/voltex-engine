@@ -22,6 +22,7 @@ use voltex_asset::FileWatcher;
 use voltex_ecs::{propagate_transforms, ComponentRegistry, World};
 use voltex_physics::PhysicsConfig;
 use voltex_platform::{GameTimer, InputState};
+use voltex_editor::UiContext;
 use voltex_renderer_ecs::RenderAssets;
 use voltex_script::ScriptInstancePool;
 
@@ -38,6 +39,12 @@ pub(crate) struct RuntimeState {
     pub camera: voltex_renderer::Camera,
     pub fps_controller: voltex_renderer::FpsController,
     pub light: voltex_renderer::LightUniform,
+    /// Immediate-mode UI context + GPU renderer for the in-window HUD overlay.
+    /// `Some` only when `config.enable_hud` was set (constructed on GPU init).
+    /// Mirrors `renderer`'s placement — wgpu resource handles keep the device
+    /// alive internally, so trailing-field drop order is safe.
+    pub ui_context: Option<UiContext>,
+    pub ui_renderer: Option<voltex_editor::UiRenderer>,
 }
 
 type UserSystem = Box<dyn FnMut(&mut World, f32) + 'static>;
@@ -45,6 +52,10 @@ type UserSystem = Box<dyn FnMut(&mut World, f32) + 'static>;
 /// Added in D3 so a flagship game can drive entities from keyboard / mouse
 /// without requiring a full `InputState as ECS resource` abstraction (v1.1).
 type InputSystem = Box<dyn FnMut(&mut World, &InputState, f32) + 'static>;
+/// HUD callback invoked each frame between the 3D pass and present, with the
+/// immediate-mode [`UiContext`] (already inside `begin_frame`/`end_frame`) and
+/// read-only access to the World. Draw text / bars / panels here.
+type HudFn = Box<dyn FnMut(&mut UiContext, &World) + 'static>;
 
 /// The runtime's top-level application object. Owns the ECS world, asset
 /// stores, schedulers, and the main loop integration with `winit`/`wgpu`.
@@ -52,6 +63,9 @@ pub struct RuntimeApp {
     pub(crate) runtime_state: Option<RuntimeState>,
     user_systems: Vec<UserSystem>,
     input_systems: Vec<InputSystem>,
+    /// Optional per-frame HUD draw callback (see [`Self::set_hud_fn`]). Only
+    /// invoked when `config.enable_hud` is set and the GPU UI was constructed.
+    pub(crate) hud_fn: Option<HudFn>,
     /// Polling file watcher used for script / scene hot reload.
     pub file_watcher: FileWatcher,
     /// Fixed-step timer driving update / render dt.
@@ -129,6 +143,7 @@ impl RuntimeApp {
             runtime_state: None,
             user_systems: Vec::new(),
             input_systems: Vec::new(),
+            hud_fn: None,
             file_watcher: FileWatcher::new(Duration::from_millis(500)),
             timer: GameTimer::new(60),
             input: InputState::new(),
@@ -175,6 +190,28 @@ impl RuntimeApp {
     /// Number of registered input systems.
     pub fn input_system_count(&self) -> usize {
         self.input_systems.len()
+    }
+
+    /// Register the per-frame HUD draw callback. Requires
+    /// [`RuntimeConfig::with_hud(true)`](crate::RuntimeConfig::with_hud); the
+    /// closure receives a [`UiContext`] already inside its frame and read-only
+    /// access to the World. Replaces any previously set callback.
+    ///
+    /// ```ignore
+    /// app.set_hud_fn(|ui, world| {
+    ///     ui.text(&format!("Entities: {}", world.entity_count()));
+    /// });
+    /// ```
+    pub fn set_hud_fn<F>(&mut self, f: F)
+    where
+        F: FnMut(&mut UiContext, &World) + 'static,
+    {
+        self.hud_fn = Some(Box::new(f));
+    }
+
+    /// `true` if a HUD callback has been registered.
+    pub fn has_hud_fn(&self) -> bool {
+        self.hud_fn.is_some()
     }
 
     /// Run one frame's worth of non-rendering systems. Used internally by the
@@ -456,6 +493,22 @@ mod tests {
         assert_eq!(app.input_system_count(), 1);
         app.tick_systems_only(0.016);
         assert_eq!(log.take(), vec!["user", "input"]);
+    }
+
+    #[test]
+    fn set_hud_fn_registers_callback() {
+        let cfg = RuntimeConfig::new()
+            .disable_physics()
+            .disable_scripts()
+            .disable_crash_log()
+            .with_hud(true);
+        let mut app = RuntimeApp::new(cfg).unwrap();
+        assert!(!app.has_hud_fn(), "no HUD callback before set_hud_fn");
+        app.set_hud_fn(|ui, world| {
+            ui.text(&format!("entities: {}", world.entity_count()));
+        });
+        assert!(app.has_hud_fn(), "HUD callback should be registered");
+        assert!(app.config.enable_hud);
     }
 
     // ── Lua input API wiring ─────────────────────────────────────────────

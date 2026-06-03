@@ -2259,6 +2259,7 @@ dependencies = [
  "thiserror 2.0.18",
  "voltex_asset",
  "voltex_ecs",
+ "voltex_editor",
  "voltex_math",
  "voltex_physics",
  "voltex_platform",

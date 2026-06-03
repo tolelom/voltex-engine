@@ -56,8 +56,9 @@ L3:
                         (IMGUI, dock, viewport, inspector, TTF)
 
 L3.5:
-  voltex_runtime    → math, platform, ecs, asset, renderer, renderer_ecs, physics, script
-                      (RuntimeApp 풀 부트스트랩, GameLoop, HUD, crash hook. drop 순서 주의)
+  voltex_runtime    → math, platform, ecs, asset, renderer, renderer_ecs, physics, script, editor
+                      (RuntimeApp 풀 부트스트랩, GameLoop, HUD(타이틀바 + editor UiContext 인-윈도우 오버레이),
+                       Lua input 발행, crash hook. drop 순서 주의)
 
 L4 (facade):
   voltex            → 모든 sub-crate(runtime 포함)를 모듈로 re-export + prelude
