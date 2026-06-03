@@ -10,6 +10,26 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## [v1.0.84] — 2026-06-04 — `Color` type (named / hex / HSV / lerp)
+
+색이 전부 raw `[f32; 4]` 배열이었다(`MaterialDesc::color([..])`, Sprite 등). 명명 색·hex·
+HSV·보간을 갖춘 1급 Color 타입 추가(상용 엔진 기본). v1.0.82 lerp 와 함께 색 트위닝.
+
+### Additive — `voltex_math::color`
+
+- **`Color`**(RGBA f32) — `rgb`/`rgba`/`hex(0xRRGGBB)`/`hexa(0xRRGGBBAA)`/
+  `from_hsv(h,s,v)`/`from_array`/`to_array`/`with_alpha`/`lerp` + 명명 상수
+  (WHITE/BLACK/TRANSPARENT/RED/GREEN/BLUE/YELLOW/CYAN/MAGENTA/GRAY).
+- **`From<[f32;4]>` / `Into<[f32;4]>`** — 렌더러 색 경로와 **무변경 연결**
+  (`MaterialDesc::color(Color::RED.into())`). renderer 시그니처 변경 0.
+- facade prelude(math)에 `Color` 추가.
+
+### 검증
+
+- 단위 7개(rgb 불투명, hex/hexa 채널 디코딩, array round-trip + From/Into, with_alpha,
+  lerp 블렌드, from_hsv 알려진 hue+wrap+grayscale) + 변이 테스트(hex red 시프트 RED→GREEN).
+- workspace build / clippy(`-D warnings`) / lib test 전부 그린.
+
 ## [v1.0.83] — 2026-06-04 — Tween (Timer + easing + lerp, packaged)
 
 v1.0.80 `Timer` 와 v1.0.82 `easing`/`lerp` 의 자연스러운 결합: "값을 N초간 부드럽게

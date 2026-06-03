@@ -173,6 +173,12 @@
 
 v1.0.9 부터는 **서비스 배포 완성도** 로드맵 (`docs/superpowers/specs/2026-05-21-service-readiness-roadmap.md`) 기준으로 진행.
 
+### 2026-06-04 — Color 타입 (v1.0.84, 자율 세션)
+
+색이 raw `[f32;4]` 뿐이던 것을 1급 타입으로. `voltex_math::Color` — rgb/rgba/hex/hexa/
+from_hsv/lerp/with_alpha + 명명 상수 + From/Into<[f32;4]>(renderer 무변경 연결). facade
+prelude 노출. 단위 7 + 변이 테스트. build/clippy/test 그린.
+
 ### 2026-06-04 — Tween (v1.0.83, 자율 세션)
 
 Timer+easing+lerp 결합. `voltex_runtime::Tween` — `new(from,to,dur,easing)`/`linear` +

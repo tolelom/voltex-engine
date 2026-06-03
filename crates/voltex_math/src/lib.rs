@@ -22,6 +22,7 @@
 #![warn(missing_docs)]
 
 pub mod aabb;
+pub mod color;
 pub mod easing;
 pub mod mat4;
 pub mod quat;
@@ -32,6 +33,7 @@ pub mod vec3;
 pub mod vec4;
 
 pub use aabb::AABB;
+pub use color::Color;
 pub use mat4::Mat4;
 pub use quat::Quat;
 pub use ray::Ray;
