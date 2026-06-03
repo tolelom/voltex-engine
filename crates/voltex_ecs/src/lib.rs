@@ -21,6 +21,7 @@
 
 pub mod archetype;
 pub mod binary_scene;
+pub mod bundle;
 pub mod component_registry;
 pub mod dependency_scheduler;
 pub mod entity;
@@ -38,6 +39,7 @@ pub mod world_transform;
 
 pub use archetype::{Archetype, ArchetypeRegistry, ArchetypeSignature};
 pub use binary_scene::{deserialize_scene_binary, serialize_scene_binary};
+pub use bundle::Bundle;
 pub use component_registry::{Component, ComponentRegistry};
 pub use dependency_scheduler::{DependencyScheduler, SystemAccess};
 pub use entity::{Entity, EntityAllocator};

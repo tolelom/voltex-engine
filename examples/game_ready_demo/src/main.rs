@@ -95,43 +95,45 @@ fn main() -> RuntimeResult<()> {
 fn setup_scene(world: &mut World, _registry: &mut ComponentRegistry, script_path: &str) {
     // Ground: a big flat scaled cube at y ≈ 0. Shape + color are declared by
     // value — the runtime materializes the GPU mesh/material at gpu_init, so
-    // there's no separate "upload" phase or Tag round-trip for these.
-    let ground = world.spawn();
+    // there's no separate "upload" phase or Tag round-trip for these. The whole
+    // entity is one `spawn_bundle` instead of spawn() + N add()s.
     let mut gt = Transform::from_position(Vec3::new(0.0, -0.1, 0.0));
     gt.scale = Vec3::new(40.0, 0.2, 40.0);
-    world.add(ground, gt);
-    world.add(ground, Tag("ground".to_string()));
-    world.add(ground, PrimitiveMesh::cube(1.0));
-    world.add(ground, MaterialDesc::color([0.35, 0.37, 0.40, 1.0]));
+    world.spawn_bundle((
+        gt,
+        Tag("ground".to_string()),
+        PrimitiveMesh::cube(1.0),
+        MaterialDesc::color([0.35, 0.37, 0.40, 1.0]),
+    ));
 
     // Player: Lua-controlled blue cube at the origin.
-    let player = world.spawn();
-    world.add(player, Transform::from_position(Vec3::new(0.0, 0.5, 0.0)));
-    world.add(player, Tag(PLAYER_TAG.to_string()));
-    world.add(player, ScriptComponent::new(script_path.to_string()));
-    world.add(player, Collider::Sphere { radius: 0.6 });
-    world.add(player, PrimitiveMesh::cube(1.0));
-    world.add(player, MaterialDesc::color([0.20, 0.50, 1.00, 1.0]));
+    world.spawn_bundle((
+        Transform::from_position(Vec3::new(0.0, 0.5, 0.0)),
+        Tag(PLAYER_TAG.to_string()),
+        ScriptComponent::new(script_path.to_string()),
+        Collider::Sphere { radius: 0.6 },
+        PrimitiveMesh::cube(1.0),
+        MaterialDesc::color([0.20, 0.50, 1.00, 1.0]),
+    ));
 
     // Chaser: red nav-mesh agent that hunts the player, beeps on catch.
-    let chaser = world.spawn();
     let mut ct = Transform::from_position(Vec3::new(10.0, 0.5, 10.0));
     ct.scale = Vec3::new(0.8, 0.8, 0.8);
-    world.add(chaser, ct);
-    world.add(chaser, Tag(CHASER_TAG.to_string()));
-    world.add(chaser, NavAgent::new(3.5));
-    world.add(chaser, AudioSource::new(0u32).spatial());
-    world.add(chaser, Collider::Sphere { radius: 0.5 });
-    world.add(chaser, PrimitiveMesh::cube(1.0));
-    world.add(chaser, MaterialDesc::color([1.00, 0.30, 0.20, 1.0]));
+    world.spawn_bundle((
+        ct,
+        Tag(CHASER_TAG.to_string()),
+        NavAgent::new(3.5),
+        AudioSource::new(0u32).spatial(),
+        Collider::Sphere { radius: 0.5 },
+        PrimitiveMesh::cube(1.0),
+        MaterialDesc::color([1.00, 0.30, 0.20, 1.0]),
+    ));
 
     // Totem: a stationary GPU-skinned strip that waves — shows skeletal
     // animation in the live runtime (mesh + pose added in gpu_init).
-    let totem = world.spawn();
     let mut tt = Transform::from_position(Vec3::new(-5.0, 0.0, -3.0));
     tt.scale = Vec3::new(1.5, 1.5, 1.5);
-    world.add(totem, tt);
-    world.add(totem, Tag(TOTEM_TAG.to_string()));
+    world.spawn_bundle((tt, Tag(TOTEM_TAG.to_string())));
 
     // Floating billboard "pickups": camera-facing colored sprites scattered
     // around the arena (no texture → solid color via Sprite::solid).
@@ -141,9 +143,7 @@ fn setup_scene(world: &mut World, _registry: &mut ComponentRegistry, script_path
         (Vec3::new(6.0, 1.2, 2.0), [0.3, 0.7, 1.0, 1.0]),
     ];
     for (pos, color) in pickups {
-        let p = world.spawn();
-        world.add(p, Transform::from_position(pos));
-        world.add(p, Sprite::solid([0.8, 0.8], color));
+        world.spawn_bundle((Transform::from_position(pos), Sprite::solid([0.8, 0.8], color)));
     }
 }
 

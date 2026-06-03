@@ -173,6 +173,16 @@
 
 v1.0.9 부터는 **서비스 배포 완성도** 로드맵 (`docs/superpowers/specs/2026-05-21-service-readiness-roadmap.md`) 기준으로 진행.
 
+### 2026-06-03 — 컴포넌트 번들 (v1.0.64, 자율 세션)
+
+기초 워크플로 격차 3번째(엔티티마다 spawn + N×add 보일러플레이트). Bevy Bundle /
+Unity 프리팹 류 (상세 CHANGELOG v1.0.64).
+
+- **`voltex_ecs::Bundle`** + `World::spawn_bundle((A,B,..))` / `insert_bundle` —
+  튜플 1~12 컴포넌트 한 번에 첨부. 매크로 생성, 외부 의존 0. facade prelude 노출.
+- 검증: 단위 6 + 변이 테스트. `game_ready_demo` 전 엔티티가 단일 spawn_bundle
+  (player 6-튜플, chaser 7-튜플, 크레이트 경계 넘는 컴포넌트 혼합). build/clippy/test 그린.
+
 ### 2026-06-03 — 입력 액션 매핑 (v1.0.63, 자율 세션)
 
 기초 워크플로 격차 2번째(입력이 raw 키코드 폴링뿐). Unity Input Actions / Godot

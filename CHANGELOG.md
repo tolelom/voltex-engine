@@ -10,6 +10,29 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## [v1.0.64] — 2026-06-03 — Component bundles (`spawn_bundle`)
+
+기초 워크플로 격차 3번째: 엔티티 하나 만들 때마다 `world.spawn()` 후 컴포넌트를
+4~6번 `add()` 하는 보일러플레이트. Bevy `Bundle` / Unity 프리팹처럼 "이 엔티티는
+무엇이다" 를 한 문장으로.
+
+### Additive — `voltex_ecs::bundle`
+
+- **`Bundle`** trait + **`World::spawn_bundle((A, B, …))`** / **`insert_bundle`** —
+  `'static` 컴포넌트 튜플(1~12개)을 한 번에 첨부. 순서대로 add 되어 같은 타입은
+  뒤쪽이 덮어씀(반복 `add` 와 동일 규칙). 매크로 생성 impl, 외부 의존 0.
+- facade prelude 에 `Bundle` 추가.
+
+### 검증
+
+- 단위 6개(전체 첨부, 1-튜플, entity_count, insert_bundle, 덮어쓰기 순서, 4-컴포넌트) +
+  변이 테스트(insert 제거 시 4개 RED→GREEN).
+- **실증**: `game_ready_demo` `setup_scene` 의 모든 엔티티(ground/player/chaser/totem/
+  pickups)가 `spawn()` + N×`add()` → 단일 `spawn_bundle`. player 는 6-튜플
+  (Transform/Tag/Script/Collider/PrimitiveMesh/MaterialDesc), chaser 는 7-튜플 —
+  크레이트 경계(ecs/physics/ai/audio/renderer_ecs) 넘는 컴포넌트도 한 번들에.
+- workspace build / clippy(`-D warnings`) / lib test 전부 그린(ecs 161→167).
+
 ## [v1.0.63] — 2026-06-03 — Input action mapping (rebindable semantic controls)
 
 상용 엔진 기초 워크플로 격차 2번째: 입력이 raw 키코드 폴링뿐이었다
