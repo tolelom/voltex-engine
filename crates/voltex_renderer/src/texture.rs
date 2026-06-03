@@ -139,6 +139,49 @@ impl GpuTexture {
         pixels: &[u8],
         layout: &wgpu::BindGroupLayout,
     ) -> Self {
+        // Color/albedo data is sRGB-encoded.
+        Self::from_rgba_with_format(
+            device,
+            queue,
+            width,
+            height,
+            pixels,
+            layout,
+            wgpu::TextureFormat::Rgba8UnormSrgb,
+        )
+    }
+
+    /// Like [`Self::from_rgba`] but uploads as **linear** `Rgba8Unorm` — use for
+    /// non-color data (normal maps, ORM/metallic-roughness, masks) so the GPU
+    /// does not apply an sRGB→linear decode to it.
+    pub fn from_rgba_linear(
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        width: u32,
+        height: u32,
+        pixels: &[u8],
+        layout: &wgpu::BindGroupLayout,
+    ) -> Self {
+        Self::from_rgba_with_format(
+            device,
+            queue,
+            width,
+            height,
+            pixels,
+            layout,
+            wgpu::TextureFormat::Rgba8Unorm,
+        )
+    }
+
+    fn from_rgba_with_format(
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        width: u32,
+        height: u32,
+        pixels: &[u8],
+        layout: &wgpu::BindGroupLayout,
+        format: wgpu::TextureFormat,
+    ) -> Self {
         let size = wgpu::Extent3d {
             width,
             height,
@@ -151,7 +194,7 @@ impl GpuTexture {
             mip_level_count: 1,
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
-            format: wgpu::TextureFormat::Rgba8UnormSrgb,
+            format,
             usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
             view_formats: &[],
         });

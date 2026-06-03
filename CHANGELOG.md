@@ -103,6 +103,11 @@ v1.0.59 데모(game_ready_demo)를 실제로 돌려보며 드러난 엔진 갭�
   `basic_renderer_pbr_path_shades_differently_than_colored` +
   `docs/visual/pbr_runtime.png`(metallic 그래디언트 + 스페큘러 + 환경 반사).
   한계: 스킨드 메시 PBR은 여전히 colored(후속), env는 procedural sky(SH 0).
+- **선형 텍스처 로더 + 노멀맵**: `GpuTexture::from_rgba_linear` +
+  `RenderAssets::add_texture_png_linear`/`add_texture_rgba_linear` — 노멀/ORM
+  맵을 sRGB 디코드 없이 linear `Rgba8Unorm`로 업로드. 컬러/알베도는 기존 sRGB
+  경로 유지. 캡처 회귀 `pbr_normal_map_perturbs_shading`(노멀맵이 PBR 셰이딩을
+  실제로 교란).
 
 ### Fixed (game-ready 세션)
 

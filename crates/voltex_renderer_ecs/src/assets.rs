@@ -116,6 +116,37 @@ impl RenderAssets {
         self.add_texture(tex)
     }
 
+    /// Like [`Self::add_texture_png`] but uploads as **linear** (no sRGB decode)
+    /// — for PBR normal / ORM maps attached via [`PbrTextures`]. Color/albedo
+    /// maps should use the sRGB `add_texture_png`.
+    pub fn add_texture_png_linear(
+        &mut self,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        png_bytes: &[u8],
+    ) -> crate::Result<TextureHandle> {
+        let layout = GpuTexture::bind_group_layout(device);
+        let (pixels, w, h) =
+            voltex_renderer::parse_png(png_bytes).map_err(|e| crate::RendererEcsError::from(e.to_string()))?;
+        let tex = GpuTexture::from_rgba_linear(device, queue, w, h, &pixels, &layout);
+        Ok(self.add_texture(tex))
+    }
+
+    /// Linear-format variant of [`Self::add_texture_rgba`] for normal / ORM
+    /// maps (no sRGB decode applied).
+    pub fn add_texture_rgba_linear(
+        &mut self,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        width: u32,
+        height: u32,
+        pixels: &[u8],
+    ) -> TextureHandle {
+        let layout = GpuTexture::bind_group_layout(device);
+        let tex = GpuTexture::from_rgba_linear(device, queue, width, height, pixels, &layout);
+        self.add_texture(tex)
+    }
+
     /// Borrows the underlying `GpuTexture` for `h`, or `None` if stale.
     pub fn texture(&self, h: TextureHandle) -> Option<&GpuTexture> {
         self.assets.get(h.0)

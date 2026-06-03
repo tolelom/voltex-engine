@@ -839,6 +839,65 @@ pub fn render_pbr_basic_renderer(gpu: &HeadlessGpu, width: u32, height: u32, pbr
     target.read_rgba8(&gpu.device, &gpu.queue)
 }
 
+/// Render a single PBR sphere; when `normal_map` is set, attach a non-flat
+/// normal map via `PbrTextures` (uploaded linear). Used to prove the normal-map
+/// slot perturbs shading. Returns RGBA8.
+pub fn render_pbr_sphere_normalmap(
+    gpu: &HeadlessGpu,
+    width: u32,
+    height: u32,
+    normal_map: bool,
+) -> Vec<u8> {
+    use voltex_renderer_ecs::PbrTextures;
+    let target = OffscreenTarget::new(&gpu.device, width, height);
+    let mut renderer = BasicRenderer::new(&gpu.device, &gpu.queue, CAPTURE_FORMAT, 8);
+    renderer.set_pbr_enabled(true);
+    let mut assets = RenderAssets::new();
+    let (sv, si) = generate_sphere(1.2, 48, 24);
+    let mesh = assets.add_mesh(Mesh::new(&gpu.device, &sv, &si));
+    let mat = assets.add_material(MaterialUniform::with_params([0.7, 0.7, 0.7, 1.0], 0.1, 0.5));
+
+    let mut world = World::new();
+    let e = world.spawn();
+    world.add(e, Transform::from_position(Vec3::ZERO));
+    world.add(e, MeshHandle(mesh.0));
+    world.add(e, MaterialHandle(mat.0));
+    if normal_map {
+        // 4×4 strongly-tilted normals (linear): xy pushed far off-axis.
+        let mut px = Vec::new();
+        for i in 0..16 {
+            let tilt = if i % 2 == 0 { 30u8 } else { 225 };
+            px.extend_from_slice(&[tilt, 255 - tilt, 200, 255]);
+        }
+        let nh = assets.add_texture_rgba_linear(&gpu.device, &gpu.queue, 4, 4, &px);
+        world.add(e, PbrTextures { normal: Some(nh), ..Default::default() });
+    }
+    voltex_ecs::propagate_transforms(&mut world);
+
+    let camera = Camera::new(Vec3::new(0.0, 0.0, 4.0), width as f32 / height as f32);
+    let mut light = LightUniform::new();
+    light.direction = [-0.3, -0.4, -1.0];
+    light.ambient_strength = 0.1;
+
+    let mut encoder = gpu
+        .device
+        .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("capture pbr-nm") });
+    renderer.render(
+        &gpu.queue,
+        &mut encoder,
+        &target.color_view,
+        &target.depth_view,
+        wgpu::Color { r: 0.02, g: 0.02, b: 0.04, a: 1.0 },
+        &mut world,
+        &assets,
+        camera.view_projection(),
+        camera.position,
+        light,
+    );
+    gpu.queue.submit(Some(encoder.finish()));
+    target.read_rgba8(&gpu.device, &gpu.queue)
+}
+
 /// Render one white cube at world `depth` (more negative = farther from the
 /// camera at z=8) under either an orthographic or perspective projection.
 /// Returns RGBA8. Used to show that orthographic footprints are
@@ -1412,6 +1471,28 @@ mod tests {
             rl > re + 10.0,
             "particles should spread outward over time: early r={re:.1} late r={rl:.1}"
         );
+    }
+
+    #[test]
+    #[ignore = "requires a GPU adapter"]
+    fn pbr_normal_map_perturbs_shading() {
+        let gpu = match HeadlessGpu::new() {
+            Ok(g) => g,
+            Err(e) => {
+                eprintln!("skip: {e}");
+                return;
+            }
+        };
+        let flat = render_pbr_sphere_normalmap(&gpu, 256, 256, false);
+        let mapped = render_pbr_sphere_normalmap(&gpu, 256, 256, true);
+        let mut diff = 0u64;
+        for (a, b) in flat.chunks_exact(4).zip(mapped.chunks_exact(4)) {
+            diff += (a[0] as i64 - b[0] as i64).unsigned_abs();
+            diff += (a[1] as i64 - b[1] as i64).unsigned_abs();
+            diff += (a[2] as i64 - b[2] as i64).unsigned_abs();
+        }
+        let mean = diff as f64 / (256.0 * 256.0 * 3.0);
+        assert!(mean > 2.0, "a normal map should perturb PBR shading, mean diff={mean:.2}");
     }
 
     #[test]
