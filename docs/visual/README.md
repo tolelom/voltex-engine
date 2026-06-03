@@ -55,6 +55,24 @@ GPU: NVIDIA GeForce RTX 4080 SUPER (Vulkan).
   surfaces reflect a flat gray IBL environment and look desaturated. Consistent
   across pbr_grid and shadow_scene; matches the simplified-IBL design.
 
+## What was verified (2026-06-03 — game-ready 2D stack)
+
+GPU: NVIDIA GeForce RTX 4080 SUPER (Vulkan). All have `#[ignore]` GPU
+regressions in `voltex_capture/src/scene.rs` (run `cargo test -p voltex_capture
+-- --ignored`).
+
+| PNG / test | Pipeline exercised | Result |
+|---|---|---|
+| `spot_cone.png` (`spotlight_lights_cone_footprint_not_corners`) | `PointLight::spot` cone falloff in `mesh_colored.wgsl` | ✅ soft-edged circular cone; center lit, corners dark; aiming away darkens |
+| `debug_lines.png` (`debug_lines_draw_colored_segments`) | `debug_line` `LineList` pipeline + `BasicRenderer::set_debug_lines` | ✅ red row + green column in their colors, corners black |
+| `sprite_billboard.png` (`billboard_sprite_faces_camera_from_any_angle`) | `Sprite` billboard pass | ✅ footprint identical from front + side orbit |
+| (`sprite_sheet_frame_selects_atlas_cell`) | `Sprite.uv_rect` / `set_sheet_frame` | ✅ each of a 2×2 atlas's 4 frames samples the right cell |
+| (`render_assets_png_loader_roundtrips_into_a_sprite`) | `RenderAssets::add_texture_png` | ✅ a red PNG loads + renders red |
+| (`overlapping_sprites_blend_independent_of_spawn_order`) | back-to-front sprite sort | ✅ overlap composite is spawn-order-independent, near on top |
+| `particle_burst.png` (`particles_spread_outward_over_time`) | `Particle` + `update_particles` + sprite pass | ✅ mean radius grows over time |
+| (`orthographic_footprint_is_depth_independent`) | `Camera::orthographic` | ✅ footprint depth-independent (vs perspective foreshortening) |
+| `demo_frame_{a,b}.png` (`demo_frames_render_nonblank`) | full `game_ready_demo` (sun + 2 point + spot + shadows + sprites + gizmos + skinned totem) | ✅ all features composite correctly |
+
 ## Runtime-verified on real hardware (no offscreen PNG)
 
 The windowed demos were each run for ~6 s on the RTX 4080 (Vulkan) under
