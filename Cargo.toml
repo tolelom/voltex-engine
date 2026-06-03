@@ -39,8 +39,12 @@ members = [
 
 [workspace.package]
 # Shared metadata for every workspace crate. Each crate's Cargo.toml
-# opts in with `license.workspace = true`. The dual licensing matches
-# the LICENSE-MIT and LICENSE-APACHE files at the repo root.
+# opts in with `license.workspace = true` / `version.workspace = true`.
+# The dual licensing matches the LICENSE-MIT and LICENSE-APACHE files
+# at the repo root. `version` tracks the engine release line so that
+# `voltex --version` (CARGO_PKG_VERSION of voltex_cli) reports the real
+# version instead of the old per-crate 0.1.0 placeholder.
+version = "1.0.61"
 license = "MIT OR Apache-2.0"
 
 [workspace.dependencies]
