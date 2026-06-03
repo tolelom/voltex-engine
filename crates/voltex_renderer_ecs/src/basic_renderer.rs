@@ -328,6 +328,7 @@ impl BasicRenderer {
         // (model matrix, mesh handle, bone palette) per skinned entity.
         let items: Vec<(Mat4, SkinnedMeshHandle, BonePalette)> = world
             .query3::<WorldTransform, SkinnedMeshHandle, SkinnedPose>()
+            .filter(|(e, _, _, _)| world.get::<crate::items::Hidden>(*e).is_none())
             .map(|(_, wt, handle, pose)| (wt.0, *handle, pose.palette()))
             .collect();
         let n = items.len().min(MAX_SKINNED);

@@ -728,6 +728,57 @@ mod tests {
 
     #[test]
     #[ignore = "requires a GPU adapter"]
+    fn hidden_component_skips_rendering() {
+        use voltex_renderer_ecs::Hidden;
+        let gpu = match HeadlessGpu::new() {
+            Ok(g) => g,
+            Err(e) => {
+                eprintln!("skip: {e}");
+                return;
+            }
+        };
+        let render = |hide: bool| -> Vec<u8> {
+            let target = OffscreenTarget::new(&gpu.device, 128, 128);
+            let renderer = BasicRenderer::new(&gpu.device, &gpu.queue, CAPTURE_FORMAT, 8);
+            let mut assets = RenderAssets::new();
+            let mesh_h = assets.add_mesh(unit_cube(&gpu.device));
+            let mat_h = assets.add_material(MaterialUniform::new());
+            let mut world = World::new();
+            let e = world.spawn();
+            world.add(e, Transform::from_position(Vec3::ZERO));
+            world.add(e, MeshHandle(mesh_h.0));
+            world.add(e, MaterialHandle(mat_h.0));
+            if hide {
+                world.add(e, Hidden);
+            }
+            voltex_ecs::propagate_transforms(&mut world);
+            let mut camera = Camera::new(Vec3::new(2.0, 1.5, 2.5), 1.0);
+            camera.yaw = -0.7;
+            camera.pitch = -0.4;
+            let mut encoder = gpu
+                .device
+                .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
+            renderer.render(
+                &gpu.queue,
+                &mut encoder,
+                &target.color_view,
+                &target.depth_view,
+                wgpu::Color { r: 0.0, g: 0.0, b: 0.0, a: 1.0 },
+                &mut world,
+                &assets,
+                camera.view_projection(),
+                camera.position,
+                LightUniform::new(),
+            );
+            gpu.queue.submit(Some(encoder.finish()));
+            target.read_rgba8(&gpu.device, &gpu.queue)
+        };
+        assert!(!ImageStats::analyze(&render(false)).looks_blank(), "visible cube should render");
+        assert!(ImageStats::analyze(&render(true)).looks_blank(), "Hidden cube should not render");
+    }
+
+    #[test]
+    #[ignore = "requires a GPU adapter"]
     fn sphere_front_hemisphere_is_lit() {
         // Regression for generate_sphere winding: with a front directional
         // light the camera-facing hemisphere must be lit (bright center). When
