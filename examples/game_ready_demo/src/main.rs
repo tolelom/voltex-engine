@@ -477,7 +477,5 @@ fn write_player_script() -> String {
 
 /// 24-vertex unit cube (per-face normals), shared by ground / player / chaser.
 fn make_unit_cube(device: &wgpu::Device) -> Mesh {
-    // Engine primitive — no more hand-rolled cube vertices.
-    let (verts, indices) = voltex_renderer::generate_cube(1.0);
-    Mesh::new(device, &verts, &indices)
+    Mesh::cube(device, 1.0) // engine primitive — one call
 }

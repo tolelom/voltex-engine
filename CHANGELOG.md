@@ -123,6 +123,10 @@ v1.0.59 데모(game_ready_demo)를 실제로 돌려보며 드러난 엔진 갭�
   스프라이트 256, 스킨드 64)를 처음 초과할 때 `eprintln!` 1회 — 조용한 truncation이
   "다 그려졌다"로 오인되지 않게. `Cell<bool>` 플래그로 프레임마다 스팸 안 함.
   단위 테스트(초과 시에만/한 번만 발화).
+- **`Mesh` 프리미티브 생성자**: `Mesh::cube(device, size)` / `Mesh::plane` /
+  `Mesh::quad(w,h)` / `Mesh::sphere(r, sectors, stacks)` — `from_obj`/`from_gltf`
+  스타일의 한 줄 GPU 메시 생성(generate_* + `Mesh::new` 래핑). capture/데모가
+  `Mesh::cube`로 교체.
 - **프리미티브 메시 생성기**: `voltex_renderer::generate_cube(size)` /
   `generate_plane(size)`(XZ 바닥, +Y) / `generate_quad(w, h)`(XY, +Z) —
   `(Vec<MeshVertex>, Vec<u32>)` 반환(`generate_sphere`와 동일 스타일).

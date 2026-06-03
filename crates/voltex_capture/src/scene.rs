@@ -22,9 +22,7 @@ fn align_up(size: u32, alignment: u32) -> u32 {
 
 /// Build a unit cube mesh (24 verts, 36 indices, outward normals).
 pub(crate) fn unit_cube(device: &wgpu::Device) -> Mesh {
-    // Delegates to the public primitive generator (edge length 1, centered).
-    let (verts, indices) = voltex_renderer::generate_cube(1.0);
-    Mesh::new(device, &verts, &indices)
+    Mesh::cube(device, 1.0)
 }
 
 /// Render a 3×3 grid of cubes lit by the default directional light, viewed
