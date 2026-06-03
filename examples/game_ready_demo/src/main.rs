@@ -29,8 +29,7 @@ use voltex_renderer::gltf::{
     AnimationPath, GltfAnimation, GltfChannel, GltfNode, GltfSkin, Interpolation,
 };
 use voltex_renderer::{
-    material::MaterialUniform, mesh::Mesh, vertex::MeshVertex, PointLight, Skeleton, SkinnedMesh,
-    SkinnedMeshVertex,
+    material::MaterialUniform, mesh::Mesh, PointLight, Skeleton, SkinnedMesh, SkinnedMeshVertex,
 };
 // Sprite + Particle now come from voltex::prelude; only the free fn + the
 // skinned-pose type need explicit paths here.
@@ -478,31 +477,7 @@ fn write_player_script() -> String {
 
 /// 24-vertex unit cube (per-face normals), shared by ground / player / chaser.
 fn make_unit_cube(device: &wgpu::Device) -> Mesh {
-    let s = 0.5;
-    let faces: [([f32; 3], [[f32; 3]; 4]); 6] = [
-        ([1.0, 0.0, 0.0], [[s, -s, -s], [s, -s, s], [s, s, s], [s, s, -s]]),
-        ([-1.0, 0.0, 0.0], [[-s, -s, s], [-s, -s, -s], [-s, s, -s], [-s, s, s]]),
-        ([0.0, 1.0, 0.0], [[-s, s, -s], [s, s, -s], [s, s, s], [-s, s, s]]),
-        ([0.0, -1.0, 0.0], [[-s, -s, s], [s, -s, s], [s, -s, -s], [-s, -s, -s]]),
-        ([0.0, 0.0, 1.0], [[s, -s, s], [-s, -s, s], [-s, s, s], [s, s, s]]),
-        ([0.0, 0.0, -1.0], [[-s, -s, -s], [s, -s, -s], [s, s, -s], [-s, s, -s]]),
-    ];
-    let uvs = [[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]];
-    let mut verts = Vec::with_capacity(24);
-    for (normal, corners) in faces {
-        for (corner, uv) in corners.iter().zip(uvs.iter()) {
-            verts.push(MeshVertex {
-                position: *corner,
-                normal,
-                uv: *uv,
-                tangent: [1.0, 0.0, 0.0, 1.0],
-            });
-        }
-    }
-    let mut indices = Vec::with_capacity(36);
-    for face in 0..6u32 {
-        let base = face * 4;
-        indices.extend([base, base + 1, base + 2, base, base + 2, base + 3]);
-    }
+    // Engine primitive — no more hand-rolled cube vertices.
+    let (verts, indices) = voltex_renderer::generate_cube(1.0);
     Mesh::new(device, &verts, &indices)
 }

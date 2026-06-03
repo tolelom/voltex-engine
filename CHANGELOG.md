@@ -117,6 +117,17 @@ v1.0.59 데모(game_ready_demo)를 실제로 돌려보며 드러난 엔진 갭�
   경로 유지. 캡처 회귀 `pbr_normal_map_perturbs_shading`(노멀맵이 PBR 셰이딩을
   실제로 교란).
 
+### Additive — 실사용 점검 보완
+
+- **프리미티브 메시 생성기**: `voltex_renderer::generate_cube(size)` /
+  `generate_plane(size)`(XZ 바닥, +Y) / `generate_quad(w, h)`(XY, +Z) —
+  `(Vec<MeshVertex>, Vec<u32>)` 반환(`generate_sphere`와 동일 스타일).
+  지금까지 공개 프리미티브가 `generate_sphere` 뿐이라 모든 게임/예제가 큐브
+  버텍스를 손으로 작성해야 했던 갭 해소. per-face normal/UV/tangent 정확(PBR
+  노멀맵 호환). `voltex_capture::unit_cube`와 `game_ready_demo`가 이걸로 교체
+  (손수 작성 큐브 제거). 단위 테스트 4개 + 기존 큐브 GPU 회귀(single_cube/
+  base_color/shadow)가 `generate_cube`로 통과.
+
 ### Fixed (game-ready 세션)
 
 - **스프라이트 투명도 정렬**: BasicRenderer 스프라이트 패스가 엔티티 순서대로

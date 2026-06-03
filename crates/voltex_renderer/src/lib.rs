@@ -37,6 +37,7 @@ pub mod mesh;
 pub mod motion_blur;
 pub mod pbr_pipeline;
 pub mod pipeline;
+pub mod primitives;
 pub mod point_shadow;
 pub mod rt_accel;
 pub mod rt_ao;
@@ -118,6 +119,7 @@ pub use shadow::{
     SHADOW_FORMAT, SHADOW_MAP_SIZE,
 };
 pub use shadow_pipeline::{create_shadow_pipeline, shadow_pass_bind_group_layout};
+pub use primitives::{generate_cube, generate_plane, generate_quad};
 pub use sphere::generate_sphere;
 pub use spot_shadow::{spot_shadow_matrix, SpotShadowMap};
 pub use sprite::{
