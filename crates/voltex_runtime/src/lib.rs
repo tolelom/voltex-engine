@@ -30,7 +30,7 @@ pub mod log;
 pub mod time;
 
 pub use app::RuntimeApp;
-pub use time::{Time, Timer, TimerMode};
+pub use time::{Time, Timer, TimerMode, Tween};
 pub use audio_sync::audio_sync_system;
 pub use config::RuntimeConfig;
 pub use crash::{crash_filename, format_crash_report, install_panic_hook};

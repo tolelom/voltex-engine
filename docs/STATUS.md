@@ -173,6 +173,12 @@
 
 v1.0.9 부터는 **서비스 배포 완성도** 로드맵 (`docs/superpowers/specs/2026-05-21-service-readiness-roadmap.md`) 기준으로 진행.
 
+### 2026-06-04 — Tween (v1.0.83, 자율 세션)
+
+Timer+easing+lerp 결합. `voltex_runtime::Tween` — `new(from,to,dur,easing)`/`linear` +
+`tick(dt)->f32`/`value`/`value_normalized`(Vec lerp용)/`finished`/`reset`. 값을 N초간
+부드럽게 이동. facade prelude 노출. 단위 5 + 변이 테스트. build/clippy/test 그린.
+
 ### 2026-06-04 — 이징 + lerp (v1.0.82, 자율 세션)
 
 tweening 토대. `voltex_math::easing` — `lerp` + 이징 곡선(quad/cubic in/out/inout,

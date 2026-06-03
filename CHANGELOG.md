@@ -10,6 +10,26 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## [v1.0.83] — 2026-06-04 — Tween (Timer + easing + lerp, packaged)
+
+v1.0.80 `Timer` 와 v1.0.82 `easing`/`lerp` 의 자연스러운 결합: "값을 N초간 부드럽게
+이동" 을 한 타입으로 (Unity/Godot tween).
+
+### Additive — `voltex_runtime::time`
+
+- **`Tween`** — `new(from, to, duration, easing)` / `linear(from,to,dur)` +
+  `tick(dt) -> f32`(진행+현재값) / `value` / `value_normalized`(eased 진행 0..1 →
+  `Vec3::lerp`/`Vec2::lerp` 로 비스칼라 tween) / `finished` / `reset`. 내부적으로
+  one-shot `Timer` 가 구동, easing 은 `fn(f32)->f32`(voltex_math::easing 곡선).
+- facade prelude 에 `Tween` 추가.
+
+### 검증
+
+- 단위 5개(linear 보간 from→to+finished, eased midpoint≠linear, value_normalized로
+  Vec3 tween, reset 재생, zero-duration 즉시 target) + 변이 테스트(value 가 진행 무시 시
+  RED→GREEN). voltex_runtime time 11→16.
+- workspace build / clippy(`-D warnings`) / lib test 전부 그린.
+
 ## [v1.0.82] — 2026-06-04 — Easing curves + lerp (tweening)
 
 UI 모션·카메라 이동·juice·부드러운 전환에 필요한 이징/보간. v1.0.80 `Timer.fraction()` 과

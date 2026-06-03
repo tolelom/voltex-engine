@@ -154,6 +154,73 @@ impl Timer {
     }
 }
 
+/// A scalar [`f32`] interpolation that plays out over time: a one-shot
+/// [`Timer`] drives an eased blend from `from` to `to`. The glue between
+/// [`Timer`] and [`voltex_math::easing`] so a game doesn't re-wire it.
+///
+/// ```ignore
+/// let mut fade = Tween::new(0.0, 1.0, 0.5, easing::ease_out_cubic);
+/// // each frame:
+/// let alpha = fade.tick(dt);
+/// // …tween a Vec3 by feeding the eased value into Vec3::lerp:
+/// let pos = start.lerp(end, fade.value_normalized());
+/// ```
+#[derive(Debug, Clone)]
+pub struct Tween {
+    timer: Timer,
+    from: f32,
+    to: f32,
+    easing: fn(f32) -> f32,
+}
+
+impl Tween {
+    /// A tween from `from` to `to` over `duration` seconds using `easing`
+    /// (any `fn(f32) -> f32` curve from [`voltex_math::easing`]).
+    pub fn new(from: f32, to: f32, duration: f32, easing: fn(f32) -> f32) -> Self {
+        Self {
+            timer: Timer::once(duration),
+            from,
+            to,
+            easing,
+        }
+    }
+
+    /// A linear tween (no easing).
+    pub fn linear(from: f32, to: f32, duration: f32) -> Self {
+        Self::new(from, to, duration, voltex_math::easing::linear)
+    }
+
+    /// Advance by `dt` and return the current eased value.
+    pub fn tick(&mut self, dt: f32) -> f32 {
+        self.timer.tick(dt);
+        self.value()
+    }
+
+    /// The current eased value without advancing.
+    pub fn value(&self) -> f32 {
+        voltex_math::easing::lerp(self.from, self.to, (self.easing)(self.timer.fraction()))
+    }
+
+    /// The eased progress in `[0, 1]` — feed this into [`Vec3::lerp`] /
+    /// [`Vec2::lerp`] to tween non-scalar values with the same curve.
+    ///
+    /// [`Vec3::lerp`]: voltex_math::Vec3::lerp
+    /// [`Vec2::lerp`]: voltex_math::Vec2::lerp
+    pub fn value_normalized(&self) -> f32 {
+        (self.easing)(self.timer.fraction())
+    }
+
+    /// True once the tween has reached `to`.
+    pub fn finished(&self) -> bool {
+        self.timer.finished()
+    }
+
+    /// Restart from the beginning.
+    pub fn reset(&mut self) {
+        self.timer.reset();
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -236,6 +303,53 @@ mod tests {
         assert!(!timer.finished());
         assert_eq!(timer.elapsed(), 0.0);
         assert!(timer.tick(1.5).just_finished(), "fires again after reset");
+    }
+
+    // ── Tween ───────────────────────────────────────────────────────────
+
+    #[test]
+    fn linear_tween_interpolates_from_to_over_duration() {
+        let mut tw = Tween::linear(0.0, 100.0, 1.0);
+        assert_eq!(tw.value(), 0.0, "starts at `from`");
+        assert!((tw.tick(0.5) - 50.0).abs() < 1e-4, "halfway -> midpoint");
+        assert!(!tw.finished());
+        assert!((tw.tick(0.6) - 100.0).abs() < 1e-4, "past end -> `to`");
+        assert!(tw.finished());
+    }
+
+    #[test]
+    fn eased_tween_differs_from_linear_at_midpoint() {
+        let mut tw = Tween::new(0.0, 100.0, 1.0, voltex_math::easing::ease_out_cubic);
+        // ease_out leads the linear ramp, so at t=0.5 it's past 50.
+        assert!(tw.tick(0.5) > 50.0);
+    }
+
+    #[test]
+    fn value_normalized_drives_vec_lerp() {
+        let mut tw = Tween::linear(0.0, 1.0, 2.0);
+        tw.tick(1.0); // half
+        let a = voltex_math::Vec3::new(0.0, 0.0, 0.0);
+        let b = voltex_math::Vec3::new(10.0, 0.0, 0.0);
+        let p = a.lerp(b, tw.value_normalized());
+        assert!((p.x - 5.0).abs() < 1e-4, "vec tween halfway: {p:?}");
+    }
+
+    #[test]
+    fn tween_reset_replays() {
+        let mut tw = Tween::linear(0.0, 10.0, 1.0);
+        tw.tick(2.0);
+        assert!(tw.finished());
+        tw.reset();
+        assert!(!tw.finished());
+        assert_eq!(tw.value(), 0.0);
+    }
+
+    #[test]
+    fn zero_duration_tween_is_immediately_at_target() {
+        let mut tw = Tween::linear(3.0, 9.0, 0.0);
+        assert_eq!(tw.value(), 9.0, "zero-duration tween reads `to`");
+        assert!((tw.tick(0.0) - 9.0).abs() < 1e-4);
+        assert!(tw.finished());
     }
 
     #[test]
