@@ -728,6 +728,32 @@ mod tests {
 
     #[test]
     #[ignore = "requires a GPU adapter"]
+    fn sphere_front_hemisphere_is_lit() {
+        // Regression for generate_sphere winding: with a front directional
+        // light the camera-facing hemisphere must be lit (bright center). When
+        // the winding was reversed the near hemisphere was culled and the far
+        // (unlit) inside showed through → a uniformly dark sphere.
+        let gpu = match HeadlessGpu::new() {
+            Ok(g) => g,
+            Err(e) => {
+                eprintln!("skip: {e}");
+                return;
+            }
+        };
+        // render_cube_point_lit draws a sphere with a directional light coming
+        // from +Z (toward the camera); no point lights.
+        let rgba = render_cube_point_lit(&gpu, 256, 256, &[]);
+        // Center pixel = sphere's front pole, facing the light → should be bright.
+        let idx = ((128 * 256 + 128) * 4) as usize;
+        let center_sum = rgba[idx] as u32 + rgba[idx + 1] as u32 + rgba[idx + 2] as u32;
+        assert!(
+            center_sum > 180,
+            "front-lit sphere center should be bright, got sum={center_sum}"
+        );
+    }
+
+    #[test]
+    #[ignore = "requires a GPU adapter"]
     fn point_lights_add_colored_illumination() {
         let gpu = match HeadlessGpu::new() {
             Ok(g) => g,

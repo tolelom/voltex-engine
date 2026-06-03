@@ -62,15 +62,20 @@ pub fn generate_sphere(radius: f32, sectors: u32, stacks: u32) -> (Vec<MeshVerte
             let k1 = i * (sectors + 1) + j;
             let k2 = k1 + sectors + 1;
 
+            // CCW-from-outside winding so outward faces are front-facing under
+            // the engine's `FrontFace::Ccw` + `cull_mode: Back`. (The previous
+            // order wound clockwise → the camera-facing hemisphere was culled
+            // and the far inner hemisphere showed through, leaving spheres lit
+            // on the wrong side.)
             // First triangle
             indices.push(k1);
-            indices.push(k2);
             indices.push(k1 + 1);
+            indices.push(k2);
 
             // Second triangle
             indices.push(k1 + 1);
-            indices.push(k2);
             indices.push(k2 + 1);
+            indices.push(k2);
         }
     }
 
