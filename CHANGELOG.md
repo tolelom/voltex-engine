@@ -46,6 +46,13 @@ v1.0.59 데모(game_ready_demo)를 실제로 돌려보며 드러난 엔진 갭�
   3D 위에 렌더(depth-test, no write). 캡처 회귀
   `debug_lines_draw_colored_segments` + `docs/visual/debug_lines.png`. 데모에
   chase 벡터 + 플레이어/추적자 cross + 아레나 AABB 추가.
+- **CPU 파티클 시스템**: `voltex_renderer_ecs::particle` — `Particle` 컴포넌트
+  (velocity/acceleration/lifetime/size·alpha 보간) + `spawn_particle` +
+  `update_particles`(RuntimeApp tick 자동 호출). 파티클 = Transform+Sprite+
+  Particle 엔티티라 빌보드 패스가 그대로 렌더. 이동·페이드·수명 만료 despawn.
+  단위 테스트(이동/중력/페이드/despawn) + 캡처 회귀
+  `particles_spread_outward_over_time`(시간에 따라 반경 증가) +
+  `docs/visual/particle_burst.png`. 데모: 잡힐 때 16개 오렌지 버스트.
 - **직교(2D/탑다운) 카메라**: `Camera::ortho_height: Option<f32>` +
   `Camera::orthographic(pos, aspect, height)` (parallel 투영) +
   `RuntimeConfig::with_orthographic(height)`. 2D·탑다운·아이소메트릭 게임용 —

@@ -20,6 +20,7 @@ cargo run -p game_ready_demo
 | **Skeletal animation** | A GPU-skinned "totem" strip (off to the left) waves via `SkinnedPose` + `BasicRenderer`'s skinned pass. |
 | **Debug draw** | `set_debug_draw_fn` builds gizmos each frame: a yellow chase vector, cyan/magenta crosses on the player/chaser, and the arena bounds as a green `DebugLines::aabb`. |
 | **Billboard sprites** | Three floating `Sprite::solid` "pickups" — camera-facing colored quads that stay screen-aligned as you orbit. |
+| **Particles** | Each catch pops a 16-particle orange burst (`spawn_particle` + the runtime's `update_particles`) that arcs outward under gravity and fades. |
 
 ## Controls
 

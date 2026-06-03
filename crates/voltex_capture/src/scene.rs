@@ -735,6 +735,60 @@ pub fn render_spot_lit(
     target.read_rgba8(&gpu.device, &gpu.queue)
 }
 
+/// Spawn an orange particle burst at the origin, advance it `ticks` times by
+/// `dt`, then render the surviving particles (as billboard sprites) from a
+/// top-down orthographic camera. Exercises particle update → sprite render.
+/// Returns RGBA8.
+pub fn render_particle_burst(
+    gpu: &HeadlessGpu,
+    width: u32,
+    height: u32,
+    ticks: u32,
+    dt: f32,
+) -> Vec<u8> {
+    use voltex_renderer_ecs::{spawn_particle, update_particles, Particle};
+    let target = OffscreenTarget::new(&gpu.device, width, height);
+    let renderer = BasicRenderer::new(&gpu.device, &gpu.queue, CAPTURE_FORMAT, 8);
+    let assets = RenderAssets::new();
+
+    let mut world = World::new();
+    let n = 16;
+    for i in 0..n {
+        let a = i as f32 / n as f32 * std::f32::consts::TAU;
+        // Spread in the XY (screen) plane so a front camera sees the whole fan.
+        let vel = Vec3::new(a.cos() * 3.0, a.sin() * 3.0, 0.0);
+        let part = Particle::new(vel, 2.0, 0.4);
+        spawn_particle(&mut world, Vec3::ZERO, [1.0, 0.55, 0.1, 1.0], part);
+    }
+    for _ in 0..ticks {
+        update_particles(&mut world, dt);
+    }
+    voltex_ecs::propagate_transforms(&mut world);
+
+    // Front-facing ortho (looks -Z, up +Y) so the radial spread fills the view.
+    let camera =
+        Camera::orthographic(Vec3::new(0.0, 0.0, 12.0), width as f32 / height as f32, 16.0);
+    let light = LightUniform::new();
+
+    let mut encoder = gpu
+        .device
+        .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("capture parts") });
+    renderer.render(
+        &gpu.queue,
+        &mut encoder,
+        &target.color_view,
+        &target.depth_view,
+        wgpu::Color { r: 0.0, g: 0.0, b: 0.0, a: 1.0 },
+        &mut world,
+        &assets,
+        camera.view_projection(),
+        camera.position,
+        light,
+    );
+    gpu.queue.submit(Some(encoder.finish()));
+    target.read_rgba8(&gpu.device, &gpu.queue)
+}
+
 /// Render one white cube at world `depth` (more negative = farther from the
 /// camera at z=8) under either an orthographic or perspective projection.
 /// Returns RGBA8. Used to show that orthographic footprints are
@@ -1199,6 +1253,49 @@ mod tests {
         assert!(
             center_off + 60 < center,
             "aiming the spot away from the ground should darken the center: aimed-down={center} aimed-away={center_off}"
+        );
+    }
+
+    #[test]
+    #[ignore = "requires a GPU adapter"]
+    fn particles_spread_outward_over_time() {
+        let gpu = match HeadlessGpu::new() {
+            Ok(g) => g,
+            Err(e) => {
+                eprintln!("skip: {e}");
+                return;
+            }
+        };
+        // Mean distance of orange pixels from the image center — grows as the
+        // radial burst expands.
+        // Orange/amber test by channel ordering (r > g > b), robust to whether
+        // the target is sRGB-encoded (which lifts the mid/low channels).
+        let is_orange = |p: &[u8]| -> bool {
+            p[0] > 150 && p[0] as i32 > p[1] as i32 + 20 && p[1] as i32 > p[2] as i32 + 20
+        };
+        let mean_radius = |rgba: &[u8]| -> f64 {
+            let (mut sum, mut n) = (0.0f64, 0u64);
+            for (i, p) in rgba.chunks_exact(4).enumerate() {
+                if is_orange(p) {
+                    let x = (i % 256) as f64 - 128.0;
+                    let y = (i / 256) as f64 - 128.0;
+                    sum += (x * x + y * y).sqrt();
+                    n += 1;
+                }
+            }
+            if n == 0 { 0.0 } else { sum / n as f64 }
+        };
+
+        let early = render_particle_burst(&gpu, 256, 256, 2, 0.1); // t≈0.2s
+        let late = render_particle_burst(&gpu, 256, 256, 8, 0.1); // t≈0.8s
+        let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../../docs/visual/");
+        crate::save_png(&format!("{dir}particle_burst.png"), 256, 256, &late).unwrap();
+
+        let (re, rl) = (mean_radius(&early), mean_radius(&late));
+        assert!(re > 1.0, "early burst should have visible particles, r={re:.1}");
+        assert!(
+            rl > re + 10.0,
+            "particles should spread outward over time: early r={re:.1} late r={rl:.1}"
         );
     }
 

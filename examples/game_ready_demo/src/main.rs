@@ -32,7 +32,7 @@ use voltex_renderer::{
     material::MaterialUniform, mesh::Mesh, vertex::MeshVertex, PointLight, Skeleton, SkinnedMesh,
     SkinnedMeshVertex,
 };
-use voltex_renderer_ecs::{Sprite, SkinnedPose};
+use voltex_renderer_ecs::{spawn_particle, Particle, SkinnedPose, Sprite};
 use voltex_runtime::{RuntimeApp, RuntimeConfig, RuntimeResult};
 
 const PLAYER_TAG: &str = "player";
@@ -373,6 +373,20 @@ fn register_systems(app: &mut RuntimeApp) {
         let mut s = coll_stats.borrow_mut();
         if caught && !s.caught {
             s.caught_count += 1;
+            // Rising edge: pop an orange particle burst at the catch site —
+            // a fan of billboards that arc outward and fade (engine particle
+            // system: spawn_particle + the runtime's update_particles tick).
+            if let Some(p) = tagged_position(world, PLAYER_TAG) {
+                let n = 16;
+                for i in 0..n {
+                    let a = i as f32 / n as f32 * std::f32::consts::TAU;
+                    let vel = Vec3::new(a.cos() * 4.0, 5.0, a.sin() * 4.0);
+                    let mut part = Particle::new(vel, 0.8, 0.25);
+                    part.acceleration = Vec3::new(0.0, -9.0, 0.0);
+                    part.end_size = 0.05;
+                    spawn_particle(world, p + Vec3::new(0.0, 0.6, 0.0), [1.0, 0.55, 0.1, 1.0], part);
+                }
+            }
         }
         s.caught = caught;
     });

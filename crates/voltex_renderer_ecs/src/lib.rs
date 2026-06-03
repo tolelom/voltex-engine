@@ -13,6 +13,7 @@ pub mod error;
 pub mod assets;
 pub mod items;
 pub mod basic_renderer;
+pub mod particle;
 pub mod skinned;
 pub mod sprite;
 
@@ -23,4 +24,5 @@ pub use basic_renderer::BasicRenderer;
 pub use skinned::{
     animation_duration, load_skinned_gltf, update_skinned_poses, SkinnedMeshHandle, SkinnedPose,
 };
+pub use particle::{spawn_particle, update_particles, Particle};
 pub use sprite::Sprite;

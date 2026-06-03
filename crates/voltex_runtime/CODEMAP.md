@@ -41,7 +41,7 @@
 | `with_audio(clips)` | new 직후 | AudioSystem 생성 + audio_sync_system 활성화 |
 
 ## RuntimeApp::tick_systems_only(dt) 실행 순서
-1. `propagate_transforms(world)` (항상)
+1. `propagate_transforms(world)` (항상) + `update_skinned_poses` + `update_particles` (no-op if 해당 엔티티 없음)
 2. `physics_step(world, &config)` (enable_physics 시)
 3. `script_start_all(world, pool)` + `script_update_all(world, pool, dt)` + `pool.poll_reload(watcher)` (enable_scripts 시)
 4. 사용자 등록 시스템 (등록 순서, `add_system` 으로 추가)
