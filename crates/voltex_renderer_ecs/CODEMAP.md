@@ -23,7 +23,7 @@ ECS World ↔ voltex_renderer 브릿지. C0a 의 `MeshHandle` / `MaterialHandle`
 | `Particle { velocity, acceleration, age, lifetime, start/end_size, start/end_alpha }` + `Particle::new(vel,lifetime,size)` / `spawn_particle(world,pos,color,particle)` / `update_particles(&mut World, dt)` | `particle.rs` | CPU 파티클(=Transform+Sprite+Particle 엔티티). update가 이동·크기/알파 보간·수명 만료 despawn. RuntimeApp tick이 `update_particles` 자동 호출 |
 | `SpriteAnimation { cols, rows, frame_count, fps, time, playing, looping }` + `SpriteAnimation::new(cols,rows,frames,fps)` / `update_sprite_animations(&mut World, dt)` | `sprite.rs` | 스프라이트시트 애니메이션. Sprite+SpriteAnimation 엔티티의 `uv_rect`를 시간에 따라 프레임 진행(loop=wrap, else clamp+stop). RuntimeApp tick 자동 호출 |
 | `RenderAssets::add_skinned_mesh(SkinnedMesh) -> SkinnedMeshHandle` / `skinned_mesh(h)` | `assets.rs` | 스킨드 메시 저장 |
-| `RenderAssets::add_texture(GpuTexture) -> TextureHandle` / `texture(h)`, `TextureHandle` 컴포넌트 | `assets.rs` | per-entity 디퓨즈 텍스처 (없으면 흰색 기본) |
+| `RenderAssets::add_texture(GpuTexture)` / `add_texture_png(device,queue,bytes) -> Result` / `add_texture_rgba(device,queue,w,h,px)` / `texture(h)`, `TextureHandle` 컴포넌트 | `assets.rs` | per-entity 디퓨즈 텍스처 (없으면 흰색 기본). `_png`/`_rgba`는 레이아웃 생성+업로드를 한 번에 (런타임 스프라이트/메시 텍스처 로딩 편의) |
 | `SkinnedMeshHandle(Handle<SkinnedMesh>)`, `SkinnedPose{skeleton,animation,player}` | `skinned.rs` | 스킨드 ECS 컴포넌트 |
 | `update_skinned_poses(&mut World, dt)`, `animation_duration(&GltfAnimation)` | `skinned.rs` | 포즈 진행 시스템 (RuntimeApp tick 호출) |
 | `load_skinned_gltf(device, &mut assets, &GltfData) -> Option<(SkinnedMeshHandle, SkinnedPose)>` | `skinned.rs` | glTF(첫 mesh+skin+anim) → 스킨드 엔티티 컴포넌트 |

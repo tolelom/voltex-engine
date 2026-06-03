@@ -76,6 +76,11 @@ v1.0.59 데모(game_ready_demo)를 실제로 돌려보며 드러난 엔진 갭�
   fps/looping) + `update_sprite_animations`(RuntimeApp tick 자동 호출) — Sprite의
   `uv_rect`를 시간에 따라 진행. loop=wrap, non-loop=마지막 프레임 clamp+정지.
   단위 테스트(프레임 진행/wrap/clamp+stop).
+- **런타임 텍스처 로딩 편의**: `RenderAssets::add_texture_png(device, queue,
+  bytes)`(PNG 디코드+업로드, `Result`) + `add_texture_rgba(device, queue, w, h,
+  px)` — bind-group 레이아웃 생성 보일러플레이트 제거. gpu_init에서 스프라이트/
+  메시 텍스처를 한 줄로 로딩. 캡처 회귀
+  `render_assets_png_loader_roundtrips_into_a_sprite`.
 
 - **그림자**: `RuntimeConfig::with_shadows(true)` — BasicRenderer directional
   shadow mapping (depth pre-pass + mesh_colored 3×3 PCF, group 3). 기본 off

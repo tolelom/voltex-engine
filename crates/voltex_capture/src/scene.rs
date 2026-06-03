@@ -1401,6 +1401,61 @@ mod tests {
 
     #[test]
     #[ignore = "requires a GPU adapter"]
+    fn render_assets_png_loader_roundtrips_into_a_sprite() {
+        use voltex_renderer_ecs::Sprite;
+        let gpu = match HeadlessGpu::new() {
+            Ok(g) => g,
+            Err(e) => {
+                eprintln!("skip: {e}");
+                return;
+            }
+        };
+        // Encode a 2×2 solid-red PNG, then load it via the convenience method.
+        let red = vec![255u8, 0, 0, 255].repeat(4); // 2×2 RGBA red
+        let png = crate::encode_rgba8(2, 2, &red);
+
+        let target = OffscreenTarget::new(&gpu.device, 256, 256);
+        let renderer = BasicRenderer::new(&gpu.device, &gpu.queue, CAPTURE_FORMAT, 8);
+        let mut assets = RenderAssets::new();
+        let tex = assets
+            .add_texture_png(&gpu.device, &gpu.queue, &png)
+            .expect("decode+upload PNG");
+
+        let mut world = World::new();
+        let e = world.spawn();
+        world.add(e, Transform::from_position(Vec3::ZERO));
+        world.add(e, Sprite::textured(tex, [3.0, 3.0]));
+        voltex_ecs::propagate_transforms(&mut world);
+
+        let camera = Camera::orthographic(Vec3::new(0.0, 0.0, 8.0), 1.0, 6.0);
+        let mut encoder = gpu.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+            label: Some("capture png loader"),
+        });
+        renderer.render(
+            &gpu.queue,
+            &mut encoder,
+            &target.color_view,
+            &target.depth_view,
+            wgpu::Color { r: 0.0, g: 0.0, b: 0.0, a: 1.0 },
+            &mut world,
+            &assets,
+            camera.view_projection(),
+            camera.position,
+            LightUniform::new(),
+        );
+        gpu.queue.submit(Some(encoder.finish()));
+        let rgba = target.read_rgba8(&gpu.device, &gpu.queue);
+
+        let i = (128 * 256 + 128) * 4;
+        let c = [rgba[i], rgba[i + 1], rgba[i + 2]];
+        assert!(
+            c[0] > 150 && c[1] < 90 && c[2] < 90,
+            "PNG-loaded red texture should render red, got {c:?}"
+        );
+    }
+
+    #[test]
+    #[ignore = "requires a GPU adapter"]
     fn sprite_sheet_frame_selects_atlas_cell() {
         let gpu = match HeadlessGpu::new() {
             Ok(g) => g,

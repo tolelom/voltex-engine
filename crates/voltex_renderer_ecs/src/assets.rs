@@ -69,6 +69,38 @@ impl RenderAssets {
         TextureHandle(self.assets.insert(texture))
     }
 
+    /// Decode a PNG and upload it as a diffuse texture in one call, returning a
+    /// [`TextureHandle`] ready to attach to a mesh or [`Sprite`](crate::Sprite).
+    /// The texture bind-group layout is created internally. Errors if the PNG
+    /// fails to decode.
+    pub fn add_texture_png(
+        &mut self,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        png_bytes: &[u8],
+    ) -> crate::Result<TextureHandle> {
+        let layout = GpuTexture::bind_group_layout(device);
+        let tex = GpuTexture::from_png(device, queue, png_bytes, &layout)
+            .map_err(crate::RendererEcsError::from)?;
+        Ok(self.add_texture(tex))
+    }
+
+    /// Upload raw RGBA8 pixels (`width * height * 4` bytes, row-major) as a
+    /// diffuse texture and return its [`TextureHandle`]. Handy for generated
+    /// atlases / solid swatches without a PNG round-trip.
+    pub fn add_texture_rgba(
+        &mut self,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        width: u32,
+        height: u32,
+        pixels: &[u8],
+    ) -> TextureHandle {
+        let layout = GpuTexture::bind_group_layout(device);
+        let tex = GpuTexture::from_rgba(device, queue, width, height, pixels, &layout);
+        self.add_texture(tex)
+    }
+
     /// Borrows the underlying `GpuTexture` for `h`, or `None` if stale.
     pub fn texture(&self, h: TextureHandle) -> Option<&GpuTexture> {
         self.assets.get(h.0)
