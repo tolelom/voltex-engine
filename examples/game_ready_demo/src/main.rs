@@ -359,6 +359,9 @@ fn register_systems(app: &mut RuntimeApp) {
         ui.text(if s.caught { ">>> CAUGHT! <<<" } else { "RUN!" });
         ui.text(&format!("Times caught: {}", s.caught_count));
         ui.text(&format!("Elapsed: {:.1}s", s.time));
+        // Danger meter — fills red as the chaser closes in (progress_bar HUD helper).
+        let danger = (1.0 - (s.dist / 15.0).min(1.0)).clamp(0.0, 1.0);
+        ui.progress_bar(12.0, 130.0, 200.0, 14.0, danger, [220, 60, 40, 255], [40, 40, 40, 255]);
     });
 }
 

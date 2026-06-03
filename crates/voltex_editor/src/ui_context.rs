@@ -191,6 +191,32 @@ impl UiContext {
         }
     }
 
+    /// Draw a filled rectangle (screen pixels, top-left origin).
+    pub fn draw_rect(&mut self, x: f32, y: f32, w: f32, h: f32, color: [u8; 4]) {
+        self.draw_list.add_rect(x, y, w, h, color);
+    }
+
+    /// Draw a horizontal progress / health bar: `bg` fills the whole track and
+    /// `fg` fills `fraction` (clamped to `0..=1`) of the width. A staple HUD
+    /// primitive (health, mana, reload, XP).
+    #[allow(clippy::too_many_arguments)]
+    pub fn progress_bar(
+        &mut self,
+        x: f32,
+        y: f32,
+        w: f32,
+        h: f32,
+        fraction: f32,
+        fg: [u8; 4],
+        bg: [u8; 4],
+    ) {
+        self.draw_list.add_rect(x, y, w, h, bg);
+        let f = fraction.clamp(0.0, 1.0);
+        if f > 0.0 {
+            self.draw_list.add_rect(x, y, w * f, h, fg);
+        }
+    }
+
     /// Calculate text width using TTF or bitmap font.
     pub fn ttf_text_width(&mut self, text: &str) -> f32 {
         if let Some(ref mut ttf) = self.ttf_font {
@@ -198,5 +224,41 @@ impl UiContext {
         } else {
             text.len() as f32 * self.font.glyph_width as f32
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn progress_bar_emits_background_and_fill() {
+        let mut ui = UiContext::new(800.0, 600.0);
+        ui.begin_frame(0.0, 0.0, false);
+        let before = ui.draw_list.vertices.len();
+        ui.progress_bar(10.0, 10.0, 100.0, 8.0, 0.5, [0, 255, 0, 255], [40, 40, 40, 255]);
+        // Two rects (bg + fg) = 8 vertices.
+        assert_eq!(ui.draw_list.vertices.len() - before, 8);
+        ui.end_frame();
+    }
+
+    #[test]
+    fn progress_bar_zero_fraction_draws_only_background() {
+        let mut ui = UiContext::new(800.0, 600.0);
+        ui.begin_frame(0.0, 0.0, false);
+        let before = ui.draw_list.vertices.len();
+        ui.progress_bar(0.0, 0.0, 100.0, 8.0, 0.0, [0, 255, 0, 255], [40, 40, 40, 255]);
+        assert_eq!(ui.draw_list.vertices.len() - before, 4, "only bg rect when fraction=0");
+        ui.end_frame();
+    }
+
+    #[test]
+    fn progress_bar_clamps_fraction_above_one() {
+        let mut ui = UiContext::new(800.0, 600.0);
+        ui.begin_frame(0.0, 0.0, false);
+        // fraction > 1 must not panic and still emits bg + fg.
+        ui.progress_bar(0.0, 0.0, 100.0, 8.0, 5.0, [0, 255, 0, 255], [40, 40, 40, 255]);
+        assert_eq!(ui.draw_list.vertices.len(), 8);
+        ui.end_frame();
     }
 }

@@ -77,4 +77,5 @@ Immediate-mode UI 에디터 — 도킹/플로팅/뷰포트/인스펙터/에셋 �
 ## 테스트
 - 단위 테스트: src/**/*.rs `#[cfg(test)]`
 - 실행: `cargo test -p voltex_editor --lib`
-- 현재 테스트 개수: 127개 (8-7 +13: picking::* ndc/ray/sphere/pick × 다양한 케이스)
+- 현재 테스트 개수: 177개 (UiContext::progress_bar +3 포함)
+- `UiContext::progress_bar(x,y,w,h,fraction,fg,bg)` / `draw_rect` — HUD 체력/진행 바 헬퍼 (runtime `set_hud_fn` 에서 사용)
