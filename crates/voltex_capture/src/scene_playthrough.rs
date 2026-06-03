@@ -7,7 +7,7 @@
 
 use voltex_ecs::{propagate_transforms, MaterialHandle, MeshHandle, Transform, World};
 use voltex_math::Vec3;
-use voltex_renderer::{Camera, LightUniform, MaterialUniform, Mesh, PointLight, SkinnedMesh};
+use voltex_renderer::{Camera, LightUniform, MaterialUniform, PointLight, SkinnedMesh};
 use voltex_renderer_ecs::{update_skinned_poses, BasicRenderer, RenderAssets, SkinnedPose};
 
 use crate::headless::HeadlessGpu;
