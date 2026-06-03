@@ -175,7 +175,7 @@
 ## v1.0 / v1.0.1 / v1.0.2 / v1.0.3 / v1.0.4 / v1.0.5 / v1.0.6 / v1.0.7 / v1.0.8 추가 한계
 
 - **3 OS exe artifact 검증** — Windows host 빌드 + runtime 검증 완료. v1.0.55 에서 **CLI 빌드 파이프라인 end-to-end 풀 실행 검증**: `voltex new` → `voltex build` (release, ~30s) → 산출 `dist/<name>.exe` (+ scene/assets/scripts + LICENSE×3 번들) 가 실제 RTX 4080 에서 panic/validation 0 으로 게임 구동. 즉 "게임 빌드 → 단일 exe 배포" DoD 헤드라인 워크플로가 실 하드웨어에서 작동 확인. Linux + macOS 실 머신 검증은 v1.1 사용자 PR.
-- **Lua input API** — 입력은 Rust `add_input_system` 만. Lua 측 `input.is_key_pressed(...)` v1.1 후속.
+- ~~**Lua input API**~~ ✅ 2026-06-03 (v1.0.59) — `voltex_script::engine_input` 가 Lua 글로벌 `input` 테이블 노출 (`is_key_pressed`/`is_key_just_pressed`/`mouse_position`/`mouse_delta`). 런타임이 매 프레임 `InputState` → 문자열-키 `ScriptInput` 스냅샷으로 브릿지 (`set_current_input`, thread-local 포인터, `__voltex_world` 와 동일 규약).
 - **voltex_cli editor 모드** — `voltex new/build/run` 만. `voltex editor` 서브커맨드 v1.1.
 - ~~**HUD 통합**~~ ✅ 2026-06-03 — `RuntimeApp::set_hud_fn` + `RuntimeConfig::with_hud` (v1.0.59).
 - ~~**런타임 카메라 고정**~~ ✅ 2026-06-03 — `RuntimeConfig::with_camera(pos,yaw,pitch)`/`with_camera_fov` + `RuntimeApp::set_camera_fn(follow/orbit)`. 기존 하드코딩 `(0,10,20)` 가 기본값으로 유지되지만 이제 게임이 프레이밍 가능. (발견 계기: game_ready_demo에서 1-unit 큐브가 먼 기본 카메라 때문에 ~15px 점으로만 보여 "박스 안 보임" 리포트. 렌더는 정상이었음.)
@@ -216,7 +216,7 @@
 - **Vec/Ray/Mat4 normalize 문서 거짓 + safe variant** ✅ v1.0.41 — `normalize_or_zero` (Vec2/Vec3), `Ray::try_new`. 기존 docstring 의 panic 주장 제거. 한계: 기존 30+ `.normalize()` 호출자 일괄 audit/교체는 v1.1+.
 - **Snapshot deserialiser 적대적 count 거부** ✅ v1.0.41 — `MAX_SNAPSHOT_ENTITIES = 1_000_000` + `checked_mul`/`checked_add`. +2 회귀 테스트.
 - **Hierarchy cycle / self-parent / stale reparent** ✅ v1.0.42 — `add_child` 가 self-parent, cycle 생성, re-parent stale entry 3종을 silently 허용. 모두 silently 거부 + 옛 parent 의 Children 정리. +5 회귀 테스트. 한계: 직렬화된 씬 파일의 pre-existing 사이클은 `validate_hierarchy` 별 pass 필요 — v1.1+.
-- **Scene deserializer 적대적 entity count / index** ✅ v1.0.43 — `.vscn` text + `VSCN` binary 양쪽에 `MAX_SCENE_ENTITIES = 1_000_000` cap. Out-of-range parent index 도 silently 무시. +5 회귀 테스트. JSON deserializer 의 추가 cap 은 v1.1+.
+- **Scene deserializer 적대적 entity count / index** ✅ v1.0.43 — `.vscn` text + `VSCN` binary 양쪽에 `MAX_SCENE_ENTITIES = 1_000_000` cap. Out-of-range parent index 도 silently 무시. +5 회귀 테스트. ~~JSON deserializer 의 추가 cap 은 v1.1+.~~ ✅ `deserialize_scene_json` 도 동일 `MAX_SCENE_ENTITIES` cap 적용 (`deserialize_scene_json_with_cap` 내부 경로 + 경계 테스트 2개).
 - **Navmesh deserializer 적대적 입력** ✅ v1.0.44 — VNAV 두 진입점에 `MAX_NAVMESH_VERTICES/TRIANGLES = 1_000_000` cap + triangle vertex index / neighbour index 범위 검사. +3 회귀 테스트.
 - **glTF accessor count + attribute mismatch** ✅ v1.0.45 — 7개 read_accessor_* 가 공통 `validate_count` (MAX=4M) + POSITION/NORMAL/UV/TANGENT 길이 일치 강제. +2 회귀 테스트.
 - **Editor redo-Spawn entity leak** ✅ v1.0.46 — `Spawn→Undo→Redo→Undo` 시 두 번째 undo 가 stale entity 를 가리켜 새로 생성된 entity 가 영구 생존하던 버그. redo 후 inverse 패치. +1 회귀.
