@@ -36,6 +36,7 @@ impl ApplicationHandler for RuntimeHandler {
         };
         let mut renderer = BasicRenderer::new(&gpu.device, &gpu.queue, gpu.surface_format, 1024);
         renderer.set_shadows(app.config.enable_shadows);
+        renderer.set_pbr_enabled(app.config.enable_pbr);
         let aspect = gpu.config.width as f32 / gpu.config.height as f32;
         let mut camera = Camera::new(app.config.camera_position, aspect);
         camera.yaw = app.config.camera_yaw;

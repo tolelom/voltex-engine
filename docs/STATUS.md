@@ -187,6 +187,10 @@ v1.0.9 부터는 **서비스 배포 완성도** 로드맵 (`docs/superpowers/spe
 - **편의**: `RenderAssets::add_texture_png/_rgba`(런타임 텍스처 로딩), prelude에
   게임 컴포넌트 추가(Sprite/Particle/SpriteAnimation/TextureHandle/Lifetime/
   DebugLines).
+- **런타임 PBR 경로(v1.1 선반영)**: `RuntimeConfig::with_pbr(true)` /
+  `BasicRenderer::set_pbr_enabled` — colored Blinn-Phong 대신 Cook-Torrance PBR
+  (멀티라이트 + per-entity 머티리얼 + 4-맵 텍스처 `PbrTextures` + IBL). 기본 off.
+  스킨드 PBR은 여전히 v1.1.
 - 이 스택으로 직교 카메라 + 텍스처/아틀라스/애니메이션 스프라이트 + 파티클 +
   디버그 기즈모를 갖춘 2D 게임 빌드 가능. capture 회귀 26개 전부 green.
 

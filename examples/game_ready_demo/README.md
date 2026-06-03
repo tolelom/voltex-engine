@@ -35,7 +35,8 @@ caught repeatedly — each catch fires a fresh beep and bumps the counter.
 
 ## Notes
 
-The skinned totem uses a single directional light + the Blinn-Phong runtime
-path. Full **PBR** materials (textures/normal maps) and **multi-light** still
-require the dedicated PBR pipeline (see `survivor_game`) — runtime integration
-of those is future work.
+This demo uses the default colored Blinn-Phong runtime path. Full **PBR**
+(Cook-Torrance + multi-light + albedo/normal/ORM/emissive maps) is now available
+in the runtime too — opt in with `RuntimeConfig::with_pbr(true)` and attach a
+`PbrTextures` component for material maps. PBR **skinning** is still on the
+Blinn-Phong path (deferred to v1.1).

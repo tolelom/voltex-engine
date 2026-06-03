@@ -90,6 +90,20 @@ v1.0.59 데모(game_ready_demo)를 실제로 돌려보며 드러난 엔진 갭�
   거의 모든 게임이 쓰므로 Transform처럼 prelude에 포함(도메인 특화 타입은 여전히
   명시 경로). prelude 컴파일 테스트 갱신.
 
+### Additive — 런타임 PBR 경로 (v1.1 항목 선반영)
+
+- **BasicRenderer 풀 PBR 패스**: `BasicRenderer::set_pbr_enabled(true)` /
+  `RuntimeConfig::with_pbr(true)` — 기존 colored Blinn-Phong 대신 Cook-Torrance
+  PBR로 메시 렌더. 멀티라이트(`LightsUniform`: directional sun + `set_point_lights`
+  의 point/spot 접합), per-entity 머티리얼 파라미터, 4-맵 텍스처(albedo/normal/
+  ORM/emissive via 신규 `PbrTextures` 컴포넌트, 없으면 flat-normal/white/black
+  기본), IBL BRDF LUT. `render()` 시그너처 불변(`LightUniform`→`LightsUniform`
+  내부 변환). colored/스프라이트/파티클/디버그라인/스킨드/그림자 패스 무영향
+  (기본 off → byte-identical). 캡처 회귀
+  `basic_renderer_pbr_path_shades_differently_than_colored` +
+  `docs/visual/pbr_runtime.png`(metallic 그래디언트 + 스페큘러 + 환경 반사).
+  한계: 스킨드 메시 PBR은 여전히 colored(후속), env는 procedural sky(SH 0).
+
 ### Fixed (game-ready 세션)
 
 - **스프라이트 투명도 정렬**: BasicRenderer 스프라이트 패스가 엔티티 순서대로

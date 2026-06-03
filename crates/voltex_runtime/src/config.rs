@@ -91,6 +91,10 @@ pub struct RuntimeConfig {
     pub light_ambient: f32,
     /// Enable directional shadow mapping in the runtime renderer. Default `false`.
     pub enable_shadows: bool,
+    /// Use the full PBR mesh path (Cook-Torrance + multi-light + material maps)
+    /// instead of colored Blinn-Phong. Default `false`. Set with
+    /// [`Self::with_pbr`].
+    pub enable_pbr: bool,
 }
 
 impl Default for RuntimeConfig {
@@ -122,6 +126,7 @@ impl Default for RuntimeConfig {
             light_color: [1.0, 1.0, 1.0],
             light_ambient: 0.1,
             enable_shadows: false,
+            enable_pbr: false,
         }
     }
 }
@@ -244,6 +249,14 @@ impl RuntimeConfig {
         self
     }
 
+    /// Use the full PBR mesh path (Cook-Torrance, multi-light, material maps,
+    /// IBL) instead of colored Blinn-Phong. Composes with `with_shadows`,
+    /// `with_light`, and `set_point_lights` (which feed the multi-light set).
+    pub fn with_pbr(mut self, enabled: bool) -> Self {
+        self.enable_pbr = enabled;
+        self
+    }
+
     /// Set the directional light: `direction` is the way light travels,
     /// `color` is RGB, `ambient` is the ambient floor `[0, 1]`. Animate it
     /// per-frame (day/night, flicker) with
@@ -355,6 +368,8 @@ mod tests {
     fn shadows_off_by_default_and_toggleable() {
         assert!(!RuntimeConfig::default().enable_shadows);
         assert!(RuntimeConfig::new().with_shadows(true).enable_shadows);
+        assert!(!RuntimeConfig::default().enable_pbr);
+        assert!(RuntimeConfig::new().with_pbr(true).enable_pbr);
     }
 
     #[test]

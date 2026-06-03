@@ -37,6 +37,7 @@
 | `disable_crash_log()` | new 직후 | panic hook 비활성화 (headless/테스트 용) |
 | `with_hud(bool)` | new 직후 | 인-윈도우 HUD 오버레이 활성화 (`set_hud_fn` 과 함께) |
 | `with_camera(pos, yaw, pitch)` / `with_camera_fov(f)` / `with_orthographic(h)` | new 직후 | 초기 카메라 프레이밍 (`set_camera_fn` 로 매 프레임 추적). `with_orthographic`은 2D/탑다운용 직교 투영(view height h) |
+| `with_pbr(bool)` | new 직후 | 메시 패스를 colored Blinn-Phong → 풀 PBR로 전환 |
 | `with_light(dir, color, ambient)` | new 직후 | directional light (`set_light_fn` 로 매 프레임 day/night) |
 | `with_audio(clips)` | new 직후 | AudioSystem 생성 + audio_sync_system 활성화 |
 
@@ -60,6 +61,7 @@
 - **충돌/트리거 이벤트**: `RuntimeApp::set_collision_fn(\|contacts, &mut world, dt\| ...)` — 매 프레임 `detect_collisions`(Collider+Transform 엔티티) 결과를 game에 전달. `enable_physics` 무관하게 실행 → 강체 없이 트리거 존으로도 사용. physics_step 직후 실행.
 - **조명**: `RuntimeConfig::with_light(dir, color, ambient)` (기본 `(0,-1,-1)`/흰색/0.1) + `RuntimeApp::set_light_fn(\|light, world, dt\| ...)` (day/night·flicker). camera_fn 직후 실행. 단일 directional light.
 - **점광원/스폿라이트**: `RuntimeApp::set_point_lights(Vec<PointLight>)` — 매 프레임 BasicRenderer에 업로드, mesh_colored가 additive (MAX_POINT_LIGHTS=8). `PointLight::new(pos, color, range, intensity)` = 무지향 점광원, `PointLight::spot(pos, dir, color, range, intensity, cone_degrees)` = 원뿔 스폿(부드러운 가장자리, `spot_cos_outer < -1.5` 가 omni 센티넬). colored 파이프라인 라이팅 정상 검증됨(흰 큐브: 광원 향한 면 밝음, 구: 앞 반구 밝음). 점광원 수학 캡처 회귀(주변 6광원→밝아짐), 스폿 원뿔 캡처 회귀(`spotlight_lights_cone_footprint_not_corners` + docs/visual/spot_cone.png).
+- **PBR 경로**: `RuntimeConfig::with_pbr(true)` → `BasicRenderer::set_pbr_enabled`. colored Blinn-Phong 대신 Cook-Torrance PBR(멀티라이트 `LightsUniform` = sun + point/spot 접합, per-entity 머티리얼 파라미터, 4-맵 텍스처 via `PbrTextures` 컴포넌트, IBL BRDF LUT). 기본 off(colored). `with_shadows`/`with_light`/`set_point_lights`와 조합. 캡처 회귀 `basic_renderer_pbr_path_shades_differently_than_colored` + `docs/visual/pbr_runtime.png`. 한계: 스킨드 메시 PBR 미구현(colored), env는 procedural sky(SH 0).
 - **그림자**: `RuntimeConfig::with_shadows(true)` → BasicRenderer가 directional shadow depth pre-pass(group 3, ortho EXTENT=30) + mesh_colored 3x3 PCF 샘플. 기본 off(uniform size 0 → 셰이더 풀라이트, 동작 불변). 캡처 회귀 `shadows_darken_ground_under_occluder` + 시각 확인(docs/visual/shadow_on.png). 한계: 스킨드 메시는 caster 아님, ortho 고정(카메라 프러스텀 fit 미적용), 바닥에 붙은 오브젝트는 자기 그림자 가림.
 - **디버그 드로우**: `RuntimeApp::set_debug_draw_fn(\|d: &mut DebugLines, world, dt\| ...)` — 매 프레임 light_fn 직후 실행. 공유 `DebugLines` 버퍼를 clear 후 콜백이 gizmo 세그먼트 큐잉 → `BasicRenderer::set_debug_lines` 업로드 → depth-tested `LineList` 패스로 3D 위에 렌더. `DebugLines` 헬퍼: `line(a,b,color)` / `ray(origin,dir,len,color)` / `aabb(min,max,color)`(12 edges) / `cross(center,half,color)`. 캡처 회귀 `debug_lines_draw_colored_segments` + `docs/visual/debug_lines.png`. 한계: 라인 두께 1px 고정, MAX 8192 verts.
 - **사용자 시스템 시그너처**: `FnMut(&mut World, f32) + 'static`. dt 는 호출 프레임의 dt (fixed_dt 가 Some 면 그 값).
