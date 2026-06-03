@@ -173,6 +173,12 @@
 
 v1.0.9 부터는 **서비스 배포 완성도** 로드맵 (`docs/superpowers/specs/2026-05-21-service-readiness-roadmap.md`) 기준으로 진행.
 
+### 2026-06-04 — Lua find_in_radius (v1.0.85, 자율 세션)
+
+Lua FFI 심화. 스크립트가 SpatialGrid 기반 `find_in_radius(x,y,z,r)`로 반경 내 엔티티
+`{id,gen}` 테이블을 받음 — Lua AI 근처 대상 탐색. SpatialGrid는 L1이라 레이어 위반 없음.
+하드닝 규약(strict reader/get_world Option) 준수. 단위 2(Lua 통합) + 변이 테스트. build/clippy/test 그린.
+
 ### 2026-06-04 — Color 타입 (v1.0.84, 자율 세션)
 
 색이 raw `[f32;4]` 뿐이던 것을 1급 타입으로. `voltex_math::Color` — rgb/rgba/hex/hexa/

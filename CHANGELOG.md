@@ -10,6 +10,25 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## [v1.0.85] — 2026-06-04 — Lua `find_in_radius` (spatial query for scripts)
+
+Lua 스크립트가 v1.0.76 `SpatialGrid` 를 통해 근접 쿼리를 할 수 있게 — Lua AI 가 근처
+적/대상/픽업을 찾는 서바이버류 핵심. (선언적 렌더러블/이벤트/리소스는 L3/타입 특화라
+Lua 노출 불가하지만, SpatialGrid 는 L1 ecs 라 voltex_script(L2)가 레이어 위반 없이 사용.)
+
+### Additive — `voltex_script::engine_api`
+
+- **`find_in_radius(x, y, z, r)`** → `{id, gen}` 핸들 배열 테이블. Transform 위치가
+  `(x,y,z)` 반경 `r` 내인 엔티티. SpatialGrid 로 백킹. 비숫자 인자/world 없음 → 빈 테이블
+  (`ipairs` 항상 안전). 기존 하드닝 규약 준수(strict numeric readers, get_world Option).
+  매 호출 grid 재구축(O(n)) — Lua 게임 규모에 적합.
+
+### 검증
+
+- Lua 통합 테스트 2개(반경 내 2/far 1 제외 + 핸들 사용 가능, 비숫자 인자 → 빈 테이블) +
+  변이 테스트(비숫자 가드 제거 RED→GREEN). voltex_script 57→59.
+- workspace build / clippy(`-D warnings`) / lib test 전부 그린.
+
 ## [v1.0.84] — 2026-06-04 — `Color` type (named / hex / HSV / lerp)
 
 색이 전부 raw `[f32; 4]` 배열이었다(`MaterialDesc::color([..])`, Sprite 등). 명명 색·hex·

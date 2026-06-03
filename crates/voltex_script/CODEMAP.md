@@ -7,7 +7,7 @@ Lua 5.4 내장 + 엔진 API 바인딩 + 샌드박싱 + 핫 리로드 + per-entit
 - `LuaState` — Lua 인터프리터 (src/state.rs)
 - `LuaCoroutine` — 코루틴 (src/coroutine.rs)
 - `Sandbox` — os/io 차단 (src/sandbox.rs)
-- engine_api — spawn/position/rotation/scale/destroy/tag/find/hierarchy/iter (17 fns) (src/engine_api/)
+- engine_api — spawn/position/rotation/scale/destroy/tag/find/hierarchy/iter/find_in_radius (18 fns) (src/engine_api/)
 - engine_input — 읽기 전용 `input` Lua 테이블 + `ScriptInput` 스냅샷 + `set_current_input` (src/engine_input.rs)
 - bindings — voltex_print 등 (src/bindings.rs)
 - ffi — Lua C API FFI (src/ffi.rs)
@@ -33,7 +33,8 @@ Lua 5.4 내장 + 엔진 API 바인딩 + 샌드박싱 + 핫 리로드 + per-entit
 - 외부 crate: cc 1 (빌드 타임 Lua 컴파일)
 
 ## 변경 시 주의점
-- engine_api: spawn_entity / destroy_entity / set_position / get_position / set_rotation / get_rotation / set_scale / get_scale / set_tag / get_tag / find_by_tag / find_all_by_tag / add_child / remove_child / entity_count / **iter_entities / iter_by_tag** (17개)
+- engine_api: spawn_entity / destroy_entity / set_position / get_position / set_rotation / get_rotation / set_scale / get_scale / set_tag / get_tag / find_by_tag / find_all_by_tag / add_child / remove_child / entity_count / iter_entities / iter_by_tag / **find_in_radius** (18개)
+- **find_in_radius(x,y,z,r)**: SpatialGrid(voltex_ecs L1)로 반경 내 Transform 엔티티 탐색 → `{id,gen}` 테이블. Lua AI가 근처 적/대상 탐색(서바이버류). 비숫자/world 없음 → 빈 테이블. 매 호출 grid 재구축(O(n)).
 - **Entity handle 규약**: Lua ↔ Rust 모든 함수가 `(id, gen)` **두 값**으로 entity 전달. spawn_entity → 2 returns; set/get_position → id+gen+payload. stale handle은 `is_alive` 로 거부.
 - **find_all_by_tag / iter_by_tag**: 항상 Lua 테이블 1개 반환 (매치 없으면 빈 테이블). 각 원소는 `{id=, gen=}` 서브테이블. `#result` 로 카운트.
 - **iter_entities**: 살아있는 모든 entity 의 `{id=, gen=}` 배열. World 가 비면 빈 테이블.
@@ -49,4 +50,4 @@ Lua 5.4 내장 + 엔진 API 바인딩 + 샌드박싱 + 핫 리로드 + per-entit
 ## 테스트
 - 단위 테스트: src/**/*.rs `#[cfg(test)]`
 - 실행: `cargo test -p voltex_script --lib`
-- 현재 테스트 개수: 57개 (engine_api nav/audio +4)
+- 현재 테스트 개수: 59개 (engine_api find_in_radius +2)

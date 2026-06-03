@@ -16,8 +16,9 @@
 
 use crate::ffi;
 use crate::state::LuaState;
-use voltex_ecs::World;
+use voltex_ecs::SpatialGrid;
 use voltex_ecs::Transform;
+use voltex_ecs::World;
 use voltex_math::{Quat, Vec3};
 use std::os::raw::c_int;
 
@@ -45,6 +46,7 @@ pub fn register_engine_api(lua: &LuaState, world: *mut World) {
     lua.register_fn("add_child", lua_add_child);
     lua.register_fn("remove_child", lua_remove_child);
     lua.register_fn("entity_count", lua_entity_count);
+    lua.register_fn("find_in_radius", lua_find_in_radius);
     lua.register_fn("iter_entities", lua_iter_entities);
     lua.register_fn("iter_by_tag", lua_iter_by_tag);
     // Gameplay-system bindings (nav / audio).
@@ -153,6 +155,45 @@ unsafe extern "C" fn lua_get_position(L: *mut ffi::lua_State) -> c_int {
 unsafe extern "C" fn lua_entity_count(L: *mut ffi::lua_State) -> c_int {
     let Some(world) = get_world(L) else { return 0 };
     ffi::lua_pushnumber(L, world.entity_count() as f64);
+    1
+}
+
+/// `find_in_radius(x, y, z, r)` → array table of `{ id =, gen = }` for every
+/// entity with a `Transform` whose position is within `r` of `(x, y, z)`.
+/// Backed by a [`SpatialGrid`] built from the world's transforms (so Lua AI can
+/// find nearby targets — enemies near the player, blast radii, pickups). Builds
+/// the grid per call (O(n)); fine for the modest entity counts Lua games drive.
+/// Non-numeric args (or a missing world) yield an empty table so `ipairs` is
+/// always safe.
+unsafe extern "C" fn lua_find_in_radius(L: *mut ffi::lua_State) -> c_int {
+    let Some(world) = get_world(L) else {
+        ffi::lua_createtable(L, 0, 0);
+        return 1;
+    };
+    let mut isnum_x: c_int = 0;
+    let mut isnum_y: c_int = 0;
+    let mut isnum_z: c_int = 0;
+    let mut isnum_r: c_int = 0;
+    let x = ffi::lua_tonumberx(L, 1, &mut isnum_x) as f32;
+    let y = ffi::lua_tonumberx(L, 2, &mut isnum_y) as f32;
+    let z = ffi::lua_tonumberx(L, 3, &mut isnum_z) as f32;
+    let r = ffi::lua_tonumberx(L, 4, &mut isnum_r) as f32;
+    if isnum_x == 0 || isnum_y == 0 || isnum_z == 0 || isnum_r == 0 {
+        ffi::lua_createtable(L, 0, 0);
+        return 1;
+    }
+
+    // Cell size = radius keeps the query to a small cell neighbourhood.
+    let grid = SpatialGrid::from_transforms(world, r);
+    let hits = grid.query_radius(Vec3::new(x, y, z), r);
+
+    ffi::lua_createtable(L, hits.len() as c_int, 0);
+    let mut index: ffi::lua_Integer = 1;
+    for entity in hits {
+        push_entity_table(L, entity);
+        ffi::lua_rawseti(L, -2, index);
+        index += 1;
+    }
     1
 }
 

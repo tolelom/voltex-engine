@@ -272,6 +272,47 @@ fn find_all_by_tag_returns_all_matches() {
     assert_eq!(lua.get_global_number("first_gen"), Some(0.0));
 }
 
+#[test]
+fn find_in_radius_returns_entities_within_range() {
+    let lua = LuaState::new();
+    let mut world = World::new();
+    register_engine_api(&lua, &mut world as *mut World);
+
+    lua.exec(
+        "
+        local a = {spawn_entity()}; set_position(a[1], a[2], 0.0, 0.0, 0.0)
+        local b = {spawn_entity()}; set_position(b[1], b[2], 2.0, 0.0, 0.0)  -- within 3
+        local c = {spawn_entity()}; set_position(c[1], c[2], 50.0, 0.0, 0.0) -- far away
+
+        local near = find_in_radius(0.0, 0.0, 0.0, 3.0)
+        near_count = #near
+        has_handle = (near[1].id ~= nil and near[1].gen ~= nil) and 1 or 0
+    ",
+    )
+    .unwrap();
+
+    assert_eq!(lua.get_global_number("near_count"), Some(2.0), "a + b are within r=3");
+    assert_eq!(lua.get_global_number("has_handle"), Some(1.0));
+}
+
+#[test]
+fn find_in_radius_with_non_numeric_args_returns_empty_table() {
+    let lua = LuaState::new();
+    let mut world = World::new();
+    register_engine_api(&lua, &mut world as *mut World);
+
+    lua.exec(
+        "
+        local id, gen = spawn_entity(); set_position(id, gen, 0.0, 0.0, 0.0)
+        local t = find_in_radius('nope', 0.0, 0.0, 3.0)
+        empty_count = #t
+    ",
+    )
+    .unwrap();
+
+    assert_eq!(lua.get_global_number("empty_count"), Some(0.0));
+}
+
 // ── nav / audio bindings ────────────────────────────────────────────────────
 
 #[test]
