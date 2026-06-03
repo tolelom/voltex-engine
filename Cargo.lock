@@ -2291,7 +2291,9 @@ version = "0.1.0"
 dependencies = [
  "cc",
  "thiserror 2.0.18",
+ "voltex_ai",
  "voltex_asset",
+ "voltex_audio",
  "voltex_ecs",
  "voltex_math",
 ]

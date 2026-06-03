@@ -272,6 +272,84 @@ fn find_all_by_tag_returns_all_matches() {
     assert_eq!(lua.get_global_number("first_gen"), Some(0.0));
 }
 
+// ── nav / audio bindings ────────────────────────────────────────────────────
+
+#[test]
+fn nav_set_target_sets_agent_goal() {
+    let lua = LuaState::new();
+    let mut world = World::new();
+    let e = world.spawn();
+    world.add(e, voltex_ai::NavAgent::new(5.0));
+    register_engine_api(&lua, &mut world as *mut World);
+
+    lua.exec(&format!(
+        "nav_set_target({}, {}, 3.0, 0.0, 4.0)",
+        e.id, e.generation
+    ))
+    .unwrap();
+
+    let t = world
+        .get::<voltex_ai::NavAgent>(e)
+        .unwrap()
+        .target
+        .expect("nav target should be set");
+    assert!((t.x - 3.0).abs() < 1e-6 && (t.z - 4.0).abs() < 1e-6);
+}
+
+#[test]
+fn nav_clear_target_and_reached_reflect_state() {
+    let lua = LuaState::new();
+    let mut world = World::new();
+    let e = world.spawn();
+    let mut agent = voltex_ai::NavAgent::new(5.0);
+    agent.set_target(voltex_math::Vec3::new(1.0, 0.0, 1.0));
+    agent.reached = true;
+    world.add(e, agent);
+    register_engine_api(&lua, &mut world as *mut World);
+
+    lua.exec(&format!(
+        "r = nav_reached({}, {}) and 1 or 0\nnav_clear_target({}, {})",
+        e.id, e.generation, e.id, e.generation
+    ))
+    .unwrap();
+
+    assert_eq!(lua.get_global_number("r"), Some(1.0), "reached should be true");
+    let agent = world.get::<voltex_ai::NavAgent>(e).unwrap();
+    assert!(agent.target.is_none(), "clear_target should drop the goal");
+}
+
+#[test]
+fn audio_play_and_stop_toggle_source() {
+    let lua = LuaState::new();
+    let mut world = World::new();
+    let e = world.spawn();
+    world.add(e, voltex_audio::AudioSource::new(0u32));
+    register_engine_api(&lua, &mut world as *mut World);
+
+    lua.exec(&format!("audio_play({}, {})", e.id, e.generation)).unwrap();
+    assert!(world.get::<voltex_audio::AudioSource>(e).unwrap().playing);
+
+    lua.exec(&format!("audio_stop({}, {})", e.id, e.generation)).unwrap();
+    assert!(!world.get::<voltex_audio::AudioSource>(e).unwrap().playing);
+}
+
+#[test]
+fn nav_audio_on_entity_without_components_is_noop() {
+    let lua = LuaState::new();
+    let mut world = World::new();
+    let e = world.spawn();
+    world.add(e, Transform::new()); // no NavAgent / AudioSource
+    register_engine_api(&lua, &mut world as *mut World);
+
+    // Must not panic, and nav_reached must be false.
+    lua.exec(&format!(
+        "nav_set_target({}, {}, 1.0, 2.0, 3.0)\naudio_play({}, {})\nr = nav_reached({}, {}) and 1 or 0",
+        e.id, e.generation, e.id, e.generation, e.id, e.generation
+    ))
+    .unwrap();
+    assert_eq!(lua.get_global_number("r"), Some(0.0));
+}
+
 #[test]
 fn find_all_by_tag_returns_empty_table_when_no_match() {
     let lua = LuaState::new();

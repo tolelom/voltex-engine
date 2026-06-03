@@ -47,6 +47,12 @@ pub fn register_engine_api(lua: &LuaState, world: *mut World) {
     lua.register_fn("entity_count", lua_entity_count);
     lua.register_fn("iter_entities", lua_iter_entities);
     lua.register_fn("iter_by_tag", lua_iter_by_tag);
+    // Gameplay-system bindings (nav / audio).
+    lua.register_fn("nav_set_target", lua_nav_set_target);
+    lua.register_fn("nav_clear_target", lua_nav_clear_target);
+    lua.register_fn("nav_reached", lua_nav_reached);
+    lua.register_fn("audio_play", lua_audio_play);
+    lua.register_fn("audio_stop", lua_audio_stop);
 }
 
 /// Helper to retrieve the World pointer from the Lua registry global.
@@ -385,6 +391,89 @@ unsafe extern "C" fn lua_find_by_tag(L: *mut ffi::lua_State) -> c_int {
     0
 }
 
+
+// ── Gameplay-system bindings ────────────────────────────────────────────────
+// `engine_api` is the Lua surface for engine components, so it knows about
+// `NavAgent` (voltex_ai) and `AudioSource` (voltex_audio) the same way it knows
+// `Transform` / `Tag`. All are silent no-ops on stale handles / missing
+// components / non-numeric args.
+
+/// `nav_set_target(id, gen, x, y, z)` — set the entity's NavAgent goal.
+unsafe extern "C" fn lua_nav_set_target(L: *mut ffi::lua_State) -> c_int {
+    let Some(world) = get_world(L) else { return 0 };
+    let Some(entity) = read_handle_strict(L) else { return 0 };
+    let mut ix: c_int = 0;
+    let mut iy: c_int = 0;
+    let mut iz: c_int = 0;
+    let x = ffi::lua_tonumberx(L, 3, &mut ix) as f32;
+    let y = ffi::lua_tonumberx(L, 4, &mut iy) as f32;
+    let z = ffi::lua_tonumberx(L, 5, &mut iz) as f32;
+    if ix == 0 || iy == 0 || iz == 0 {
+        return 0;
+    }
+    if !world.is_alive(entity) {
+        return 0;
+    }
+    if let Some(agent) = world.get_mut::<voltex_ai::NavAgent>(entity) {
+        agent.set_target(Vec3::new(x, y, z));
+    }
+    0
+}
+
+/// `nav_clear_target(id, gen)` — stop the entity's NavAgent (go idle).
+unsafe extern "C" fn lua_nav_clear_target(L: *mut ffi::lua_State) -> c_int {
+    let Some(world) = get_world(L) else { return 0 };
+    let Some(entity) = read_handle_strict(L) else { return 0 };
+    if !world.is_alive(entity) {
+        return 0;
+    }
+    if let Some(agent) = world.get_mut::<voltex_ai::NavAgent>(entity) {
+        agent.clear_target();
+    }
+    0
+}
+
+/// `nav_reached(id, gen)` → bool — `true` if the NavAgent reached its goal.
+/// Returns `false` for stale handles / entities without a NavAgent.
+unsafe extern "C" fn lua_nav_reached(L: *mut ffi::lua_State) -> c_int {
+    let reached = (|| {
+        let world = get_world(L)?;
+        let entity = read_handle_strict(L)?;
+        if !world.is_alive(entity) {
+            return None;
+        }
+        world.get::<voltex_ai::NavAgent>(entity).map(|a| a.reached)
+    })()
+    .unwrap_or(false);
+    ffi::lua_pushboolean(L, reached as c_int);
+    1
+}
+
+/// `audio_play(id, gen)` — start the entity's AudioSource (one-shot or loop).
+unsafe extern "C" fn lua_audio_play(L: *mut ffi::lua_State) -> c_int {
+    let Some(world) = get_world(L) else { return 0 };
+    let Some(entity) = read_handle_strict(L) else { return 0 };
+    if !world.is_alive(entity) {
+        return 0;
+    }
+    if let Some(src) = world.get_mut::<voltex_audio::AudioSource>(entity) {
+        src.play();
+    }
+    0
+}
+
+/// `audio_stop(id, gen)` — stop the entity's AudioSource.
+unsafe extern "C" fn lua_audio_stop(L: *mut ffi::lua_State) -> c_int {
+    let Some(world) = get_world(L) else { return 0 };
+    let Some(entity) = read_handle_strict(L) else { return 0 };
+    if !world.is_alive(entity) {
+        return 0;
+    }
+    if let Some(src) = world.get_mut::<voltex_audio::AudioSource>(entity) {
+        src.stop();
+    }
+    0
+}
 
 #[cfg(test)]
 mod tests;

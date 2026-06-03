@@ -46,7 +46,7 @@ L1 (depends on math only):
 L2:
   voltex_ai         → voltex_math, voltex_ecs        (NavMesh, A*, steering)
   voltex_physics    → voltex_math, voltex_ecs        (Collider, RigidBody, Raycast)
-  voltex_script     → voltex_math, voltex_ecs        (Lua 5.4, sandbox)
+  voltex_script     → voltex_math, voltex_ecs, voltex_ai, voltex_audio   (Lua 5.4, sandbox; ai/audio는 engine_api의 nav/audio Lua 바인딩용)
   voltex_renderer   → voltex_math, voltex_platform, voltex_image   (wgpu, PBR, RT, post-process; 디코더는 voltex_image에서 재export)
 
 L3:

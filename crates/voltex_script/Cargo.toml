@@ -8,6 +8,8 @@ license.workspace = true
 voltex_math.workspace = true
 voltex_ecs.workspace = true
 voltex_asset.workspace = true
+voltex_ai.workspace = true
+voltex_audio.workspace = true
 thiserror = { workspace = true }
 
 [build-dependencies]

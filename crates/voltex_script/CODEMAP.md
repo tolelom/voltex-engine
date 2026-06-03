@@ -29,7 +29,7 @@ Lua 5.4 내장 + 엔진 API 바인딩 + 샌드박싱 + 핫 리로드 + per-entit
 - `system` — script_start_all / script_update_all + Lua callback invocation (src/system.rs)
 
 ## 의존성
-- voltex crate: voltex_math (Vec3), voltex_ecs (Entity, World, ScriptComponent), voltex_asset (FileWatcher)
+- voltex crate: voltex_math (Vec3), voltex_ecs (Entity, World, ScriptComponent), voltex_asset (FileWatcher), voltex_ai (NavAgent — Lua nav API), voltex_audio (AudioSource — Lua audio API)
 - 외부 crate: cc 1 (빌드 타임 Lua 컴파일)
 
 ## 변경 시 주의점
@@ -40,6 +40,7 @@ Lua 5.4 내장 + 엔진 API 바인딩 + 샌드박싱 + 핫 리로드 + per-entit
 - **ScriptInstancePool**: 한 .lua 파일당 **하나**의 LuaState 공유 (여러 entity 가 같은 path 면 같은 인터프리터). per-entity 상태는 스크립트가 인자(id, gen) 만으로 처리해야 함. 글로벌 사용은 entity 간 공유.
 - **`script_start_all` 호출 순서**: ScriptComponent.instance_id == UNBOUND (or pool 에 없는 id) → 자동 재바인딩 + `on_start` 호출 + started=true. 이후 `script_update_all` 가 매 프레임 `on_update(id, gen, dt)`.
 - **Lua callback 미정의**: 함수가 없으면 silent skip (panic 없음). `lua_pcall` 실패도 silent (v1).
+- **Lua nav/audio API**: `nav_set_target(id,gen,x,y,z)` / `nav_clear_target` / `nav_reached(id,gen)->bool` (NavAgent), `audio_play(id,gen)` / `audio_stop` (AudioSource). 모두 stale handle/컴포넌트 없음/비숫자 인자에 silent no-op. engine_api가 voltex_ai/voltex_audio 의존 — Transform/Tag처럼 엔진 컴포넌트를 아는 스크립팅 표면이라 의도적.
 - **Lua input API**: `input` 전역 테이블 (is_key_pressed/is_key_just_pressed/mouse_position/mouse_delta/is_mouse_button_pressed/scroll). 키는 **문자열 이름**("W","Space",...) — 이름↔keycode 매핑은 winit 의존을 피하려 `voltex_runtime`(SCRIPT_KEY_NAMES)이 소유. `voltex_script`는 winit 무의존, POD `ScriptInput` 스냅샷만 안다. 런타임이 매 프레임 `set_current_input(&snapshot)` 발행(thread-local), 실행 후 null 로 클리어. 스냅샷 미발행 시 모든 input 함수는 false/0 반환.
 - **Drop 순서**: ScriptInstancePool 이 World 보다 먼저 drop 되어야 LuaState 내부의 `__voltex_world` light userdata 가 dangling 안 됨 (실질적 use-after-free 는 발생 안 하지만 정책적 정렬).
 - state.rs는 505줄 (spec 만족, 분리 대상 아님)
@@ -48,4 +49,4 @@ Lua 5.4 내장 + 엔진 API 바인딩 + 샌드박싱 + 핫 리로드 + per-entit
 ## 테스트
 - 단위 테스트: src/**/*.rs `#[cfg(test)]`
 - 실행: `cargo test -p voltex_script --lib`
-- 현재 테스트 개수: 53개 (engine_input +5)
+- 현재 테스트 개수: 57개 (engine_api nav/audio +4)
