@@ -1586,7 +1586,7 @@ mod tests {
             }
         };
         // Encode a 2×2 solid-red PNG, then load it via the convenience method.
-        let red = vec![255u8, 0, 0, 255].repeat(4); // 2×2 RGBA red
+        let red = [255u8, 0, 0, 255].repeat(4); // 2×2 RGBA red
         let png = crate::encode_rgba8(2, 2, &red);
 
         let target = OffscreenTarget::new(&gpu.device, 256, 256);
