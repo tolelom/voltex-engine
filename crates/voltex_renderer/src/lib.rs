@@ -93,6 +93,10 @@ pub use material::MaterialUniform;
 pub use mesh::Mesh;
 pub use motion_blur::MotionBlur;
 pub use pbr_pipeline::create_pbr_pipeline;
+pub use pipeline::{
+    bone_palette_bind_group_layout, create_skinned_mesh_pipeline,
+    skinned_camera_bind_group_layout,
+};
 pub use point_shadow::{
     point_shadow_projection, point_shadow_view_matrices, PointShadowMap, POINT_SHADOW_FORMAT,
     POINT_SHADOW_SIZE,

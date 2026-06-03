@@ -6,7 +6,7 @@
 - ~~**JPG 디코더 자체 구현**~~ ✅ Baseline JPEG 완료.
 - ~~**glTF 파서**~~ ✅ glTF 2.0 / GLB 완료.
 - ~~**JPG Progressive**~~ ✅ SOF2 감지 + 스캔 파라미터 파싱 + DCT 계수 병합 완료.
-- ~~**glTF 애니메이션/스킨 파싱**~~ ✅ nodes/skins/animations/JOINTS_0/WEIGHTS_0 파싱 완료. **스킨드 렌더링 + 애니메이션 시스템** 미구현.
+- ~~**glTF 애니메이션/스킨 파싱**~~ ✅ nodes/skins/animations/JOINTS_0/WEIGHTS_0 파싱 완료. ~~**스킨드 렌더링 + 애니메이션 시스템** 미구현~~ 🟡 2026-06-03 Blinn-Phong 경로 완료 — `voltex_renderer::Skeleton`(from_skin/apply_animation/compute_palette) + `create_skinned_mesh_pipeline`/`mesh_skinned.wgsl`(group0 camera, group1 bone palette, GPU vertex skinning). `voltex_capture::scene_skinned` 가 RTX 4080(Vulkan)에서 rest(직선)↔bent(굽힘) 2프레임 렌더 + 픽셀 차이 검증 (`docs/visual/skinned_{rest,bent}.png`). **PBR 경로 스키닝(bind group 재배치) + ECS 통합(SkinnedMesh 컴포넌트/자동 재생) 미구현** — v1.1.
 
 ## Phase 3a
 

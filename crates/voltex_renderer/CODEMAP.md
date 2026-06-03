@@ -9,6 +9,8 @@ wgpu 기반 렌더링 — 메시/PBR/그림자/IBL/디퍼드/RT/post-process. �
 - `GpuContext`, `DEPTH_FORMAT` — wgpu 디바이스/큐/surface (src/gpu.rs)
 - `Vertex`, `MeshVertex` — 정점 포맷 (src/vertex.rs)
 - `SkinnedMeshVertex`, `BonePalette`, `MAX_BONES` — 스킨드 메시 정점 (src/skinned_vertex.rs)
+- `Skeleton`, `JointPose` — 조인트 계층 + 포즈 → BonePalette (from_skin/apply_animation/compute_palette) (src/skeleton.rs)
+- `create_skinned_mesh_pipeline`, `skinned_camera_bind_group_layout`, `bone_palette_bind_group_layout` — GPU 스키닝 파이프라인 (src/pipeline.rs, src/mesh_skinned.wgsl)
 - `Mesh` — 메시 데이터 (src/mesh.rs)
 - `Camera`, `FpsController` — 카메라 (src/camera.rs)
 - `GpuTexture`, `pbr_texture_bind_group_layout` 등 — GPU 텍스처 + PBR 바인딩 (src/texture.rs)
@@ -88,7 +90,7 @@ wgpu 기반 렌더링 — 메시/PBR/그림자/IBL/디퍼드/RT/post-process. �
 - 이미지/모델: voltex_image 재export (png, jpg, progressive_jpeg, deflate, obj, gltf, json_parser — 실제 파일은 voltex_image에 있음)
 - 머티리얼/조명/그림자: material, light, shadow, csm, point_shadow, spot_shadow, frustum, shadow_pipeline, pbr_pipeline
 - IBL: sh, brdf_lut, ibl
-- 애니메이션: animation, skinned_vertex
+- 애니메이션: animation, skinned_vertex, skeleton (조인트 계층→bone palette)
 - 디퍼드: gbuffer, gbuffer_compress, deferred_pipeline
 - RT: rt_accel, rt_shadow, rt_reflections, rt_ao, rt_point_shadow, soft_rt_shadow, blas_update, rt_fallback
 - SSGI/Probes/Volumes: ssgi, half_res_ssgi, stencil_opt, light_volumes, light_probes
@@ -112,4 +114,4 @@ wgpu 기반 렌더링 — 메시/PBR/그림자/IBL/디퍼드/RT/post-process. �
 ## 테스트
 - 단위 테스트: src/**/*.rs `#[cfg(test)]`
 - 실행: `cargo test -p voltex_renderer --lib`
-- 현재 테스트 개수: 174개 (E1 분리 후 — 91개는 voltex_image로 이관)
+- 현재 테스트 개수: 180개 (skeleton +6). 스킨드 GPU 시각 검증은 voltex_capture::scene_skinned (#[ignore] GPU-gated)
