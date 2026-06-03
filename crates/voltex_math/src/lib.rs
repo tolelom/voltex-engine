@@ -22,6 +22,7 @@
 #![warn(missing_docs)]
 
 pub mod aabb;
+pub mod easing;
 pub mod mat4;
 pub mod quat;
 pub mod ray;

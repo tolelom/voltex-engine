@@ -173,6 +173,13 @@
 
 v1.0.9 부터는 **서비스 배포 완성도** 로드맵 (`docs/superpowers/specs/2026-05-21-service-readiness-roadmap.md`) 기준으로 진행.
 
+### 2026-06-04 — 이징 + lerp (v1.0.82, 자율 세션)
+
+tweening 토대. `voltex_math::easing` — `lerp` + 이징 곡선(quad/cubic in/out/inout,
+smoothstep, ease_out_back; t clamp, 끝점 고정) + `Vec2::lerp`/`Vec3::lerp`. Timer.fraction()
+결합 시 tween. 함수 다수라 `voltex::math::easing` 경로(prelude 미포함). 단위 11 + 변이 테스트.
+build/clippy/test 그린.
+
 ### 2026-06-03 — 캡스톤 boids 데모 (v1.0.81, 자율 세션)
 
 세션 프리미티브를 실행 가능한 군집 게임으로 조합. `examples/boids_demo` — Rng 랜덤

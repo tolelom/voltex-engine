@@ -10,6 +10,27 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## [v1.0.82] — 2026-06-04 — Easing curves + lerp (tweening)
+
+UI 모션·카메라 이동·juice·부드러운 전환에 필요한 이징/보간. v1.0.80 `Timer.fraction()` 과
+결합하면 tween (Unity/Godot tween 대응).
+
+### Additive — `voltex_math`
+
+- **`easing` 모듈**: `lerp(a, b, t)` + 곡선 `linear` / `ease_in|out|in_out_quad` /
+  `_cubic` / `smoothstep` / `ease_out_back`(overshoot). 모두 t 를 `[0,1]` clamp,
+  끝점 `f(0)=0`·`f(1)=1` 고정. 순수, 외부 dep 0.
+- **`Vec2::lerp` / `Vec3::lerp`** — 위치·색 보간 메서드.
+- 함수가 많아 prelude 미포함 — `voltex::math::easing::*` 경로. Vec lerp 은 메서드라
+  prelude 타입에서 바로 사용. 사용 패턴: `lerp(a, b, ease_out_cubic(timer.fraction()))`.
+
+### 검증
+
+- 단위 9개(전 곡선 끝점 고정, out-of-range clamp, ease_in<linear<ease_out, smoothstep
+  대칭, ease_out_back overshoot, lerp 보간/외삽, timer→easing 램프) + Vec2/Vec3 lerp 각 1 +
+  변이 테스트(ease_in_quad→linear RED→GREEN).
+- workspace build / clippy(`-D warnings`) / lib test 전부 그린.
+
 ## [v1.0.81] — 2026-06-03 — Capstone: boids swarm demo (the new stack, composed)
 
 이번 세션(v1.0.62~80)의 프리미티브들이 **하나의 실행 가능한 게임으로 조합됨**을 보이는

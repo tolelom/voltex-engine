@@ -8,6 +8,7 @@
 - `Mat4` — 4x4 변환 행렬, transform/lookAt/perspective/orthographic/inverse (src/mat4.rs)
 - `AABB` — 축 정렬 바운딩 박스 (src/aabb.rs)
 - `Ray` — 광선 (origin + direction) (src/ray.rs)
+- `easing` 모듈 — `lerp(a,b,t)` + `linear`/`ease_in/out/in_out_quad`/`_cubic`/`smoothstep`/`ease_out_back` 이징 곡선(t∈[0,1] clamp, 끝점 0/1 고정) (src/easing.rs). `Vec2::lerp`/`Vec3::lerp` 메서드도 추가. Timer.fraction()과 결합해 tween
 - `Rng` — SplitMix64 결정론적 PRNG. `seeded`/`next_u64`/`next_u32`/`next_f32`/`range_f32`/`range_i32`/`chance`/`unit_vec2`/`unit_vec3` (src/rng.rs). 외부 dep 0, 시드 동일→시퀀스 동일
 
 ## 모듈 구조
@@ -16,6 +17,7 @@
 - `aabb` — AABB (src/aabb.rs)
 - `ray` — Ray (src/ray.rs)
 - `rng` — Rng 결정론적 PRNG (src/rng.rs)
+- `easing` — 이징 곡선 + lerp (src/easing.rs)
 
 ## 의존성
 - voltex crate: 없음

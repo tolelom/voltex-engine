@@ -76,6 +76,12 @@ impl Vec3 {
         self.length_squared().sqrt()
     }
 
+    /// Component-wise linear interpolation toward `other` by `t` (positions,
+    /// colors, etc.). `t` is not clamped — pass eased progress in `[0, 1]`.
+    pub fn lerp(self, other: Vec3, t: f32) -> Vec3 {
+        self + (other - self) * t
+    }
+
     /// Returns a unit-length vector pointing in the same direction.
     ///
     /// **Beware**: dividing an `f32` by 0 does not panic — it produces
@@ -161,6 +167,15 @@ impl Neg for Vec3 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn lerp_interpolates_each_component() {
+        let a = Vec3::new(0.0, 10.0, -4.0);
+        let b = Vec3::new(10.0, 0.0, 4.0);
+        assert_eq!(a.lerp(b, 0.0), a);
+        assert_eq!(a.lerp(b, 1.0), b);
+        assert_eq!(a.lerp(b, 0.5), Vec3::new(5.0, 5.0, 0.0));
+    }
 
     #[test]
     fn test_new() {
