@@ -58,7 +58,7 @@
 - **씬 저장/로드**: `RuntimeApp::save_scene_json(path)` (registry 등록 컴포넌트만 직렬화) / `load_scene(path)` (World clear 후 binary→JSON, Vfs 우선). `with_initial_scene` 는 부팅 시 로드.
 - **충돌/트리거 이벤트**: `RuntimeApp::set_collision_fn(\|contacts, &mut world, dt\| ...)` — 매 프레임 `detect_collisions`(Collider+Transform 엔티티) 결과를 game에 전달. `enable_physics` 무관하게 실행 → 강체 없이 트리거 존으로도 사용. physics_step 직후 실행.
 - **조명**: `RuntimeConfig::with_light(dir, color, ambient)` (기본 `(0,-1,-1)`/흰색/0.1) + `RuntimeApp::set_light_fn(\|light, world, dt\| ...)` (day/night·flicker). camera_fn 직후 실행. 단일 directional light.
-- **점광원**: `RuntimeApp::set_point_lights(Vec<PointLight>)` — 매 프레임 BasicRenderer에 업로드, mesh_colored가 additive (MAX_POINT_LIGHTS=8). **주의**: 캡처 하니스상 colored 파이프라인의 가시 면 노멀이 카메라 반대로 나타나는 정황(단일 광원이 반대 면을 비출 수 있음). 라이팅 방향성은 시각 디버깅 확인 필요 — 점광원 수학 자체는 캡처 회귀로 검증됨(주변 6광원 → 밝아짐).
+- **점광원**: `RuntimeApp::set_point_lights(Vec<PointLight>)` — 매 프레임 BasicRenderer에 업로드, mesh_colored가 additive (MAX_POINT_LIGHTS=8). colored 파이프라인 라이팅은 정상 검증됨(흰 큐브 캡처 → 광원 향한 면 밝고 반대 면 어둠). 점광원 수학도 캡처 회귀(주변 6광원→밝아짐). 단, `generate_sphere`는 Ccw+Back 컬링 기준 winding이 반대라 구는 먼 반구가 보임(라이팅과 무관한 sphere 전용 quirk, 큐브는 정상).
 - **사용자 시스템 시그너처**: `FnMut(&mut World, f32) + 'static`. dt 는 호출 프레임의 dt (fixed_dt 가 Some 면 그 값).
 - **HUD 오버레이**: `with_hud(true)` + `set_hud_fn(|ui, world| ...)`. UiContext/UiRenderer 는 `RuntimeState`(GPU) 에 보관, `resumed` 에서 생성. `redraw` 가 BasicRenderer 다음 같은 encoder 로 `LoadOp::Load` UI 패스. 콜백은 `take()` 로 꺼내 `app.world` 와 disjoint-field 借用 충돌 회피.
 - **Lua input 발행**: `enable_scripts` 시 매 프레임 `fill_script_input` 으로 `script_input` 갱신 → `voltex_script::set_current_input(ptr)` (실행 후 null). 키 이름↔winit keycode 매핑 `SCRIPT_KEY_NAMES` 가 여기 소유.
