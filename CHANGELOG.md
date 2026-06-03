@@ -90,6 +90,14 @@ v1.0.59 데모(game_ready_demo)를 실제로 돌려보며 드러난 엔진 갭�
   거의 모든 게임이 쓰므로 Transform처럼 prelude에 포함(도메인 특화 타입은 여전히
   명시 경로). prelude 컴파일 테스트 갱신.
 
+### Fixed (game-ready 세션)
+
+- **스프라이트 투명도 정렬**: BasicRenderer 스프라이트 패스가 엔티티 순서대로
+  그려 겹친 반투명 스프라이트의 합성이 spawn 순서에 따라 달라지던 문제 — 카메라
+  거리 기준 back-to-front 정렬 추가. 캡처 회귀
+  `overlapping_sprites_blend_independent_of_spawn_order`(두 spawn 순서가 동일
+  결과 + 가까운 스프라이트가 위로 합성).
+
 - **그림자**: `RuntimeConfig::with_shadows(true)` — BasicRenderer directional
   shadow mapping (depth pre-pass + mesh_colored 3×3 PCF, group 3). 기본 off
   (동작 불변). 캡처 검증 `docs/visual/shadow_on.png`. 한계: 스킨드 caster 제외,

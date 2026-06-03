@@ -585,15 +585,17 @@ impl BasicRenderer {
         } // end non-skinned pass
 
         self.render_skinned(queue, encoder, target_view, depth_view, world, assets, view_proj);
-        self.render_sprites(queue, encoder, target_view, depth_view, world, assets, view_proj);
+        self.render_sprites(queue, encoder, target_view, depth_view, world, assets, view_proj, cam_pos);
         self.render_debug_lines(queue, encoder, target_view, depth_view, view_proj);
     }
 
     /// Billboard pass: draws every entity carrying a [`WorldTransform`] + a
     /// [`Sprite`] as a camera-facing quad at its world position (alpha-blended,
     /// depth-tested, no depth write). Camera right/up are recovered from the
-    /// inverse view-projection, so no extra camera state is threaded in. Capped
-    /// at [`MAX_SPRITES`] per frame.
+    /// inverse view-projection, so no extra camera state is threaded in. Sprites
+    /// are sorted back-to-front by distance from `cam_pos` so overlapping
+    /// transparency blends correctly regardless of spawn order. Capped at
+    /// [`MAX_SPRITES`] per frame.
     #[allow(clippy::too_many_arguments)]
     fn render_sprites(
         &self,
@@ -604,9 +606,10 @@ impl BasicRenderer {
         world: &mut World,
         assets: &RenderAssets,
         view_proj: Mat4,
+        cam_pos: Vec3,
     ) {
         // (world position, sprite) for each visible sprite entity.
-        let items: Vec<(Vec3, Sprite)> = world
+        let mut items: Vec<(Vec3, Sprite)> = world
             .query2::<WorldTransform, Sprite>()
             .filter(|(e, _, _)| world.get::<crate::items::Hidden>(*e).is_none())
             .map(|(_, wt, s)| {
@@ -614,10 +617,17 @@ impl BasicRenderer {
                 (Vec3::new(c[0], c[1], c[2]), *s)
             })
             .collect();
-        let n = items.len().min(MAX_SPRITES);
-        if n == 0 {
+        if items.is_empty() {
             return;
         }
+        // Back-to-front sort (farthest from the camera first) so alpha-blended
+        // sprites composite correctly independent of spawn/iteration order.
+        items.sort_by(|a, b| {
+            let da = (a.0 - cam_pos).length_squared();
+            let db = (b.0 - cam_pos).length_squared();
+            db.partial_cmp(&da).unwrap_or(std::cmp::Ordering::Equal)
+        });
+        let n = items.len().min(MAX_SPRITES);
 
         // World-space camera right/up from the inverse VP (clip-x/clip-y axes
         // map back to camera right/up for a shear-free perspective/ortho proj).

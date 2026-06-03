@@ -1401,6 +1401,67 @@ mod tests {
 
     #[test]
     #[ignore = "requires a GPU adapter"]
+    fn overlapping_sprites_blend_independent_of_spawn_order() {
+        use voltex_renderer_ecs::Sprite;
+        let gpu = match HeadlessGpu::new() {
+            Ok(g) => g,
+            Err(e) => {
+                eprintln!("skip: {e}");
+                return;
+            }
+        };
+        // A far blue + a near red sprite, both semi-transparent, overlapping at
+        // screen center. Back-to-front sorting must make the composited result
+        // the same no matter which order they were spawned in.
+        let render = |near_first: bool| -> [u8; 3] {
+            let target = OffscreenTarget::new(&gpu.device, 256, 256);
+            let renderer = BasicRenderer::new(&gpu.device, &gpu.queue, CAPTURE_FORMAT, 8);
+            let assets = RenderAssets::new();
+            let mut world = World::new();
+            let far = (Vec3::new(0.0, 0.0, -2.0), [0.1, 0.1, 1.0, 0.5]); // blue
+            let near = (Vec3::new(0.0, 0.0, 2.0), [1.0, 0.1, 0.1, 0.5]); // red
+            let order = if near_first { [near, far] } else { [far, near] };
+            for (pos, color) in order {
+                let e = world.spawn();
+                world.add(e, Transform::from_position(pos));
+                world.add(e, Sprite::solid([3.0, 3.0], color));
+            }
+            voltex_ecs::propagate_transforms(&mut world);
+            let camera = Camera::orthographic(Vec3::new(0.0, 0.0, 8.0), 1.0, 6.0);
+            let mut encoder = gpu.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("capture sprite order"),
+            });
+            renderer.render(
+                &gpu.queue,
+                &mut encoder,
+                &target.color_view,
+                &target.depth_view,
+                wgpu::Color { r: 0.0, g: 0.0, b: 0.0, a: 1.0 },
+                &mut world,
+                &assets,
+                camera.view_projection(),
+                camera.position,
+                LightUniform::new(),
+            );
+            gpu.queue.submit(Some(encoder.finish()));
+            let rgba = target.read_rgba8(&gpu.device, &gpu.queue);
+            let i = (128 * 256 + 128) * 4;
+            [rgba[i], rgba[i + 1], rgba[i + 2]]
+        };
+
+        let a = render(true);
+        let b = render(false);
+        // Spawn-order independence: the two composites match closely.
+        let diff = (a[0] as i32 - b[0] as i32).abs()
+            + (a[1] as i32 - b[1] as i32).abs()
+            + (a[2] as i32 - b[2] as i32).abs();
+        assert!(diff < 12, "overlap must be spawn-order-independent: {a:?} vs {b:?}");
+        // And the near (red) sprite composites on top → red beats blue.
+        assert!(a[0] > a[2], "near red sprite should dominate the overlap: {a:?}");
+    }
+
+    #[test]
+    #[ignore = "requires a GPU adapter"]
     fn render_assets_png_loader_roundtrips_into_a_sprite() {
         use voltex_renderer_ecs::Sprite;
         let gpu = match HeadlessGpu::new() {
