@@ -29,7 +29,7 @@ use voltex_renderer::gltf::{
     AnimationPath, GltfAnimation, GltfChannel, GltfNode, GltfSkin, Interpolation,
 };
 use voltex_renderer::{
-    material::MaterialUniform, mesh::Mesh, vertex::MeshVertex, Skeleton, SkinnedMesh,
+    material::MaterialUniform, mesh::Mesh, vertex::MeshVertex, PointLight, Skeleton, SkinnedMesh,
     SkinnedMeshVertex,
 };
 use voltex_renderer_ecs::SkinnedPose;
@@ -265,6 +265,13 @@ fn register_systems(app: &mut RuntimeApp) {
     if let Some(player) = player {
         app.set_audio_listener(player);
     }
+
+    // Two colored arena point lights (warm + cool) for some dynamic-looking
+    // shading on top of the rotating sun.
+    app.set_point_lights(vec![
+        PointLight::new([6.0, 4.0, 6.0], [1.0, 0.6, 0.3], 18.0, 2.5),
+        PointLight::new([-6.0, 4.0, -6.0], [0.3, 0.5, 1.0], 18.0, 2.5),
+    ]);
 
     let stats = Rc::new(RefCell::new(DemoState::default()));
 
