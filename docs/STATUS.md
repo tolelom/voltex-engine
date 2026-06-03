@@ -173,6 +173,13 @@
 
 v1.0.9 부터는 **서비스 배포 완성도** 로드맵 (`docs/superpowers/specs/2026-05-21-service-readiness-roadmap.md`) 기준으로 진행.
 
+### 2026-06-03 — 풀스택 조합 테스트 (v1.0.75, 자율 세션)
+
+12개 프리미티브(v1.0.62~74)를 시스템 레벨에서 조합해 게임플레이 루프로 검증
+(`crates/voltex_ecs/tests/gameplay_slice.rs`, public API만): Prefabs 스폰 + spawn_child
+shield + Score/SpawnBudget 리소스 + iter_by_tag 데미지 + despawn_recursive + send/drain
+EnemyKilled 이벤트. 3개 통합 테스트 그린, **통합 버그 0**. 게임 배선 정식 예제 겸용.
+
 ### 2026-06-03 — 이벤트/메시징 (v1.0.74, 자율 세션)
 
 기초 워크플로 격차 9번째(시스템 간 통신 부재). 사이클 8 리소스 위에 `Events<T>` +

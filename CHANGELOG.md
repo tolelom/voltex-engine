@@ -10,6 +10,30 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## [v1.0.75] — 2026-06-03 — Full-stack composition test (gameplay slice)
+
+이 세션(v1.0.62~74)의 12개 프리미티브를 단위가 아닌 **시스템 레벨에서 조합**해 실제
+게임플레이 루프로 검증. 단위 테스트가 못 잡는 통합 버그를 노린다(사이클 7·8 이 이렇게
+실버그를 잡았음).
+
+### Additive — `crates/voltex_ecs/tests/gameplay_slice.rs` (외부 통합 테스트, public API만)
+
+- **`full_stack_gameplay_loop_spawns_kills_and_scores`** — `Prefabs` 로 적 스폰 +
+  `spawn_child_bundle` 로 shield 부착, `SpawnBudget`/`Score` 리소스, `iter_by_tag` 로
+  순회하며 데미지, 0 HP 시 `despawn_recursive` + `send_event(EnemyKilled)`, 별도
+  시스템이 `drain_events` 로 점수 적립. 프레임 루프를 수렴까지 돌려 Score==30,
+  적·shield 0, budget 0 단언.
+- **`events_left_undrained_persist_until_a_consumer_runs`** — consumer 가 안 돌면
+  kill 이벤트가 유실되지 않고 큐에 남아 다음 drain 에서 처리됨.
+- **`child_entities_are_torn_down_with_their_parent_mid_loop`** — 게임 흐름 안에서
+  spawn_child_bundle + despawn_recursive 상호작용 확인.
+
+### 결과
+
+- 3개 통합 테스트 그린 — **통합 버그 0** (스택이 의도대로 조합됨을 확인). 동시에 게임을
+  실제로 어떻게 배선하는지 보여주는 정식 예제 역할.
+- workspace build / clippy(`-D warnings`) / test 전부 그린.
+
 ## [v1.0.74] — 2026-06-03 — Events / messaging (decoupled systems on top of resources)
 
 기초 워크플로 격차 9번째: 시스템 간 통신 수단 부재(적 사망 → 점수·오디오·파티클을
