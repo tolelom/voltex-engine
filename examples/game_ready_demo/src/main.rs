@@ -22,6 +22,7 @@ use std::rc::Rc;
 use voltex::ecs::{Bounds, Entity, MaterialHandle, MeshHandle, ScriptComponent, Tag};
 use voltex::math::{Vec3, AABB};
 use voltex::prelude::*;
+use voltex::physics::Collider;
 use voltex_ai::{nav_agent_system, NavAgent, NavMesh, NavTriangle};
 use voltex_audio::{AudioClip, AudioSource};
 use voltex_renderer::gltf::{
@@ -37,7 +38,6 @@ use voltex_runtime::{RuntimeApp, RuntimeConfig, RuntimeResult};
 const PLAYER_TAG: &str = "player";
 const CHASER_TAG: &str = "chaser";
 const TOTEM_TAG: &str = "totem";
-const CATCH_RADIUS: f32 = 1.2;
 
 /// The player-movement Lua script (written to a temp file at startup so the
 /// path is valid regardless of the working directory).
@@ -82,6 +82,9 @@ fn main() -> RuntimeResult<()> {
                 0.15,
             )
             .with_audio(vec![beep_clip()])
+            // No rigid-body dynamics here — collisions are used only as
+            // trigger events (the set_collision_fn catch detector).
+            .disable_physics()
             .with_scene_builder(move |world, reg| setup_scene(world, reg, &script_path))
             .with_gpu_init(upload_meshes)
             .with_system_setup(register_systems),
@@ -102,6 +105,7 @@ fn setup_scene(world: &mut World, _registry: &mut ComponentRegistry, script_path
     world.add(player, Transform::from_position(Vec3::new(0.0, 0.5, 0.0)));
     world.add(player, Tag(PLAYER_TAG.to_string()));
     world.add(player, ScriptComponent::new(script_path.to_string()));
+    world.add(player, Collider::Sphere { radius: 0.6 });
 
     // Chaser: nav-mesh agent that hunts the player, beeps on catch.
     let chaser = world.spawn();
@@ -111,6 +115,7 @@ fn setup_scene(world: &mut World, _registry: &mut ComponentRegistry, script_path
     world.add(chaser, Tag(CHASER_TAG.to_string()));
     world.add(chaser, NavAgent::new(3.5));
     world.add(chaser, AudioSource::new(0u32).spatial());
+    world.add(chaser, Collider::Sphere { radius: 0.5 });
 
     // Totem: a stationary GPU-skinned strip that waves — shows skeletal
     // animation in the live runtime (mesh + pose added in gpu_init).
@@ -263,15 +268,13 @@ fn register_systems(app: &mut RuntimeApp) {
 
     let stats = Rc::new(RefCell::new(DemoState::default()));
 
-    // Chase system: target the player, run nav, update audio + readout.
+    // Chase system: target the player, run nav, track distance + elapsed time.
     let navmesh = flat_navmesh();
     let chase_stats = stats.clone();
     app.add_system(move |world, dt| {
         let Some(player_pos) = tagged_position(world, PLAYER_TAG) else {
             return;
         };
-
-        // Point every chaser at the player (re-path each frame as it moves).
         let chasers: Vec<Entity> = world
             .query2::<Tag, NavAgent>()
             .filter(|(_, t, _)| t.0 == CHASER_TAG)
@@ -282,32 +285,48 @@ fn register_systems(app: &mut RuntimeApp) {
                 agent.set_target(player_pos);
             }
         }
-
         nav_agent_system(world, &navmesh, dt);
 
-        // Distance + catch detection (single chaser for the demo).
-        let Some(chaser_pos) = tagged_position(world, CHASER_TAG) else {
-            return;
-        };
-        let dx = chaser_pos.x - player_pos.x;
-        let dz = chaser_pos.z - player_pos.z;
-        let dist = (dx * dx + dz * dz).sqrt();
-        let caught = dist < CATCH_RADIUS;
+        if let Some(chaser_pos) = tagged_position(world, CHASER_TAG) {
+            let dx = chaser_pos.x - player_pos.x;
+            let dz = chaser_pos.z - player_pos.z;
+            let mut s = chase_stats.borrow_mut();
+            s.dist = (dx * dx + dz * dz).sqrt();
+            s.time += dt;
+        }
+    });
 
-        // Drive the chaser's AudioSource: rising edge (just caught) → beep.
-        for e in &chasers {
-            if let Some(src) = world.get_mut::<AudioSource>(*e) {
+    // Catch detection via the engine's collision events (player + chaser carry
+    // sphere Colliders). Rising edge → beep + bump the counter.
+    let coll_stats = stats.clone();
+    app.set_collision_fn(move |contacts, world, _dt| {
+        let is_player_chaser = |a: Option<&str>, b: Option<&str>| {
+            (a == Some(PLAYER_TAG) && b == Some(CHASER_TAG))
+                || (a == Some(CHASER_TAG) && b == Some(PLAYER_TAG))
+        };
+        let mut caught = false;
+        for c in contacts {
+            let ta = world.get::<Tag>(c.entity_a).map(|t| t.0.clone());
+            let tb = world.get::<Tag>(c.entity_b).map(|t| t.0.clone());
+            if is_player_chaser(ta.as_deref(), tb.as_deref()) {
+                caught = true;
+            }
+        }
+        // Beep the chaser on the catch (rising edge handled by audio_sync).
+        let chaser = world
+            .query::<Tag>()
+            .find(|(_, t)| t.0 == CHASER_TAG)
+            .map(|(e, _)| e);
+        if let Some(e) = chaser {
+            if let Some(src) = world.get_mut::<AudioSource>(e) {
                 src.playing = caught;
             }
         }
-
-        let mut s = chase_stats.borrow_mut();
+        let mut s = coll_stats.borrow_mut();
         if caught && !s.caught {
             s.caught_count += 1;
         }
         s.caught = caught;
-        s.dist = dist;
-        s.time += dt;
     });
 
     // Follow camera: frame the player from behind/above so the gameplay is

@@ -21,7 +21,7 @@ use std::time::Duration;
 use voltex_asset::FileWatcher;
 use voltex_audio::AudioSystem;
 use voltex_ecs::{propagate_transforms, ComponentRegistry, Entity, World};
-use voltex_physics::PhysicsConfig;
+use voltex_physics::{detect_collisions, ContactPoint, PhysicsConfig};
 use voltex_platform::{GameTimer, InputState};
 use voltex_editor::UiContext;
 use voltex_renderer::{Camera, LightUniform};
@@ -67,6 +67,12 @@ type CameraFn = Box<dyn FnMut(&mut Camera, &World, f32) + 'static>;
 /// after the systems tick with the live [`LightUniform`] and read-only World,
 /// for day/night cycles, flicker, etc.
 type LightFn = Box<dyn FnMut(&mut LightUniform, &World, f32) + 'static>;
+/// Per-frame collision callback (see [`RuntimeApp::set_collision_fn`]). Receives
+/// the frame's contact pairs (between entities carrying a
+/// [`Collider`](voltex_physics::Collider) and a Transform) plus the mutable
+/// World, for trigger/hit reactions. Runs regardless of `enable_physics`, so it
+/// doubles as a trigger-zone detector.
+type CollisionFn = Box<dyn FnMut(&[ContactPoint], &mut World, f32) + 'static>;
 
 /// The runtime's top-level application object. Owns the ECS world, asset
 /// stores, schedulers, and the main loop integration with `winit`/`wgpu`.
@@ -81,6 +87,8 @@ pub struct RuntimeApp {
     pub(crate) camera_fn: Option<CameraFn>,
     /// Optional per-frame directional-light updater (see [`Self::set_light_fn`]).
     pub(crate) light_fn: Option<LightFn>,
+    /// Optional per-frame collision/trigger callback (see [`Self::set_collision_fn`]).
+    collision_fn: Option<CollisionFn>,
     /// Polling file watcher used for script / scene hot reload.
     pub file_watcher: FileWatcher,
     /// Fixed-step timer driving update / render dt.
@@ -181,6 +189,7 @@ impl RuntimeApp {
             hud_fn: None,
             camera_fn: None,
             light_fn: None,
+            collision_fn: None,
             file_watcher: FileWatcher::new(Duration::from_millis(500)),
             timer: GameTimer::new(60),
             input: InputState::new(),
@@ -306,6 +315,30 @@ impl RuntimeApp {
         self.light_fn.is_some()
     }
 
+    /// Register a per-frame collision/trigger callback. Each frame the runtime
+    /// runs broad+narrow phase over entities with a
+    /// [`Collider`](voltex_physics::Collider) + Transform and hands the
+    /// resulting contact pairs (plus mutable World) to `f` — react to hits,
+    /// implement triggers, despawn on contact, etc. Runs even with physics
+    /// disabled (pure trigger detection). Replaces any previous callback.
+    ///
+    /// ```ignore
+    /// app.set_collision_fn(|contacts, world, _dt| {
+    ///     for c in contacts { /* react to c.entity_a / c.entity_b */ }
+    /// });
+    /// ```
+    pub fn set_collision_fn<F>(&mut self, f: F)
+    where
+        F: FnMut(&[ContactPoint], &mut World, f32) + 'static,
+    {
+        self.collision_fn = Some(Box::new(f));
+    }
+
+    /// `true` if a collision callback has been registered.
+    pub fn has_collision_fn(&self) -> bool {
+        self.collision_fn.is_some()
+    }
+
     /// Run one frame's worth of non-rendering systems. Used internally by the
     /// winit handler and directly by unit tests / headless harnesses that
     /// don't need a window.
@@ -315,6 +348,13 @@ impl RuntimeApp {
         voltex_renderer_ecs::update_skinned_poses(&mut self.world, dt);
         if self.config.enable_physics {
             voltex_physics::physics_step(&mut self.world, &self.physics_config);
+        }
+        // Collision/trigger events: detect contacts and hand them to the game.
+        // Runs even without physics dynamics, so it works as a trigger detector.
+        if let Some(mut cf) = self.collision_fn.take() {
+            let contacts = detect_collisions(&self.world);
+            cf(&contacts, &mut self.world, dt);
+            self.collision_fn = Some(cf);
         }
         if self.config.enable_scripts {
             // Publish the current frame's input so the `input` Lua table reads
@@ -627,6 +667,40 @@ mod tests {
         fnc(&mut cam, &app.world, 0.016);
         assert!(seen.get(), "camera_fn should have run");
         assert_eq!(cam.position, Vec3::new(3.0, 3.0, 3.0));
+    }
+
+    #[test]
+    fn collision_fn_receives_overlapping_pairs() {
+        use voltex_physics::Collider;
+        let cfg = RuntimeConfig::new()
+            .disable_physics()
+            .disable_scripts()
+            .disable_crash_log();
+        let mut app = RuntimeApp::new(cfg).unwrap();
+
+        // Two overlapping unit spheres → one contact pair.
+        let a = app.world.spawn();
+        app.world.add(a, Transform::from_position(Vec3::ZERO));
+        app.world.add(a, Collider::Sphere { radius: 1.0 });
+        let b = app.world.spawn();
+        app.world.add(b, Transform::from_position(Vec3::new(0.5, 0.0, 0.0)));
+        app.world.add(b, Collider::Sphere { radius: 1.0 });
+
+        let hits = Rc::new(Cell::new(0usize));
+        let h = hits.clone();
+        app.set_collision_fn(move |contacts, _world, _dt| h.set(contacts.len()));
+        assert!(app.has_collision_fn());
+
+        // Trigger detection runs even though physics is disabled.
+        app.tick_systems_only(0.016);
+        assert!(hits.get() >= 1, "overlapping colliders should report a contact");
+
+        // Separated → no contact.
+        if let Some(t) = app.world.get_mut::<Transform>(b) {
+            t.position = Vec3::new(10.0, 0.0, 0.0);
+        }
+        app.tick_systems_only(0.016);
+        assert_eq!(hits.get(), 0, "separated colliders should report no contact");
     }
 
     #[test]

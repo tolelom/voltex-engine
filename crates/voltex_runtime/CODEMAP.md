@@ -55,6 +55,7 @@
 - **GPU init lazy**: `RuntimeApp::new` 는 window/GPU 를 만들지 않는다. `with_gpu_init` 콜백이 첫 `resumed` 에서 한 번만 실행. 헤드리스 단위 테스트에서는 `tick_systems_only` 만 호출 가능.
 - **BasicRenderer 시그너처**: handler.rs 의 `redraw` 가 직접 호출. `voltex_renderer_ecs::BasicRenderer::render` 인자가 바뀌면 함께 갱신.
 - **카메라**: 초기 위치/방향은 `RuntimeConfig::with_camera(pos, yaw, pitch)` / `with_camera_fov` (기본 `(0,10,20)`, yaw 0, pitch -0.4, 45°). 매 프레임 추적(follow/orbit)은 `RuntimeApp::set_camera_fn(\|cam, world, dt\| ...)` — tick 직후 실행되며 기본 RMB fly-camera를 override. **주의**: 기본 카메라가 멀어서(z=20) 1-unit 오브젝트는 화면에서 ~15px 점으로 보임 — 게임은 거의 항상 with_camera/set_camera_fn로 프레이밍해야 함 (voltex_capture `camera_framing_controls_visible_object_size` 회귀가 가드).
+- **충돌/트리거 이벤트**: `RuntimeApp::set_collision_fn(\|contacts, &mut world, dt\| ...)` — 매 프레임 `detect_collisions`(Collider+Transform 엔티티) 결과를 game에 전달. `enable_physics` 무관하게 실행 → 강체 없이 트리거 존으로도 사용. physics_step 직후 실행.
 - **조명**: `RuntimeConfig::with_light(dir, color, ambient)` (기본 `(0,-1,-1)`/흰색/0.1) + `RuntimeApp::set_light_fn(\|light, world, dt\| ...)` (day/night·flicker). camera_fn 직후 실행. 단일 directional light (BasicRenderer 한계) — 멀티 라이트는 PBR 파이프라인 전용.
 - **사용자 시스템 시그너처**: `FnMut(&mut World, f32) + 'static`. dt 는 호출 프레임의 dt (fixed_dt 가 Some 면 그 값).
 - **HUD 오버레이**: `with_hud(true)` + `set_hud_fn(|ui, world| ...)`. UiContext/UiRenderer 는 `RuntimeState`(GPU) 에 보관, `resumed` 에서 생성. `redraw` 가 BasicRenderer 다음 같은 encoder 로 `LoadOp::Load` UI 패스. 콜백은 `take()` 로 꺼내 `app.world` 와 disjoint-field 借用 충돌 회피.
@@ -65,7 +66,7 @@
 ## 테스트
 - 단위 테스트: src/**/*.rs `#[cfg(test)]`
 - 실행: `cargo test -p voltex_runtime --lib`
-- 현재 테스트 개수: 58개 (light config + set_light_fn ×2 추가)
+- 현재 테스트 개수: 59개 (collision_fn ×1 추가)
 - GPU/winit 의존 테스트는 직접 검증 불가 → examples/runtime_demo 수동 실행 검증
 
 ## 예제

@@ -177,6 +177,7 @@
 - **voltex_cli editor 모드** — `voltex new/build/run` 만. `voltex editor` 서브커맨드 v1.1.
 - ~~**HUD 통합**~~ ✅ 2026-06-03 — `RuntimeApp::set_hud_fn` + `RuntimeConfig::with_hud` (v1.0.59).
 - ~~**런타임 카메라 고정**~~ ✅ 2026-06-03 — `RuntimeConfig::with_camera(pos,yaw,pitch)`/`with_camera_fov` + `RuntimeApp::set_camera_fn(follow/orbit)`. 기존 하드코딩 `(0,10,20)` 가 기본값으로 유지되지만 이제 게임이 프레이밍 가능. (발견 계기: game_ready_demo에서 1-unit 큐브가 먼 기본 카메라 때문에 ~15px 점으로만 보여 "박스 안 보임" 리포트. 렌더는 정상이었음.)
+- ~~**충돌/트리거 이벤트 런타임 노출**~~ ✅ 2026-06-03 — `RuntimeApp::set_collision_fn(\|contacts, &mut world, dt\|)`. 매 프레임 `detect_collisions` 결과(entity_a/entity_b 페어) 전달. `enable_physics` 무관 실행(트리거 존). game_ready_demo의 "잡힘"을 거리 계산 → 실제 Collider 충돌 이벤트로 교체. +1 테스트.
 - ~~**런타임 조명 고정**~~ ✅ 2026-06-03 — `RuntimeConfig::with_light(dir,color,ambient)` + `RuntimeApp::set_light_fn(\|light,world,dt\|)` (day/night·flicker). 기본값은 기존 `LightUniform::new()` 와 동일(역호환). 단일 directional light — 런타임 멀티 라이트(PBR 통합)는 후속.
 - **1573 missing_docs** — facade prelude + tier-1 API 만 보장. crate 별 점진 작성 v1.1. v1.0.19 부터 시작: voltex_math 59→0, v1.0.20 voltex_platform 38→0. 나머지 11 crate (~1476): asset / net / ai / physics / audio / ecs / script / renderer_ecs / editor / runtime / renderer.
 - **`pub(crate)` 다운그레이드** — 후보 노트 (`docs/v1.0-pub-audit.md`) 만 작성. 실 변경 v1.1.
