@@ -60,7 +60,16 @@ impl SpotShadowMap {
 /// The projection uses a perspective matrix with FOV = 2 * outer_angle,
 /// 1:1 aspect ratio, near = 0.1, far = range.
 pub fn spot_shadow_matrix(position: Vec3, direction: Vec3, outer_angle: f32, range: f32) -> Mat4 {
-    let dir = direction.normalize();
+    // A zero/degenerate direction would normalize to NaN and poison the view
+    // matrix; fall back to straight-down so the shadow stays finite.
+    let dir = {
+        let d = direction.normalize_or_zero();
+        if d == Vec3::ZERO {
+            Vec3::new(0.0, -1.0, 0.0)
+        } else {
+            d
+        }
+    };
 
     // Pick a stable up vector that isn't parallel to the light direction.
     let up = if dir.cross(Vec3::Y).length_squared() < 1e-6 {
@@ -164,5 +173,16 @@ mod tests {
         let vp = spot_shadow_matrix(pos, dir, 30.0_f32.to_radians(), 15.0);
         // Should not panic; the matrix should be valid
         assert_ne!(vp.cols, Mat4::IDENTITY.cols);
+    }
+
+    #[test]
+    fn spot_shadow_matrix_with_zero_direction_is_finite() {
+        // A zero direction must fall back to straight-down rather than NaN.
+        let vp = spot_shadow_matrix(Vec3::new(0.0, 10.0, 0.0), Vec3::ZERO, 30.0_f32.to_radians(), 15.0);
+        for col in &vp.cols {
+            for x in col {
+                assert!(x.is_finite(), "spot shadow matrix must be finite, got {x}");
+            }
+        }
     }
 }

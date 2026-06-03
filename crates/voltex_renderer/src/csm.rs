@@ -179,8 +179,18 @@ pub fn compute_cascade_matrices(
     let ndc_split = depth_to_ndc(split);
     let ndc_far = depth_to_ndc(far);
 
-    // Light direction is the direction light travels (away from the source).
-    let dir = (-light_dir).normalize();
+    // Light direction is the direction light travels (away from the source). A
+    // zero/degenerate `light_dir` (e.g. an uninitialised light) would normalize
+    // to NaN and poison every cascade matrix; fall back to straight-down,
+    // matching the runtime's directional_light_vp.
+    let dir = {
+        let d = (-light_dir).normalize_or_zero();
+        if d == Vec3::ZERO {
+            Vec3::new(0.0, -1.0, 0.0)
+        } else {
+            d
+        }
+    };
 
     let corners0 = frustum_corners_world(&inv_vp, ndc_near, ndc_split);
     let corners1 = frustum_corners_world(&inv_vp, ndc_split, ndc_far);
@@ -260,5 +270,21 @@ mod tests {
         assert!((corners[0].z - 0.0).abs() < 1e-5);
         // Far plane at z=1
         assert!((corners[4].z - 1.0).abs() < 1e-5);
+    }
+
+    #[test]
+    fn compute_cascade_matrices_with_zero_light_dir_is_finite() {
+        // A zero light direction (uninitialised light) must not poison the
+        // cascade matrices with NaN — it falls back to straight-down.
+        let view = Mat4::look_at(Vec3::new(0.0, 5.0, 10.0), Vec3::ZERO, Vec3::Y);
+        let proj = Mat4::perspective(std::f32::consts::FRAC_PI_4, 16.0 / 9.0, 0.1, 100.0);
+        let matrices = compute_cascade_matrices(Vec3::ZERO, &view, &proj, 0.1, 100.0, 20.0);
+        for m in &matrices {
+            for col in &m.cols {
+                for x in col {
+                    assert!(x.is_finite(), "cascade matrix must be finite, got {x}");
+                }
+            }
+        }
     }
 }
