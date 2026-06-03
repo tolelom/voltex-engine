@@ -173,6 +173,13 @@
 
 v1.0.9 부터는 **서비스 배포 완성도** 로드맵 (`docs/superpowers/specs/2026-05-21-service-readiness-roadmap.md`) 기준으로 진행.
 
+### 2026-06-03 — 프리팹 레지스트리 (v1.0.67, 자율 세션)
+
+기초 워크플로 격차 6번째(같은 엔티티 반복 조립). `voltex_ecs::Prefabs` — `register(name, factory)`/
+`spawn(world, name)`. spawn_bundle 위 "한 번 정의, 이름으로 인스턴스화"(Unity Prefab).
+팩토리 컴포넌트-무관. facade prelude 노출. 단위 6 + 변이 테스트. `game_ready_demo`
+pickup 3개를 프리팹 인스턴스화+per-instance 설정으로 전환. build/clippy/test 그린.
+
 ### 2026-06-03 — 프레임 클록 (v1.0.66, 자율 세션)
 
 기초 워크플로 격차 5번째(시스템이 dt만 받고 누적 시간 없음). `voltex_runtime::Time`

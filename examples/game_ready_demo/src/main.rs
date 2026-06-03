@@ -136,14 +136,23 @@ fn setup_scene(world: &mut World, _registry: &mut ComponentRegistry, script_path
     world.spawn_bundle((tt, Tag(TOTEM_TAG.to_string())));
 
     // Floating billboard "pickups": camera-facing colored sprites scattered
-    // around the arena (no texture → solid color via Sprite::solid).
+    // around the arena. Defined once as a "pickup" prefab, then instantiated
+    // per spawn point and configured per-instance (the Unity prefab pattern).
+    let mut prefabs = Prefabs::new();
+    prefabs.register("pickup", |w| {
+        w.spawn_bundle((Transform::default(), Sprite::solid([0.8, 0.8], [1.0, 1.0, 1.0, 1.0])))
+    });
     let pickups = [
         (Vec3::new(4.0, 1.2, -4.0), [1.0, 0.85, 0.1, 1.0]),
         (Vec3::new(-4.0, 1.2, 4.0), [0.1, 1.0, 0.4, 1.0]),
         (Vec3::new(6.0, 1.2, 2.0), [0.3, 0.7, 1.0, 1.0]),
     ];
     for (pos, color) in pickups {
-        world.spawn_bundle((Transform::from_position(pos), Sprite::solid([0.8, 0.8], color)));
+        let e = prefabs.spawn(world, "pickup").expect("pickup prefab is registered");
+        world.get_mut::<Transform>(e).unwrap().position = pos;
+        if let Some(sprite) = world.get_mut::<Sprite>(e) {
+            sprite.color = color;
+        }
     }
 }
 

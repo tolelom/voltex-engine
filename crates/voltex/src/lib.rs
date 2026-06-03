@@ -58,7 +58,7 @@ pub mod prelude {
     // ECS 핵심 + C0a 의 렌더링 컴포넌트 + S1 의 스크립트 컴포넌트
     pub use voltex_ecs::{
         Bounds, Bundle, Children, Component, ComponentRegistry, Entity, MaterialHandle, MeshHandle,
-        Parent, ScriptComponent, Transform, World,
+        Parent, Prefabs, ScriptComponent, Transform, World,
     };
 
     // 플랫폼 (윈도우, 입력, 타이머)
@@ -117,6 +117,8 @@ mod tests {
         _imap.bind_mouse("fire", MouseButton::Left);
         // Runtime clock reachable via prelude:
         let _t: Time = Time::new();
+        // Prefab registry reachable via prelude:
+        let _p = Prefabs::new();
     }
 
     /// 모듈 경로 re-export가 작동하는지 검증.

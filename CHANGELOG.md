@@ -10,6 +10,27 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## [v1.0.67] — 2026-06-03 — Prefab registry (named entity templates)
+
+기초 워크플로 격차 6번째: 같은 엔티티를 여러 번 만들 때 매번 컴포넌트 조립을 반복.
+Unity Prefab / Godot PackedScene 처럼 "한 번 정의, 이름으로 인스턴스화".
+
+### Additive — `voltex_ecs::prefab`
+
+- **`Prefabs`** 레지스트리 + `register(name, \|&mut World\| -> Entity)` /
+  `spawn(&mut World, name) -> Option<Entity>` / `contains` / `len` / `is_empty`.
+  팩토리는 `spawn_bundle`(사이클 v1.0.64) 위에 얹히고 컴포넌트-무관이라 어느 crate
+  컴포넌트(Sprite 등)든 클로저 안에서 사용. 미등록 이름 spawn → `None`(아무것도 안 만듦).
+- facade prelude 에 `Prefabs` 추가.
+
+### 검증
+
+- 단위 6개(템플릿 인스턴스화, 미등록 None, 2회 distinct, 인스턴스별 후처리, contains/len,
+  재등록 교체) + 변이 테스트(`contains` 반전 RED→GREEN).
+- **실증**: `game_ready_demo` 의 3개 pickup 이 "pickup" 프리팹 등록 → 스폰 지점마다
+  인스턴스화 후 위치/색 per-instance 설정(Unity instantiate-then-configure 패턴).
+- workspace build / clippy(`-D warnings`) / lib test 전부 그린.
+
 ## [v1.0.66] — 2026-06-03 — Frame clock for systems (`Time` + `add_timed_system`)
 
 기초 워크플로 격차 5번째: 시스템은 per-frame `dt` 만 받고 **누적 경과 시간·프레임
