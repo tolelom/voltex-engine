@@ -640,6 +640,56 @@ mod tests {
         assert!(bb > br, "blue-textured cube should be blue-dominant: R={br} B={bb}");
     }
 
+    /// Minimal GLB (one triangle, POSITION + indices) — mirrors the
+    /// voltex_image parser's own test fixture.
+    fn minimal_glb_triangle() -> Vec<u8> {
+        let mut bin = Vec::new();
+        for &v in &[0.0f32, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0] {
+            bin.extend_from_slice(&v.to_le_bytes());
+        }
+        for &i in &[0u16, 1, 2] {
+            bin.extend_from_slice(&i.to_le_bytes());
+        }
+        bin.extend_from_slice(&[0, 0]); // 4-byte align
+        let json = format!(
+            r#"{{"asset":{{"version":"2.0"}},"buffers":[{{"byteLength":{}}}],"bufferViews":[{{"buffer":0,"byteOffset":0,"byteLength":36}},{{"buffer":0,"byteOffset":36,"byteLength":6}}],"accessors":[{{"bufferView":0,"componentType":5126,"count":3,"type":"VEC3","max":[1.0,1.0,0.0],"min":[0.0,0.0,0.0]}},{{"bufferView":1,"componentType":5123,"count":3,"type":"SCALAR"}}],"meshes":[{{"name":"Tri","primitives":[{{"attributes":{{"POSITION":0}},"indices":1}}]}}]}}"#,
+            bin.len()
+        );
+        let jb = json.into_bytes();
+        let jpad = (jb.len() + 3) & !3;
+        let mut json_padded = jb;
+        while json_padded.len() < jpad {
+            json_padded.push(b' ');
+        }
+        let total = 12 + 8 + json_padded.len() + 8 + bin.len();
+        let mut glb = Vec::with_capacity(total);
+        glb.extend_from_slice(&0x46546C67u32.to_le_bytes()); // glTF magic
+        glb.extend_from_slice(&2u32.to_le_bytes());
+        glb.extend_from_slice(&(total as u32).to_le_bytes());
+        glb.extend_from_slice(&(json_padded.len() as u32).to_le_bytes());
+        glb.extend_from_slice(&0x4E4F534Au32.to_le_bytes()); // JSON
+        glb.extend_from_slice(&json_padded);
+        glb.extend_from_slice(&(bin.len() as u32).to_le_bytes());
+        glb.extend_from_slice(&0x004E4942u32.to_le_bytes()); // BIN\0
+        glb.extend_from_slice(&bin);
+        glb
+    }
+
+    #[test]
+    #[ignore = "requires a GPU adapter"]
+    fn loads_gltf_mesh() {
+        let gpu = match HeadlessGpu::new() {
+            Ok(g) => g,
+            Err(e) => {
+                eprintln!("skip: {e}");
+                return;
+            }
+        };
+        let glb = minimal_glb_triangle();
+        let mesh = voltex_renderer::Mesh::from_gltf(&gpu.device, &glb).expect("parse+upload glTF");
+        assert_eq!(mesh.num_indices, 3, "triangle should have 3 indices");
+    }
+
     #[test]
     #[ignore = "requires a GPU adapter"]
     fn loads_png_into_texture_and_renders() {

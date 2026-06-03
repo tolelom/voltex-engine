@@ -41,6 +41,17 @@ impl Mesh {
         Mesh::new(device, &data.vertices, &data.indices)
     }
 
+    /// Parse a glTF/GLB byte buffer and upload its **first** mesh primitive as
+    /// a GPU mesh. Convenience over [`parse_gltf`](crate::parse_gltf) +
+    /// [`Mesh::new`]. Returns the decoder error / "no meshes" on failure.
+    /// (Materials, skins, animations, and additional primitives are ignored
+    /// here — use `parse_gltf` directly for those.)
+    pub fn from_gltf(device: &wgpu::Device, bytes: &[u8]) -> Result<Self, String> {
+        let data = crate::parse_gltf(bytes).map_err(|e| e.to_string())?;
+        let prim = data.meshes.first().ok_or("glTF has no meshes")?;
+        Ok(Mesh::new(device, &prim.vertices, &prim.indices))
+    }
+
     /// Create a mesh with additional buffer usage flags (e.g. `BLAS_INPUT` for ray tracing).
     pub fn new_with_usage(
         device: &wgpu::Device,
