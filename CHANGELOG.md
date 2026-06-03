@@ -10,6 +10,27 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## [v1.0.69] — 2026-06-03 — Per-frame materialization (runtime-spawned renderables become visible)
+
+사이클 1(v1.0.62)의 실제 한계 수정: `materialize_renderables` 가 `gpu_init` 에서 **한 번만**
+실행돼, 부팅 후 런타임에 스폰된 엔티티(Lua `spawn_entity`, 투사체 팩토리, 게임플레이
+시스템)가 `PrimitiveMesh`/`MaterialDesc` 를 달아도 GPU 자원을 영영 못 받아 안 보였다.
+
+### Fix — `voltex_runtime` 핸들러
+
+- redraw 경로에서 `tick_systems_only` **직후 매 프레임** `materialize_renderables` 호출
+  (device 가 거기서만 존재). idempotent(이미 resolve 된 엔티티 skip) + pending 없으면
+  저렴(쿼리 2회). 부팅 엔티티는 첫 프레임에서 커버되고, 이후 스폰 엔티티도 다음
+  프레임에 자동 가시화. gpu_init 의 1회 materialize 는 첫 렌더 전 보장용으로 유지.
+- 정적 메시를 수동 부착(MeshHandle)하는 기존 게임은 PrimitiveMesh 가 없어 무영향.
+
+### 검증
+
+- RTX 4080 capture 회귀 `materialize_picks_up_entities_spawned_after_a_prior_pass` —
+  1차 materialize 후 새 엔티티를 스폰하면 2차 pass 가 그것을 resolve(MeshHandle+
+  MaterialHandle 부착) 함을 확인 — 런타임 스폰 시나리오의 정확한 재현.
+- workspace build / clippy(`-D warnings`) / lib test 전부 그린.
+
 ## [v1.0.68] — 2026-06-03 — Data-authored visual scenes (compose v1.0.62/64/67) + scene-anchor doc
 
 상용 엔진의 본질은 "코드가 아닌 데이터 씬"이다. 사이클 1(선언적 렌더러블)이

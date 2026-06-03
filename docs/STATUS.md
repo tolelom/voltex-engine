@@ -173,6 +173,14 @@
 
 v1.0.9 부터는 **서비스 배포 완성도** 로드맵 (`docs/superpowers/specs/2026-05-21-service-readiness-roadmap.md`) 기준으로 진행.
 
+### 2026-06-03 — 프레임별 materialize (v1.0.69, 자율 세션)
+
+사이클 1 한계 수정: `materialize_renderables`가 gpu_init 1회만 실행돼 런타임 스폰
+엔티티(Lua/투사체/게임플레이)가 선언적 렌더러블을 달아도 안 보였음. 핸들러 redraw에서
+`tick_systems_only` 직후 매 프레임 materialize 호출(idempotent, pending 없으면 저렴).
+RTX 4080 capture 회귀 `materialize_picks_up_entities_spawned_after_a_prior_pass`로
+런타임 스폰 시나리오 검증. build/clippy/test 그린.
+
 ### 2026-06-03 — 데이터 저작 visual 씬 (v1.0.68, 자율 세션)
 
 상용 엔진의 본질인 "코드 아닌 데이터 씬" 결합 검증. 사이클 1의 `PrimitiveMesh`/

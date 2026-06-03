@@ -213,6 +213,26 @@ fn redraw(app: &mut RuntimeApp, event_loop: &ActiveEventLoop) {
 
     app.tick_systems_only(dt);
 
+    // Materialize declarative renderables spawned *this frame* by scripts or
+    // gameplay systems. gpu_init only covers boot-time entities; entities that
+    // appear at runtime (Lua spawn, projectile factories, …) carrying
+    // PrimitiveMesh/MaterialDesc would otherwise never get GPU resources. This
+    // is idempotent and cheap when nothing is pending.
+    {
+        let state_ptr: *const RuntimeState =
+            app.runtime_state.as_ref().expect("redraw needs runtime_state") as *const _;
+        // SAFETY: shared device ref while mutating the disjoint world/assets
+        // fields — same split-borrow pattern as gpu_init.
+        unsafe {
+            let st = &*state_ptr;
+            voltex_renderer_ecs::materialize_renderables(
+                &mut app.world,
+                &mut app.assets,
+                &st.gpu.device,
+            );
+        }
+    }
+
     // Game-controlled camera (follow / orbit / cinematic), if registered.
     // Runs after the tick so it sees this frame's world, and overrides the
     // fly-camera above. Taken out so it can borrow `app.world` while the

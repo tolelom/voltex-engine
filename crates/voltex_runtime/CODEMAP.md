@@ -51,7 +51,7 @@
 8. `audio_sync_system` (enable_audio 시) — 같은 프레임의 playback 토글/listener 이동 반영
 9. `update_lifetimes` — 마지막. `Lifetime` 엔티티를 카운트다운 후 만료 시 `despawn_recursive` (사용자 시스템이 마지막 프레임을 관측한 뒤 제거). no-op if 없음
 
-매 프레임 `run()` 의 winit handler 가 `tick_systems_only` 호출 후 `BasicRenderer::render` (+ enable_hud 시 UI 오버레이) 로 화면 출력.
+매 프레임 `run()` 의 winit handler 가 `tick_systems_only` 호출 → `materialize_renderables`(이번 프레임에 스폰된 `PrimitiveMesh`/`MaterialDesc` 엔티티를 GPU 메시/머티리얼로, device 필요해 handler 에서 실행) → `BasicRenderer::render` (+ enable_hud 시 UI 오버레이) 로 화면 출력. materialize 는 idempotent + pending 없으면 저렴.
 
 ## 변경 시 주의점
 - **Drop 순서**: `RuntimeApp` 의 필드 선언 순서가 곧 drop 순서. `runtime_state` (GPU) → `user_systems` → `file_watcher`/`timer`/`input`/`physics_config` → `script_pool` (LuaState 의 `__voltex_world` light userdata 가 World 보다 먼저 drop) → `assets`/`registry`/`world` → `config`. 이 순서는 LuaState use-after-free 회피용. 필드 추가/순서 변경 시 LuaState 가 World 보다 먼저 drop 됨을 유지.

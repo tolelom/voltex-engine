@@ -2111,6 +2111,49 @@ mod tests {
 
     #[test]
     #[ignore]
+    fn materialize_picks_up_entities_spawned_after_a_prior_pass() {
+        // The runtime calls materialize_renderables every frame (not just at
+        // gpu_init) so entities spawned at runtime — by Lua, projectile
+        // factories, etc. — become drawable. This proves a later pass resolves
+        // an entity that did not exist during the first pass.
+        use voltex_renderer_ecs::{materialize_renderables, MaterialDesc, PrimitiveMesh};
+
+        let gpu = match HeadlessGpu::new() {
+            Ok(g) => g,
+            Err(e) => {
+                eprintln!("skipping: {e}");
+                return;
+            }
+        };
+        let mut assets = RenderAssets::new();
+        let mut world = World::new();
+
+        // Frame 1: one cube, materialized.
+        let a = world.spawn();
+        world.add(a, Transform::default());
+        world.add(a, PrimitiveMesh::cube(1.0));
+        world.add(a, MaterialDesc::color([1.0, 1.0, 1.0, 1.0]));
+        materialize_renderables(&mut world, &mut assets, &gpu.device);
+        assert!(world.get::<MeshHandle>(a).is_some(), "frame-1 entity resolved");
+
+        // Frame 2: a new entity appears (as if spawned by a script) and the
+        // next materialize pass must resolve it too.
+        let b = world.spawn();
+        world.add(b, Transform::from_position(Vec3::new(2.0, 0.0, 0.0)));
+        world.add(b, PrimitiveMesh::sphere_default(0.5));
+        world.add(b, MaterialDesc::color([1.0, 0.0, 0.0, 1.0]));
+        assert!(world.get::<MeshHandle>(b).is_none(), "not yet materialized");
+
+        materialize_renderables(&mut world, &mut assets, &gpu.device);
+        assert!(
+            world.get::<MeshHandle>(b).is_some(),
+            "a later materialize pass must resolve a runtime-spawned entity"
+        );
+        assert!(world.get::<MaterialHandle>(b).is_some());
+    }
+
+    #[test]
+    #[ignore]
     fn materialize_dedupes_identical_meshes_and_attaches_bounds() {
         use voltex_ecs::Bounds;
         use voltex_renderer_ecs::{materialize_renderables, MaterialDesc, PrimitiveMesh};
