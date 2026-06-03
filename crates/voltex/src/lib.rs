@@ -53,7 +53,7 @@ pub use voltex_asset::Vfs;
 /// 제외 — `voltex::ecs::Result`, `voltex::editor::Result` 등 명시 경로 사용.
 pub mod prelude {
     // 수학 — 거의 모든 코드가 필요
-    pub use voltex_math::{Mat4, Quat, Ray, Vec2, Vec3, Vec4, AABB};
+    pub use voltex_math::{Mat4, Quat, Ray, Rng, Vec2, Vec3, Vec4, AABB};
 
     // ECS 핵심 + C0a 의 렌더링 컴포넌트 + S1 의 스크립트 컴포넌트
     pub use voltex_ecs::{

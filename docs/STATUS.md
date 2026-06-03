@@ -173,6 +173,13 @@
 
 v1.0.9 부터는 **서비스 배포 완성도** 로드맵 (`docs/superpowers/specs/2026-05-21-service-readiness-roadmap.md`) 기준으로 진행.
 
+### 2026-06-03 — 결정론적 RNG (v1.0.79, 자율 세션)
+
+게임 무작위성 토대. `voltex_math::Rng`(SplitMix64, 외부 dep 0) — `seeded`/`next_*`/
+`range_f32`/`range_i32`/`chance`/`unit_vec2`/`unit_vec3`. 시드 동일→시퀀스 동일(결정론).
+World 리소스로 per-run 보관. facade prelude 노출. 단위 8(보정 테스트 포함) + 변이 테스트.
+build/clippy/test 그린.
+
 ### 2026-06-03 — flocking ECS 시스템 (v1.0.78, 자율 세션)
 
 v1.0.77 순수 함수를 시스템으로. `Boid` 컴포넌트 + `BoidParams` + `flocking_system(world,

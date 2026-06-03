@@ -1,19 +1,21 @@
 # voltex_math
 
 ## 책임 (한 줄)
-선형대수 원시 타입 — Vec2/3/4, Mat4, AABB, Ray.
+선형대수 원시 타입 — Vec2/3/4, Mat4, AABB, Ray + 결정론적 RNG.
 
 ## 공개 API 진입점
 - `Vec2`, `Vec3`, `Vec4` — 2D/3D/4D 벡터 (src/vec2.rs, src/vec3.rs, src/vec4.rs)
 - `Mat4` — 4x4 변환 행렬, transform/lookAt/perspective/orthographic/inverse (src/mat4.rs)
 - `AABB` — 축 정렬 바운딩 박스 (src/aabb.rs)
 - `Ray` — 광선 (origin + direction) (src/ray.rs)
+- `Rng` — SplitMix64 결정론적 PRNG. `seeded`/`next_u64`/`next_u32`/`next_f32`/`range_f32`/`range_i32`/`chance`/`unit_vec2`/`unit_vec3` (src/rng.rs). 외부 dep 0, 시드 동일→시퀀스 동일
 
 ## 모듈 구조
 - `vec2`, `vec3`, `vec4` — 벡터 (src/vec2.rs, vec3.rs, vec4.rs)
 - `mat4` — 4x4 행렬 + 변환 함수 (src/mat4.rs)
 - `aabb` — AABB (src/aabb.rs)
 - `ray` — Ray (src/ray.rs)
+- `rng` — Rng 결정론적 PRNG (src/rng.rs)
 
 ## 의존성
 - voltex crate: 없음

@@ -10,6 +10,26 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## [v1.0.79] — 2026-06-03 — Deterministic RNG (`voltex_math::Rng`)
+
+게임은 무작위성(스폰 jitter·전리품·절차 배치)이 필요하지만 엔진엔 없었고, 프로젝트의
+외부-dep-0 정책상 `rand` 크레이트는 부적합. 내장 결정론적 PRNG 추가(SplitMix64).
+
+### Additive — `voltex_math::rng`
+
+- **`Rng`** — `seeded(u64)` / `next_u64` / `next_u32` / `next_f32`([0,1)) /
+  `range_f32(min,max)` / `range_i32(min,max)` / `chance(p)` / `unit_vec2` /
+  `unit_vec3`(area-uniform 구면). 외부 dep 0. **시드 동일 → 시퀀스 동일**(리플레이/
+  네트워크/테스트 결정론). World 리소스로 보관해 per-run 제너레이터로 활용.
+- facade prelude(math)에 `Rng` 추가.
+
+### 검증
+
+- 단위 8개(시드 결정론, 시드 분기, f32 [0,1), range_f32/i32 경계+커버리지, chance
+  극단값, **chance 보정**(p=0.25 → 10만 표본 ±2%), unit 벡터 정규화) + 변이 테스트
+  (`>>8`→`>>7` 로 [0,1) 깨면 RED→GREEN).
+- workspace build / clippy(`-D warnings`) / lib test 전부 그린.
+
 ## [v1.0.78] — 2026-06-03 — Flocking as an ECS system (`Boid` + `flocking_system`)
 
 v1.0.77 의 순수 boid 함수를 "한 번 호출로 군집 AI" 로 끌어올림 (선언적 렌더러블 →
