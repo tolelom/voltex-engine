@@ -8,7 +8,8 @@ struct Sprite {
     camera_up: vec4<f32>,
     center: vec4<f32>,
     color: vec4<f32>,
-    size: vec4<f32>, // xy = width/height
+    size: vec4<f32>,    // xy = width/height
+    uv_rect: vec4<f32>, // [u_min, v_min, u_max, v_max]
 };
 @group(0) @binding(0) var<uniform> sprite: Sprite;
 
@@ -32,7 +33,8 @@ fn vs_main(in: VsIn) -> VsOut {
         + sprite.camera_right.xyz * (in.corner.x * sprite.size.x)
         + sprite.camera_up.xyz * (in.corner.y * sprite.size.y);
     out.clip = sprite.view_proj * vec4<f32>(world, 1.0);
-    out.uv = in.uv;
+    // Remap the unit-quad UV into the sprite's texture sub-rect (atlas frame).
+    out.uv = mix(sprite.uv_rect.xy, sprite.uv_rect.zw, in.uv);
     return out;
 }
 

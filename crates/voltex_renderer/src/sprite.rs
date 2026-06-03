@@ -59,6 +59,9 @@ pub struct SpriteUniform {
     pub color: [f32; 4],
     /// `xy` = world-space width/height; `zw` padding.
     pub size: [f32; 4],
+    /// Texture sub-rect `[u_min, v_min, u_max, v_max]` for sprite sheets /
+    /// atlases. `[0, 0, 1, 1]` samples the whole texture.
+    pub uv_rect: [f32; 4],
 }
 
 /// Bind group layout for [`SpriteUniform`] (group 0, dynamic offset, vertex +
@@ -151,8 +154,8 @@ mod tests {
 
     #[test]
     fn sprite_uniform_is_std140_sized() {
-        // 4×vec4 mat (64) + 5 vec4 (80) = 144, a multiple of 16.
-        assert_eq!(mem::size_of::<SpriteUniform>(), 144);
+        // 4×vec4 mat (64) + 6 vec4 (96) = 160, a multiple of 16.
+        assert_eq!(mem::size_of::<SpriteUniform>(), 160);
         assert_eq!(mem::size_of::<SpriteUniform>() % 16, 0);
     }
 

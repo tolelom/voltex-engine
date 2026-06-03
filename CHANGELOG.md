@@ -67,6 +67,11 @@ v1.0.59 데모(game_ready_demo)를 실제로 돌려보며 드러난 엔진 갭�
   파티클·월드 마커·간단한 2D-in-3D 적에 사용. 캡처 회귀
   `billboard_sprite_faces_camera_from_any_angle`(정면/측면 footprint 일치) +
   `docs/visual/sprite_billboard.png`. 데모에 떠다니는 픽업 3개 추가.
+- **스프라이트시트/아틀라스 UV**: `Sprite.uv_rect` + `with_uv_rect` +
+  `set_sheet_frame(cols, rows, index)`(row-major) — sprite.wgsl이 단위 쿼드 UV를
+  서브렉트로 remap. 2D 캐릭터 애니메이션·아틀라스용. 단위 테스트(프레임→uv_rect)
+  + 캡처 회귀 `sprite_sheet_frame_selects_atlas_cell`(4색 2×2 아틀라스 각 프레임
+  정확 샘플).
 
 - **그림자**: `RuntimeConfig::with_shadows(true)` — BasicRenderer directional
   shadow mapping (depth pre-pass + mesh_colored 3×3 PCF, group 3). 기본 off

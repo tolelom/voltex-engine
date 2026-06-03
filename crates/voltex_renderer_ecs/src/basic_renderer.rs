@@ -639,6 +639,7 @@ impl BasicRenderer {
                 center: [pos.x, pos.y, pos.z, 0.0],
                 color: sprite.color,
                 size: [sprite.size[0], sprite.size[1], 0.0, 0.0],
+                uv_rect: sprite.uv_rect,
             };
             let b = bytemuck::bytes_of(&u);
             staging[i * aligned..i * aligned + b.len()].copy_from_slice(b);

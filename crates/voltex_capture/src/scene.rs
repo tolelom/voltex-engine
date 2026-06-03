@@ -842,6 +842,71 @@ pub fn render_cube_at_depth(
     target.read_rgba8(&gpu.device, &gpu.queue)
 }
 
+/// Render a textured billboard sampling `frame` of a 2×2 sprite sheet. The
+/// atlas is a 64×64 four-color grid (TL red, TR green, BL blue, BR yellow), so
+/// each frame fills the sprite with one solid color — verifying `uv_rect`
+/// sub-rect sampling. Returns RGBA8.
+pub fn render_sprite_sheet_frame(gpu: &HeadlessGpu, width: u32, height: u32, frame: u32) -> Vec<u8> {
+    use voltex_renderer::GpuTexture;
+    use voltex_renderer_ecs::Sprite;
+
+    let target = OffscreenTarget::new(&gpu.device, width, height);
+    let renderer = BasicRenderer::new(&gpu.device, &gpu.queue, CAPTURE_FORMAT, 8);
+    let mut assets = RenderAssets::new();
+
+    // 64×64 atlas: 2×2 blocks of solid color (row-major, v=0 at top).
+    let dim = 64usize;
+    let mut pixels = vec![0u8; dim * dim * 4];
+    let color_at = |cx: usize, cy: usize| -> [u8; 4] {
+        match (cx, cy) {
+            (0, 0) => [255, 0, 0, 255],   // TL red
+            (1, 0) => [0, 255, 0, 255],   // TR green
+            (0, 1) => [0, 0, 255, 255],   // BL blue
+            _ => [255, 255, 0, 255],      // BR yellow
+        }
+    };
+    for y in 0..dim {
+        for x in 0..dim {
+            let c = color_at(x / (dim / 2), y / (dim / 2));
+            let o = (y * dim + x) * 4;
+            pixels[o..o + 4].copy_from_slice(&c);
+        }
+    }
+    let layout = GpuTexture::bind_group_layout(&gpu.device);
+    let tex = GpuTexture::from_rgba(&gpu.device, &gpu.queue, dim as u32, dim as u32, &pixels, &layout);
+    let tex_h = assets.add_texture(tex);
+
+    let mut sprite = Sprite::textured(tex_h, [3.0, 3.0]);
+    sprite.set_sheet_frame(2, 2, frame);
+
+    let mut world = World::new();
+    let e = world.spawn();
+    world.add(e, Transform::from_position(Vec3::ZERO));
+    world.add(e, sprite);
+    voltex_ecs::propagate_transforms(&mut world);
+
+    let camera = Camera::orthographic(Vec3::new(0.0, 0.0, 8.0), width as f32 / height as f32, 6.0);
+    let light = LightUniform::new();
+
+    let mut encoder = gpu
+        .device
+        .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("capture sheet") });
+    renderer.render(
+        &gpu.queue,
+        &mut encoder,
+        &target.color_view,
+        &target.depth_view,
+        wgpu::Color { r: 0.0, g: 0.0, b: 0.0, a: 1.0 },
+        &mut world,
+        &assets,
+        camera.view_projection(),
+        camera.position,
+        light,
+    );
+    gpu.queue.submit(Some(encoder.finish()));
+    target.read_rgba8(&gpu.device, &gpu.queue)
+}
+
 /// Render a single magenta billboard [`Sprite`] at the world origin, viewed
 /// from `cam_pos` with the given `yaw` (pitch 0). A camera-facing quad should
 /// present the same footprint from any orbit angle. Returns RGBA8.
@@ -1331,6 +1396,34 @@ mod tests {
         assert!(
             (p_far as f64) < (p_near as f64) * 0.7,
             "perspective should foreshorten the farther cube: near={p_near} far={p_far}"
+        );
+    }
+
+    #[test]
+    #[ignore = "requires a GPU adapter"]
+    fn sprite_sheet_frame_selects_atlas_cell() {
+        let gpu = match HeadlessGpu::new() {
+            Ok(g) => g,
+            Err(e) => {
+                eprintln!("skip: {e}");
+                return;
+            }
+        };
+        let center = |rgba: &[u8]| -> [u8; 3] {
+            let i = (128 * 256 + 128) * 4;
+            [rgba[i], rgba[i + 1], rgba[i + 2]]
+        };
+        // Frame 0 = TL red, 1 = TR green, 2 = BL blue, 3 = BR yellow.
+        let f0 = center(&render_sprite_sheet_frame(&gpu, 256, 256, 0));
+        let f1 = center(&render_sprite_sheet_frame(&gpu, 256, 256, 1));
+        let f2 = center(&render_sprite_sheet_frame(&gpu, 256, 256, 2));
+        let f3 = center(&render_sprite_sheet_frame(&gpu, 256, 256, 3));
+        assert!(f0[0] > 150 && f0[1] < 90 && f0[2] < 90, "frame 0 should be red, got {f0:?}");
+        assert!(f1[1] > 150 && f1[0] < 90 && f1[2] < 90, "frame 1 should be green, got {f1:?}");
+        assert!(f2[2] > 150 && f2[0] < 90 && f2[1] < 90, "frame 2 should be blue, got {f2:?}");
+        assert!(
+            f3[0] > 150 && f3[1] > 150 && f3[2] < 90,
+            "frame 3 should be yellow, got {f3:?}"
         );
     }
 
