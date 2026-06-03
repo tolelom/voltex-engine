@@ -114,6 +114,11 @@ pub struct BasicRenderer {
     // Device handle (cheap Arc clone) so the PBR pass can build per-entity
     // 4-map texture bind groups, which need the device at build time.
     device: wgpu::Device,
+    // One-time overflow warnings (so silent per-frame caps don't read as
+    // "everything drew"). Set the first time each cap is exceeded.
+    mesh_overflow_warned: Cell<bool>,
+    sprite_overflow_warned: Cell<bool>,
+    skinned_overflow_warned: Cell<bool>,
     // ── Skinned PBR (used when both pbr_enabled and skinned entities exist) ──
     pbr_skinned_pipeline: wgpu::RenderPipeline,
     pbr_skinned_cam_buffer: wgpu::Buffer,
@@ -624,6 +629,9 @@ impl BasicRenderer {
             pbr_default_texture_bind_group,
             point_lights_cpu: RefCell::new(Vec::new()),
             device: device.clone(),
+            mesh_overflow_warned: Cell::new(false),
+            sprite_overflow_warned: Cell::new(false),
+            skinned_overflow_warned: Cell::new(false),
             pbr_skinned_pipeline,
             pbr_skinned_cam_buffer,
             pbr_skinned_cam_aligned,
@@ -705,6 +713,7 @@ impl BasicRenderer {
             }
             None => true,
         });
+        warn_overflow_once(&self.mesh_overflow_warned, "mesh entities", items.len(), self.max_entities);
         let n = items.len().min(self.max_entities);
 
         // ── Directional shadow depth pre-pass ───────────────────────────────
@@ -831,6 +840,7 @@ impl BasicRenderer {
             let db = (b.0 - cam_pos).length_squared();
             db.partial_cmp(&da).unwrap_or(std::cmp::Ordering::Equal)
         });
+        warn_overflow_once(&self.sprite_overflow_warned, "sprites", items.len(), MAX_SPRITES);
         let n = items.len().min(MAX_SPRITES);
 
         // World-space camera right/up from the inverse VP (clip-x/clip-y axes
@@ -1201,6 +1211,7 @@ impl BasicRenderer {
                 }
             })
             .collect();
+        warn_overflow_once(&self.skinned_overflow_warned, "skinned meshes", items.len(), MAX_SKINNED);
         let n = items.len().min(MAX_SKINNED);
         if n == 0 {
             return;
@@ -1446,6 +1457,19 @@ fn pbr_camera_light_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
     })
 }
 
+/// Emit a one-time `eprintln!` the first time a per-frame draw cap is exceeded,
+/// so silently-dropped objects don't read as "everything rendered". `flag` is
+/// flipped after the first warning.
+fn warn_overflow_once(flag: &Cell<bool>, kind: &str, count: usize, cap: usize) {
+    if count > cap && !flag.get() {
+        flag.set(true);
+        eprintln!(
+            "voltex_renderer_ecs: {count} {kind} exceed the per-frame cap of {cap}; \
+             extra {kind} are not drawn (this warning fires once)."
+        );
+    }
+}
+
 /// Skinned-PBR group-0 layout: camera (binding 0, dynamic, vertex+fragment) +
 /// lights (binding 1, fragment) + bone palette (binding 2, dynamic, vertex).
 fn pbr_skinned_g0_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
@@ -1536,6 +1560,20 @@ fn camera_light_bind_group_layout(device: &wgpu::Device) -> wgpu::BindGroupLayou
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn warn_overflow_once_fires_only_on_overflow_and_only_once() {
+        let flag = Cell::new(false);
+        // Within cap → no warn, flag stays false.
+        warn_overflow_once(&flag, "sprites", 100, 256);
+        assert!(!flag.get());
+        // Over cap → warns once, flag set.
+        warn_overflow_once(&flag, "sprites", 300, 256);
+        assert!(flag.get());
+        // Already warned → stays set, no re-fire path (flag unchanged).
+        warn_overflow_once(&flag, "sprites", 999, 256);
+        assert!(flag.get());
+    }
 
     #[test]
     fn world_bounding_sphere_identity_unit_cube() {
