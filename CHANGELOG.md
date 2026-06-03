@@ -10,6 +10,70 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## [v1.0.61] — 2026-06-03 — Status sweep: hygiene + runtime lights/audio/shadows + robustness audit
+
+프로젝트 현황 점검 후 A(위생)→D(대형) 우선순위로 자율 진행한 세션. 모두 헤드리스
+검증(단위 + RTX 4080 capture 회귀) + 역호환 유지. 점검 중 DEFERRED.md 의 **문서
+drift 4건**(이미 구현됐는데 v1.1 후속으로 표기) 확인·정정.
+
+### Fix — 위생 (Tier A)
+
+- **clippy 게이트 복구**: `voltex_capture` 텍스처 로드 테스트의 `vec![...].repeat`
+  가 `clippy::useless_vec` 로 `--all-targets -D warnings` 게이트를 깨고 있던 것 수정.
+- **워크스페이스 버전 sync**: 17개 라이브러리 crate 가 placeholder `0.1.0` 이라
+  `voltex --version` 이 0.1.0 을 출력하던 문제 — `[workspace.package].version = "1.0.61"`
+  + 각 crate `version.workspace = true` (기존 `license.workspace` 패턴). 예제는 0.1.0 유지.
+
+### Additive — 런타임 라이팅/오디오 (Tier B)
+
+- **per-frame 점광원 업데이터**: `RuntimeApp::set_point_lights_fn(\|&mut Vec<PointLight>, &World, f32\|)`
+  — directional `set_light_fn` 과 대칭. 움직이는 횃불·깜빡이는 램프·발광 투사체를
+  world 상태 기반으로 매 프레임 구동(정적 `set_point_lights` 보강). 멀티라이트 배선
+  자체는 이미 완료돼 있었음(colored PointLightsUniform + PBR LightsUniform 병합, spot 포함).
+- **AudioSource 씬 직렬화**: `voltex_audio::AudioSource`(ECS 무의존)를 `register_raw`
+  escape hatch 로 등록(`audio_sync::{serialize,deserialize}_audio_source` +
+  `register_audio_source`, RuntimeApp 이 `register_defaults()` 직후 자동 등록). 11바이트
+  (clip_id+volume+spatial/looping/playing; transient played_once/active 미저장).
+  JSON/binary 씬 round-trip. +3 테스트.
+
+### Additive — 스킨드 메시 그림자 caster (Tier B)
+
+- 런타임 directional 그림자 pre-pass 가 정적 메시만 그려 스킨드 캐릭터가 그림자를
+  못 던지던 갭 해소. `create_skinned_shadow_pipeline` + `skinned_shadow_shader.wgsl`
+  (depth-only GPU 스키닝, `view_proj=light_vp`, 기존 skinned camera/palette 레이아웃
+  재사용 — 신규 레이아웃 0). `BasicRenderer::gather_skinned_shadow` 가 light-space
+  cam UBO + 공유 palette 업로드 후 정적 메시 뒤에 스킨드 메시를 깊이에 렌더. Hidden
+  엔티티는 cast/draw 모두 제외. RTX 4080 검증 `skinned_mesh_casts_shadow`(strip 이
+  바닥에 그림자 투사, Hidden 대조군 압도) + `docs/visual/skinned_shadow.png`.
+
+### Fix — 견고성 audit (Tier C)
+
+- **`.normalize()` zero-input audit** (v1.0.41 deferred): 게임플레이 핵심 경로
+  (voltex_ai steering seek/flee/arrive/wander + nav_agent_system)는 **이미 length 가드**가
+  있어 NaN-safe 확인. 유저 라이트 설정이 zero direction 일 때 NaN 전파되던
+  `csm::compute_cascade_matrices` + `spot_shadow_matrix` 두 곳을 `normalize_or_zero`
+  + straight-down fallback 으로 수정. +2 finite-output 회귀.
+
+### 문서 drift 정정 (점검 중 발견 — 이미 구현됐던 항목)
+
+- **Lua 입력 API**: `voltex_script::engine_input` 의 `input` 테이블(v1.0.59) — DEFERRED 가
+  아직 "v1.1 후속" 표기였음.
+- **JSON 씬 entity cap**: `deserialize_scene_json` 도 `MAX_SCENE_ENTITIES` 적용.
+- **`validate_hierarchy`**: 구현 완료 + text/binary/JSON 3개 deserializer 모두 로드 후
+  호출(pre-existing 사이클 방어) — DEFERRED 가 아직 "별 pass 필요" 표기였음.
+
+### Tier D / B-7 (의도적 미진행 — 평가 후 문서화)
+
+- **에디터 커스텀 컴포넌트 리플렉션**: ComponentRegistry 에 필드 레벨 리플렉션 인프라
+  부재 — 별도 설계 필요. **Archetype 스토리지 / dep scheduler 실제 병렬**: major
+  rewrite (data-race 위험, 다중 세션). **CI 첫 green run**: GitHub mirror 필요(자율 불가).
+  **missing_docs 1476 / pub(crate) 다운그레이드**: 대량 기계적 churn, 가치 낮음 — 보류.
+
+### 검증
+
+`cargo build --workspace` / `cargo clippy --workspace --all-targets -- -D warnings` /
+`cargo test --workspace --lib` (1239 lib 테스트, 0 실패) 전부 그린.
+
 ## [v1.0.60] — 2026-06-03 — Scene control + asset loading + deeper game-ready wiring
 
 v1.0.59 데모(game_ready_demo)를 실제로 돌려보며 드러난 엔진 갭들을 연달아 메운

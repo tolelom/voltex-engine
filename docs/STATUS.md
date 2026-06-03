@@ -173,6 +173,25 @@
 
 v1.0.9 부터는 **서비스 배포 완성도** 로드맵 (`docs/superpowers/specs/2026-05-21-service-readiness-roadmap.md`) 기준으로 진행.
 
+### 2026-06-03 — 현황 점검 sweep (v1.0.61, 자율 세션)
+
+현황 점검 후 A(위생)→D(대형) 우선순위로 진행 (상세 CHANGELOG v1.0.61). 점검 중
+DEFERRED.md **문서 drift 4건** 정정(Lua 입력 API / JSON 씬 cap / `validate_hierarchy` /
+멀티라이트 — 이미 구현됐는데 미구현 표기였음).
+
+- **위생**: clippy 게이트 회귀 수정(`useless_vec`), 워크스페이스 17 crate 버전 sync
+  → `voltex --version` = 1.0.61 (이전 0.1.0 placeholder).
+- **런타임**: `set_point_lights_fn`(per-frame 점광원, directional `set_light_fn` 대칭),
+  AudioSource 씬 직렬화(`register_raw` escape hatch, 자동 등록).
+- **스킨드 그림자 caster**: `create_skinned_shadow_pipeline` + `skinned_shadow_shader.wgsl`
+  (depth-only GPU 스키닝, 기존 레이아웃 재사용). RTX 4080 검증 `skinned_mesh_casts_shadow`
+  + `docs/visual/skinned_shadow.png`.
+- **견고성**: `.normalize()` audit — AI 경로 이미 safe 확인, csm/spot_shadow light dir
+  zero-input NaN 2건 수정.
+- **미진행(평가 후 문서화)**: 에디터 컴포넌트 리플렉션(인프라 부재), archetype/병렬
+  스케줄러(major rewrite), CI green(mirror 필요), missing_docs/pub(crate)(저가치 churn).
+- 검증: build/clippy(`-D warnings` all-targets)/test(1239 lib) 전부 그린.
+
 ### 2026-06-03 — Game-ready 2D 스택 + 게임플레이 빌트인 (자율 세션)
 
 `game_ready_demo`를 실제로 돌려보며 드러난 "기능 연결" 갭을 메우는 자율 세션
