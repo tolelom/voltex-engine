@@ -19,7 +19,120 @@
 //! neighbours / the result is degenerate); scale by a weight and feed into your
 //! velocity integration.
 
+use std::collections::HashMap;
+
+use voltex_ecs::{Entity, SpatialGrid, Transform, World};
 use voltex_math::Vec3;
+
+/// Velocity carried by a flocking agent. Attach alongside a [`Transform`]; the
+/// [`flocking_system`] integrates it each tick.
+#[derive(Debug, Clone, Copy)]
+pub struct Boid {
+    /// Current velocity (world units / second).
+    pub velocity: Vec3,
+}
+
+impl Default for Boid {
+    fn default() -> Self {
+        Self {
+            velocity: Vec3::ZERO,
+        }
+    }
+}
+
+impl Boid {
+    /// A boid with the given initial velocity.
+    pub fn new(velocity: Vec3) -> Self {
+        Self { velocity }
+    }
+}
+
+/// Tuning for [`flocking_system`]: neighbour search radius, the three rule
+/// weights, and a speed cap.
+#[derive(Debug, Clone, Copy)]
+pub struct BoidParams {
+    /// Agents within this distance count as neighbours.
+    pub neighbour_radius: f32,
+    /// Weight of the [`separation`] rule.
+    pub separation: f32,
+    /// Weight of the [`cohesion`] rule.
+    pub cohesion: f32,
+    /// Weight of the [`alignment`] rule.
+    pub alignment: f32,
+    /// Maximum speed; velocity is clamped to this after applying forces.
+    pub max_speed: f32,
+}
+
+impl Default for BoidParams {
+    fn default() -> Self {
+        Self {
+            neighbour_radius: 3.0,
+            separation: 1.5,
+            cohesion: 1.0,
+            alignment: 1.0,
+            max_speed: 5.0,
+        }
+    }
+}
+
+/// Advance every `(Transform, Boid)` entity by one flocking step: gather each
+/// boid's neighbours via a [`SpatialGrid`] (so this is ~O(n) for evenly spread
+/// crowds, not O(n²)), combine the three boid rules into an acceleration,
+/// integrate velocity (clamped to `params.max_speed`) and position.
+///
+/// All boids are read into a snapshot first, so every boid reacts to the *same*
+/// frame's state regardless of iteration order.
+pub fn flocking_system(world: &mut World, params: &BoidParams, dt: f32) {
+    let boids: Vec<(Entity, Vec3, Vec3)> = world
+        .query2::<Transform, Boid>()
+        .map(|(e, t, b)| (e, t.position, b.velocity))
+        .collect();
+    if boids.is_empty() {
+        return;
+    }
+
+    let mut grid = SpatialGrid::new(params.neighbour_radius);
+    let mut state: HashMap<Entity, (Vec3, Vec3)> = HashMap::with_capacity(boids.len());
+    for &(e, pos, vel) in &boids {
+        grid.insert(e, pos);
+        state.insert(e, (pos, vel));
+    }
+
+    let mut neighbour_buf = Vec::new();
+    let mut updates: Vec<(Entity, Vec3, Vec3)> = Vec::with_capacity(boids.len());
+    for &(e, pos, vel) in &boids {
+        grid.query_radius_into(pos, params.neighbour_radius, &mut neighbour_buf);
+        let mut npos = Vec::new();
+        let mut nvel = Vec::new();
+        for &ne in &neighbour_buf {
+            if ne == e {
+                continue;
+            }
+            let (p, v) = state[&ne];
+            npos.push(p);
+            nvel.push(v);
+        }
+        let acc = separation(pos, &npos) * params.separation
+            + cohesion(pos, &npos) * params.cohesion
+            + alignment(&nvel) * params.alignment;
+        let mut new_vel = vel + acc * dt;
+        let speed = new_vel.length();
+        if speed > params.max_speed {
+            new_vel = new_vel.normalize_or_zero() * params.max_speed;
+        }
+        let new_pos = pos + new_vel * dt;
+        updates.push((e, new_pos, new_vel));
+    }
+
+    for (e, p, v) in updates {
+        if let Some(t) = world.get_mut::<Transform>(e) {
+            t.position = p;
+        }
+        if let Some(b) = world.get_mut::<Boid>(e) {
+            b.velocity = v;
+        }
+    }
+}
 
 /// Steer away from nearby `neighbours`, weighted by inverse distance so closer
 /// crowders push harder. Returns a unit direction away from the crowd, or zero
@@ -125,6 +238,87 @@ mod tests {
     #[test]
     fn alignment_with_no_neighbours_is_zero() {
         assert_eq!(alignment(&[]), Vec3::ZERO);
+    }
+
+    // ── flocking_system (ECS integration) ──────────────────────────────
+
+    use voltex_ecs::{Transform, World};
+
+    fn spawn_boid(world: &mut World, pos: Vec3, vel: Vec3) -> voltex_ecs::Entity {
+        let e = world.spawn();
+        world.add(e, Transform::from_position(pos));
+        world.add(e, Boid::new(vel));
+        e
+    }
+
+    fn dist(world: &World, a: voltex_ecs::Entity, b: voltex_ecs::Entity) -> f32 {
+        let pa = world.get::<Transform>(a).unwrap().position;
+        let pb = world.get::<Transform>(b).unwrap().position;
+        (pa - pb).length()
+    }
+
+    #[test]
+    fn separation_pushes_crowded_boids_apart() {
+        let mut world = World::new();
+        let a = spawn_boid(&mut world, Vec3::new(-0.25, 0.0, 0.0), Vec3::ZERO);
+        let b = spawn_boid(&mut world, Vec3::new(0.25, 0.0, 0.0), Vec3::ZERO);
+        let params = BoidParams {
+            separation: 5.0,
+            cohesion: 0.0,
+            alignment: 0.0,
+            ..Default::default()
+        };
+        let before = dist(&world, a, b);
+        flocking_system(&mut world, &params, 0.1);
+        assert!(dist(&world, a, b) > before, "separation should increase spacing");
+    }
+
+    #[test]
+    fn cohesion_pulls_spread_boids_together() {
+        let mut world = World::new();
+        // Within neighbour radius (3.0) but spread apart.
+        let a = spawn_boid(&mut world, Vec3::new(-1.0, 0.0, 0.0), Vec3::ZERO);
+        let b = spawn_boid(&mut world, Vec3::new(1.0, 0.0, 0.0), Vec3::ZERO);
+        let params = BoidParams {
+            separation: 0.0,
+            cohesion: 5.0,
+            alignment: 0.0,
+            ..Default::default()
+        };
+        let before = dist(&world, a, b);
+        flocking_system(&mut world, &params, 0.1);
+        assert!(dist(&world, a, b) < before, "cohesion should reduce spacing");
+    }
+
+    #[test]
+    fn lone_boid_coasts_at_constant_velocity() {
+        let mut world = World::new();
+        let e = spawn_boid(&mut world, Vec3::ZERO, Vec3::new(2.0, 0.0, 0.0));
+        flocking_system(&mut world, &BoidParams::default(), 0.5);
+        // No neighbours → no steering force → velocity unchanged, position moved.
+        assert_eq!(world.get::<Boid>(e).unwrap().velocity, Vec3::new(2.0, 0.0, 0.0));
+        assert!((world.get::<Transform>(e).unwrap().position.x - 1.0).abs() < 1e-5);
+    }
+
+    #[test]
+    fn velocity_is_clamped_to_max_speed() {
+        let mut world = World::new();
+        let a = spawn_boid(&mut world, Vec3::new(-0.1, 0.0, 0.0), Vec3::ZERO);
+        let _b = spawn_boid(&mut world, Vec3::new(0.1, 0.0, 0.0), Vec3::ZERO);
+        let params = BoidParams {
+            separation: 1000.0, // huge force
+            max_speed: 2.0,
+            ..Default::default()
+        };
+        flocking_system(&mut world, &params, 0.5);
+        let speed = world.get::<Boid>(a).unwrap().velocity.length();
+        assert!(speed <= 2.0 + 1e-4, "speed {speed} exceeds max_speed");
+    }
+
+    #[test]
+    fn empty_world_is_a_noop() {
+        let mut world = World::new();
+        flocking_system(&mut world, &BoidParams::default(), 0.1); // must not panic
     }
 
     /// The headline integration claim: gathering neighbours through a

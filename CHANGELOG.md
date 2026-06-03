@@ -10,6 +10,27 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## [v1.0.78] — 2026-06-03 — Flocking as an ECS system (`Boid` + `flocking_system`)
+
+v1.0.77 의 순수 boid 함수를 "한 번 호출로 군집 AI" 로 끌어올림 (선언적 렌더러블 →
+materialize 와 같은 패턴): 컴포넌트 + 시스템.
+
+### Additive — `voltex_ai`
+
+- **`Boid { velocity }`** 컴포넌트 + **`BoidParams`**(neighbour_radius / separation /
+  cohesion / alignment 가중치 / max_speed, `Default` 제공).
+- **`flocking_system(&mut World, &BoidParams, dt)`** — 모든 `(Transform, Boid)` 를
+  스냅샷 → `SpatialGrid` 로 이웃 수집(~O(n)) → 3법칙 가중합 가속 → 속도(max_speed
+  clamp)·위치 적분 → 일괄 기록. 스냅샷-후-기록이라 모든 boid 가 같은 프레임 상태를
+  관측(순서 무관). `nav_agent_system` 과 같은 호출자-주입 패턴.
+
+### 검증
+
+- 단위 5개 추가(군집 분리로 간격↑, 응집으로 간격↓, 단독 boid 등속 coast, max_speed
+  clamp, 빈 월드 no-op) + 변이 테스트(`vel + acc*dt`→`vel` 가속 무시 RED→GREEN).
+  voltex_ai flocking 9→14.
+- workspace build / clippy(`-D warnings`) / lib test 전부 그린.
+
 ## [v1.0.77] — 2026-06-03 — Boid flocking steering (uses the spatial grid)
 
 v1.0.76 의 `SpatialGrid` 를 실제로 활용: voltex_ai 에 이웃 기반 스티어링이 전혀 없었다

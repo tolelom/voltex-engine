@@ -21,7 +21,7 @@ pub mod pathfinding;
 pub mod steering;
 
 pub use error::{AiError, Result};
-pub use flocking::{alignment, cohesion, separation};
+pub use flocking::{alignment, cohesion, flocking_system, separation, Boid, BoidParams};
 pub use nav_agent::NavAgent;
 pub use nav_agent_system::nav_agent_system;
 pub use navmesh::{deserialize_navmesh, serialize_navmesh, NavMesh, NavTriangle};

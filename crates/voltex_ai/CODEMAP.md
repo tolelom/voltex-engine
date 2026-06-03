@@ -8,7 +8,7 @@ AI 기초 — NavMesh (수동 + 자동 voxelization), A* + Funnel, steering, 동
 - `NavMeshBuilder` — voxelization 기반 자동 생성 (src/navmesh_builder/)
 - `find_path` — A* + String Pulling (Funnel) (src/pathfinding.rs)
 - Steering — `seek`, `flee`, `arrive`, `wander` (src/steering.rs)
-- Flocking (boid) — `separation`, `cohesion`, `alignment` (src/flocking.rs). 이웃 위치/속도 리스트 입력 → unit 방향. 이웃 수집은 `voltex_ecs::SpatialGrid` 로 (O(n²) 회피)
+- Flocking (boid) — `separation`, `cohesion`, `alignment` 순수 함수 + `Boid` 컴포넌트 + `BoidParams` + `flocking_system(world, &params, dt)` ECS 시스템 (src/flocking.rs). 시스템이 `SpatialGrid` 로 이웃 수집(~O(n)) 후 3법칙 가중합 → 속도/위치 적분(max_speed clamp). 스냅샷 후 일괄 기록(순서 무관)
 - `NavAgent` — ECS 컴포넌트 (src/nav_agent.rs)
 - `nav_agent_system(world, navmesh, dt)` — NavAgent 엔티티 경로 추적 ECS 시스템 (src/nav_agent_system.rs)
 - `Obstacle`, velocity obstacle 회피 (src/obstacle.rs)
