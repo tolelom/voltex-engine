@@ -665,6 +665,76 @@ pub fn render_cube_point_lit(
     target.read_rgba8(&gpu.device, &gpu.queue)
 }
 
+/// Render a large up-facing ground plane viewed from straight above, lit only
+/// by the given point/spot lights (the directional light is nearly off). With a
+/// downward-aimed spotlight this produces a bright circular cone footprint in
+/// the center with dark corners outside the cone. Returns RGBA8.
+pub fn render_spot_lit(
+    gpu: &HeadlessGpu,
+    width: u32,
+    height: u32,
+    lights: &[voltex_renderer::PointLight],
+) -> Vec<u8> {
+    let target = OffscreenTarget::new(&gpu.device, width, height);
+    let renderer = BasicRenderer::new(&gpu.device, &gpu.queue, CAPTURE_FORMAT, 8);
+    let mut assets = RenderAssets::new();
+
+    // Up-facing ground quad (+Y normal, CCW-from-above) so an overhead spot lits
+    // it via N·L. Spans the full view so the cone footprint sits inside it.
+    let n = [0.0f32, 1.0, 0.0];
+    let mk = |x: f32, z: f32| MeshVertex {
+        position: [x, 0.0, z],
+        normal: n,
+        uv: [0.0, 0.0],
+        tangent: [1.0, 0.0, 0.0, 1.0],
+    };
+    let gverts = [
+        mk(-10.0, -10.0),
+        mk(10.0, -10.0),
+        mk(10.0, 10.0),
+        mk(-10.0, 10.0),
+    ];
+    let gidx = [0u32, 2, 1, 0, 3, 2];
+    let mesh_h = assets.add_mesh(voltex_renderer::Mesh::new(&gpu.device, &gverts, &gidx));
+    let mat_h = assets.add_material(MaterialUniform::with_params([1.0, 1.0, 1.0, 1.0], 0.0, 1.0));
+
+    let mut world = World::new();
+    let ground = world.spawn();
+    world.add(ground, Transform::from_position(Vec3::ZERO));
+    world.add(ground, MeshHandle(mesh_h.0));
+    world.add(ground, MaterialHandle(mat_h.0));
+    voltex_ecs::propagate_transforms(&mut world);
+
+    // Top-down camera looking straight at the ground.
+    let mut camera = Camera::new(Vec3::new(0.0, 8.0, 0.0), width as f32 / height as f32);
+    camera.yaw = 0.0;
+    camera.pitch = -std::f32::consts::FRAC_PI_2 + 0.001; // look ~straight down
+    // Directional light nearly off so the spot dominates what we measure.
+    let mut light = LightUniform::new();
+    light.direction = [0.0, -1.0, 0.0];
+    light.color = [0.02, 0.02, 0.02];
+    light.ambient_strength = 0.02;
+
+    renderer.set_point_lights(&gpu.queue, lights);
+    let mut encoder = gpu
+        .device
+        .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("capture spot") });
+    renderer.render(
+        &gpu.queue,
+        &mut encoder,
+        &target.color_view,
+        &target.depth_view,
+        wgpu::Color { r: 0.0, g: 0.0, b: 0.0, a: 1.0 },
+        &mut world,
+        &assets,
+        camera.view_projection(),
+        camera.position,
+        light,
+    );
+    gpu.queue.submit(Some(encoder.finish()));
+    target.read_rgba8(&gpu.device, &gpu.queue)
+}
+
 /// Render a cube textured with a 2×2 solid `color` (RGBA).
 pub fn render_textured_cube(gpu: &HeadlessGpu, width: u32, height: u32, color: [u8; 4]) -> Vec<u8> {
     use voltex_renderer::GpuTexture;
@@ -937,6 +1007,63 @@ mod tests {
         assert!(
             ll > lb + 15.0,
             "surrounding point lights should brighten the sphere: baseline={lb} lit={ll}"
+        );
+    }
+
+    #[test]
+    #[ignore = "requires a GPU adapter"]
+    fn spotlight_lights_cone_footprint_not_corners() {
+        let gpu = match HeadlessGpu::new() {
+            Ok(g) => g,
+            Err(e) => {
+                eprintln!("skip: {e}");
+                return;
+            }
+        };
+        let lum = |rgba: &[u8], x: usize, y: usize| -> u32 {
+            let i = (y * 256 + x) * 4;
+            rgba[i] as u32 + rgba[i + 1] as u32 + rgba[i + 2] as u32
+        };
+
+        // Spotlight above the plane aimed straight down — a tight cone hits the
+        // center of the top-down view but not the corners.
+        let down = voltex_renderer::PointLight::spot(
+            [0.0, 5.0, 0.0],
+            [0.0, -1.0, 0.0],
+            [1.0, 1.0, 1.0],
+            12.0,
+            6.0,
+            22.0,
+        );
+        let on = render_spot_lit(&gpu, 256, 256, &[down]);
+        let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../../docs/visual/");
+        crate::save_png(&format!("{dir}spot_cone.png"), 256, 256, &on).unwrap();
+        let center = lum(&on, 128, 128);
+        let corner = lum(&on, 20, 20);
+        assert!(
+            center > 150,
+            "spot cone center should be brightly lit, got {center}"
+        );
+        assert!(
+            center > corner + 60,
+            "inside the cone (center={center}) must be much brighter than the corner outside it (corner={corner})"
+        );
+
+        // Same light aimed horizontally — its cone no longer points at the ground
+        // below, so the center stays dark (the cone gate culls it).
+        let sideways = voltex_renderer::PointLight::spot(
+            [0.0, 5.0, 0.0],
+            [1.0, 0.0, 0.0],
+            [1.0, 1.0, 1.0],
+            12.0,
+            6.0,
+            22.0,
+        );
+        let off = render_spot_lit(&gpu, 256, 256, &[sideways]);
+        let center_off = lum(&off, 128, 128);
+        assert!(
+            center_off + 60 < center,
+            "aiming the spot away from the ground should darken the center: aimed-down={center} aimed-away={center_off}"
         );
     }
 

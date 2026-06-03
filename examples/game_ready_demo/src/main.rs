@@ -268,10 +268,19 @@ fn register_systems(app: &mut RuntimeApp) {
     }
 
     // Two colored arena point lights (warm + cool) for some dynamic-looking
-    // shading on top of the rotating sun.
+    // shading on top of the rotating sun, plus a white spotlight pooled on the
+    // arena center (a downward cone with a soft edge).
     app.set_point_lights(vec![
         PointLight::new([6.0, 4.0, 6.0], [1.0, 0.6, 0.3], 18.0, 2.5),
         PointLight::new([-6.0, 4.0, -6.0], [0.3, 0.5, 1.0], 18.0, 2.5),
+        PointLight::spot(
+            [0.0, 9.0, 0.0],
+            [0.0, -1.0, 0.0],
+            [1.0, 1.0, 0.95],
+            22.0,
+            4.0,
+            28.0,
+        ),
     ]);
 
     let stats = Rc::new(RefCell::new(DemoState::default()));

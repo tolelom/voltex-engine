@@ -31,6 +31,12 @@ v1.0.59 데모(game_ready_demo)를 실제로 돌려보며 드러난 엔진 갭�
   충돌로 교체.
 - **점광원**: `RuntimeApp::set_point_lights(Vec<PointLight>)` — mesh_colored가
   additive point light (MAX_POINT_LIGHTS=8). 단일 directional을 보강.
+- **스폿라이트**: `PointLight`를 3×vec4(48B)로 확장(방향 + cos(outer half-angle)).
+  `PointLight::spot(pos, dir, color, range, intensity, cone_degrees)` = 부드러운
+  가장자리 원뿔, `PointLight::new` = omni(센티넬 `spot_cos_outer < -1.5`).
+  mesh_colored가 cone smoothstep gate 적용 → `set_point_lights` 경유 그대로 사용.
+  캡처 회귀 `spotlight_lights_cone_footprint_not_corners` +
+  `docs/visual/spot_cone.png`. 데모 아레나 중앙에 흰 스폿 추가.
 - **HUD 바**: `UiContext::progress_bar` / `draw_rect` (체력/진행 바). 데모에
   danger meter 추가.
 

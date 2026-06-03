@@ -16,7 +16,7 @@ cargo run -p game_ready_demo
 | **Collision events** | "Caught" is a real `set_collision_fn` contact between the player + chaser sphere `Collider`s (not distance math). |
 | **HUD runtime API** | `set_hud_fn` draws distance / `RUN!` vs `CAUGHT!` / counters on screen. |
 | **Camera control** | `set_camera_fn` keeps a follow-camera framed on the player (the default runtime camera sits far back, leaving a 1-unit cube a tiny speck). |
-| **Lighting** | `with_light` (warm angled sun) + `set_light_fn` (slowly rotating it) + two colored arena `set_point_lights` + `with_shadows(true)` directional shadows. |
+| **Lighting** | `with_light` (warm angled sun) + `set_light_fn` (slowly rotating it) + two colored arena point lights + a white center **spotlight** (`PointLight::spot`) via `set_point_lights` + `with_shadows(true)` directional shadows. |
 | **Skeletal animation** | A GPU-skinned "totem" strip (off to the left) waves via `SkinnedPose` + `BasicRenderer`'s skinned pass. |
 
 ## Controls

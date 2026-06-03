@@ -108,8 +108,10 @@ impl LightUniform {
 /// Max additive point lights in the `BasicRenderer` Blinn-Phong path.
 pub const MAX_POINT_LIGHTS: usize = 8;
 
-/// One point light for the `BasicRenderer` path (`mesh_colored.wgsl` group 2).
-/// 32 bytes / std140-friendly (vec3+f32, vec3+f32).
+/// One point/spot light for the `BasicRenderer` path (`mesh_colored.wgsl`
+/// group 2). 48 bytes / std140-friendly (three vec4: pos+range, color+intensity,
+/// dir+spot-cone). `spot_cos_outer < -1.5` marks an omnidirectional point light
+/// (no cone); otherwise it's a spotlight aimed along `direction`.
 #[repr(C)]
 #[derive(Copy, Clone, Debug, Pod, Zeroable)]
 pub struct PointLight {
@@ -121,12 +123,43 @@ pub struct PointLight {
     pub color: [f32; 3],
     /// Brightness multiplier.
     pub intensity: f32,
+    /// Spot cone axis (unit). Ignored for omni point lights.
+    pub direction: [f32; 3],
+    /// Cosine of the spot's outer half-angle; `< -1.5` ⇒ omni point light.
+    pub spot_cos_outer: f32,
 }
 
 impl PointLight {
-    /// A point light at `position` with `color` and `intensity`, reaching to `range`.
+    /// An omnidirectional point light at `position`.
     pub fn new(position: [f32; 3], color: [f32; 3], range: f32, intensity: f32) -> Self {
-        Self { position, range, color, intensity }
+        Self {
+            position,
+            range,
+            color,
+            intensity,
+            direction: [0.0, 0.0, 0.0],
+            spot_cos_outer: -2.0, // sentinel: omni
+        }
+    }
+
+    /// A spotlight at `position` aimed along `direction`, with full intensity
+    /// inside the cone and a soft edge near its `cone_degrees` half-angle.
+    pub fn spot(
+        position: [f32; 3],
+        direction: [f32; 3],
+        color: [f32; 3],
+        range: f32,
+        intensity: f32,
+        cone_degrees: f32,
+    ) -> Self {
+        Self {
+            position,
+            range,
+            color,
+            intensity,
+            direction,
+            spot_cos_outer: cone_degrees.to_radians().cos(),
+        }
     }
 }
 
@@ -151,8 +184,14 @@ impl PointLightsUniform {
     /// All-zero, `count = 0` (no point lights).
     pub fn new() -> Self {
         Self {
-            lights: [PointLight { position: [0.0; 3], range: 0.0, color: [0.0; 3], intensity: 0.0 };
-                MAX_POINT_LIGHTS],
+            lights: [PointLight {
+                position: [0.0; 3],
+                range: 0.0,
+                color: [0.0; 3],
+                intensity: 0.0,
+                direction: [0.0; 3],
+                spot_cos_outer: -2.0,
+            }; MAX_POINT_LIGHTS],
             count: 0,
             _pad: [0; 3],
         }
@@ -285,6 +324,41 @@ impl LightsUniform {
 mod tests {
     use super::*;
     use std::mem;
+
+    #[test]
+    fn test_point_light_size() {
+        assert_eq!(
+            mem::size_of::<PointLight>(),
+            48,
+            "PointLight must be exactly 48 bytes (3 × vec4) to match mesh_colored.wgsl"
+        );
+    }
+
+    #[test]
+    fn test_point_light_new_is_omni() {
+        let pl = PointLight::new([1.0, 2.0, 3.0], [1.0, 1.0, 1.0], 10.0, 2.0);
+        assert!(
+            pl.spot_cos_outer < -1.5,
+            "PointLight::new must mark an omni light (spot_cos_outer < -1.5)"
+        );
+    }
+
+    #[test]
+    fn test_point_light_spot_cone() {
+        let pl = PointLight::spot(
+            [0.0, 5.0, 0.0],
+            [0.0, -1.0, 0.0],
+            [1.0, 1.0, 1.0],
+            20.0,
+            3.0,
+            30.0,
+        );
+        let expected = 30.0_f32.to_radians().cos();
+        assert!(
+            (pl.spot_cos_outer - expected).abs() < 1e-6,
+            "spot_cos_outer should be cos(30°)"
+        );
+    }
 
     #[test]
     fn test_light_data_size() {

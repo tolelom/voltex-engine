@@ -22,11 +22,14 @@ struct LightUniform {
 @group(1) @binding(0) var t_diffuse: texture_2d<f32>;
 @group(1) @binding(1) var s_diffuse: sampler;
 
-// Two vec4 (pos+range, color+intensity) to avoid the std140 vec3 packing
-// ambiguity — this matches the Rust `PointLight`'s contiguous [f32;3]+f32 fields.
+// Three vec4 (pos+range, color+intensity, dir+spot-cone) to avoid the std140
+// vec3 packing ambiguity — matches the Rust `PointLight`'s contiguous fields.
+// dir_cos.w < -1.5 marks an omnidirectional point light; otherwise it's a
+// spotlight aimed along dir_cos.xyz with outer half-angle cosine dir_cos.w.
 struct PointLight {
     pos_range: vec4<f32>,        // xyz = position, w = range
     color_intensity: vec4<f32>,  // rgb = color, w = intensity
+    dir_cos: vec4<f32>,          // xyz = cone axis, w = cos(outer half-angle)
 };
 struct PointLights {
     lights: array<PointLight, 8>,
@@ -114,7 +117,16 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         if (range > 0.0 && dist < range) {
             let l = to_light / max(dist, 1e-4);
             let atten = 1.0 - dist / range;
-            let d = max(dot(normal, l), 0.0) * atten * atten * pl.color_intensity.w;
+            // Spot cone: full inside the cone, soft edge near the outer angle.
+            // Omni lights (cos_outer < -1.5) get cone = 1.0.
+            var cone = 1.0;
+            let cos_outer = pl.dir_cos.w;
+            if (cos_outer > -1.5) {
+                let sdir = normalize(pl.dir_cos.xyz);
+                let theta = dot(-l, sdir);
+                cone = smoothstep(cos_outer, cos_outer + 0.05, theta);
+            }
+            let d = max(dot(normal, l), 0.0) * atten * atten * cone * pl.color_intensity.w;
             point_contrib = point_contrib + d * pl.color_intensity.xyz;
         }
     }
