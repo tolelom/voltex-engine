@@ -14,6 +14,7 @@ cargo run -p game_ready_demo
 | **nav_agent_system** | The smaller chaser cube paths toward the player every frame via the navmesh. |
 | **audio_sync_system** | The chaser carries a spatial `AudioSource` that beeps the moment it catches you (listener = player). |
 | **HUD runtime API** | `set_hud_fn` draws distance / `RUN!` vs `CAUGHT!` / counters on screen. |
+| **Camera control** | `set_camera_fn` keeps a follow-camera framed on the player (the default runtime camera sits far back, leaving a 1-unit cube a tiny speck). |
 
 ## Controls
 

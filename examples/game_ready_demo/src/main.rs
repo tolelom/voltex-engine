@@ -176,6 +176,17 @@ fn register_systems(app: &mut RuntimeApp) {
         s.time += dt;
     });
 
+    // Follow camera: frame the player from behind/above so the gameplay is
+    // actually visible (the default runtime camera sits far back at (0,10,20),
+    // which leaves a 1-unit cube a tiny speck). Uses the new set_camera_fn API.
+    app.set_camera_fn(|cam, world, _dt| {
+        if let Some(p) = tagged_position(world, PLAYER_TAG) {
+            cam.position = p + Vec3::new(0.0, 9.0, 13.0);
+            cam.yaw = 0.0;
+            cam.pitch = -0.55;
+        }
+    });
+
     // HUD: read the shared readout each frame.
     let hud_stats = stats;
     app.set_hud_fn(move |ui, _world| {

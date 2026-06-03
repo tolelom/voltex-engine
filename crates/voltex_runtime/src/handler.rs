@@ -1,7 +1,7 @@
 //! winit event-loop adapter. Lives in its own module so `app.rs` stays
 //! focused on subsystem ownership and `tick_systems_only`.
 
-use voltex_math::{Mat4, Vec3};
+use voltex_math::Mat4;
 use voltex_renderer::{Camera, FpsController, GpuContext, LightUniform};
 use voltex_renderer_ecs::BasicRenderer;
 use winit::application::ApplicationHandler;
@@ -36,8 +36,10 @@ impl ApplicationHandler for RuntimeHandler {
         };
         let renderer = BasicRenderer::new(&gpu.device, &gpu.queue, gpu.surface_format, 1024);
         let aspect = gpu.config.width as f32 / gpu.config.height as f32;
-        let mut camera = Camera::new(Vec3::new(0.0, 10.0, 20.0), aspect);
-        camera.pitch = -0.4;
+        let mut camera = Camera::new(app.config.camera_position, aspect);
+        camera.yaw = app.config.camera_yaw;
+        camera.pitch = app.config.camera_pitch;
+        camera.fov_y = app.config.camera_fov_y;
         let fps_controller = FpsController::new();
         let light = LightUniform::new();
         // Construct the in-window HUD context + GPU renderer only when enabled.
@@ -177,6 +179,17 @@ fn redraw(app: &mut RuntimeApp, event_loop: &ActiveEventLoop) {
     }
 
     app.tick_systems_only(dt);
+
+    // Game-controlled camera (follow / orbit / cinematic), if registered.
+    // Runs after the tick so it sees this frame's world, and overrides the
+    // fly-camera above. Taken out so it can borrow `app.world` while the
+    // updater mutates the camera inside `runtime_state` (disjoint fields).
+    if let Some(mut cam_fn) = app.camera_fn.take() {
+        if let Some(state) = app.runtime_state.as_mut() {
+            cam_fn(&mut state.camera, &app.world, dt);
+        }
+        app.camera_fn = Some(cam_fn);
+    }
 
     // HUD: feed the per-frame dt, push a new window title when the update
     // interval elapses. The HUD's tick() returns None either when the

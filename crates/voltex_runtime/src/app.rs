@@ -24,6 +24,7 @@ use voltex_ecs::{propagate_transforms, ComponentRegistry, Entity, World};
 use voltex_physics::PhysicsConfig;
 use voltex_platform::{GameTimer, InputState};
 use voltex_editor::UiContext;
+use voltex_renderer::Camera;
 use voltex_renderer_ecs::RenderAssets;
 use voltex_script::ScriptInstancePool;
 
@@ -57,6 +58,11 @@ type InputSystem = Box<dyn FnMut(&mut World, &InputState, f32) + 'static>;
 /// immediate-mode [`UiContext`] (already inside `begin_frame`/`end_frame`) and
 /// read-only access to the World. Draw text / bars / panels here.
 type HudFn = Box<dyn FnMut(&mut UiContext, &World) + 'static>;
+/// Per-frame camera updater (see [`RuntimeApp::set_camera_fn`]). Runs after the
+/// systems tick, with the live [`Camera`] and read-only World, so games can
+/// implement follow / orbit / cinematic cameras. Overrides the default RMB
+/// fly-camera for the frame.
+type CameraFn = Box<dyn FnMut(&mut Camera, &World, f32) + 'static>;
 
 /// The runtime's top-level application object. Owns the ECS world, asset
 /// stores, schedulers, and the main loop integration with `winit`/`wgpu`.
@@ -67,6 +73,8 @@ pub struct RuntimeApp {
     /// Optional per-frame HUD draw callback (see [`Self::set_hud_fn`]). Only
     /// invoked when `config.enable_hud` is set and the GPU UI was constructed.
     pub(crate) hud_fn: Option<HudFn>,
+    /// Optional per-frame camera updater (see [`Self::set_camera_fn`]).
+    pub(crate) camera_fn: Option<CameraFn>,
     /// Polling file watcher used for script / scene hot reload.
     pub file_watcher: FileWatcher,
     /// Fixed-step timer driving update / render dt.
@@ -165,6 +173,7 @@ impl RuntimeApp {
             user_systems: Vec::new(),
             input_systems: Vec::new(),
             hud_fn: None,
+            camera_fn: None,
             file_watcher: FileWatcher::new(Duration::from_millis(500)),
             timer: GameTimer::new(60),
             input: InputState::new(),
@@ -241,6 +250,31 @@ impl RuntimeApp {
     /// (typically the camera or player). Only meaningful when audio is enabled.
     pub fn set_audio_listener(&mut self, entity: Entity) {
         self.audio_listener = Some(entity);
+    }
+
+    /// Register a per-frame camera updater for follow / orbit / cinematic
+    /// cameras. It runs each frame after the systems tick with the live
+    /// [`Camera`] and read-only World, and overrides the default RMB
+    /// fly-camera. Replaces any previously set updater.
+    ///
+    /// ```ignore
+    /// app.set_camera_fn(|cam, world, _dt| {
+    ///     if let Some(p) = player_position(world) {
+    ///         cam.position = p + Vec3::new(0.0, 8.0, 12.0);
+    ///         cam.pitch = -0.5;
+    ///     }
+    /// });
+    /// ```
+    pub fn set_camera_fn<F>(&mut self, f: F)
+    where
+        F: FnMut(&mut Camera, &World, f32) + 'static,
+    {
+        self.camera_fn = Some(Box::new(f));
+    }
+
+    /// `true` if a per-frame camera updater has been registered.
+    pub fn has_camera_fn(&self) -> bool {
+        self.camera_fn.is_some()
     }
 
     /// Run one frame's worth of non-rendering systems. Used internally by the
@@ -527,6 +561,41 @@ mod tests {
         assert_eq!(app.input_system_count(), 1);
         app.tick_systems_only(0.016);
         assert_eq!(log.take(), vec!["user", "input"]);
+    }
+
+    #[test]
+    fn camera_config_defaults_and_builder() {
+        let d = RuntimeConfig::default();
+        assert_eq!(d.camera_position, Vec3::new(0.0, 10.0, 20.0));
+        assert_eq!(d.camera_yaw, 0.0);
+        assert!((d.camera_pitch + 0.4).abs() < 1e-6);
+        let c = RuntimeConfig::new().with_camera(Vec3::new(1.0, 2.0, 3.0), 0.5, -0.2);
+        assert_eq!(c.camera_position, Vec3::new(1.0, 2.0, 3.0));
+        assert!((c.camera_yaw - 0.5).abs() < 1e-6);
+        assert!((c.camera_pitch + 0.2).abs() < 1e-6);
+    }
+
+    #[test]
+    fn set_camera_fn_registers_and_runs_on_camera() {
+        let cfg = RuntimeConfig::new().disable_physics().disable_scripts().disable_crash_log();
+        let mut app = RuntimeApp::new(cfg).unwrap();
+        assert!(!app.has_camera_fn());
+
+        // Capture that the updater is actually invoked against a Camera.
+        let seen = Rc::new(Cell::new(false));
+        let s = seen.clone();
+        app.set_camera_fn(move |cam, _world, _dt| {
+            cam.position = Vec3::new(3.0, 3.0, 3.0);
+            s.set(true);
+        });
+        assert!(app.has_camera_fn());
+
+        // Drive the updater directly (no window needed) to prove it mutates a Camera.
+        let mut fnc = app.camera_fn.take().unwrap();
+        let mut cam = voltex_renderer::Camera::new(Vec3::ZERO, 1.0);
+        fnc(&mut cam, &app.world, 0.016);
+        assert!(seen.get(), "camera_fn should have run");
+        assert_eq!(cam.position, Vec3::new(3.0, 3.0, 3.0));
     }
 
     #[test]

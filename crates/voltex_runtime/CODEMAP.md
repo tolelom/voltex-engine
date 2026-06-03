@@ -36,6 +36,8 @@
 | `with_crash_log_dir(path)` | new 직후 | crash log 저장 경로 |
 | `disable_crash_log()` | new 직후 | panic hook 비활성화 (headless/테스트 용) |
 | `with_hud(bool)` | new 직후 | 인-윈도우 HUD 오버레이 활성화 (`set_hud_fn` 과 함께) |
+| `with_camera(pos, yaw, pitch)` / `with_camera_fov(f)` | new 직후 | 초기 카메라 프레이밍 (`set_camera_fn` 로 매 프레임 추적) |
+| `with_audio(clips)` | new 직후 | AudioSystem 생성 + audio_sync_system 활성화 |
 
 ## RuntimeApp::tick_systems_only(dt) 실행 순서
 1. `propagate_transforms(world)` (항상)
@@ -51,7 +53,7 @@
 - **Drop 순서**: `RuntimeApp` 의 필드 선언 순서가 곧 drop 순서. `runtime_state` (GPU) → `user_systems` → `file_watcher`/`timer`/`input`/`physics_config` → `script_pool` (LuaState 의 `__voltex_world` light userdata 가 World 보다 먼저 drop) → `assets`/`registry`/`world` → `config`. 이 순서는 LuaState use-after-free 회피용. 필드 추가/순서 변경 시 LuaState 가 World 보다 먼저 drop 됨을 유지.
 - **GPU init lazy**: `RuntimeApp::new` 는 window/GPU 를 만들지 않는다. `with_gpu_init` 콜백이 첫 `resumed` 에서 한 번만 실행. 헤드리스 단위 테스트에서는 `tick_systems_only` 만 호출 가능.
 - **BasicRenderer 시그너처**: handler.rs 의 `redraw` 가 직접 호출. `voltex_renderer_ecs::BasicRenderer::render` 인자가 바뀌면 함께 갱신.
-- **카메라/조명 정책**: v1 에서는 고정 — `Camera::new(Vec3::new(0,10,20), aspect)` + pitch=-0.4, `LightUniform::new()` 기본값. 사용자가 RuntimeState 직접 접근 못 함 (private). 향후 v1.1 에서 카메라 커스터마이즈 API 추가 예정.
+- **카메라**: 초기 위치/방향은 `RuntimeConfig::with_camera(pos, yaw, pitch)` / `with_camera_fov` (기본 `(0,10,20)`, yaw 0, pitch -0.4, 45°). 매 프레임 추적(follow/orbit)은 `RuntimeApp::set_camera_fn(\|cam, world, dt\| ...)` — tick 직후 실행되며 기본 RMB fly-camera를 override. **주의**: 기본 카메라가 멀어서(z=20) 1-unit 오브젝트는 화면에서 ~15px 점으로 보임 — 게임은 거의 항상 with_camera/set_camera_fn로 프레이밍해야 함 (voltex_capture `camera_framing_controls_visible_object_size` 회귀가 가드). 조명은 여전히 `LightUniform::new()` 고정.
 - **사용자 시스템 시그너처**: `FnMut(&mut World, f32) + 'static`. dt 는 호출 프레임의 dt (fixed_dt 가 Some 면 그 값).
 - **HUD 오버레이**: `with_hud(true)` + `set_hud_fn(|ui, world| ...)`. UiContext/UiRenderer 는 `RuntimeState`(GPU) 에 보관, `resumed` 에서 생성. `redraw` 가 BasicRenderer 다음 같은 encoder 로 `LoadOp::Load` UI 패스. 콜백은 `take()` 로 꺼내 `app.world` 와 disjoint-field 借用 충돌 회피.
 - **Lua input 발행**: `enable_scripts` 시 매 프레임 `fill_script_input` 으로 `script_input` 갱신 → `voltex_script::set_current_input(ptr)` (실행 후 null). 키 이름↔winit keycode 매핑 `SCRIPT_KEY_NAMES` 가 여기 소유.
@@ -61,7 +63,7 @@
 ## 테스트
 - 단위 테스트: src/**/*.rs `#[cfg(test)]`
 - 실행: `cargo test -p voltex_runtime --lib`
-- 현재 테스트 개수: 54개 (audio_sync ×3 + audio config ×1 추가)
+- 현재 테스트 개수: 56개 (camera config + set_camera_fn ×2 추가)
 - GPU/winit 의존 테스트는 직접 검증 불가 → examples/runtime_demo 수동 실행 검증
 
 ## 예제

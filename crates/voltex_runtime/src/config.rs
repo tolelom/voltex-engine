@@ -5,6 +5,7 @@
 use std::path::PathBuf;
 
 use voltex_ecs::{ComponentRegistry, World};
+use voltex_math::Vec3;
 use voltex_platform::WindowConfig;
 
 /// Boxed closure that augments the [`ComponentRegistry`] during boot.
@@ -65,6 +66,16 @@ pub struct RuntimeConfig {
     /// Directory the crash log is written to. When `None`, the current
     /// working directory at hook-fire time is used.
     pub crash_log_dir: Option<PathBuf>,
+    /// Initial camera eye position. Default `(0, 10, 20)`. Set with
+    /// [`Self::with_camera`]; drive it per-frame with
+    /// [`crate::RuntimeApp::set_camera_fn`].
+    pub camera_position: Vec3,
+    /// Initial camera yaw (radians, rotation about Y). Default `0`.
+    pub camera_yaw: f32,
+    /// Initial camera pitch (radians). Default `-0.4` (looking slightly down).
+    pub camera_pitch: f32,
+    /// Vertical field of view (radians). Default 45°.
+    pub camera_fov_y: f32,
 }
 
 impl Default for RuntimeConfig {
@@ -85,6 +96,11 @@ impl Default for RuntimeConfig {
             vfs: None,
             enable_crash_log: true,
             crash_log_dir: None,
+            // Matches the historical hardcoded runtime camera.
+            camera_position: Vec3::new(0.0, 10.0, 20.0),
+            camera_yaw: 0.0,
+            camera_pitch: -0.4,
+            camera_fov_y: std::f32::consts::FRAC_PI_4,
         }
     }
 }
@@ -174,6 +190,22 @@ impl RuntimeConfig {
     /// [`crate::RuntimeApp::set_hud_fn`] to draw text / bars over the 3D scene.
     pub fn with_hud(mut self, enabled: bool) -> Self {
         self.enable_hud = enabled;
+        self
+    }
+
+    /// Set the initial camera eye position + orientation (yaw/pitch radians).
+    /// For a camera that tracks gameplay (follow / orbit), register a per-frame
+    /// updater with [`crate::RuntimeApp::set_camera_fn`].
+    pub fn with_camera(mut self, position: Vec3, yaw: f32, pitch: f32) -> Self {
+        self.camera_position = position;
+        self.camera_yaw = yaw;
+        self.camera_pitch = pitch;
+        self
+    }
+
+    /// Override the camera vertical field of view (radians).
+    pub fn with_camera_fov(mut self, fov_y: f32) -> Self {
+        self.camera_fov_y = fov_y;
         self
     }
 

@@ -174,7 +174,8 @@
 - **3 OS exe artifact 검증** — Windows host 빌드 + runtime 검증 완료. v1.0.55 에서 **CLI 빌드 파이프라인 end-to-end 풀 실행 검증**: `voltex new` → `voltex build` (release, ~30s) → 산출 `dist/<name>.exe` (+ scene/assets/scripts + LICENSE×3 번들) 가 실제 RTX 4080 에서 panic/validation 0 으로 게임 구동. 즉 "게임 빌드 → 단일 exe 배포" DoD 헤드라인 워크플로가 실 하드웨어에서 작동 확인. Linux + macOS 실 머신 검증은 v1.1 사용자 PR.
 - **Lua input API** — 입력은 Rust `add_input_system` 만. Lua 측 `input.is_key_pressed(...)` v1.1 후속.
 - **voltex_cli editor 모드** — `voltex new/build/run` 만. `voltex editor` 서브커맨드 v1.1.
-- **HUD 통합** — 런타임 UiContext 정식 API 없음. 점수 등 표시는 콘솔 print 만.
+- ~~**HUD 통합**~~ ✅ 2026-06-03 — `RuntimeApp::set_hud_fn` + `RuntimeConfig::with_hud` (v1.0.59).
+- ~~**런타임 카메라 고정**~~ ✅ 2026-06-03 — `RuntimeConfig::with_camera(pos,yaw,pitch)`/`with_camera_fov` + `RuntimeApp::set_camera_fn(follow/orbit)`. 기존 하드코딩 `(0,10,20)` 가 기본값으로 유지되지만 이제 게임이 프레이밍 가능. (발견 계기: game_ready_demo에서 1-unit 큐브가 먼 기본 카메라 때문에 ~15px 점으로만 보여 "박스 안 보임" 리포트. 렌더는 정상이었음.)
 - **1573 missing_docs** — facade prelude + tier-1 API 만 보장. crate 별 점진 작성 v1.1. v1.0.19 부터 시작: voltex_math 59→0, v1.0.20 voltex_platform 38→0. 나머지 11 crate (~1476): asset / net / ai / physics / audio / ecs / script / renderer_ecs / editor / runtime / renderer.
 - **`pub(crate)` 다운그레이드** — 후보 노트 (`docs/v1.0-pub-audit.md`) 만 작성. 실 변경 v1.1.
 - **600줄 한도 위반 4건** ✅ v1.0.2 에서 재분리.

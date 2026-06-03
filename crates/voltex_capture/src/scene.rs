@@ -433,10 +433,107 @@ pub(crate) fn camera_light_bgl(device: &wgpu::Device) -> wgpu::BindGroupLayout {
     })
 }
 
+/// DEBUG: replicate `examples/game_ready_demo` (ground + player + chaser cubes)
+/// rendered with the *runtime's* fixed camera (`(0,10,20)`, pitch -0.4) to see
+/// what the user actually sees. Returns RGBA8.
+pub fn render_demo_like_cam(
+    gpu: &HeadlessGpu,
+    width: u32,
+    height: u32,
+    cam_pos: Vec3,
+    yaw: f32,
+    pitch: f32,
+    include_ground: bool,
+) -> Vec<u8> {
+    let target = OffscreenTarget::new(&gpu.device, width, height);
+    let renderer = BasicRenderer::new(&gpu.device, &gpu.queue, CAPTURE_FORMAT, 1024);
+    let mut assets = RenderAssets::new();
+    let mesh_h = assets.add_mesh(unit_cube(&gpu.device));
+    let mat_h = assets.add_material(MaterialUniform::new());
+    let mut world = World::new();
+    let all = [
+        (Vec3::new(0.0, -0.1, 0.0), Vec3::new(40.0, 0.2, 40.0)), // ground
+        (Vec3::new(0.0, 0.5, 0.0), Vec3::ONE),                   // player
+        (Vec3::new(10.0, 0.5, 10.0), Vec3::new(0.8, 0.8, 0.8)),  // chaser
+    ];
+    let specs: &[(Vec3, Vec3)] = if include_ground { &all } else { &all[1..] };
+    for &(pos, scale) in specs {
+        let e = world.spawn();
+        let mut t = Transform::from_position(pos);
+        t.scale = scale;
+        world.add(e, t);
+        world.add(e, MeshHandle(mesh_h.0));
+        world.add(e, MaterialHandle(mat_h.0));
+    }
+    voltex_ecs::propagate_transforms(&mut world);
+    let mut camera = Camera::new(cam_pos, width as f32 / height as f32);
+    camera.yaw = yaw;
+    camera.pitch = pitch;
+    let view_proj = camera.view_projection();
+    let light = LightUniform::new();
+    let mut encoder = gpu
+        .device
+        .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("demo_like_cam") });
+    renderer.render(
+        &gpu.queue,
+        &mut encoder,
+        &target.color_view,
+        &target.depth_view,
+        wgpu::Color { r: 0.02, g: 0.02, b: 0.05, a: 1.0 },
+        &mut world,
+        &assets,
+        view_proj,
+        camera.position,
+        light,
+    );
+    gpu.queue.submit(Some(encoder.finish()));
+    target.read_rgba8(&gpu.device, &gpu.queue)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::ImageStats;
+
+    /// Count pixels that differ from the top-left (background) pixel — i.e. the
+    /// rendered object's footprint.
+    fn object_pixels(rgba: &[u8]) -> usize {
+        let bg = [rgba[0], rgba[1], rgba[2]];
+        rgba
+            .chunks_exact(4)
+            .filter(|p| {
+                (p[0] as i32 - bg[0] as i32).abs() > 20
+                    || (p[1] as i32 - bg[1] as i32).abs() > 20
+                    || (p[2] as i32 - bg[2] as i32).abs() > 20
+            })
+            .count()
+    }
+
+    /// Regression for the "I can't see my boxes" report: a 1-unit object at the
+    /// origin is a tiny speck under the runtime's default far camera
+    /// `(0,10,20)`, but fills a large area once a framing camera is used. This
+    /// is why `RuntimeConfig::with_camera` / `RuntimeApp::set_camera_fn` exist.
+    #[test]
+    #[ignore = "requires a GPU adapter"]
+    fn camera_framing_controls_visible_object_size() {
+        let gpu = match HeadlessGpu::new() {
+            Ok(g) => g,
+            Err(e) => {
+                eprintln!("skipping: {e}");
+                return;
+            }
+        };
+        let (w, h) = (320, 180);
+        // Cubes only (no ground), so the footprint isolates the gameplay objects.
+        let far = render_demo_like_cam(&gpu, w, h, Vec3::new(0.0, 10.0, 20.0), 0.0, -0.4, false);
+        let close = render_demo_like_cam(&gpu, w, h, Vec3::new(0.0, 2.5, 6.0), 0.0, -0.3, false);
+        let (far_px, close_px) = (object_pixels(&far), object_pixels(&close));
+        assert!(far_px > 0, "the cube must render even when far (got {far_px})");
+        assert!(
+            close_px > far_px * 5,
+            "framing camera should show the object far larger: far={far_px} close={close_px}"
+        );
+    }
 
     // GPU-gated: ignored by default (no GPU in CI). Run with:
     //   cargo test -p voltex_capture -- --ignored
