@@ -496,4 +496,78 @@ mod tests {
         let mut registry = ComponentRegistry::new();
         register_renderable_components(&mut registry);
     }
+
+    #[test]
+    fn declarative_renderables_round_trip_through_a_data_scene() {
+        use voltex_ecs::{
+            deserialize_scene_json, serialize_scene_json, Transform,
+        };
+        use voltex_math::Vec3;
+
+        // A registry that knows the engine built-ins plus the renderable
+        // components — exactly what RuntimeApp sets up on boot.
+        let mut registry = ComponentRegistry::new();
+        registry.register_defaults();
+        register_renderable_components(&mut registry);
+
+        // Author a "scene" in code, then serialize it to JSON (the on-disk
+        // data format) — a cube + a sphere, each with a color.
+        // Renderables carry a Transform (they need a position) — which is also
+        // what `serialize_scene_json` uses as the entity anchor.
+        let mut world = World::new();
+        let cube = world.spawn();
+        world.add(cube, Transform::from_position(Vec3::new(1.0, 2.0, 3.0)));
+        world.add(cube, PrimitiveMesh::cube(2.0));
+        world.add(cube, MaterialDesc::color([0.9, 0.1, 0.1, 1.0]));
+        let sphere = world.spawn();
+        world.add(sphere, Transform::from_position(Vec3::new(-1.0, 0.0, 0.0)));
+        world.add(sphere, PrimitiveMesh::sphere(0.5, 16, 8));
+        world.add(sphere, MaterialDesc::pbr([0.1, 0.8, 0.2, 1.0], 0.5, 0.3));
+
+        let json = serialize_scene_json(&world, &registry);
+
+        // Load it into a fresh world purely from the data — no code attaches
+        // the shapes/materials.
+        let mut loaded = World::new();
+        let entities = deserialize_scene_json(&mut loaded, &json, &registry).unwrap();
+        assert_eq!(entities.len(), 2);
+
+        // Both entities carry their declarative renderable through the data
+        // round-trip; materialize_renderables would then make them visible
+        // with zero game code.
+        let prims: Vec<PrimitiveMesh> =
+            loaded.query::<PrimitiveMesh>().map(|(_, p)| *p).collect();
+        assert!(prims.contains(&PrimitiveMesh::cube(2.0)));
+        assert!(prims.contains(&PrimitiveMesh::sphere(0.5, 16, 8)));
+
+        let pending = plan_primitive_meshes(&loaded);
+        assert_eq!(pending.len(), 2, "loaded scene primitives still need GPU meshes");
+        assert_eq!(plan_materials(&loaded).len(), 2);
+    }
+
+    #[test]
+    fn renderable_without_a_transform_is_not_serialized() {
+        // Documents the scene format's Transform-anchor rule: an entity with a
+        // renderable but no Transform is dropped entirely on save. Renderables
+        // need a position anyway, so this only bites pathological scenes — but
+        // it must not be silent, hence this guard.
+        use voltex_ecs::{deserialize_scene_json, serialize_scene_json};
+
+        let mut registry = ComponentRegistry::new();
+        registry.register_defaults();
+        register_renderable_components(&mut registry);
+
+        let mut world = World::new();
+        let e = world.spawn();
+        world.add(e, PrimitiveMesh::cube(1.0)); // no Transform
+        world.add(e, MaterialDesc::color([1.0, 1.0, 1.0, 1.0]));
+
+        let json = serialize_scene_json(&world, &registry);
+        let mut loaded = World::new();
+        let entities = deserialize_scene_json(&mut loaded, &json, &registry).unwrap();
+        assert!(
+            entities.is_empty(),
+            "a renderable without a Transform is not anchored in the scene"
+        );
+    }
 }

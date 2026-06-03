@@ -279,6 +279,15 @@ fn hex_digit(c: u8) -> crate::Result<u8> {
 
 /// Serialize all entities with a Transform to JSON format using the component registry.
 /// Format: {"version":1,"entities":[{"parent":null_or_idx,"components":{"name":"hex",...}}]}
+///
+/// **Transform anchor**: only entities that have a [`Transform`] are emitted —
+/// the Transform is the scene's entity anchor (parent indices reference this
+/// list). An entity carrying other components (e.g. `PrimitiveMesh`, `Sprite`,
+/// `AudioSource`) but *no* Transform is dropped entirely. In practice every
+/// renderable/spatial entity has a Transform, so this is rarely a surprise, but
+/// it means a Transform-less entity will not round-trip. The binary
+/// ([`serialize_scene_binary`](crate::serialize_scene_binary)) path shares this
+/// anchor rule.
 pub fn serialize_scene_json(world: &World, registry: &ComponentRegistry) -> String {
     let entities_with_transform: Vec<(Entity, Transform)> =
         world.query::<Transform>().map(|(e, t)| (e, *t)).collect();

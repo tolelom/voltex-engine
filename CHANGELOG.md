@@ -10,6 +10,32 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## [v1.0.68] — 2026-06-03 — Data-authored visual scenes (compose v1.0.62/64/67) + scene-anchor doc
+
+상용 엔진의 본질은 "코드가 아닌 데이터 씬"이다. 사이클 1(선언적 렌더러블)이
+`PrimitiveMesh`/`MaterialDesc` 를 `Component` 로 만들어 둔 덕에, 씬 파일(JSON/VSCN)에
+**모양+색이 담겨** 코드 없이 visual 씬을 저작할 수 있어야 한다 — 이게 실제로
+레지스트리 경유 직렬화로 round-trip 하고 materialize→렌더되는지 검증.
+
+### 검증 (결합 동작 + 회귀 가드)
+
+- `declarative_renderables_round_trip_through_a_data_scene` — Transform+PrimitiveMesh+
+  MaterialDesc 월드를 `serialize_scene_json` → `deserialize_scene_json`(레지스트리:
+  `register_defaults` + `register_renderable_components`) 하면 두 컴포넌트가 그대로
+  복원됨. 로드 후 `plan_primitive_meshes`/`plan_materials` 가 GPU 작업 대기로 인식.
+- RTX 4080 capture 회귀 `data_authored_scene_renders_nonblank` — JSON 문자열에서만
+  로드한 월드를 `materialize_renderables` 후 BasicRenderer 로 그려 non-blank 확인
+  (**데이터 → 픽셀, 스폰 코드 0**).
+
+### 발견 & 문서화 (truthful-doc)
+
+- **scene Transform-anchor footgun**: `serialize_scene_json`/binary 는 **Transform 이
+  있는 엔티티만** 직렬화 — Transform 없는 렌더러블 엔티티는 통째로 누락(silent). 검증
+  중 재현 확정. 동작 변경(3개 포맷 영향, 위험) 대신 docstring 에 명시 + 회귀 가드
+  `renderable_without_a_transform_is_not_serialized` 추가 (v1.0.41/56 의 truthful-doc
+  패턴). 렌더러블은 위치가 필요해 Transform 이 사실상 필수라 실사용 영향 없음.
+- workspace build / clippy(`-D warnings`) / lib test 전부 그린.
+
 ## [v1.0.67] — 2026-06-03 — Prefab registry (named entity templates)
 
 기초 워크플로 격차 6번째: 같은 엔티티를 여러 번 만들 때 매번 컴포넌트 조립을 반복.

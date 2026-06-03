@@ -207,6 +207,80 @@ pub fn render_materialized_primitives(gpu: &HeadlessGpu, width: u32, height: u32
     target.read_rgba8(&gpu.device, &gpu.queue)
 }
 
+/// Render a scene authored as **data**: a world of `PrimitiveMesh` +
+/// `MaterialDesc` entities is serialized to a JSON scene string, then loaded
+/// into a *fresh* world purely from that string (no spawn code), materialized,
+/// and drawn. Proves the full "data scene → pixels" path — the same one a
+/// `.vscn`/JSON file on disk drives. Returns RGBA8.
+pub fn render_data_authored_scene(gpu: &HeadlessGpu, width: u32, height: u32) -> Vec<u8> {
+    use voltex_ecs::{
+        deserialize_scene_json, serialize_scene_json, ComponentRegistry,
+    };
+    use voltex_renderer_ecs::{
+        materialize_renderables, register_renderable_components, MaterialDesc, PrimitiveMesh,
+    };
+
+    // Registry mirrors RuntimeApp boot: built-ins + declarative renderables.
+    let mut registry = ComponentRegistry::new();
+    registry.register_defaults();
+    register_renderable_components(&mut registry);
+
+    // Author in code, then freeze to the on-disk JSON format.
+    let mut authored = World::new();
+    let c = authored.spawn();
+    let mut ct = Transform::from_position(Vec3::new(-0.85, 0.0, 0.0));
+    ct.rotation = Quat::from_euler_yxz(Vec3::new(0.3, 0.6, 0.0));
+    authored.add(c, ct);
+    authored.add(c, PrimitiveMesh::cube(1.0));
+    authored.add(c, MaterialDesc::color([0.9, 0.2, 0.15, 1.0]));
+    let s = authored.spawn();
+    authored.add(s, Transform::from_position(Vec3::new(0.85, 0.0, 0.0)));
+    authored.add(s, PrimitiveMesh::sphere_default(0.6));
+    authored.add(s, MaterialDesc::color([0.2, 0.8, 0.3, 1.0]));
+    let json = serialize_scene_json(&authored, &registry);
+
+    // Load a brand-new world from the data alone.
+    let mut world = World::new();
+    deserialize_scene_json(&mut world, &json, &registry).expect("scene JSON loads");
+
+    let target = OffscreenTarget::new(&gpu.device, width, height);
+    let renderer = BasicRenderer::new(&gpu.device, &gpu.queue, CAPTURE_FORMAT, 16);
+    let mut assets = RenderAssets::new();
+    materialize_renderables(&mut world, &mut assets, &gpu.device);
+
+    let mut camera = Camera::new(Vec3::new(0.0, 1.0, 4.0), width as f32 / height as f32);
+    camera.pitch = -0.22;
+    let view_proj = camera.view_projection();
+    let mut light = LightUniform::new();
+    light.direction = [-0.4, -1.0, -0.6];
+
+    let mut encoder = gpu
+        .device
+        .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+            label: Some("capture data_authored_scene"),
+        });
+    renderer.render(
+        &gpu.queue,
+        &mut encoder,
+        &target.color_view,
+        &target.depth_view,
+        wgpu::Color {
+            r: 0.05,
+            g: 0.05,
+            b: 0.08,
+            a: 1.0,
+        },
+        &mut world,
+        &assets,
+        view_proj,
+        camera.position,
+        light,
+    );
+    gpu.queue.submit(Some(encoder.finish()));
+
+    target.read_rgba8(&gpu.device, &gpu.queue)
+}
+
 /// Render the canonical PBR test: a 7×7 grid of spheres with metallic varying
 /// left→right and roughness varying bottom→top, lit by one directional light.
 /// Exercises the full Cook-Torrance pipeline (`create_pbr_pipeline`) plus the
@@ -2011,6 +2085,26 @@ mod tests {
             !stats.looks_blank(),
             "declarative primitive frame is blank — materialize_renderables \
              did not produce drawable meshes: {stats:?}"
+        );
+        assert!(stats.mean_luminance > 0.01, "frame too dark: {stats:?}");
+    }
+
+    #[test]
+    #[ignore]
+    fn data_authored_scene_renders_nonblank() {
+        let gpu = match HeadlessGpu::new() {
+            Ok(g) => g,
+            Err(e) => {
+                eprintln!("skipping: {e}");
+                return;
+            }
+        };
+        let rgba = render_data_authored_scene(&gpu, 320, 240);
+        let stats = ImageStats::analyze(&rgba);
+        assert!(
+            !stats.looks_blank(),
+            "scene loaded from JSON data rendered blank — the data→materialize→\
+             render path is broken: {stats:?}"
         );
         assert!(stats.mean_luminance > 0.01, "frame too dark: {stats:?}");
     }

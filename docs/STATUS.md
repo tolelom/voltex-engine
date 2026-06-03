@@ -173,6 +173,15 @@
 
 v1.0.9 부터는 **서비스 배포 완성도** 로드맵 (`docs/superpowers/specs/2026-05-21-service-readiness-roadmap.md`) 기준으로 진행.
 
+### 2026-06-03 — 데이터 저작 visual 씬 (v1.0.68, 자율 세션)
+
+상용 엔진의 본질인 "코드 아닌 데이터 씬" 결합 검증. 사이클 1의 `PrimitiveMesh`/
+`MaterialDesc`(Component)가 레지스트리 경유 씬 JSON round-trip → materialize→렌더됨을
+단위 + RTX 4080 capture(`data_authored_scene_renders_nonblank`)로 확인(데이터→픽셀,
+스폰 코드 0). 검증 중 **scene Transform-anchor footgun** 발견(Transform 없는 엔티티
+직렬화 누락) → 동작 변경 대신 docstring 명시 + 회귀 가드(truthful-doc, v1.0.41/56 패턴).
+build/clippy/test 그린.
+
 ### 2026-06-03 — 프리팹 레지스트리 (v1.0.67, 자율 세션)
 
 기초 워크플로 격차 6번째(같은 엔티티 반복 조립). `voltex_ecs::Prefabs` — `register(name, factory)`/
