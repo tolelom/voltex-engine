@@ -62,6 +62,9 @@ pub struct RuntimeApp {
     pub physics_config: PhysicsConfig,
     /// Pool of loaded Lua interpreters keyed by script path.
     pub script_pool: ScriptInstancePool,
+    /// Per-frame input snapshot published to Lua scripts (`input` table).
+    /// Re-filled from [`Self::input`] before scripts run each frame.
+    pub(crate) script_input: voltex_script::ScriptInput,
     /// GPU-resident mesh + material storage shared with the renderer.
     pub assets: RenderAssets,
     /// Component registry used for scene (de)serialisation.
@@ -131,6 +134,7 @@ impl RuntimeApp {
             input: InputState::new(),
             physics_config: PhysicsConfig::default(),
             script_pool: ScriptInstancePool::new(),
+            script_input: voltex_script::ScriptInput::new(),
             assets: RenderAssets::new(),
             registry,
             world,
@@ -182,8 +186,14 @@ impl RuntimeApp {
             voltex_physics::physics_step(&mut self.world, &self.physics_config);
         }
         if self.config.enable_scripts {
+            // Publish the current frame's input so the `input` Lua table reads
+            // live state. Re-derive the pointer every frame (the app may have
+            // moved) and clear it after, mirroring the `__voltex_world` rule.
+            fill_script_input(&mut self.script_input, &self.input);
+            voltex_script::set_current_input(&self.script_input as *const _);
             voltex_script::script_start_all(&mut self.world, &mut self.script_pool);
             voltex_script::script_update_all(&mut self.world, &mut self.script_pool, dt);
+            voltex_script::set_current_input(std::ptr::null());
             let _ = self.script_pool.poll_reload(&mut self.file_watcher);
         }
         for sys in self.user_systems.iter_mut() {
@@ -219,6 +229,56 @@ impl RuntimeApp {
         }
         result
     }
+}
+
+/// Mapping from the string names exposed to Lua (`input.is_key_pressed("W")`)
+/// to platform keycodes. Owning the table here keeps `voltex_script` free of
+/// any windowing/winit dependency. Unlisted keys are simply unqueryable.
+const SCRIPT_KEY_NAMES: &[(&str, winit::keyboard::KeyCode)] = {
+    use winit::keyboard::KeyCode as K;
+    &[
+        ("A", K::KeyA), ("B", K::KeyB), ("C", K::KeyC), ("D", K::KeyD),
+        ("E", K::KeyE), ("F", K::KeyF), ("G", K::KeyG), ("H", K::KeyH),
+        ("I", K::KeyI), ("J", K::KeyJ), ("K", K::KeyK), ("L", K::KeyL),
+        ("M", K::KeyM), ("N", K::KeyN), ("O", K::KeyO), ("P", K::KeyP),
+        ("Q", K::KeyQ), ("R", K::KeyR), ("S", K::KeyS), ("T", K::KeyT),
+        ("U", K::KeyU), ("V", K::KeyV), ("W", K::KeyW), ("X", K::KeyX),
+        ("Y", K::KeyY), ("Z", K::KeyZ),
+        ("0", K::Digit0), ("1", K::Digit1), ("2", K::Digit2), ("3", K::Digit3),
+        ("4", K::Digit4), ("5", K::Digit5), ("6", K::Digit6), ("7", K::Digit7),
+        ("8", K::Digit8), ("9", K::Digit9),
+        ("Space", K::Space), ("Enter", K::Enter), ("Escape", K::Escape),
+        ("Tab", K::Tab),
+        ("Left", K::ArrowLeft), ("Right", K::ArrowRight),
+        ("Up", K::ArrowUp), ("Down", K::ArrowDown),
+        ("LShift", K::ShiftLeft), ("RShift", K::ShiftRight),
+        ("LCtrl", K::ControlLeft), ("RCtrl", K::ControlRight),
+        ("LAlt", K::AltLeft), ("RAlt", K::AltRight),
+    ]
+};
+
+/// Translate the platform [`InputState`] into the windowing-agnostic
+/// [`voltex_script::ScriptInput`] snapshot read by Lua.
+fn fill_script_input(si: &mut voltex_script::ScriptInput, input: &InputState) {
+    use winit::event::MouseButton;
+    si.clear();
+    for (name, code) in SCRIPT_KEY_NAMES {
+        if input.is_key_pressed(*code) {
+            si.set_key_pressed(name);
+        }
+        if input.is_key_just_pressed(*code) {
+            si.set_key_just_pressed(name);
+        }
+    }
+    let (mx, my) = input.mouse_position();
+    let (dx, dy) = input.mouse_delta();
+    si.set_mouse(mx, my, dx, dy);
+    si.set_buttons(
+        input.is_mouse_button_pressed(MouseButton::Left),
+        input.is_mouse_button_pressed(MouseButton::Right),
+        input.is_mouse_button_pressed(MouseButton::Middle),
+    );
+    si.set_scroll(input.mouse_scroll());
 }
 
 fn load_scene_via_vfs_or_disk(
@@ -396,6 +456,65 @@ mod tests {
         assert_eq!(app.input_system_count(), 1);
         app.tick_systems_only(0.016);
         assert_eq!(log.take(), vec!["user", "input"]);
+    }
+
+    // ── Lua input API wiring ─────────────────────────────────────────────
+
+    #[test]
+    fn fill_script_input_maps_keys_and_buttons() {
+        use winit::event::MouseButton;
+        use winit::keyboard::KeyCode;
+        let mut input = InputState::new();
+        input.process_key(KeyCode::KeyW, true);
+        input.process_mouse_button(MouseButton::Left, true);
+        let mut si = voltex_script::ScriptInput::new();
+        fill_script_input(&mut si, &input);
+        assert!(si.key_pressed("W"), "W should map to pressed");
+        assert!(si.key_just_pressed("W"), "W press edge should map");
+        assert!(!si.key_pressed("A"), "A was not pressed");
+        assert!(si.button_pressed("left"), "left button should map");
+        assert!(!si.button_pressed("right"));
+    }
+
+    #[test]
+    fn script_reads_live_input_through_tick() {
+        use voltex_ecs::{ScriptComponent, Transform};
+        use voltex_math::Vec3;
+        let dir = std::env::temp_dir().join("voltex_runtime_input_test");
+        let _ = std::fs::create_dir_all(&dir);
+        let path = dir.join("input_mover.lua");
+        std::fs::write(
+            &path,
+            "function on_start(id, gen) end
+             function on_update(id, gen, dt)
+                 if input.is_key_pressed('W') then
+                     set_position(id, gen, 0.0, 0.0, 5.0)
+                 end
+             end",
+        )
+        .unwrap();
+
+        // Scripts are enabled by default; physics off to keep the test focused.
+        let cfg = RuntimeConfig::new().disable_physics().disable_crash_log();
+        let mut app = RuntimeApp::new(cfg).unwrap();
+        let e = app.world.spawn();
+        app.world.add(e, Transform::from_position(Vec3::ZERO));
+        app.world
+            .add(e, ScriptComponent::new(path.to_str().unwrap().to_string()));
+
+        // No key held → entity stays at the origin.
+        app.tick_systems_only(0.016);
+        assert!(app.world.get::<Transform>(e).unwrap().position.z.abs() < 1e-6);
+
+        // Hold W → the script reads it via the `input` table and moves the entity.
+        app.input
+            .process_key(winit::keyboard::KeyCode::KeyW, true);
+        app.tick_systems_only(0.016);
+        let z = app.world.get::<Transform>(e).unwrap().position.z;
+        assert!(
+            (z - 5.0).abs() < 1e-6,
+            "script should have observed W and moved entity, got z={z}"
+        );
     }
 
     #[test]

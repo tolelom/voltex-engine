@@ -7,7 +7,8 @@ Lua 5.4 내장 + 엔진 API 바인딩 + 샌드박싱 + 핫 리로드 + per-entit
 - `LuaState` — Lua 인터프리터 (src/state.rs)
 - `LuaCoroutine` — 코루틴 (src/coroutine.rs)
 - `Sandbox` — os/io 차단 (src/sandbox.rs)
-- engine_api — spawn/position/rotation/scale/destroy/tag/find/hierarchy/iter (17 fns) (src/engine_api.rs)
+- engine_api — spawn/position/rotation/scale/destroy/tag/find/hierarchy/iter (17 fns) (src/engine_api/)
+- engine_input — 읽기 전용 `input` Lua 테이블 + `ScriptInput` 스냅샷 + `set_current_input` (src/engine_input.rs)
 - bindings — voltex_print 등 (src/bindings.rs)
 - ffi — Lua C API FFI (src/ffi.rs)
 - `ScriptInstance` — 한 .lua 파일 하나의 LuaState (src/instance.rs)
@@ -19,7 +20,8 @@ Lua 5.4 내장 + 엔진 API 바인딩 + 샌드박싱 + 핫 리로드 + per-entit
 - `state` — LuaState + push/read table/vec3, register_fn, exec (src/state.rs, 505줄)
 - `coroutine` — LuaCoroutine (src/coroutine.rs)
 - `sandbox` — 샌드박싱 (src/sandbox.rs)
-- `engine_api` — Rust ↔ Lua 엔진 API (src/engine_api.rs)
+- `engine_api` — Rust ↔ Lua 엔진 API (src/engine_api/)
+- `engine_input` — Lua `input` 테이블 (키/마우스 읽기), thread-local 스냅샷 포인터 (src/engine_input.rs)
 - `bindings` — 표준 라이브러리 바인딩 (src/bindings.rs)
 - `ffi` — Lua C FFI 선언 (src/ffi.rs)
 - `instance` — ScriptInstance struct (lua + path + started flag) (src/instance.rs)
@@ -38,6 +40,7 @@ Lua 5.4 내장 + 엔진 API 바인딩 + 샌드박싱 + 핫 리로드 + per-entit
 - **ScriptInstancePool**: 한 .lua 파일당 **하나**의 LuaState 공유 (여러 entity 가 같은 path 면 같은 인터프리터). per-entity 상태는 스크립트가 인자(id, gen) 만으로 처리해야 함. 글로벌 사용은 entity 간 공유.
 - **`script_start_all` 호출 순서**: ScriptComponent.instance_id == UNBOUND (or pool 에 없는 id) → 자동 재바인딩 + `on_start` 호출 + started=true. 이후 `script_update_all` 가 매 프레임 `on_update(id, gen, dt)`.
 - **Lua callback 미정의**: 함수가 없으면 silent skip (panic 없음). `lua_pcall` 실패도 silent (v1).
+- **Lua input API**: `input` 전역 테이블 (is_key_pressed/is_key_just_pressed/mouse_position/mouse_delta/is_mouse_button_pressed/scroll). 키는 **문자열 이름**("W","Space",...) — 이름↔keycode 매핑은 winit 의존을 피하려 `voltex_runtime`(SCRIPT_KEY_NAMES)이 소유. `voltex_script`는 winit 무의존, POD `ScriptInput` 스냅샷만 안다. 런타임이 매 프레임 `set_current_input(&snapshot)` 발행(thread-local), 실행 후 null 로 클리어. 스냅샷 미발행 시 모든 input 함수는 false/0 반환.
 - **Drop 순서**: ScriptInstancePool 이 World 보다 먼저 drop 되어야 LuaState 내부의 `__voltex_world` light userdata 가 dangling 안 됨 (실질적 use-after-free 는 발생 안 하지만 정책적 정렬).
 - state.rs는 505줄 (spec 만족, 분리 대상 아님)
 - Lua 5.4는 cc로 내장 빌드 — Windows MSVC 환경 의존
@@ -45,4 +48,4 @@ Lua 5.4 내장 + 엔진 API 바인딩 + 샌드박싱 + 핫 리로드 + per-entit
 ## 테스트
 - 단위 테스트: src/**/*.rs `#[cfg(test)]`
 - 실행: `cargo test -p voltex_script --lib`
-- 현재 테스트 개수: 42개 (S1 +12: pool ×6, system ×4, engine_api iter ×2)
+- 현재 테스트 개수: 53개 (engine_input +5)

@@ -12,6 +12,7 @@ use voltex_ecs::World;
 
 use crate::bindings::register_default_bindings;
 use crate::engine_api::register_engine_api;
+use crate::engine_input::register_engine_input;
 use crate::instance::ScriptInstance;
 use crate::state::LuaState;
 
@@ -50,6 +51,9 @@ impl ScriptInstancePool {
         let lua = LuaState::new();
         register_default_bindings(&lua);
         register_engine_api(&lua, world);
+        // The global `input` table reads a thread-local snapshot published by
+        // the runtime each frame (`set_current_input`); harmless if unset.
+        register_engine_input(&lua);
         lua.exec_file(path)?;
         let id = self.next_id;
         self.next_id += 1;
