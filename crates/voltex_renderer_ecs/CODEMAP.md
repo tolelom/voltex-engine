@@ -27,7 +27,7 @@ ECS World ↔ voltex_renderer 브릿지. C0a 의 `MeshHandle` / `MaterialHandle`
 | `materialize_renderables(&mut World, &mut RenderAssets, &Device)` | `renderable.rs` | `PrimitiveMesh`/`MaterialDesc` → GPU 메시/머티리얼 + `MeshHandle`/`MaterialHandle`/`Bounds` 부착. **dedup**(동일 프리미티브·머티리얼 공유) + **멱등**(resolve 된 엔티티 skip). RuntimeApp 이 gpu_init 직후 자동 호출 |
 | `register_renderable_components(&mut ComponentRegistry)` / `plan_primitive_meshes(&World)` / `plan_materials(&World)` | `renderable.rs` | 등록 헬퍼 + 순수(GPU 무관) plan 헬퍼(멱등 계약 테스트용) |
 | `RenderAssets::add_skinned_mesh(SkinnedMesh) -> SkinnedMeshHandle` / `skinned_mesh(h)` | `assets.rs` | 스킨드 메시 저장 |
-| `RenderAssets::add_texture(GpuTexture)` / `add_texture_png(device,queue,bytes) -> Result` / `add_texture_rgba(device,queue,w,h,px)` / `texture(h)`, `TextureHandle` 컴포넌트 | `assets.rs` | per-entity 디퓨즈 텍스처 (없으면 흰색 기본). `_png`/`_rgba`는 레이아웃 생성+업로드를 한 번에 (런타임 스프라이트/메시 텍스처 로딩 편의) |
+| `RenderAssets::add_texture(GpuTexture)` / `add_texture_png(device,queue,bytes) -> Result` / `add_texture_rgba(device,queue,w,h,px)` / `replace_texture_png(device,queue,handle,bytes) -> Result` / `texture(h)`, `TextureHandle` 컴포넌트 | `assets.rs` | per-entity 디퓨즈 텍스처 (없으면 흰색 기본). `_png`/`_rgba`는 레이아웃 생성+업로드를 한 번에. `replace_texture_png`는 핫리로드 — 기존 핸들 뒤 GpuTexture를 in-place 교체(generation 보존, 엔티티 재부착 불필요) |
 | `SkinnedMeshHandle(Handle<SkinnedMesh>)`, `SkinnedPose{skeleton,animation,player}` | `skinned.rs` | 스킨드 ECS 컴포넌트 |
 | `update_skinned_poses(&mut World, dt)`, `animation_duration(&GltfAnimation)` | `skinned.rs` | 포즈 진행 시스템 (RuntimeApp tick 호출) |
 | `load_skinned_gltf(device, &mut assets, &GltfData) -> Option<(SkinnedMeshHandle, SkinnedPose)>` | `skinned.rs` | glTF(첫 mesh+skin+anim) → 스킨드 엔티티 컴포넌트 |

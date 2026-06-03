@@ -173,6 +173,25 @@
 
 v1.0.9 부터는 **서비스 배포 완성도** 로드맵 (`docs/superpowers/specs/2026-05-21-service-readiness-roadmap.md`) 기준으로 진행.
 
+### 2026-06-04 — 에셋 핫리로드 (v1.0.87, 자율 세션)
+
+v1.0.86 파이프라인의 후속. 브라우저에서 Open한 텍스처/씬이 디스크에서 바뀌면 뷰포트에
+즉시 반영. `FileWatcher`(mtime 폴링) + `AssetStorage::replace_in_place`(generation 보존)
+조합. 레이어링 유지 — 메커니즘은 renderer_ecs, 감시 배선은 editor_demo.
+
+- **voltex_renderer_ecs**: `RenderAssets::replace_texture_png(device,queue,handle,bytes)`
+  — 기존 `TextureHandle` 뒤 GpuTexture in-place 교체. 핸들 불변이라 그 핸들을 든 모든
+  엔티티가 다음 렌더에서 새 텍스처 샘플(재부착 불필요). stale handle/디코드 실패 → Err.
+- **editor_demo**: `FileWatcher`(300ms) + `watched_textures: HashMap<PathBuf,TextureHandle>`
+  + `watched_scene: Option<PathBuf>`. Open 시 watch 등록, 매 프레임 `poll_changes` →
+  텍스처는 `replace_texture_png`, 씬은 `LoadScene` 재dispatch. 상태 텍스트.
+- **voltex_capture**: `render_texture_hot_reload`(같은 핸들/엔티티에서 png_a→png_b
+  in-place 교체 후 재렌더) + `texture_hot_reload_swaps_rendered_pixels` RTX 4080 회귀
+  (red→blue 우세 전환).
+- 설계: `docs/superpowers/specs/2026-06-04-asset-hot-reload-design.md`.
+- 비범위(후속): Mesh/Audio 핫리로드, 디렉토리 감시, OS 네이티브 알림, 4-맵 머티리얼.
+- build/clippy(-D warnings)/test 그린.
+
 ### 2026-06-04 — 에셋 브라우저 → 에디터 파이프라인 연결 (v1.0.86, 자율 세션)
 
 에디터의 흩어진 조각(AssetBrowser, LoadScene, RenderAssets::add_texture_png,

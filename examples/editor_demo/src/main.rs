@@ -7,7 +7,11 @@ use winit::{
 };
 use voltex_platform::{VoltexWindow, WindowConfig, InputState, GameTimer};
 use voltex_renderer::{GpuContext, LightUniform, MaterialUniform, Mesh, MeshVertex};
-use voltex_renderer_ecs::{BasicRenderer, RenderAssets};
+use voltex_renderer_ecs::{BasicRenderer, RenderAssets, TextureHandle};
+use voltex_asset::FileWatcher;
+use std::collections::HashMap;
+use std::path::PathBuf;
+use std::time::Duration;
 use voltex_editor::{
     UiContext, UiRenderer, DockTree, DockNode, Axis, Rect,
     OrbitCamera, ViewportTexture, ViewportRenderer, VIEWPORT_COLOR_FORMAT, VIEWPORT_DEPTH_FORMAT,
@@ -60,6 +64,10 @@ struct AppState {
     asset_browser: AssetBrowser,
     // Last asset-pipeline action result, shown in the toolbar.
     status: String,
+    // Hot reload: watch opened files and re-apply on disk change.
+    watcher: FileWatcher,
+    watched_textures: HashMap<PathBuf, TextureHandle>,
+    watched_scene: Option<PathBuf>,
     // Mouse tracking
     prev_mouse: (f32, f32),
     left_dragging: bool,
@@ -270,6 +278,9 @@ impl ApplicationHandler for EditorDemoApp {
             viewport_renderer,
             render_assets,
             status: String::new(),
+            watcher: FileWatcher::new(Duration::from_millis(300)),
+            watched_textures: HashMap::new(),
+            watched_scene: None,
             basic_renderer,
             cube_mesh_h,
             ground_mesh_h,
@@ -499,6 +510,11 @@ impl ApplicationHandler for EditorDemoApp {
                                 Ok(_) => {
                                     state.session.selected = None;
                                     state.status = format!("Loaded scene: {}", name);
+                                    // Watch for live edits — only one scene at a time.
+                                    if let Some(old) = state.watched_scene.replace(path.clone()) {
+                                        if old != path { state.watcher.unwatch(&old); }
+                                    }
+                                    state.watcher.watch(path.clone());
                                 }
                                 Err(e) => state.status = format!("Load failed: {}", e),
                             }
@@ -514,6 +530,9 @@ impl ApplicationHandler for EditorDemoApp {
                                         if let Some(sel) = state.session.selected {
                                             state.session.world.add(sel, handle);
                                             state.status = format!("Applied texture: {}", name);
+                                            // Watch this file → hot-reload onto the same handle.
+                                            state.watched_textures.insert(path.clone(), handle);
+                                            state.watcher.watch(path.clone());
                                         } else {
                                             state.status = "Select an entity first".to_string();
                                         }
@@ -528,6 +547,38 @@ impl ApplicationHandler for EditorDemoApp {
                         }
                     }
                     eprintln!("[asset] {}", state.status);
+                }
+
+                // ── Hot reload: re-apply opened files that changed on disk ──
+                for changed in state.watcher.poll_changes() {
+                    let name = changed
+                        .file_name()
+                        .map(|n| n.to_string_lossy().into_owned())
+                        .unwrap_or_default();
+                    if state.watched_scene.as_deref() == Some(changed.as_path()) {
+                        let path_str = changed.to_string_lossy().into_owned();
+                        match state.session.dispatch(EditorCommand::LoadScene { path: path_str }) {
+                            Ok(_) => {
+                                state.session.selected = None;
+                                state.status = format!("Reloaded scene: {}", name);
+                            }
+                            Err(e) => state.status = format!("Scene reload failed: {}", e),
+                        }
+                    } else if let Some(&handle) = state.watched_textures.get(&changed) {
+                        match std::fs::read(&changed) {
+                            Ok(bytes) => match state.render_assets.replace_texture_png(
+                                &state.gpu.device,
+                                &state.gpu.queue,
+                                handle,
+                                &bytes,
+                            ) {
+                                Ok(()) => state.status = format!("Reloaded texture: {}", name),
+                                Err(e) => state.status = format!("Texture reload failed: {}", e),
+                            },
+                            Err(e) => state.status = format!("Reread failed: {}", e),
+                        }
+                    }
+                    eprintln!("[hot-reload] {}", state.status);
                 }
 
                 // Orbit camera input (only when mouse is over viewport).

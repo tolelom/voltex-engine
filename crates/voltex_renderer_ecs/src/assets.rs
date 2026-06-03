@@ -100,6 +100,34 @@ impl RenderAssets {
         Ok(self.add_texture(tex))
     }
 
+    /// Hot-reload: decode `png_bytes` and replace the `GpuTexture` *behind an
+    /// existing* [`TextureHandle`] in place. The handle's id/generation are
+    /// preserved, so every entity already holding it samples the new texture on
+    /// the next render — no re-attach needed. Errors if the PNG fails to decode
+    /// or `handle` is stale (its slot was freed/reused).
+    pub fn replace_texture_png(
+        &mut self,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        handle: TextureHandle,
+        png_bytes: &[u8],
+    ) -> crate::Result<()> {
+        let layout = GpuTexture::bind_group_layout(device);
+        let tex = GpuTexture::from_png(device, queue, png_bytes, &layout)
+            .map_err(crate::RendererEcsError::from)?;
+        let replaced = self
+            .assets
+            .storage_mut::<GpuTexture>()
+            .replace_in_place(handle.0, tex);
+        if replaced {
+            Ok(())
+        } else {
+            Err(crate::RendererEcsError::from(
+                "replace_texture_png: stale TextureHandle".to_string(),
+            ))
+        }
+    }
+
     /// Upload raw RGBA8 pixels (`width * height * 4` bytes, row-major) as a
     /// diffuse texture and return its [`TextureHandle`]. Handy for generated
     /// atlases / solid swatches without a PNG round-trip.
