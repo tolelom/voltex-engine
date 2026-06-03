@@ -4,7 +4,7 @@
 //! 를 모두 owning. `render(...)` 한 메서드로 World 를 그린다.
 
 use voltex_ecs::{World, WorldTransform};
-use voltex_math::{Mat4, Vec3};
+use voltex_math::{Mat4, Vec3, Vec4, AABB};
 use voltex_renderer::{
     pipeline::{create_colored_mesh_pipeline, create_skinned_mesh_pipeline},
     BonePalette, ColoredCameraUniform, GpuTexture, LightUniform, PointLight, PointLightsUniform,
@@ -235,7 +235,18 @@ impl BasicRenderer {
         cam_pos: Vec3,
         light: LightUniform,
     ) {
-        let items = collect_render_items(world, assets);
+        let mut items = collect_render_items(world, assets);
+        // Frustum culling: drop entities whose world bounding sphere is fully
+        // outside the camera frustum. Entities without `Bounds` are always
+        // kept (can't cull conservatively).
+        let frustum = voltex_renderer::extract_frustum(&view_proj);
+        items.retain(|it| match world.get::<voltex_ecs::Bounds>(it.entity) {
+            Some(b) => {
+                let (center, radius) = world_bounding_sphere(it.model, b.0);
+                voltex_renderer::sphere_vs_frustum(center, radius, &frustum)
+            }
+            None => true,
+        });
         let n = items.len().min(self.max_entities);
         let aligned = self.aligned_size as usize;
 
@@ -392,6 +403,22 @@ impl BasicRenderer {
     }
 }
 
+/// Conservative world-space bounding sphere of a local-space [`AABB`] under a
+/// model matrix: transform the center, and scale the AABB's half-diagonal by
+/// the largest model basis-vector length (handles rotation + scale).
+fn world_bounding_sphere(model: Mat4, local: AABB) -> (Vec3, f32) {
+    let c = local.center();
+    let wc = model * Vec4::new(c.x, c.y, c.z, 1.0);
+    let half = (local.max - local.min) * 0.5;
+    let r = (half.x * half.x + half.y * half.y + half.z * half.z).sqrt();
+    let col_len = |i: usize| {
+        let c = model.cols[i];
+        (c[0] * c[0] + c[1] * c[1] + c[2] * c[2]).sqrt()
+    };
+    let scale = col_len(0).max(col_len(1)).max(col_len(2));
+    (Vec3::new(wc.x, wc.y, wc.z), r * scale)
+}
+
 /// A dynamic-offset uniform bind group layout with a single vertex-visible
 /// buffer binding of `min_size` bytes.
 fn dynamic_uniform_layout(
@@ -442,4 +469,40 @@ fn camera_light_bind_group_layout(device: &wgpu::Device) -> wgpu::BindGroupLayou
             },
         ],
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn world_bounding_sphere_identity_unit_cube() {
+        let aabb = AABB::new(Vec3::new(-1.0, -1.0, -1.0), Vec3::new(1.0, 1.0, 1.0));
+        let (c, r) = world_bounding_sphere(Mat4::IDENTITY, aabb);
+        assert!((c - Vec3::ZERO).length() < 1e-5);
+        assert!((r - 3.0_f32.sqrt()).abs() < 1e-4, "r={r}");
+    }
+
+    #[test]
+    fn world_bounding_sphere_translation_and_scale() {
+        let aabb = AABB::new(Vec3::new(-1.0, -1.0, -1.0), Vec3::new(1.0, 1.0, 1.0));
+        let m = Mat4::translation(5.0, 0.0, 0.0) * Mat4::scale(2.0, 2.0, 2.0);
+        let (c, r) = world_bounding_sphere(m, aabb);
+        assert!((c - Vec3::new(5.0, 0.0, 0.0)).length() < 1e-4, "c={c:?}");
+        assert!((r - 2.0 * 3.0_f32.sqrt()).abs() < 1e-3, "r={r}");
+    }
+
+    #[test]
+    fn frustum_keeps_front_culls_behind() {
+        let cam = voltex_renderer::Camera::new(Vec3::new(0.0, 0.0, 5.0), 1.0); // looks -Z
+        let frustum = voltex_renderer::extract_frustum(&cam.view_projection());
+        assert!(
+            voltex_renderer::sphere_vs_frustum(Vec3::ZERO, 1.0, &frustum),
+            "object in front should be visible"
+        );
+        assert!(
+            !voltex_renderer::sphere_vs_frustum(Vec3::new(0.0, 0.0, 50.0), 1.0, &frustum),
+            "object behind the camera should be culled"
+        );
+    }
 }
