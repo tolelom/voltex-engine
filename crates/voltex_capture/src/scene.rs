@@ -493,10 +493,74 @@ pub fn render_demo_like_cam(
     target.read_rgba8(&gpu.device, &gpu.queue)
 }
 
+/// Load a Wavefront OBJ source via `Mesh::from_obj` and render it as a single
+/// centered model through `BasicRenderer`. Returns RGBA8.
+pub fn render_obj_model(gpu: &HeadlessGpu, width: u32, height: u32, obj_src: &str) -> Vec<u8> {
+    let target = OffscreenTarget::new(&gpu.device, width, height);
+    let renderer = BasicRenderer::new(&gpu.device, &gpu.queue, CAPTURE_FORMAT, 8);
+    let mut assets = RenderAssets::new();
+    let mesh_h = assets.add_mesh(voltex_renderer::Mesh::from_obj(&gpu.device, obj_src));
+    let mat_h = assets.add_material(MaterialUniform::with_params([0.6, 0.7, 0.9, 1.0], 0.0, 0.6));
+
+    let mut world = World::new();
+    let e = world.spawn();
+    let mut t = Transform::from_position(Vec3::ZERO);
+    t.rotation = Quat::from_euler_yxz(Vec3::new(0.3, 0.6, 0.0));
+    world.add(e, t);
+    world.add(e, MeshHandle(mesh_h.0));
+    world.add(e, MaterialHandle(mat_h.0));
+    voltex_ecs::propagate_transforms(&mut world);
+
+    let mut camera = Camera::new(Vec3::new(2.0, 1.5, 2.5), width as f32 / height as f32);
+    camera.yaw = -0.7;
+    camera.pitch = -0.4;
+    let mut light = LightUniform::new();
+    light.direction = [-0.4, -1.0, -0.6];
+
+    let mut encoder = gpu
+        .device
+        .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("capture obj") });
+    renderer.render(
+        &gpu.queue,
+        &mut encoder,
+        &target.color_view,
+        &target.depth_view,
+        wgpu::Color { r: 0.05, g: 0.05, b: 0.08, a: 1.0 },
+        &mut world,
+        &assets,
+        camera.view_projection(),
+        camera.position,
+        light,
+    );
+    gpu.queue.submit(Some(encoder.finish()));
+    target.read_rgba8(&gpu.device, &gpu.queue)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::ImageStats;
+
+    /// The repo's `assets/cube.obj`, embedded for the loader regression.
+    const CUBE_OBJ: &str = include_str!("../../../assets/cube.obj");
+
+    #[test]
+    #[ignore = "requires a GPU adapter"]
+    fn loads_and_renders_obj_model() {
+        let gpu = match HeadlessGpu::new() {
+            Ok(g) => g,
+            Err(e) => {
+                eprintln!("skip: {e}");
+                return;
+            }
+        };
+        let rgba = render_obj_model(&gpu, 256, 256, CUBE_OBJ);
+        let stats = ImageStats::analyze(&rgba);
+        assert!(
+            !stats.looks_blank(),
+            "loaded OBJ model should render (not blank): {stats:?}"
+        );
+    }
 
     /// Count pixels that differ from the top-left (background) pixel — i.e. the
     /// rendered object's footprint.

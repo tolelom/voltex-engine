@@ -33,6 +33,14 @@ impl Mesh {
         }
     }
 
+    /// Parse a Wavefront OBJ source string and upload it as a GPU mesh.
+    /// Convenience over `parse_obj` + [`Mesh::new`]. The caller reads the file
+    /// (from disk / VFS) and passes its text.
+    pub fn from_obj(device: &wgpu::Device, source: &str) -> Self {
+        let data = crate::obj::parse_obj(source);
+        Mesh::new(device, &data.vertices, &data.indices)
+    }
+
     /// Create a mesh with additional buffer usage flags (e.g. `BLAS_INPUT` for ray tracing).
     pub fn new_with_usage(
         device: &wgpu::Device,
