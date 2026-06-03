@@ -290,7 +290,15 @@ fn register_systems(app: &mut RuntimeApp) {
 
     let stats = Rc::new(RefCell::new(DemoState::default()));
 
-    // Chase system: target the player, run nav, track distance + elapsed time.
+    // Elapsed-time readout comes from the runtime clock via a timed system —
+    // no hand-rolled `+= dt` accumulator (which used to pause whenever the
+    // chaser wasn't tracked).
+    let time_stats = stats.clone();
+    app.add_timed_system(move |_world, time| {
+        time_stats.borrow_mut().time = time.elapsed_secs;
+    });
+
+    // Chase system: target the player, run nav, track distance.
     let navmesh = flat_navmesh();
     let chase_stats = stats.clone();
     app.add_system(move |world, dt| {
@@ -314,7 +322,6 @@ fn register_systems(app: &mut RuntimeApp) {
             let dz = chaser_pos.z - player_pos.z;
             let mut s = chase_stats.borrow_mut();
             s.dist = (dx * dx + dz * dz).sqrt();
-            s.time += dt;
         }
     });
 

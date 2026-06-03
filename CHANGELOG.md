@@ -10,6 +10,29 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## [v1.0.66] — 2026-06-03 — Frame clock for systems (`Time` + `add_timed_system`)
+
+기초 워크플로 격차 5번째: 시스템은 per-frame `dt` 만 받고 **누적 경과 시간·프레임
+수**를 못 봤다. 타이머/쿨다운/애니메이션 위상을 쓰는 게임 코드가 매번 `+= dt` 를
+손으로 누적(조건 분기에 묻혀 버그 유발).
+
+### Additive — `voltex_runtime::time`
+
+- **`Time { elapsed_secs, delta_secs, frame_count }`** + `advance(dt)`. `elapsed_secs`
+  는 시스템에 넘기는 `dt` 와 동일 누적이라 fixed-timestep 에서 결정적.
+- **`RuntimeApp.time`** public 필드 — `tick_systems_only` 시작에서 1회 `advance`,
+  그래서 그 프레임의 모든 시스템·HUD 가 일관된 시계 관측.
+- **`add_timed_system(|&mut World, &Time|)`** — 액션 시스템 직후 실행.
+- facade prelude 에 `Time` 추가.
+
+### 검증
+
+- 단위 6개(Time::new/advance 누적/delta + 런타임 time 누적/timed 시스템 관측) +
+  변이 테스트(`+= dt`→`= dt` RED→GREEN).
+- **실증**: `game_ready_demo` 의 HUD 경과시간이 chase 시스템의 조건부 `s.time += dt`
+  (chaser 미추적 시 멈추던 버그) → `add_timed_system` 이 `time.elapsed_secs` 반영.
+- workspace build / clippy(`-D warnings`) / lib test 전부 그린.
+
 ## [v1.0.65] — 2026-06-03 — Tag lookup helpers (`find_by_tag` / `iter_by_tag`)
 
 기초 워크플로 격차 4번째: 데모마다 반복되던

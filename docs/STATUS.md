@@ -173,6 +173,14 @@
 
 v1.0.9 부터는 **서비스 배포 완성도** 로드맵 (`docs/superpowers/specs/2026-05-21-service-readiness-roadmap.md`) 기준으로 진행.
 
+### 2026-06-03 — 프레임 클록 (v1.0.66, 자율 세션)
+
+기초 워크플로 격차 5번째(시스템이 dt만 받고 누적 시간 없음). `voltex_runtime::Time`
+{elapsed_secs/delta_secs/frame_count} + `RuntimeApp.time`(tick 시작에서 advance) +
+`add_timed_system(|world,&Time|)`. facade prelude 노출. 단위 6 + 변이 테스트.
+`game_ready_demo` HUD 경과시간을 타임드 시스템으로 전환(조건부 누적 버그 해소).
+build/clippy/test 그린.
+
 ### 2026-06-03 — 태그 조회 헬퍼 (v1.0.65, 자율 세션)
 
 기초 워크플로 격차 4번째(`query::<Tag>().find(..).map(..)` 반복). `World::find_by_tag`/

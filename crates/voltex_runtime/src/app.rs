@@ -22,6 +22,7 @@ use voltex_asset::FileWatcher;
 use voltex_audio::AudioSystem;
 use voltex_ecs::{propagate_transforms, ComponentRegistry, Entity, World};
 use voltex_physics::{detect_collisions, ContactPoint, PhysicsConfig};
+use crate::time::Time;
 use voltex_platform::{GameTimer, InputMap, InputState};
 use voltex_editor::UiContext;
 use voltex_renderer::{Camera, LightUniform, PointLight};
@@ -59,6 +60,10 @@ type InputSystem = Box<dyn FnMut(&mut World, &InputState, f32) + 'static>;
 /// addition to the raw [`InputState`]. Lets a game rebind controls in one place
 /// (`app.input_map`) and drive entities by action name.
 type ActionSystem = Box<dyn FnMut(&mut World, &InputState, &InputMap, f32) + 'static>;
+/// User system that receives the runtime [`Time`] (accumulated elapsed seconds,
+/// per-frame delta, frame counter) instead of just a bare `dt`. For timers,
+/// cooldowns, and animation phase that need wallclock-since-start.
+type TimedSystem = Box<dyn FnMut(&mut World, &Time) + 'static>;
 /// HUD callback invoked each frame between the 3D pass and present, with the
 /// immediate-mode [`UiContext`] (already inside `begin_frame`/`end_frame`) and
 /// read-only access to the World. Draw text / bars / panels here.
@@ -124,6 +129,11 @@ pub struct RuntimeApp {
     pub input_map: InputMap,
     /// User systems that read resolved actions (world + input + input_map + dt).
     action_systems: Vec<ActionSystem>,
+    /// Accumulated frame clock (elapsed seconds, delta, frame count). Advanced
+    /// once per `tick_systems_only`; read by [`Self::add_timed_system`] systems.
+    pub time: Time,
+    /// User systems that read the [`Time`] clock.
+    timed_systems: Vec<TimedSystem>,
     /// Physics tuning knobs (gravity, fixed_dt, solver iterations).
     pub physics_config: PhysicsConfig,
     /// Pool of loaded Lua interpreters keyed by script path.
@@ -235,6 +245,8 @@ impl RuntimeApp {
             input: InputState::new(),
             input_map: config.input_map.take().unwrap_or_default(),
             action_systems: Vec::new(),
+            time: Time::new(),
+            timed_systems: Vec::new(),
             physics_config: PhysicsConfig::default(),
             script_pool: ScriptInstancePool::new(),
             script_input: voltex_script::ScriptInput::new(),
@@ -298,6 +310,22 @@ impl RuntimeApp {
     /// Number of registered action systems.
     pub fn action_system_count(&self) -> usize {
         self.action_systems.len()
+    }
+
+    /// Register a per-frame system that receives the runtime [`Time`] clock
+    /// (`time.elapsed_secs`, `time.delta_secs`, `time.frame_count`) so it can
+    /// drive timers / cooldowns / animation phase without accumulating dt by
+    /// hand. Runs after the action systems each frame.
+    pub fn add_timed_system<F>(&mut self, system: F)
+    where
+        F: FnMut(&mut World, &Time) + 'static,
+    {
+        self.timed_systems.push(Box::new(system));
+    }
+
+    /// Number of registered timed systems.
+    pub fn timed_system_count(&self) -> usize {
+        self.timed_systems.len()
     }
 
     /// Register the per-frame HUD draw callback. Requires
@@ -487,6 +515,9 @@ impl RuntimeApp {
     /// winit handler and directly by unit tests / headless harnesses that
     /// don't need a window.
     pub fn tick_systems_only(&mut self, dt: f32) {
+        // Advance the frame clock first so every system this frame (and the HUD)
+        // sees a consistent elapsed/delta/frame_count.
+        self.time.advance(dt);
         propagate_transforms(&mut self.world);
         // Advance skeletal animations (no-op if no SkinnedPose entities).
         voltex_renderer_ecs::update_skinned_poses(&mut self.world, dt);
@@ -523,6 +554,9 @@ impl RuntimeApp {
         }
         for sys in self.action_systems.iter_mut() {
             sys(&mut self.world, &self.input, &self.input_map, dt);
+        }
+        for sys in self.timed_systems.iter_mut() {
+            sys(&mut self.world, &self.time);
         }
         // Audio runs last so it observes playback toggles / listener moves made
         // by user systems this same frame (lowest latency).
@@ -817,6 +851,36 @@ mod tests {
         app.input.process_key(KeyCode::Space, true);
         app.tick_systems_only(0.016);
         assert!(jumped.get(), "action system should observe the bound 'jump' key");
+    }
+
+    #[test]
+    fn time_accumulates_across_ticks() {
+        let cfg = RuntimeConfig::new().disable_physics().disable_scripts();
+        let mut app = RuntimeApp::new(cfg).unwrap();
+        assert_eq!(app.time.frame_count, 0);
+
+        app.tick_systems_only(0.5);
+        app.tick_systems_only(0.5);
+
+        assert_eq!(app.time.frame_count, 2);
+        assert_eq!(app.time.delta_secs, 0.5);
+        assert!((app.time.elapsed_secs - 1.0).abs() < 1e-5, "elapsed={}", app.time.elapsed_secs);
+    }
+
+    #[test]
+    fn timed_system_receives_advancing_clock() {
+        let cfg = RuntimeConfig::new().disable_physics().disable_scripts();
+        let mut app = RuntimeApp::new(cfg).unwrap();
+
+        let seen = Rc::new(Cell::new(0.0f32));
+        let probe = seen.clone();
+        app.add_timed_system(move |_w, time| probe.set(time.elapsed_secs));
+        assert_eq!(app.timed_system_count(), 1);
+
+        app.tick_systems_only(0.25);
+        assert!((seen.get() - 0.25).abs() < 1e-5, "first frame elapsed = {}", seen.get());
+        app.tick_systems_only(0.25);
+        assert!((seen.get() - 0.5).abs() < 1e-5, "second frame elapsed = {}", seen.get());
     }
 
     #[test]

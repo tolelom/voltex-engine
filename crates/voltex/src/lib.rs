@@ -81,7 +81,7 @@ pub mod prelude {
     pub use voltex_runtime::{DebugLines, Lifetime};
 
     // 런타임 부트스트랩 — main 본문에서 가장 흔하게 쓰인다
-    pub use voltex_runtime::{RuntimeApp, RuntimeConfig};
+    pub use voltex_runtime::{RuntimeApp, RuntimeConfig, Time};
 }
 
 #[cfg(test)]
@@ -115,6 +115,8 @@ mod tests {
         let mut _imap = InputMap::new();
         _imap.bind_key("jump", KeyCode::Space);
         _imap.bind_mouse("fire", MouseButton::Left);
+        // Runtime clock reachable via prelude:
+        let _t: Time = Time::new();
     }
 
     /// 모듈 경로 re-export가 작동하는지 검증.
