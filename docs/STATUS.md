@@ -173,6 +173,20 @@
 
 v1.0.9 부터는 **서비스 배포 완성도** 로드맵 (`docs/superpowers/specs/2026-05-21-service-readiness-roadmap.md`) 기준으로 진행.
 
+### 2026-06-03 — 입력 액션 매핑 (v1.0.63, 자율 세션)
+
+기초 워크플로 격차 2번째(입력이 raw 키코드 폴링뿐). Unity Input Actions / Godot
+InputMap 류의 시맨틱 액션/축 레이어 추가 (상세 CHANGELOG v1.0.63).
+
+- **`voltex_platform::InputMap`** — `InputState` 위 순수 매핑. `bind_key`/`bind_mouse`/
+  `bind_axis` + `is_pressed`/`just_pressed`/`just_released`/`axis`/`vector`. `Trigger`
+  enum + `KeyCode`/`MouseButton` 재export.
+- **런타임**: `RuntimeApp.input_map` + `add_action_system(|world,input,map,dt|)` +
+  `RuntimeConfig::with_input_map`. facade prelude 노출.
+- 검증: 단위 8 + 변이 테스트 + 런타임 통합 테스트. flagship `voltex_survivor` 이동
+  ~35줄 → bind_axis 4줄 + 액션 시스템. build/clippy/test 그린.
+- 한계: 마우스 just-released 미지원, 축 직렬화/런타임 설정 파일 바인딩은 후속.
+
 ### 2026-06-03 — 선언적 렌더러블 (v1.0.62, 자율 세션)
 
 상용 엔진(Unity/Godot)과 **기초 워크플로**를 비교: 기능 폭은 충분하나 "눈에 보이는

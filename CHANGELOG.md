@@ -10,6 +10,43 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## [v1.0.63] — 2026-06-03 — Input action mapping (rebindable semantic controls)
+
+상용 엔진 기초 워크플로 격차 2번째: 입력이 raw 키코드 폴링뿐이었다
+(`input.is_key_pressed(KeyCode::KeyW)`). Unity Input Actions / Godot `InputMap`
+처럼 **시맨틱 액션/축**을 한 곳에서 바인딩하고 이름으로 질의하는 레이어가 없었다.
+
+### Additive — `voltex_platform::input_map`
+
+- **`InputMap`** — `InputState` 위 순수(상태 없는) 매핑 레이어. `bind_key(action,key)`
+  / `bind_mouse(action,btn)` / `bind(action, Trigger)`(다중 = OR 대체) +
+  `bind_axis(axis, positive, negative)`(±1/0). 질의: `is_pressed`/`just_pressed`/
+  `just_released`/`axis`(→ f32 `[-1,1]`)/`vector(x,y)`(→ `Vec2`). 모두
+  `&InputState` 를 받아 윈도우/GPU 없이 단위 테스트 가능.
+- **`Trigger`** enum (`Key`/`Mouse`) + `KeyCode`/`MouseButton` winit 재export
+  (게임이 winit 직접 의존 회피).
+- 한계: 마우스 just-released 미지원(InputState public 질의 부재) — mouse 트리거의
+  `just_released` 는 항상 false.
+
+### Additive — 런타임 통합
+
+- **`RuntimeApp.input_map`** public 필드 + **`add_action_system(|&mut World,
+  &InputState, &InputMap, f32|)`** — raw input system 직후 실행. 컨트롤 리바인딩이
+  `app.input_map` 한 곳에 모임.
+- **`RuntimeConfig::with_input_map(InputMap)`** — 부팅 시 `app.input_map` 으로 이동.
+- facade prelude 에 `InputMap`/`KeyCode`/`MouseButton` 추가.
+
+### 검증
+
+- 단위 8개(액션 held/edge, axis ±/0, vector 합성, 마우스 트리거, 미바인딩=false/0) +
+  변이 테스트(axis `p-n`→`p+n` RED→GREEN).
+- 런타임 통합 테스트 `action_system_reads_input_map_bindings`(바인딩된 키를 액션
+  시스템이 관측).
+- **실증**: flagship `voltex_survivor` 의 WASD/화살표 이동 ~35줄(8개 `is_key_pressed`
+  분기 + 수동 정규화) → `bind_axis` 4줄 + `map.vector("move_x","move_y")` 액션 시스템.
+  WASD·화살표가 같은 축의 대체 바인딩.
+- workspace build / clippy(`-D warnings` all-targets) / lib test 전부 그린.
+
 ## [v1.0.62] — 2026-06-03 — Declarative renderables (one-call "spawn a visible object")
 
 상용 엔진과의 **기초 워크플로 격차** 정정. 기능 폭(PBR/물리/오디오/AI/net/Lua)은

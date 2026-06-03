@@ -62,7 +62,11 @@ pub mod prelude {
     };
 
     // 플랫폼 (윈도우, 입력, 타이머)
-    pub use voltex_platform::{GameTimer, InputState, VoltexWindow, WindowConfig};
+    // InputMap/KeyCode/MouseButton 은 액션 바인딩 진입점 — 게임 입력 코드가
+    // 거의 항상 쓰므로 prelude 에 포함 (winit 직접 import 회피).
+    pub use voltex_platform::{
+        GameTimer, InputMap, InputState, KeyCode, MouseButton, VoltexWindow, WindowConfig,
+    };
 
     // 자원 핸들 + VFS (B2)
     pub use voltex_asset::{Assets, Handle, Vfs};
@@ -107,6 +111,10 @@ mod tests {
         // Declarative renderables reachable via prelude:
         let _prim: Option<PrimitiveMesh> = Some(PrimitiveMesh::cube(1.0));
         let _matd: Option<MaterialDesc> = Some(MaterialDesc::color([1.0, 1.0, 1.0, 1.0]));
+        // Input action mapping reachable via prelude:
+        let mut _imap = InputMap::new();
+        _imap.bind_key("jump", KeyCode::Space);
+        _imap.bind_mouse("fire", MouseButton::Left);
     }
 
     /// 모듈 경로 re-export가 작동하는지 검증.

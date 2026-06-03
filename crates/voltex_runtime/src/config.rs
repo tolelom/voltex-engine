@@ -95,6 +95,9 @@ pub struct RuntimeConfig {
     /// instead of colored Blinn-Phong. Default `false`. Set with
     /// [`Self::with_pbr`].
     pub enable_pbr: bool,
+    /// Semantic input bindings copied into `app.input_map` on boot. `None`
+    /// (default) leaves an empty map. Set with [`Self::with_input_map`].
+    pub input_map: Option<voltex_platform::InputMap>,
 }
 
 impl Default for RuntimeConfig {
@@ -127,6 +130,7 @@ impl Default for RuntimeConfig {
             light_ambient: 0.1,
             enable_shadows: false,
             enable_pbr: false,
+            input_map: None,
         }
     }
 }
@@ -254,6 +258,21 @@ impl RuntimeConfig {
     /// `with_light`, and `set_point_lights` (which feed the multi-light set).
     pub fn with_pbr(mut self, enabled: bool) -> Self {
         self.enable_pbr = enabled;
+        self
+    }
+
+    /// Provide semantic input bindings. The map is moved into `app.input_map`
+    /// on boot, where [`crate::RuntimeApp::add_action_system`] systems read it.
+    ///
+    /// ```ignore
+    /// use voltex::platform::{InputMap, KeyCode};
+    /// let mut map = InputMap::new();
+    /// map.bind_key("jump", KeyCode::Space)
+    ///    .bind_axis("move_x", KeyCode::KeyD, KeyCode::KeyA);
+    /// let cfg = RuntimeConfig::new().with_input_map(map);
+    /// ```
+    pub fn with_input_map(mut self, map: voltex_platform::InputMap) -> Self {
+        self.input_map = Some(map);
         self
     }
 

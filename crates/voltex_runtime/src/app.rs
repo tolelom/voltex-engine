@@ -22,7 +22,7 @@ use voltex_asset::FileWatcher;
 use voltex_audio::AudioSystem;
 use voltex_ecs::{propagate_transforms, ComponentRegistry, Entity, World};
 use voltex_physics::{detect_collisions, ContactPoint, PhysicsConfig};
-use voltex_platform::{GameTimer, InputState};
+use voltex_platform::{GameTimer, InputMap, InputState};
 use voltex_editor::UiContext;
 use voltex_renderer::{Camera, LightUniform, PointLight};
 use voltex_renderer_ecs::RenderAssets;
@@ -55,6 +55,10 @@ type UserSystem = Box<dyn FnMut(&mut World, f32) + 'static>;
 /// Added in D3 so a flagship game can drive entities from keyboard / mouse
 /// without requiring a full `InputState as ECS resource` abstraction (v1.1).
 type InputSystem = Box<dyn FnMut(&mut World, &InputState, f32) + 'static>;
+/// User system that reads semantic actions/axes via the [`InputMap`] layer in
+/// addition to the raw [`InputState`]. Lets a game rebind controls in one place
+/// (`app.input_map`) and drive entities by action name.
+type ActionSystem = Box<dyn FnMut(&mut World, &InputState, &InputMap, f32) + 'static>;
 /// HUD callback invoked each frame between the 3D pass and present, with the
 /// immediate-mode [`UiContext`] (already inside `begin_frame`/`end_frame`) and
 /// read-only access to the World. Draw text / bars / panels here.
@@ -114,6 +118,12 @@ pub struct RuntimeApp {
     pub timer: GameTimer,
     /// Aggregated input state (keyboard + mouse + scroll), refreshed each frame.
     pub input: InputState,
+    /// Semantic action/axis bindings (see [`Self::add_action_system`]). Empty
+    /// by default; populate via [`RuntimeConfig::with_input_map`] or by mutating
+    /// this field directly before `run`.
+    pub input_map: InputMap,
+    /// User systems that read resolved actions (world + input + input_map + dt).
+    action_systems: Vec<ActionSystem>,
     /// Physics tuning knobs (gravity, fixed_dt, solver iterations).
     pub physics_config: PhysicsConfig,
     /// Pool of loaded Lua interpreters keyed by script path.
@@ -223,6 +233,8 @@ impl RuntimeApp {
             file_watcher: FileWatcher::new(Duration::from_millis(500)),
             timer: GameTimer::new(60),
             input: InputState::new(),
+            input_map: config.input_map.take().unwrap_or_default(),
+            action_systems: Vec::new(),
             physics_config: PhysicsConfig::default(),
             script_pool: ScriptInstancePool::new(),
             script_input: voltex_script::ScriptInput::new(),
@@ -268,6 +280,24 @@ impl RuntimeApp {
     /// Number of registered input systems.
     pub fn input_system_count(&self) -> usize {
         self.input_systems.len()
+    }
+
+    /// Register a per-frame system that receives the [`InputMap`] alongside the
+    /// raw [`InputState`], so it can query semantic actions/axes
+    /// (`map.is_pressed("jump", input)`, `map.vector("move_x", "move_y", input)`)
+    /// instead of hard-coded keycodes. Runs after the raw input systems each
+    /// frame. Bind controls via [`RuntimeConfig::with_input_map`] or by mutating
+    /// `app.input_map` before `run`.
+    pub fn add_action_system<F>(&mut self, system: F)
+    where
+        F: FnMut(&mut World, &InputState, &InputMap, f32) + 'static,
+    {
+        self.action_systems.push(Box::new(system));
+    }
+
+    /// Number of registered action systems.
+    pub fn action_system_count(&self) -> usize {
+        self.action_systems.len()
     }
 
     /// Register the per-frame HUD draw callback. Requires
@@ -490,6 +520,9 @@ impl RuntimeApp {
         }
         for sys in self.input_systems.iter_mut() {
             sys(&mut self.world, &self.input, dt);
+        }
+        for sys in self.action_systems.iter_mut() {
+            sys(&mut self.world, &self.input, &self.input_map, dt);
         }
         // Audio runs last so it observes playback toggles / listener moves made
         // by user systems this same frame (lowest latency).
@@ -753,6 +786,37 @@ mod tests {
         assert_eq!(app.input_system_count(), 1);
         app.tick_systems_only(0.016);
         assert_eq!(log.take(), vec!["user", "input"]);
+    }
+
+    #[test]
+    fn action_system_reads_input_map_bindings() {
+        use voltex_platform::KeyCode;
+
+        let mut map = InputMap::new();
+        map.bind_key("jump", KeyCode::Space);
+        let cfg = RuntimeConfig::new()
+            .disable_physics()
+            .disable_scripts()
+            .with_input_map(map);
+        let mut app = RuntimeApp::new(cfg).unwrap();
+
+        let jumped = Rc::new(Cell::new(false));
+        let flag = jumped.clone();
+        app.add_action_system(move |_w, input, map, _dt| {
+            if map.just_pressed("jump", input) {
+                flag.set(true);
+            }
+        });
+        assert_eq!(app.action_system_count(), 1);
+
+        // No key held → action does not fire.
+        app.tick_systems_only(0.016);
+        assert!(!jumped.get(), "jump fired with no key pressed");
+
+        // Press the bound key → the action system observes it via the map.
+        app.input.process_key(KeyCode::Space, true);
+        app.tick_systems_only(0.016);
+        assert!(jumped.get(), "action system should observe the bound 'jump' key");
     }
 
     #[test]

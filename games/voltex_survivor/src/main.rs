@@ -84,31 +84,24 @@ fn upload_meshes(app: &mut RuntimeApp, device: &wgpu::Device, queue: &wgpu::Queu
 }
 
 fn register_systems(app: &mut RuntimeApp) {
-    // 1. Player input → Transform.position. Input-aware system gives us
-    //    read access to the per-frame InputState.
-    app.add_input_system(|world, input, dt| {
-        // Skip while game.lua reports game over by checking for a Tag we
-        // remove — for v1.0 simplicity we just keep moving regardless.
-        let mut dir_x = 0.0f32;
-        let mut dir_z = 0.0f32;
-        if input.is_key_pressed(KeyCode::KeyW) || input.is_key_pressed(KeyCode::ArrowUp) {
-            dir_z -= 1.0;
-        }
-        if input.is_key_pressed(KeyCode::KeyS) || input.is_key_pressed(KeyCode::ArrowDown) {
-            dir_z += 1.0;
-        }
-        if input.is_key_pressed(KeyCode::KeyA) || input.is_key_pressed(KeyCode::ArrowLeft) {
-            dir_x -= 1.0;
-        }
-        if input.is_key_pressed(KeyCode::KeyD) || input.is_key_pressed(KeyCode::ArrowRight) {
-            dir_x += 1.0;
-        }
-        if dir_x == 0.0 && dir_z == 0.0 {
+    // 1. Player input → Transform.position via the semantic InputMap. WASD and
+    //    the arrow keys are bound as two alternatives on the same axes, so the
+    //    movement system reads "move_x"/"move_y" without knowing any keycodes —
+    //    rebinding lives here, in one place.
+    app.input_map
+        .bind_axis("move_x", KeyCode::KeyD, KeyCode::KeyA)
+        .bind_axis("move_x", KeyCode::ArrowRight, KeyCode::ArrowLeft)
+        .bind_axis("move_y", KeyCode::KeyW, KeyCode::KeyS)
+        .bind_axis("move_y", KeyCode::ArrowUp, KeyCode::ArrowDown);
+
+    app.add_action_system(|world, input, map, dt| {
+        // x = strafe (right +), y = forward (W/Up +); world forward is -Z.
+        let mv = map.vector("move_x", "move_y", input);
+        let dir = Vec3::new(mv.x, 0.0, -mv.y).normalize_or_zero();
+        if dir.x == 0.0 && dir.z == 0.0 {
             return;
         }
-        let len = (dir_x * dir_x + dir_z * dir_z).sqrt();
         let step = PLAYER_SPEED * dt;
-        let (nx, nz) = (dir_x / len * step, dir_z / len * step);
 
         let player: Option<Entity> = world
             .query::<Tag>()
@@ -116,8 +109,8 @@ fn register_systems(app: &mut RuntimeApp) {
             .map(|(e, _)| e);
         if let Some(p) = player {
             if let Some(t) = world.get_mut::<Transform>(p) {
-                t.position.x += nx;
-                t.position.z += nz;
+                t.position.x += dir.x * step;
+                t.position.z += dir.z * step;
             }
         }
     });
