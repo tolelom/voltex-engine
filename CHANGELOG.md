@@ -10,6 +10,28 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## [v1.0.76] — 2026-06-03 — Spatial grid (gameplay proximity queries)
+
+기초를 넘어 깊이로: 서바이버류(flagship)·AoE·어그로·이웃 탐색이 늘 필요로 하는
+"반경 내 엔티티" 가 지금껏 O(n) 수동 거리 루프뿐이었다. 균일 그리드 공간 해시 추가.
+
+### Additive — `voltex_ecs::spatial`
+
+- **`SpatialGrid`** — `new(cell_size)` / `from_transforms(&World, cell_size)`(Transform
+  위치로 빌드) / `insert(e, pos)`(재삽입 시 셀 이동) / `query_radius(center, r)`(반경
+  AABB 가 겹치는 셀만 스캔 후 정확 거리 필터, 경계 포함) / `query_radius_into`(버퍼
+  재사용, 무할당) / `nearest(point, exclude)`. 음수/NaN 반경은 빈 결과.
+- physics 의 콜라이더 BVH 와 별개 — 이쪽은 엔티티 Transform 위치 기반 게임플레이 인덱스.
+  프레임당 재구축(Transform 1패스).
+- facade prelude 에 `SpatialGrid` 추가.
+
+### 검증
+
+- 단위 8개(반경 내/외, 셀 경계 횡단, 경계 포함, 음수 좌표, nearest+exclude, 빈 그리드,
+  재삽입 셀 이동, degenerate cell_size) + 변이 테스트(`<=`→`<` inclusive RED→GREEN).
+  voltex_ecs 195→203.
+- workspace build / clippy(`-D warnings`, 부정비교/map_or 2건 정리) / lib test 전부 그린.
+
 ## [v1.0.75] — 2026-06-03 — Full-stack composition test (gameplay slice)
 
 이 세션(v1.0.62~74)의 12개 프리미티브를 단위가 아닌 **시스템 레벨에서 조합**해 실제

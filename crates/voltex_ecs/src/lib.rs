@@ -34,6 +34,7 @@ pub mod render_components;
 pub mod scene;
 pub mod scheduler;
 pub mod script_component;
+pub mod spatial;
 pub mod sparse_set;
 pub mod transform;
 pub mod world;
@@ -58,6 +59,7 @@ pub use scene::{
 pub use scheduler::{Scheduler, System};
 pub use script_component::ScriptComponent;
 pub use sparse_set::SparseSet;
+pub use spatial::SpatialGrid;
 pub use transform::Transform;
 pub use world::World;
 pub use world_transform::{propagate_transforms, WorldTransform};

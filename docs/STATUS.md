@@ -173,6 +173,12 @@
 
 v1.0.9 부터는 **서비스 배포 완성도** 로드맵 (`docs/superpowers/specs/2026-05-21-service-readiness-roadmap.md`) 기준으로 진행.
 
+### 2026-06-03 — 공간 그리드 (v1.0.76, 자율 세션)
+
+기초를 넘어 깊이로. `voltex_ecs::SpatialGrid` — 균일 그리드 공간 해시로 게임플레이
+근접 쿼리(`query_radius`/`nearest`). 서바이버류·AoE·어그로·이웃 탐색용. physics BVH와
+별개(Transform 위치 기반). facade prelude 노출. 단위 8 + 변이 테스트. build/clippy/test 그린.
+
 ### 2026-06-03 — 풀스택 조합 테스트 (v1.0.75, 자율 세션)
 
 12개 프리미티브(v1.0.62~74)를 시스템 레벨에서 조합해 게임플레이 루프로 검증
