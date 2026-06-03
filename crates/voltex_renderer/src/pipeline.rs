@@ -174,6 +174,7 @@ pub fn create_colored_mesh_pipeline(
     format: wgpu::TextureFormat,
     camera_light_layout: &wgpu::BindGroupLayout,
     texture_layout: &wgpu::BindGroupLayout,
+    point_lights_layout: &wgpu::BindGroupLayout,
 ) -> wgpu::RenderPipeline {
     let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
         label: Some("Mesh Colored Shader"),
@@ -182,7 +183,7 @@ pub fn create_colored_mesh_pipeline(
 
     let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
         label: Some("Mesh Colored Pipeline Layout"),
-        bind_group_layouts: &[camera_light_layout, texture_layout],
+        bind_group_layouts: &[camera_light_layout, texture_layout, point_lights_layout],
         immediate_size: 0,
     });
 

@@ -243,6 +243,7 @@ fn redraw(app: &mut RuntimeApp, event_loop: &ActiveEventLoop) {
     let view_proj: Mat4 = state.camera.view_projection();
     let cam_pos = state.camera.position;
 
+    state.renderer.set_point_lights(&state.gpu.queue, &app.point_lights);
     state.renderer.render(
         &state.gpu.queue,
         &mut encoder,

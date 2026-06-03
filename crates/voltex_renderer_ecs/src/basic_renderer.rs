@@ -7,7 +7,8 @@ use voltex_ecs::{World, WorldTransform};
 use voltex_math::{Mat4, Vec3};
 use voltex_renderer::{
     pipeline::{create_colored_mesh_pipeline, create_skinned_mesh_pipeline},
-    BonePalette, ColoredCameraUniform, GpuTexture, LightUniform, SkinnedCameraUniform,
+    BonePalette, ColoredCameraUniform, GpuTexture, LightUniform, PointLight, PointLightsUniform,
+    SkinnedCameraUniform,
 };
 
 use crate::assets::RenderAssets;
@@ -28,6 +29,9 @@ pub struct BasicRenderer {
     default_texture: GpuTexture,
     aligned_size: u32,
     max_entities: usize,
+    // Additive point lights (group 2 of the colored mesh shader).
+    point_lights_buffer: wgpu::Buffer,
+    point_lights_bind_group: wgpu::BindGroup,
     // Skinned pass: GPU vertex skinning for entities with SkinnedMeshHandle.
     skinned_pipeline: wgpu::RenderPipeline,
     skinned_cam_buffer: wgpu::Buffer,
@@ -88,7 +92,45 @@ impl BasicRenderer {
         });
 
         let default_texture = GpuTexture::white_1x1(device, queue, &tex_layout);
-        let pipeline = create_colored_mesh_pipeline(device, target_format, &cl_layout, &tex_layout);
+
+        // Point lights (group 2): single fragment-visible uniform, no dynamic offset.
+        let pl_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: Some("BasicRenderer Point Lights BGL"),
+            entries: &[wgpu::BindGroupLayoutEntry {
+                binding: 0,
+                visibility: wgpu::ShaderStages::FRAGMENT,
+                ty: wgpu::BindingType::Buffer {
+                    ty: wgpu::BufferBindingType::Uniform,
+                    has_dynamic_offset: false,
+                    min_binding_size: wgpu::BufferSize::new(
+                        std::mem::size_of::<PointLightsUniform>() as u64,
+                    ),
+                },
+                count: None,
+            }],
+        });
+        let point_lights_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("BasicRenderer Point Lights UBO"),
+            size: std::mem::size_of::<PointLightsUniform>() as u64,
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+        queue.write_buffer(
+            &point_lights_buffer,
+            0,
+            bytemuck::bytes_of(&PointLightsUniform::new()),
+        );
+        let point_lights_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("BasicRenderer Point Lights BG"),
+            layout: &pl_layout,
+            entries: &[wgpu::BindGroupEntry {
+                binding: 0,
+                resource: point_lights_buffer.as_entire_binding(),
+            }],
+        });
+
+        let pipeline =
+            create_colored_mesh_pipeline(device, target_format, &cl_layout, &tex_layout, &pl_layout);
 
         // ── Skinned pass resources ──────────────────────────────────────────
         let skinned_cam_aligned =
@@ -157,6 +199,8 @@ impl BasicRenderer {
             default_texture,
             aligned_size,
             max_entities,
+            point_lights_buffer,
+            point_lights_bind_group,
             skinned_pipeline,
             skinned_cam_buffer,
             palette_buffer,
@@ -165,6 +209,14 @@ impl BasicRenderer {
             skinned_cam_aligned,
             palette_aligned,
         }
+    }
+
+    /// Set the additive point lights used by the non-skinned mesh pass. Excess
+    /// lights beyond [`MAX_POINT_LIGHTS`](voltex_renderer::MAX_POINT_LIGHTS) are
+    /// dropped. Call once per frame (cheap; just a uniform write).
+    pub fn set_point_lights(&self, queue: &wgpu::Queue, lights: &[PointLight]) {
+        let uniform = PointLightsUniform::from_slice(lights);
+        queue.write_buffer(&self.point_lights_buffer, 0, bytemuck::bytes_of(&uniform));
     }
 
     /// World 의 모든 MeshHandle 엔티티를 dynamic-offset draw 로 렌더링한다.
@@ -233,6 +285,8 @@ impl BasicRenderer {
         });
 
         pass.set_pipeline(&self.pipeline);
+        // Point lights are shared across all non-skinned draws (group 2).
+        pass.set_bind_group(2, &self.point_lights_bind_group, &[]);
 
         for (i, item) in items.iter().take(n).enumerate() {
             let mesh = assets

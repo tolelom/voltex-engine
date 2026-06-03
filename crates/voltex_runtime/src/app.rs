@@ -24,7 +24,7 @@ use voltex_ecs::{propagate_transforms, ComponentRegistry, Entity, World};
 use voltex_physics::{detect_collisions, ContactPoint, PhysicsConfig};
 use voltex_platform::{GameTimer, InputState};
 use voltex_editor::UiContext;
-use voltex_renderer::{Camera, LightUniform};
+use voltex_renderer::{Camera, LightUniform, PointLight};
 use voltex_renderer_ecs::RenderAssets;
 use voltex_script::ScriptInstancePool;
 
@@ -89,6 +89,8 @@ pub struct RuntimeApp {
     pub(crate) light_fn: Option<LightFn>,
     /// Optional per-frame collision/trigger callback (see [`Self::set_collision_fn`]).
     collision_fn: Option<CollisionFn>,
+    /// Additive point lights uploaded to the renderer each frame.
+    pub(crate) point_lights: Vec<PointLight>,
     /// Polling file watcher used for script / scene hot reload.
     pub file_watcher: FileWatcher,
     /// Fixed-step timer driving update / render dt.
@@ -190,6 +192,7 @@ impl RuntimeApp {
             camera_fn: None,
             light_fn: None,
             collision_fn: None,
+            point_lights: Vec::new(),
             file_watcher: FileWatcher::new(Duration::from_millis(500)),
             timer: GameTimer::new(60),
             input: InputState::new(),
@@ -337,6 +340,13 @@ impl RuntimeApp {
     /// `true` if a collision callback has been registered.
     pub fn has_collision_fn(&self) -> bool {
         self.collision_fn.is_some()
+    }
+
+    /// Replace the additive point lights (uploaded to the renderer each frame).
+    /// Excess beyond [`MAX_POINT_LIGHTS`](voltex_renderer::MAX_POINT_LIGHTS) are
+    /// ignored by the renderer.
+    pub fn set_point_lights(&mut self, lights: Vec<PointLight>) {
+        self.point_lights = lights;
     }
 
     /// Serialize the current World to a JSON scene file. Only components

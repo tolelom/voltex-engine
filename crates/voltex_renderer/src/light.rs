@@ -105,6 +105,69 @@ impl LightUniform {
     }
 }
 
+/// Max additive point lights in the `BasicRenderer` Blinn-Phong path.
+pub const MAX_POINT_LIGHTS: usize = 8;
+
+/// One point light for the `BasicRenderer` path (`mesh_colored.wgsl` group 2).
+/// 32 bytes / std140-friendly (vec3+f32, vec3+f32).
+#[repr(C)]
+#[derive(Copy, Clone, Debug, Pod, Zeroable)]
+pub struct PointLight {
+    /// World-space position.
+    pub position: [f32; 3],
+    /// Falloff radius (attenuation reaches 0 at `range`).
+    pub range: f32,
+    /// RGB color.
+    pub color: [f32; 3],
+    /// Brightness multiplier.
+    pub intensity: f32,
+}
+
+impl PointLight {
+    /// A point light at `position` with `color` and `intensity`, reaching to `range`.
+    pub fn new(position: [f32; 3], color: [f32; 3], range: f32, intensity: f32) -> Self {
+        Self { position, range, color, intensity }
+    }
+}
+
+/// GPU uniform: a fixed array of [`PointLight`] + active `count`.
+#[repr(C)]
+#[derive(Copy, Clone, Debug, Pod, Zeroable)]
+pub struct PointLightsUniform {
+    /// Light slots; only the first `count` are active.
+    pub lights: [PointLight; MAX_POINT_LIGHTS],
+    /// Number of active lights (`0..=MAX_POINT_LIGHTS`).
+    pub count: u32,
+    pub _pad: [u32; 3],
+}
+
+impl Default for PointLightsUniform {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl PointLightsUniform {
+    /// All-zero, `count = 0` (no point lights).
+    pub fn new() -> Self {
+        Self {
+            lights: [PointLight { position: [0.0; 3], range: 0.0, color: [0.0; 3], intensity: 0.0 };
+                MAX_POINT_LIGHTS],
+            count: 0,
+            _pad: [0; 3],
+        }
+    }
+
+    /// Build from a slice, clamping to [`MAX_POINT_LIGHTS`].
+    pub fn from_slice(src: &[PointLight]) -> Self {
+        let mut u = Self::new();
+        let n = src.len().min(MAX_POINT_LIGHTS);
+        u.lights[..n].copy_from_slice(&src[..n]);
+        u.count = n as u32;
+        u
+    }
+}
+
 // Multi-light support
 pub const MAX_LIGHTS: usize = 16;
 pub const LIGHT_DIRECTIONAL: u32 = 0;

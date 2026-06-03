@@ -86,8 +86,8 @@ pub use hdr::{HdrTarget, HDR_FORMAT};
 pub use ibl::IblResources;
 pub use instancing::{create_instanced_pipeline, InstanceBuffer, InstanceData};
 pub use light::{
-    CameraUniform, ColoredCameraUniform, LightData, LightUniform, LightsUniform, LIGHT_DIRECTIONAL,
-    LIGHT_POINT, LIGHT_SPOT, MAX_LIGHTS,
+    CameraUniform, ColoredCameraUniform, LightData, LightUniform, LightsUniform, PointLight,
+    PointLightsUniform, LIGHT_DIRECTIONAL, LIGHT_POINT, LIGHT_SPOT, MAX_LIGHTS, MAX_POINT_LIGHTS,
 };
 pub use material::MaterialUniform;
 pub use mesh::Mesh;

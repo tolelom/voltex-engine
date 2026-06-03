@@ -543,6 +543,57 @@ pub fn render_cube_with_texture(
     target.read_rgba8(&gpu.device, &gpu.queue)
 }
 
+/// Render a white cube under a dim directional light + the given additive
+/// point lights (via `BasicRenderer::set_point_lights`). Returns RGBA8.
+pub fn render_cube_point_lit(
+    gpu: &HeadlessGpu,
+    width: u32,
+    height: u32,
+    lights: &[voltex_renderer::PointLight],
+) -> Vec<u8> {
+    let target = OffscreenTarget::new(&gpu.device, width, height);
+    let renderer = BasicRenderer::new(&gpu.device, &gpu.queue, CAPTURE_FORMAT, 8);
+    let mut assets = RenderAssets::new();
+    // Sphere — radial outward normals, so the hemisphere facing a light has an
+    // unambiguous positive N·L (no winding/normal quirks).
+    let (sv, si) = voltex_renderer::generate_sphere(1.0, 32, 16);
+    let mesh_h = assets.add_mesh(voltex_renderer::Mesh::new(&gpu.device, &sv, &si));
+    let mat_h = assets.add_material(MaterialUniform::new());
+
+    let mut world = World::new();
+    let e = world.spawn();
+    world.add(e, Transform::from_position(Vec3::ZERO));
+    world.add(e, MeshHandle(mesh_h.0));
+    world.add(e, MaterialHandle(mat_h.0));
+    voltex_ecs::propagate_transforms(&mut world);
+
+    let camera = Camera::new(Vec3::new(0.0, 0.0, 4.0), width as f32 / height as f32);
+    // Moderate directional with headroom so a point light measurably brightens.
+    let mut light = LightUniform::new();
+    light.direction = [0.0, 0.0, -1.0];
+    light.color = [0.30, 0.30, 0.30];
+    light.ambient_strength = 0.08;
+
+    renderer.set_point_lights(&gpu.queue, lights);
+    let mut encoder = gpu
+        .device
+        .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("capture plight") });
+    renderer.render(
+        &gpu.queue,
+        &mut encoder,
+        &target.color_view,
+        &target.depth_view,
+        wgpu::Color { r: 0.0, g: 0.0, b: 0.0, a: 1.0 },
+        &mut world,
+        &assets,
+        camera.view_projection(),
+        camera.position,
+        light,
+    );
+    gpu.queue.submit(Some(encoder.finish()));
+    target.read_rgba8(&gpu.device, &gpu.queue)
+}
+
 /// Render a cube textured with a 2×2 solid `color` (RGBA).
 pub fn render_textured_cube(gpu: &HeadlessGpu, width: u32, height: u32, color: [u8; 4]) -> Vec<u8> {
     use voltex_renderer::GpuTexture;
@@ -673,6 +724,50 @@ mod tests {
         glb.extend_from_slice(&0x004E4942u32.to_le_bytes()); // BIN\0
         glb.extend_from_slice(&bin);
         glb
+    }
+
+    #[test]
+    #[ignore = "requires a GPU adapter"]
+    fn point_lights_add_colored_illumination() {
+        let gpu = match HeadlessGpu::new() {
+            Ok(g) => g,
+            Err(e) => {
+                eprintln!("skip: {e}");
+                return;
+            }
+        };
+        // mean luminance over lit (non-near-black) pixels.
+        fn mean_lum(rgba: &[u8]) -> f64 {
+            let (mut s, mut n) = (0u64, 0u64);
+            for p in rgba.chunks_exact(4) {
+                let sum = p[0] as u32 + p[1] as u32 + p[2] as u32;
+                if sum > 24 {
+                    s += sum as u64;
+                    n += 1;
+                }
+            }
+            s as f64 / n.max(1) as f64
+        }
+
+        let baseline = render_cube_point_lit(&gpu, 256, 256, &[]);
+        // Surround the sphere with white point lights on all six axes, so the
+        // visible hemisphere is lit regardless of its normal orientation.
+        let pl = |p: [f32; 3]| voltex_renderer::PointLight::new(p, [1.0, 1.0, 1.0], 10.0, 2.0);
+        let lights = [
+            pl([3.0, 0.0, 0.0]),
+            pl([-3.0, 0.0, 0.0]),
+            pl([0.0, 3.0, 0.0]),
+            pl([0.0, -3.0, 0.0]),
+            pl([0.0, 0.0, 3.0]),
+            pl([0.0, 0.0, -3.0]),
+        ];
+        let lit = render_cube_point_lit(&gpu, 256, 256, &lights);
+
+        let (lb, ll) = (mean_lum(&baseline), mean_lum(&lit));
+        assert!(
+            ll > lb + 15.0,
+            "surrounding point lights should brighten the sphere: baseline={lb} lit={ll}"
+        );
     }
 
     #[test]
