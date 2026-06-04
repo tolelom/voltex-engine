@@ -17,3 +17,8 @@ voltex_asset = { path = "../voltex_asset" }
 # Scene parsing for build-time asset-reference scanning (workspace crate —
 # the external-deps-zero policy holds; pulls only math/asset, no GPU).
 voltex_ecs = { path = "../voltex_ecs" }
+
+[dev-dependencies]
+# E2E texture-bundle test encodes a real PNG the engine's own decoder reads
+# (workspace crate — external-deps-zero policy holds for dev deps too).
+voltex_image = { path = "../voltex_image" }

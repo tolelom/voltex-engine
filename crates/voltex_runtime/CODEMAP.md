@@ -12,7 +12,7 @@
 - `app` — RuntimeApp (모든 subsystem 보관 + `tick_systems_only` + `set_hud_fn` + Lua `script_input` 발행) (src/app.rs)
 - `config` — RuntimeConfig + 14개 builder 메서드 + 4개 callback 타입 (RegistrySetupFn, SceneBuilderFn, SystemSetupFn, GpuInitFn) (src/config.rs)
 - `error` — RuntimeError enum + Result alias (src/error.rs)
-- `asset_paths` — `AssetPathCache`(경로별 핸들 공유 + 실패 None 캐시) + `resolve_asset_paths_with`(주입 로더 코어, GPU 무관 테스트 가능) + `resolve_asset_paths`(**Vfs 우선 + fs fallback** read → 업로드 실 래퍼; 키 = forward-slash 경로 = 에디터 영속 형식 = `.vpkg` 엔트리). 씬 영속 TexturePath/MeshPath → 핸들. handler 가 materialize 직후 매 프레임 호출(멱등), load_scene 이 clear_failures (v1.0.98~100) (src/asset_paths.rs)
+- `asset_paths` — `AssetPathCache`(경로별 핸들 공유 + 실패 None 캐시) + `resolve_asset_paths_with`(주입 로더 코어, GPU 무관 테스트 가능) + `resolve_asset_paths`(**Vfs 우선 + fs fallback** read → 업로드 실 래퍼; 키 = forward-slash 경로 = 에디터 영속 형식 = `.vpkg` 엔트리). 씬 영속 TexturePath/MeshPath → 핸들. handler 가 materialize 직후 매 프레임 호출(멱등), load_scene 이 clear_failures (v1.0.98~100). resolve 성공 시 1회 `resolved N texture path(s)` log_info — dist exe E2E 의 양성 증거 (v1.0.102) (src/asset_paths.rs)
 - `audio_sync` — `audio_sync_system` (AudioSource→AudioSystem 브릿지) + 순수 `decide_action` 엣지 로직 + `poll_audio_hot_reload(watcher, watched, audio)` (변경 파일 재디코드 → replace_clip; v1.0.90) (src/audio_sync.rs)
 - `RuntimeApp::watch_audio_clip(path, clip_index)` — 오디오 파일 감시 등록 (전용 `audio_watcher`, script watcher 와 분리 — 그쪽은 pool 이 변경을 전부 소비). tick 의 audio 단계에서 자동 폴링 + 로그 (src/app.rs)
 - `handler` (crate-private) — winit ApplicationHandler 구현 (src/handler.rs)
@@ -26,7 +26,7 @@
 |---|---|---|
 | `with_window_title(s)` | new 직전 | window.title |
 | `with_window_size(w, h)` | new 직전 | window dims |
-| `with_initial_scene(path)` | new (silent 실패) | binary 우선 → JSON fallback |
+| `with_initial_scene(path)` | new (실패 시 log_error + 빈 월드 degrade — silent 아님, v1.0.102) | binary 우선 → JSON fallback |
 | `with_registry_setup(F)` | new 첫 단계 | `&mut ComponentRegistry` (register_defaults 이후) |
 | `with_scene_builder(F)` | new 마지막 단계 | `&mut World, &mut ComponentRegistry` — GPU 없이 가능한 entity seed |
 | `with_system_setup(F)` | new 마지막 단계 | `&mut RuntimeApp` — `add_system` 호출 등 |

@@ -107,7 +107,7 @@ pub fn resolve_asset_paths(
     // resolve_asset_paths_with runs the texture pass before the mesh pass.
     // Split via RefCell to satisfy the borrow checker without unsafe.
     let assets = std::cell::RefCell::new(assets);
-    resolve_asset_paths_with(
+    let (tex_n, mesh_n) = resolve_asset_paths_with(
         world,
         cache,
         |path| match read_asset(vfs, path).and_then(|bytes| {
@@ -135,7 +135,15 @@ pub fn resolve_asset_paths(
                 None
             }
         },
-    )
+    );
+    // Positive evidence for hands-off verification (dist-exe E2E greps this).
+    // Idempotence keeps this quiet after the first resolving frame.
+    if tex_n > 0 || mesh_n > 0 {
+        crate::log_info!(
+            "voltex_runtime: resolved {tex_n} texture path(s), {mesh_n} mesh path(s)"
+        );
+    }
+    (tex_n, mesh_n)
 }
 
 /// Read asset bytes: the Vfs (when present **and** it has the entry) wins,

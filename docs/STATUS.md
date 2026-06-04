@@ -173,6 +173,31 @@
 
 v1.0.9 부터는 **서비스 배포 완성도** 로드맵 (`docs/superpowers/specs/2026-05-21-service-readiness-roadmap.md`) 기준으로 진행.
 
+### 2026-06-04 — CLI 텍스처 번들 E2E 실검증 (v1.0.102, 자율 세션)
+
+v1.0.96~101 체인의 끝단 실기기 통검: `voltex new` → `texture_path` 씬 →
+`voltex build` 자동 동봉 → **루즈 파일 없는 다른 디렉토리**에서 exe 가 vpkg
+경유로 텍스처 resolve. 수동 1회(RTX 4080) + ignored E2E 테스트로 코드화, 통과.
+
+- **격차 발견·수정 (voltex_runtime)**: 초기 씬 로드 실패가 `let _ =` 로
+  **조용히** 삼켜져 빈 월드로 무로그 구동 — "에러 없음"이 양성 증거가 못 되던
+  것을 수정. ① `RuntimeApp::new` 가 initial scene 로드 성공 시
+  `initial scene ... loaded (N entities)` log_info / 실패 시 log_error (빈
+  월드 degrade 는 유지 — scene builder 가 채울 수 있음). ② `resolve_asset_paths`
+  성공 시 1회 `resolved N texture path(s), M mesh path(s)` log_info (멱등이라
+  스팸 없음).
+- **voltex_cli `tests/e2e_texture_bundle.rs`** (#[ignore], `--ignored` 명시
+  실행): 씬은 `voltex_ecs` 직렬화 + `register_raw` 마커로 생성(primitive_mesh
+  와이어 미러 — GPU 스택 미링크), PNG 는 `voltex_image::encode_rgba8`
+  dev-dep. 단언: 자동 동봉 stderr 로그 / `.vpkg` 에 `textures/checker.png` 키
+  (선언 `assets/` **밖** — v1.0.101 경로만으로 도달) / foreign cwd 12초 구동
+  (fs fallback 구조적 불가) 양성 로그 2종 + `failed to resolve/load` 부재.
+  1회 완주 130s 통과. 관찰: 첫 resolve 는 GPU 파이프라인 콜드 컴파일 뒤 ~6초.
+- 검증: voltex_runtime 97 / workspace lib 전부 그린, clippy(-D warnings) 그린,
+  E2E 1 passed.
+- 설계: `docs/superpowers/specs/2026-06-04-cli-texture-e2e-design.md`.
+- 비범위(후속): 픽셀 단위 시각 검증, Audio 경로 영속화 E2E, 메시 동봉 E2E.
+
 ### 2026-06-04 — voltex build 씬 참조 에셋 자동 동봉 (v1.0.101, 자율 세션)
 
 에셋 영속화 체인(v1.0.96~100)의 최종 배선. `pack_archive` 가 이미 manifest

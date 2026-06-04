@@ -209,12 +209,25 @@ impl RuntimeApp {
 
         let mut world = World::new();
         if let Some(scene_path) = config.initial_scene.as_ref() {
-            let _ = load_scene_via_vfs_or_disk(
+            // A broken initial scene degrades to an empty world (the scene
+            // builder below may still populate it), but never silently — the
+            // dist-exe E2E reads these lines as its load evidence.
+            match load_scene_via_vfs_or_disk(
                 &mut world,
                 &registry,
                 scene_path,
                 config.vfs.as_ref(),
-            );
+            ) {
+                Ok(()) => crate::log_info!(
+                    "voltex_runtime: initial scene `{}` loaded ({} entities)",
+                    scene_path,
+                    world.entity_count()
+                ),
+                Err(e) => crate::log_error!(
+                    "voltex_runtime: initial scene `{}` failed to load: {e}",
+                    scene_path
+                ),
+            }
         }
         let scene_builder = config.build_scene.take();
         if let Some(build) = scene_builder {

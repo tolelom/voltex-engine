@@ -56,6 +56,7 @@ src/
 
 ## 의존성
 - workspace 내부: voltex_asset (`.vpkg` write/read), voltex_ecs (빌드 시 씬 에셋 참조 스캔 `scan_scene_asset_paths` — v1.0.101). voltex_runtime 은 wrapper 의 의존, voltex_cli 의 의존 아님
+- dev-dependency: voltex_image (E2E 텍스처 번들 테스트의 PNG 인코딩)
 - 외부 crate: 없음 (TOML 파서 자체 구현)
 - 시스템 의존: `cargo` 가 PATH 에 있어야 함 (없으면 `CargoMissing` 친화 에러)
 
@@ -68,7 +69,9 @@ src/
 ## 테스트
 - 19개 단위 테스트 (manifest 9 + new 3 + build 2 + util 3 + error 0 — Display 검증은 추후)
 - 실행: `cargo test -p voltex_cli`
-- cargo invocation 자체는 단위 테스트 안 함 — 수동 검증 또는 통합 테스트 별도 추가
+- E2E (`tests/`, 전부 `#[ignore]` — `cargo test -p voltex_cli -- --ignored` 로 명시 실행, wrapper 의 release 엔진 링크 ~2-5분):
+  - `e2e_new_build.rs` — `voltex new` → `voltex build` → dist exe + 라이선스 번들 확인
+  - `e2e_texture_bundle.rs` — v1.0.96~101 체인 통검: `texture_path` 씬 → 자동 동봉 로그 + `.vpkg` 키 확인 → exe 를 루즈 파일 없는 디렉토리에서 12초 구동, `initial scene ... loaded` + `resolved 1 texture path(s)` 양성 로그 단언 (실창/GPU 필요)
 
 ## 수동 검증 절차
 ```bash
