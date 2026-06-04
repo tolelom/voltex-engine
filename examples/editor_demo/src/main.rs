@@ -166,18 +166,10 @@ fn load_mesh_from_path(device: &wgpu::Device, path: &Path) -> Result<(Mesh, AABB
     }
 }
 
-/// Decode an audio file (.wav / .ogg) into an [`AudioClip`].
+/// Decode an audio file (.wav / .ogg) into an [`AudioClip`]. Thin wrapper over
+/// [`voltex_audio::load_clip_file`] mapping the error into the demo's String.
 fn load_clip_from_path(path: &Path) -> Result<AudioClip, String> {
-    let bytes = std::fs::read(path).map_err(|e| e.to_string())?;
-    let ext = path
-        .extension()
-        .and_then(|e| e.to_str())
-        .map(|e| e.to_ascii_lowercase());
-    match ext.as_deref() {
-        Some("wav") => voltex_audio::parse_wav(&bytes).map_err(|e| e.to_string()),
-        Some("ogg") => voltex_audio::decode_ogg_vorbis_bytes(&bytes).map_err(|e| e.to_string()),
-        _ => Err(format!("unsupported audio extension: {}", path.display())),
-    }
+    voltex_audio::load_clip_file(path).map_err(|e| e.to_string())
 }
 
 impl ApplicationHandler for EditorDemoApp {

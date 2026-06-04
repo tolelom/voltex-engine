@@ -144,6 +144,11 @@ pub struct RuntimeApp {
     /// Audio mixer, present only when `config.enable_audio` and init succeeded.
     /// Driven each frame by `audio_sync_system` from `AudioSource` components.
     pub audio: Option<AudioSystem>,
+    /// Watches audio files registered via [`Self::watch_audio_clip`]; separate
+    /// from `file_watcher` because the script pool drains that one's changes.
+    audio_watcher: FileWatcher,
+    /// Path → clip index map driving audio hot-reload (see `watch_audio_clip`).
+    watched_audio_clips: std::collections::HashMap<std::path::PathBuf, usize>,
     /// Entity whose `Transform` positions the 3D audio listener (camera/player).
     /// `None` leaves the listener unchanged.
     pub audio_listener: Option<Entity>,
@@ -251,6 +256,8 @@ impl RuntimeApp {
             script_pool: ScriptInstancePool::new(),
             script_input: voltex_script::ScriptInput::new(),
             audio,
+            audio_watcher: FileWatcher::new(Duration::from_millis(300)),
+            watched_audio_clips: std::collections::HashMap::new(),
             audio_listener: None,
             assets: RenderAssets::new(),
             registry,
@@ -354,6 +361,18 @@ impl RuntimeApp {
     /// (typically the camera or player). Only meaningful when audio is enabled.
     pub fn set_audio_listener(&mut self, entity: Entity) {
         self.audio_listener = Some(entity);
+    }
+
+    /// Hot-reload: watch an audio file and swap the clip at `clip_index`
+    /// (the index into the `with_audio` clip Vec, i.e. the `ClipId` value)
+    /// whenever the file changes on disk. Looping sounds pick the new data up
+    /// on the next mix block; one-shots on their next play. Decode failures
+    /// are logged and leave the old clip intact. No-op while audio is
+    /// disabled (the watch is still registered for when it is).
+    pub fn watch_audio_clip(&mut self, path: impl Into<std::path::PathBuf>, clip_index: usize) {
+        let path = path.into();
+        self.watched_audio_clips.insert(path.clone(), clip_index);
+        self.audio_watcher.watch(path);
     }
 
     /// Register a per-frame camera updater for follow / orbit / cinematic
@@ -562,6 +581,22 @@ impl RuntimeApp {
         // by user systems this same frame (lowest latency).
         if let Some(audio) = self.audio.as_ref() {
             crate::audio_sync::audio_sync_system(&mut self.world, audio, self.audio_listener);
+            for (path, outcome) in crate::audio_sync::poll_audio_hot_reload(
+                &mut self.audio_watcher,
+                &self.watched_audio_clips,
+                audio,
+            ) {
+                match outcome {
+                    Ok(()) => crate::log_info!(
+                        "voltex_runtime: hot-reloaded audio clip: {}",
+                        path.display()
+                    ),
+                    Err(e) => crate::log_error!(
+                        "voltex_runtime: audio hot-reload failed for {}: {e}",
+                        path.display()
+                    ),
+                }
+            }
         }
         // Despawn expired-lifetime entities after user systems have observed
         // them on their final frame (no-op if no Lifetime entities).

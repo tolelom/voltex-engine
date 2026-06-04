@@ -125,6 +125,38 @@ pub fn audio_sync_system(world: &mut World, audio: &AudioSystem, listener: Optio
     }
 }
 
+// ── Hot reload ──────────────────────────────────────────────────────────────
+
+/// Poll `watcher` once and hot-reload every changed file that `watched` maps
+/// to a clip index: re-decode via [`voltex_audio::load_clip_file`] and swap
+/// the clip in place with [`AudioSystem::replace_clip`] (same index — looping
+/// BGM picks the new data up on the next mix block; one-shots on next play).
+///
+/// Returns one `(path, outcome)` per *watched* changed file so the caller can
+/// log / surface results. Changes to unwatched paths are ignored. A decode
+/// failure leaves the old clip playing (the swap is skipped).
+pub fn poll_audio_hot_reload(
+    watcher: &mut voltex_asset::FileWatcher,
+    watched: &std::collections::HashMap<std::path::PathBuf, usize>,
+    audio: &AudioSystem,
+) -> Vec<(std::path::PathBuf, Result<(), String>)> {
+    let mut outcomes = Vec::new();
+    for changed in watcher.poll_changes() {
+        let Some(&clip_index) = watched.get(&changed) else {
+            continue;
+        };
+        let outcome = match voltex_audio::load_clip_file(&changed) {
+            Ok(clip) => {
+                audio.replace_clip(clip_index, clip);
+                Ok(())
+            }
+            Err(e) => Err(e.to_string()),
+        };
+        outcomes.push((changed, outcome));
+    }
+    outcomes
+}
+
 // ── Scene serialization ─────────────────────────────────────────────────────
 //
 // `AudioSource` lives in voltex_audio, which has no voltex_ecs dependency, so it
@@ -207,6 +239,68 @@ mod tests {
         assert_eq!(decide_action(false, true, false), AudioAction::Stop);
         // idle
         assert_eq!(decide_action(false, false, false), AudioAction::None);
+    }
+
+    #[test]
+    fn poll_audio_hot_reload_swaps_changed_watched_files_only() {
+        use std::time::Duration;
+        let dir = std::env::temp_dir();
+        let watched_path = dir.join(format!("voltex_audio_hr_{}.wav", std::process::id()));
+        let unwatched_path = dir.join(format!("voltex_audio_hr_un_{}.wav", std::process::id()));
+        let wav = voltex_audio::generate_wav_bytes(&[0.0, 0.1, -0.1], 44100);
+        std::fs::write(&watched_path, &wav).unwrap();
+        std::fs::write(&unwatched_path, &wav).unwrap();
+
+        let audio = AudioSystem::new(vec![voltex_audio::AudioClip::new(
+            vec![0.0; 8],
+            44100,
+            1,
+        )])
+        .expect("audio system");
+        let mut watcher = voltex_asset::FileWatcher::new(Duration::from_millis(0));
+        watcher.watch(watched_path.clone());
+        watcher.watch(unwatched_path.clone());
+        let watched: std::collections::HashMap<std::path::PathBuf, usize> =
+            [(watched_path.clone(), 0usize)].into_iter().collect();
+
+        // First poll establishes the mtime baseline — no outcomes.
+        assert!(poll_audio_hot_reload(&mut watcher, &watched, &audio).is_empty());
+
+        // Touch both files; only the mapped one produces an outcome.
+        std::thread::sleep(Duration::from_millis(20));
+        let wav2 = voltex_audio::generate_wav_bytes(&[0.5, -0.5], 22050);
+        std::fs::write(&watched_path, &wav2).unwrap();
+        std::fs::write(&unwatched_path, &wav2).unwrap();
+        let outcomes = poll_audio_hot_reload(&mut watcher, &watched, &audio);
+        assert_eq!(outcomes.len(), 1, "only the mapped path is reloaded");
+        assert_eq!(outcomes[0].0, watched_path);
+        assert!(outcomes[0].1.is_ok(), "valid wav swaps Ok: {:?}", outcomes[0].1);
+
+        let _ = std::fs::remove_file(&watched_path);
+        let _ = std::fs::remove_file(&unwatched_path);
+    }
+
+    #[test]
+    fn poll_audio_hot_reload_reports_decode_failure_without_panicking() {
+        use std::time::Duration;
+        let path = std::env::temp_dir()
+            .join(format!("voltex_audio_hr_bad_{}.wav", std::process::id()));
+        std::fs::write(&path, voltex_audio::generate_wav_bytes(&[0.0], 44100)).unwrap();
+
+        let audio = AudioSystem::new(Vec::new()).expect("audio system");
+        let mut watcher = voltex_asset::FileWatcher::new(Duration::from_millis(0));
+        watcher.watch(path.clone());
+        let watched: std::collections::HashMap<std::path::PathBuf, usize> =
+            [(path.clone(), 0usize)].into_iter().collect();
+        let _ = poll_audio_hot_reload(&mut watcher, &watched, &audio); // baseline
+
+        std::thread::sleep(Duration::from_millis(20));
+        std::fs::write(&path, b"RIFFcorrupt").unwrap();
+        let outcomes = poll_audio_hot_reload(&mut watcher, &watched, &audio);
+        assert_eq!(outcomes.len(), 1);
+        assert!(outcomes[0].1.is_err(), "corrupt file reports Err, old clip kept");
+
+        let _ = std::fs::remove_file(&path);
     }
 
     #[test]

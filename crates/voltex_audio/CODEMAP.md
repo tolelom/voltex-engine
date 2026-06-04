@@ -9,6 +9,7 @@
 - `AudioSource` / `ClipId` — per-entity 재생 디스크립터 + 타입화된 clip 식별자. ECS 컴포넌트로 등록 가능하나 audio crate 자체는 ECS 무의존 (src/audio_source.rs)
 - `AsyncAudioLoader` — 비동기 로딩 (src/async_loader.rs)
 - WAV/OGG 디코더 — `parse_wav`, `decode_ogg` (src/wav.rs, src/ogg.rs, src/vorbis.rs)
+- `load_clip_file(path) -> Result<AudioClip>` — 파일 read + 확장자 분기(wav/ogg) 원콜 디코드 (src/lib.rs; 에디터/핫리로드 공용)
 - `MixGroup`, `MixGroupManager`, `AudioBus` — 믹싱 (src/mix_group.rs, src/dynamic_groups.rs, src/audio_bus.rs)
 - `EffectChain`, `Reverb`, `EchoDelay` — 이펙트 (src/effect_chain.rs, src/reverb.rs)
 - spatial — `distance_attenuation`, `stereo_pan`, `doppler_shift`, HRTF (src/spatial.rs, src/hrtf.rs)

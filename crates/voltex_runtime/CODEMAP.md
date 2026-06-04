@@ -12,7 +12,8 @@
 - `app` — RuntimeApp (모든 subsystem 보관 + `tick_systems_only` + `set_hud_fn` + Lua `script_input` 발행) (src/app.rs)
 - `config` — RuntimeConfig + 14개 builder 메서드 + 4개 callback 타입 (RegistrySetupFn, SceneBuilderFn, SystemSetupFn, GpuInitFn) (src/config.rs)
 - `error` — RuntimeError enum + Result alias (src/error.rs)
-- `audio_sync` — `audio_sync_system` (AudioSource→AudioSystem 브릿지) + 순수 `decide_action` 엣지 로직 (src/audio_sync.rs)
+- `audio_sync` — `audio_sync_system` (AudioSource→AudioSystem 브릿지) + 순수 `decide_action` 엣지 로직 + `poll_audio_hot_reload(watcher, watched, audio)` (변경 파일 재디코드 → replace_clip; v1.0.90) (src/audio_sync.rs)
+- `RuntimeApp::watch_audio_clip(path, clip_index)` — 오디오 파일 감시 등록 (전용 `audio_watcher`, script watcher 와 분리 — 그쪽은 pool 이 변경을 전부 소비). tick 의 audio 단계에서 자동 폴링 + 로그 (src/app.rs)
 - `handler` (crate-private) — winit ApplicationHandler 구현 (src/handler.rs)
 
 ## 의존성

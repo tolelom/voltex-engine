@@ -52,6 +52,26 @@ pub fn decode_ogg_vorbis_bytes(data: &[u8]) -> Result<AudioClip> {
     let packets = ogg::parse_ogg(data)?;
     vorbis::decode_vorbis(&packets)
 }
+
+/// Read an audio file from disk and decode it into an [`AudioClip`] by
+/// extension: `.wav` → [`parse_wav`], `.ogg` → [`decode_ogg_vorbis_bytes`]
+/// (case-insensitive). Errors on read failure, decode failure, or any other
+/// extension. The one-call path for editors / hot-reload loops.
+pub fn load_clip_file(path: &std::path::Path) -> Result<AudioClip> {
+    let bytes = std::fs::read(path)?;
+    let ext = path
+        .extension()
+        .and_then(|e| e.to_str())
+        .map(|e| e.to_ascii_lowercase());
+    match ext.as_deref() {
+        Some("wav") => parse_wav(&bytes),
+        Some("ogg") => decode_ogg_vorbis_bytes(&bytes),
+        _ => Err(AudioError::from(format!(
+            "load_clip_file: unsupported audio extension: {}",
+            path.display()
+        ))),
+    }
+}
 pub use mixing::{PlayingSound, mix_sounds};
 pub use audio_system::AudioSystem;
 pub use spatial::{Listener, SpatialParams, distance_attenuation, stereo_pan, compute_spatial_gains};
@@ -73,3 +93,44 @@ pub use backend::{AudioBackend, BackendError, NullBackend, make_backend};
 pub use backend::WasapiBackend;
 #[cfg(target_os = "linux")]
 pub use backend::AlsaBackend;
+
+#[cfg(test)]
+mod lib_tests {
+    use super::*;
+
+    fn temp_file(name: &str) -> std::path::PathBuf {
+        std::env::temp_dir().join(format!("{}_{}", std::process::id(), name))
+    }
+
+    #[test]
+    fn load_clip_file_decodes_wav_by_extension() {
+        let path = temp_file("voltex_load_clip.wav");
+        let wav = generate_wav_bytes(&[0.0, 0.5, -0.5, 0.25], 22050);
+        std::fs::write(&path, wav).unwrap();
+
+        let clip = load_clip_file(&path).expect("wav decodes");
+        assert_eq!(clip.sample_rate, 22050);
+        assert_eq!(clip.channels, 1);
+        assert_eq!(clip.samples.len(), 4);
+        let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
+    fn load_clip_file_rejects_unknown_extension_and_missing_file() {
+        let txt = temp_file("voltex_load_clip.txt");
+        std::fs::write(&txt, b"not audio").unwrap();
+        assert!(load_clip_file(&txt).is_err(), "unsupported extension is Err");
+        let _ = std::fs::remove_file(&txt);
+
+        let missing = temp_file("voltex_load_clip_missing.wav");
+        assert!(load_clip_file(&missing).is_err(), "missing file is Err");
+    }
+
+    #[test]
+    fn load_clip_file_propagates_decode_errors() {
+        let path = temp_file("voltex_load_clip_corrupt.wav");
+        std::fs::write(&path, b"RIFFnope").unwrap();
+        assert!(load_clip_file(&path).is_err(), "corrupt wav is Err");
+        let _ = std::fs::remove_file(&path);
+    }
+}

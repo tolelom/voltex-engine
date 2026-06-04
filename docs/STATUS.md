@@ -173,6 +173,25 @@
 
 v1.0.9 부터는 **서비스 배포 완성도** 로드맵 (`docs/superpowers/specs/2026-05-21-service-readiness-roadmap.md`) 기준으로 진행.
 
+### 2026-06-04 — 런타임 오디오 클립 핫리로드 (v1.0.90, 자율 세션)
+
+v1.0.88 의 에디터 오디오 핫리로드를 게임 런타임(`RuntimeApp` + AudioSource ECS
+경로)에도 제공. 게임이 파일↔클립 매핑을 등록하면 디스크 변경 시 같은
+`clip_index` 뒤 데이터가 교체 — 루핑 BGM 은 다음 믹스 블록부터 새 소리.
+
+- **voltex_audio**: `load_clip_file(path)` — read + 확장자 분기(wav/ogg) 원콜
+  디코드. editor_demo 로컬 헬퍼를 이것으로 교체(DRY). 단위 +3.
+- **voltex_runtime**: `RuntimeApp::watch_audio_clip(path, clip_index)` +
+  전용 `audio_watcher`(300ms; script watcher 는 pool 이 변경을 전부 소비해
+  분리) + `audio_sync::poll_audio_hot_reload`(테스트 가능한 헬퍼로 추출,
+  outcome 반환) — tick 의 audio 단계에서 자동 폴링 + log_info/log_error.
+  디코드 실패는 기존 클립 유지. 단위 +2 (NullBackend 헤드리스, 실제 wav
+  round-trip + 손상 파일 graceful).
+- 설계: `docs/superpowers/specs/2026-06-04-runtime-audio-hot-reload-design.md`.
+- 비범위(후속): ClipId↔경로 자동 등록(`with_audio_files` 류), 씬 오디오 경로
+  직렬화, 디렉토리 감시.
+- build/clippy(-D warnings)/test 그린.
+
 ### 2026-06-04 — 인스펙터 컴포넌트 목록 + Remove (v1.0.89, 자율 세션)
 
 E3 (AddComponent/RemoveComponent 커맨드 + undo + Add 버튼)의 마지막 UI 격차.
