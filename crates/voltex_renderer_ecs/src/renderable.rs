@@ -301,11 +301,13 @@ impl Component for MaterialDesc {
 }
 
 /// Register the declarative renderable components ([`PrimitiveMesh`],
-/// [`MaterialDesc`]) so they survive scene serialization. `voltex_runtime`
-/// calls this automatically after `register_defaults()`.
+/// [`MaterialDesc`], [`TexturePath`](crate::TexturePath)) so they survive
+/// scene serialization. `voltex_runtime` calls this automatically after
+/// `register_defaults()`.
 pub fn register_renderable_components(registry: &mut voltex_ecs::ComponentRegistry) {
     registry.register::<PrimitiveMesh>();
     registry.register::<MaterialDesc>();
+    registry.register::<crate::TexturePath>();
 }
 
 /// Entities that declare a [`PrimitiveMesh`] but don't yet have a

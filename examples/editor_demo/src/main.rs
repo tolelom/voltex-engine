@@ -7,7 +7,7 @@ use winit::{
 };
 use voltex_platform::{VoltexWindow, WindowConfig, InputState, GameTimer};
 use voltex_renderer::{GpuContext, LightUniform, MaterialUniform, Mesh, MeshVertex};
-use voltex_renderer_ecs::{BasicRenderer, RenderAssets, TextureHandle};
+use voltex_renderer_ecs::{BasicRenderer, RenderAssets, TextureHandle, TexturePath};
 use voltex_asset::FileWatcher;
 use voltex_audio::{AudioClip, AudioSystem};
 use std::collections::HashMap;
@@ -178,6 +178,55 @@ fn load_clip_from_path(path: &Path) -> Result<AudioClip, String> {
     voltex_audio::load_clip_file(path).map_err(|e| e.to_string())
 }
 
+/// Re-attach `TextureHandle`s after a scene load: every entity carrying a
+/// persisted [`TexturePath`] gets its file re-read, uploaded, and watched for
+/// hot-reload. Handles are runtime-only, so this is what makes applied
+/// textures survive Save → Load. Returns how many entities were resolved;
+/// failures log and skip (the entity renders with the white default).
+fn resolve_texture_paths(
+    world: &mut voltex_ecs::World,
+    render_assets: &mut RenderAssets,
+    device: &wgpu::Device,
+    queue: &wgpu::Queue,
+    watcher: &mut FileWatcher,
+    watched_textures: &mut HashMap<PathBuf, TextureHandle>,
+) -> usize {
+    let targets: Vec<(Entity, PathBuf)> = world
+        .query::<TexturePath>()
+        .map(|(e, p)| (e, PathBuf::from(&p.0)))
+        .collect();
+    let mut resolved = 0;
+    for (entity, path) in targets {
+        // Reuse the handle if this file was already loaded this run (several
+        // entities sharing one texture must share one handle).
+        let handle = match watched_textures.get(&path) {
+            Some(&h) => Some(h),
+            None => match std::fs::read(&path)
+                .map_err(|e| e.to_string())
+                .and_then(|bytes| {
+                    render_assets
+                        .add_texture_png(device, queue, &bytes)
+                        .map_err(|e| e.to_string())
+                }) {
+                Ok(h) => {
+                    watched_textures.insert(path.clone(), h);
+                    watcher.watch(path.clone());
+                    Some(h)
+                }
+                Err(e) => {
+                    eprintln!("[scene] texture {} failed to resolve: {}", path.display(), e);
+                    None
+                }
+            },
+        };
+        if let Some(h) = handle {
+            world.add(entity, h);
+            resolved += 1;
+        }
+    }
+    resolved
+}
+
 /// Decode an image file (.png / .jpg) and upload it for UI preview, returning
 /// the [`UiRenderer`] texture slot for [`asset_browser_panel`]'s thumbnail.
 fn make_thumbnail(
@@ -272,6 +321,9 @@ impl ApplicationHandler for EditorDemoApp {
         // Save → Load round-trip.
         std::fs::create_dir_all("scenes").ok();
         let mut session = EditorSession::new("scenes/editor_demo.vscn");
+        // Persist applied-texture *paths* in scenes (handles are runtime-only;
+        // resolve_texture_paths re-attaches them after every load).
+        session.registry.register::<TexturePath>();
 
         let seed = |session: &mut EditorSession, pos: Vec3, tag: &str| -> Entity {
             let e = session.dispatch(EditorCommand::Spawn).unwrap();
@@ -651,7 +703,20 @@ impl ApplicationHandler for EditorDemoApp {
                             match state.session.dispatch(EditorCommand::LoadScene { path: path_str }) {
                                 Ok(_) => {
                                     state.session.selected = None;
-                                    state.status = format!("Loaded scene: {}", name);
+                                    // Persisted texture paths → fresh handles.
+                                    let resolved = resolve_texture_paths(
+                                        &mut state.session.world,
+                                        &mut state.render_assets,
+                                        &state.gpu.device,
+                                        &state.gpu.queue,
+                                        &mut state.watcher,
+                                        &mut state.watched_textures,
+                                    );
+                                    state.status = if resolved > 0 {
+                                        format!("Loaded scene: {} ({} textures)", name, resolved)
+                                    } else {
+                                        format!("Loaded scene: {}", name)
+                                    };
                                     // Watch for live edits — only one scene at a time.
                                     if let Some(old) = state.watched_scene.replace(path.clone()) {
                                         if old != path { state.watcher.unwatch(&old); }
@@ -671,6 +736,12 @@ impl ApplicationHandler for EditorDemoApp {
                                     Ok(handle) => {
                                         if let Some(sel) = state.session.selected {
                                             state.session.world.add(sel, handle);
+                                            // Persist the *path* — handles are
+                                            // runtime-only and die with the run.
+                                            state.session.world.add(
+                                                sel,
+                                                TexturePath(path.to_string_lossy().into_owned()),
+                                            );
                                             state.status = format!("Applied texture: {}", name);
                                             // Watch this file → hot-reload onto the same handle.
                                             state.watched_textures.insert(path.clone(), handle);
@@ -760,7 +831,19 @@ impl ApplicationHandler for EditorDemoApp {
                         match state.session.dispatch(EditorCommand::LoadScene { path: path_str }) {
                             Ok(_) => {
                                 state.session.selected = None;
-                                state.status = format!("Reloaded scene: {}", name);
+                                let resolved = resolve_texture_paths(
+                                    &mut state.session.world,
+                                    &mut state.render_assets,
+                                    &state.gpu.device,
+                                    &state.gpu.queue,
+                                    &mut state.watcher,
+                                    &mut state.watched_textures,
+                                );
+                                state.status = if resolved > 0 {
+                                    format!("Reloaded scene: {} ({} textures)", name, resolved)
+                                } else {
+                                    format!("Reloaded scene: {}", name)
+                                };
                             }
                             Err(e) => state.status = format!("Scene reload failed: {}", e),
                         }

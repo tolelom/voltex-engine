@@ -173,6 +173,26 @@
 
 v1.0.9 부터는 **서비스 배포 완성도** 로드맵 (`docs/superpowers/specs/2026-05-21-service-readiness-roadmap.md`) 기준으로 진행.
 
+### 2026-06-04 — 텍스처 에셋 경로 직렬화 (v1.0.96, 자율 세션)
+
+**데이터 손실 수정**: Open 으로 적용한 텍스처는 `TextureHandle`(런타임
+RenderAssets 슬롯)만 부착돼 Save → Load 하면 사라졌다. 에셋 참조의 경로
+영속화 패턴 첫 사례.
+
+- **voltex_renderer_ecs**: `TexturePath(pub String)` 컴포넌트 —
+  `Component` impl(NAME `texture_path`, UTF-8 round-trip, invalid UTF-8 거부)
+  + `register_renderable_components` 에 등록 + re-export.
+- **editor_demo**: 세션 registry 에 등록, 텍스처 적용 시 핸들과 함께
+  `TexturePath` 부착, `resolve_texture_paths` — LoadScene 직후(Open + 씬
+  핫리로드 분기) 경로별 1회 로드(같은 파일 공유 엔티티는 핸들 공유) + 핸들
+  재부착 + 핫리로드 watch. 실패는 로그 + skip(흰색 기본 텍스처 fallback).
+  상태 텍스트에 복원 수 표기.
+- 검증: 단위 +2 (씬 JSON round-trip, invalid UTF-8). renderer_ecs 40.
+  build/clippy(-D warnings)/test 그린.
+- 설계: `docs/superpowers/specs/2026-06-04-texture-path-persistence-design.md`.
+- 비범위(후속): Mesh/Audio 경로 영속화(같은 패턴), 런타임 자동 resolve,
+  상대경로/VFS 정규화(현재 절대경로 — 프로젝트 이식성 한계).
+
 ### 2026-06-04 — 썸네일 핫리로드 invalidation (v1.0.95, 자율 세션)
 
 v1.0.93 비범위 후속 (editor_demo 한정). 선택 텍스처 파일이 디스크에서 바뀌면

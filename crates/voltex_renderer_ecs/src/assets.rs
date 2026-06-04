@@ -16,6 +16,35 @@ use crate::skinned::SkinnedMeshHandle;
 #[derive(Debug, Clone, Copy)]
 pub struct TextureHandle(pub Handle<GpuTexture>);
 
+/// ECS component: the source *file path* of the texture an entity's
+/// [`TextureHandle`] was loaded from. Unlike the handle (a runtime
+/// `RenderAssets` slot, meaningless across runs), this **persists in scenes**
+/// — registered components serialize it, and an integration layer (editor /
+/// runtime) re-loads the file and re-attaches a fresh handle after scene load.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TexturePath(pub String);
+
+impl voltex_ecs::Component for TexturePath {
+    const NAME: &'static str = "texture_path";
+
+    fn serialize(world: &voltex_ecs::World, entity: voltex_ecs::Entity) -> Option<Vec<u8>> {
+        let p = world.get::<TexturePath>(entity)?;
+        Some(p.0.as_bytes().to_vec())
+    }
+
+    fn deserialize(
+        world: &mut voltex_ecs::World,
+        entity: voltex_ecs::Entity,
+        data: &[u8],
+    ) -> voltex_ecs::Result<()> {
+        let s = std::str::from_utf8(data)
+            .map_err(|_| "texture_path: invalid UTF-8")?
+            .to_string();
+        world.add(entity, TexturePath(s));
+        Ok(())
+    }
+}
+
 /// ECS component: extra PBR material maps for the runtime PBR pass (used only
 /// when `BasicRenderer` has PBR enabled). Each is optional; an absent map falls
 /// back to a sensible default (flat normal, white ORM = unoccluded/rough/
@@ -235,5 +264,40 @@ mod tests {
         let assets = RenderAssets::new();
         let stale = MeshHandle(Handle::from_raw_parts(99, 0));
         assert!(assets.mesh(stale).is_none());
+    }
+
+    #[test]
+    fn texture_path_round_trips_through_scene_json() {
+        use voltex_ecs::{deserialize_scene_json, serialize_scene_json, Transform};
+        use voltex_math::Vec3;
+
+        let mut registry = voltex_ecs::ComponentRegistry::new();
+        registry.register::<Transform>();
+        crate::register_renderable_components(&mut registry);
+
+        let mut world = voltex_ecs::World::new();
+        let e = world.spawn();
+        world.add(e, Transform::from_position(Vec3::new(1.0, 0.0, 0.0)));
+        world.add(e, TexturePath("assets/hero.png".to_string()));
+
+        let json = serialize_scene_json(&world, &registry);
+        let mut loaded = voltex_ecs::World::new();
+        deserialize_scene_json(&mut loaded, &json, &registry).expect("scene loads");
+
+        let restored: Vec<&TexturePath> = loaded
+            .query::<TexturePath>()
+            .map(|(_, p)| p)
+            .collect();
+        assert_eq!(restored.len(), 1);
+        assert_eq!(restored[0].0, "assets/hero.png", "path survives save/load");
+    }
+
+    #[test]
+    fn texture_path_deserialize_rejects_invalid_utf8() {
+        use voltex_ecs::Component;
+        let mut world = voltex_ecs::World::new();
+        let e = world.spawn();
+        assert!(TexturePath::deserialize(&mut world, e, &[0xFF, 0xFE]).is_err());
+        assert!(world.get::<TexturePath>(e).is_none());
     }
 }
