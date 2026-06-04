@@ -308,6 +308,7 @@ pub fn register_renderable_components(registry: &mut voltex_ecs::ComponentRegist
     registry.register::<PrimitiveMesh>();
     registry.register::<MaterialDesc>();
     registry.register::<crate::TexturePath>();
+    registry.register::<crate::MeshPath>();
 }
 
 /// Entities that declare a [`PrimitiveMesh`] but don't yet have a

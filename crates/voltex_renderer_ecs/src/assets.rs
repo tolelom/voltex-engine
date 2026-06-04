@@ -45,6 +45,36 @@ impl voltex_ecs::Component for TexturePath {
     }
 }
 
+/// ECS component: the source *file path* of the mesh an entity's
+/// [`MeshHandle`](voltex_ecs::MeshHandle) was loaded from (`.obj` / `.gltf` /
+/// `.glb`). Same persistence contract as [`TexturePath`]: the handle is a
+/// runtime slot, the path survives in scenes and is re-resolved after load.
+/// (Deliberate plain duplication of the `TexturePath` impl — extract a macro
+/// if a third path component appears.)
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MeshPath(pub String);
+
+impl voltex_ecs::Component for MeshPath {
+    const NAME: &'static str = "mesh_path";
+
+    fn serialize(world: &voltex_ecs::World, entity: voltex_ecs::Entity) -> Option<Vec<u8>> {
+        let p = world.get::<MeshPath>(entity)?;
+        Some(p.0.as_bytes().to_vec())
+    }
+
+    fn deserialize(
+        world: &mut voltex_ecs::World,
+        entity: voltex_ecs::Entity,
+        data: &[u8],
+    ) -> voltex_ecs::Result<()> {
+        let s = std::str::from_utf8(data)
+            .map_err(|_| "mesh_path: invalid UTF-8")?
+            .to_string();
+        world.add(entity, MeshPath(s));
+        Ok(())
+    }
+}
+
 /// ECS component: extra PBR material maps for the runtime PBR pass (used only
 /// when `BasicRenderer` has PBR enabled). Each is optional; an absent map falls
 /// back to a sensible default (flat normal, white ORM = unoccluded/rough/
@@ -299,5 +329,37 @@ mod tests {
         let e = world.spawn();
         assert!(TexturePath::deserialize(&mut world, e, &[0xFF, 0xFE]).is_err());
         assert!(world.get::<TexturePath>(e).is_none());
+    }
+
+    #[test]
+    fn mesh_path_round_trips_through_scene_json() {
+        use voltex_ecs::{deserialize_scene_json, serialize_scene_json, Transform};
+        use voltex_math::Vec3;
+
+        let mut registry = voltex_ecs::ComponentRegistry::new();
+        registry.register::<Transform>();
+        crate::register_renderable_components(&mut registry);
+
+        let mut world = voltex_ecs::World::new();
+        let e = world.spawn();
+        world.add(e, Transform::from_position(Vec3::new(0.0, 1.0, 0.0)));
+        world.add(e, MeshPath("assets/ship.obj".to_string()));
+
+        let json = serialize_scene_json(&world, &registry);
+        let mut loaded = voltex_ecs::World::new();
+        deserialize_scene_json(&mut loaded, &json, &registry).expect("scene loads");
+
+        let restored: Vec<&MeshPath> = loaded.query::<MeshPath>().map(|(_, p)| p).collect();
+        assert_eq!(restored.len(), 1);
+        assert_eq!(restored[0].0, "assets/ship.obj", "path survives save/load");
+    }
+
+    #[test]
+    fn mesh_path_deserialize_rejects_invalid_utf8() {
+        use voltex_ecs::Component;
+        let mut world = voltex_ecs::World::new();
+        let e = world.spawn();
+        assert!(MeshPath::deserialize(&mut world, e, &[0xFF, 0xFE]).is_err());
+        assert!(world.get::<MeshPath>(e).is_none());
     }
 }

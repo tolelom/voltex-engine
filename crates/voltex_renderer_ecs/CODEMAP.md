@@ -28,7 +28,7 @@ ECS World ↔ voltex_renderer 브릿지. C0a 의 `MeshHandle` / `MaterialHandle`
 | `materialize_renderables(&mut World, &mut RenderAssets, &Device)` | `renderable.rs` | `PrimitiveMesh`/`MaterialDesc` → GPU 메시/머티리얼 + `MeshHandle`/`MaterialHandle`/`Bounds` 부착. **dedup**(동일 프리미티브·머티리얼 공유) + **멱등**(resolve 된 엔티티 skip). RuntimeApp 이 gpu_init 직후 자동 호출 |
 | `register_renderable_components(&mut ComponentRegistry)` / `plan_primitive_meshes(&World)` / `plan_materials(&World)` | `renderable.rs` | 등록 헬퍼 + 순수(GPU 무관) plan 헬퍼(멱등 계약 테스트용) |
 | `RenderAssets::add_skinned_mesh(SkinnedMesh) -> SkinnedMeshHandle` / `skinned_mesh(h)` | `assets.rs` | 스킨드 메시 저장 |
-| `TexturePath(pub String)` 컴포넌트 | `assets.rs` | 적용 텍스처의 **파일 경로** (씬 영속 — 핸들은 런타임 전용이라 Save/Load 에서 죽음). `Component` impl(UTF-8), `register_renderable_components` 에 포함. 통합 레이어가 로드 후 재해석해 핸들 재부착 (v1.0.96) |
+| `TexturePath(pub String)` / `MeshPath(pub String)` 컴포넌트 | `assets.rs` | 적용 에셋의 **파일 경로** (씬 영속 — 핸들은 런타임 전용이라 Save/Load 에서 죽음). `Component` impl(UTF-8), `register_renderable_components` 에 포함. 통합 레이어가 로드 후 재해석해 핸들 재부착 (v1.0.96~97). 3번째 사례(Audio) 등장 시 매크로 추출 검토 |
 | `RenderAssets::add_texture(GpuTexture)` / `add_texture_png(device,queue,bytes) -> Result` / `add_texture_rgba(device,queue,w,h,px)` / `replace_texture_png(device,queue,handle,bytes) -> Result` / `texture(h)`, `TextureHandle` 컴포넌트 | `assets.rs` | per-entity 디퓨즈 텍스처 (없으면 흰색 기본). `_png`/`_rgba`는 레이아웃 생성+업로드를 한 번에. `replace_texture_png`는 핫리로드 — 기존 핸들 뒤 GpuTexture를 in-place 교체(generation 보존, 엔티티 재부착 불필요) |
 | `SkinnedMeshHandle(Handle<SkinnedMesh>)`, `SkinnedPose{skeleton,animation,player}` | `skinned.rs` | 스킨드 ECS 컴포넌트 |
 | `update_skinned_poses(&mut World, dt)`, `animation_duration(&GltfAnimation)` | `skinned.rs` | 포즈 진행 시스템 (RuntimeApp tick 호출) |

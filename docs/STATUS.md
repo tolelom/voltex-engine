@@ -173,6 +173,24 @@
 
 v1.0.9 부터는 **서비스 배포 완성도** 로드맵 (`docs/superpowers/specs/2026-05-21-service-readiness-roadmap.md`) 기준으로 진행.
 
+### 2026-06-04 — 메시 에셋 경로 직렬화 (v1.0.97, 자율 세션)
+
+v1.0.96 패턴 반복. Open 으로 적용한 메시(`MeshHandle`)도 Save → Load 에서
+사라지던 것을 `MeshPath` 로 영속화.
+
+- **voltex_renderer_ecs**: `MeshPath(pub String)` — TexturePath 와 대칭
+  (NAME `mesh_path`, UTF-8 round-trip). 의도적 평문 중복 — Audio(3번째)가
+  오면 매크로 추출 검토. 등록/re-export 포함.
+- **editor_demo**: Mesh 적용 시 `MeshPath` 부착 + `resolve_mesh_paths`
+  (LoadScene 직후 두 분기, 경로별 1회 로드 + 공유 핸들 + watch). **Bounds 는
+  씬이 복원하므로 resolve 가 건드리지 않음** — 저장 후 파일이 바뀌면 stale
+  (핫리로드 v1 한계와 동일). 상태 텍스트 `(N textures, M meshes)`.
+- 검증: 단위 +2 (round-trip / invalid UTF-8). renderer_ecs 42.
+  build/clippy(-D warnings)/test 그린.
+- 설계: `docs/superpowers/specs/2026-06-04-mesh-path-persistence-design.md`.
+- 비범위(후속): Audio 경로 영속화(ClipId 기반 — 별도 설계), 런타임 자동
+  resolve, 상대경로/VFS 정규화.
+
 ### 2026-06-04 — 텍스처 에셋 경로 직렬화 (v1.0.96, 자율 세션)
 
 **데이터 손실 수정**: Open 으로 적용한 텍스처는 `TextureHandle`(런타임
