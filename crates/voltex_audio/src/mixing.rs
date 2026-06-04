@@ -198,6 +198,38 @@ mod tests {
     }
 
     #[test]
+    fn hot_reload_to_shorter_clip_ends_stale_position_gracefully() {
+        // A clip replaced in place (hot-reload) can be shorter than the one a
+        // sound started against. The sound's position then exceeds the new
+        // frame_count — it must end without panicking or emitting samples.
+        let clips = vec![make_mono_clip(1.0, 10, 44100)]; // post-reload: 10 frames
+        let mut sound = PlayingSound::new(0, 1.0, false);
+        sound.position = 100; // accumulated against the pre-reload, longer clip
+        let mut playing = vec![sound];
+        let mut output = Vec::new();
+
+        mix_sounds(&mut output, &mut playing, &clips, 44100, 1, 10, &Listener::default(), &MixerState::new());
+
+        assert!(playing.is_empty(), "exhausted sound must be removed");
+        assert!(output.iter().all(|&s| s == 0.0), "no samples past clip end");
+    }
+
+    #[test]
+    fn hot_reload_to_shorter_clip_wraps_looping_sound() {
+        // Same scenario but looping: position resets to 0 instead of ending.
+        let clips = vec![make_mono_clip(1.0, 10, 44100)];
+        let mut sound = PlayingSound::new(0, 1.0, true);
+        sound.position = 100;
+        let mut playing = vec![sound];
+        let mut output = Vec::new();
+
+        mix_sounds(&mut output, &mut playing, &clips, 44100, 1, 10, &Listener::default(), &MixerState::new());
+
+        assert_eq!(playing.len(), 1, "looping sound must survive");
+        assert_eq!(playing[0].position, 0, "looping sound rewinds to start");
+    }
+
+    #[test]
     fn two_sounds_sum() {
         // Two clips each at 0.3; sum is 0.6 (below clamp threshold)
         let clips = vec![

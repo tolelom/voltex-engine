@@ -1,6 +1,6 @@
 //! AudioSystem: high-level audio playback management with a dedicated audio thread.
 
-use std::sync::{Arc, mpsc};
+use std::sync::mpsc;
 use std::thread;
 
 use crate::{AudioClip, PlayingSound, mix_sounds};
@@ -72,8 +72,33 @@ pub(crate) enum AudioCommand {
         /// Fade length in seconds.
         duration: f32,
     },
+    /// Append a clip to the thread's clip list (hot-load).
+    AddClip {
+        /// The decoded clip to append.
+        clip: AudioClip,
+    },
+    /// Replace the clip at `clip_index` in place (hot-reload). Out-of-range
+    /// indices are ignored.
+    ReplaceClip {
+        /// Index of the clip to replace.
+        clip_index: usize,
+        /// The new clip data.
+        clip: AudioClip,
+    },
     /// Shut down the audio thread.
     Shutdown,
+}
+
+/// Replace `clips[clip_index]` with `clip`, returning whether the index was
+/// in range. Out-of-range is a silent no-op — consistent with the
+/// fire-and-forget contract of the other clip commands (`stop`, `set_volume`).
+pub(crate) fn replace_clip_in(clips: &mut [AudioClip], clip_index: usize, clip: AudioClip) -> bool {
+    if let Some(slot) = clips.get_mut(clip_index) {
+        *slot = clip;
+        true
+    } else {
+        false
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -83,6 +108,10 @@ pub(crate) enum AudioCommand {
 /// Manages audio playback via a dedicated OS-level thread.
 pub struct AudioSystem {
     sender: mpsc::Sender<AudioCommand>,
+    /// Number of clips the thread holds (initial + added). Hands out the next
+    /// `add_clip` index; stays in lockstep with the thread's `Vec` because
+    /// `AddClip` commands are processed in mpsc FIFO order.
+    clip_count: usize,
 }
 
 impl AudioSystem {
@@ -91,18 +120,35 @@ impl AudioSystem {
     /// Spawns a background audio thread that owns the clips and drives the
     /// WASAPI device (on Windows) or runs in silent mode (other platforms).
     pub fn new(clips: Vec<AudioClip>) -> crate::Result<Self> {
-        let clips = Arc::new(clips);
+        let clip_count = clips.len();
         let (tx, rx) = mpsc::channel::<AudioCommand>();
 
-        let clips_arc = Arc::clone(&clips);
         thread::Builder::new()
             .name("voltex_audio_thread".to_string())
             .spawn(move || {
-                audio_thread(rx, clips_arc);
+                audio_thread(rx, clips);
             })
             .map_err(|e| crate::AudioError::from(format!("Failed to spawn audio thread: {}", e)))?;
 
-        Ok(AudioSystem { sender: tx })
+        Ok(AudioSystem { sender: tx, clip_count })
+    }
+
+    /// Hot-load: append a decoded clip at runtime and return its `clip_index`,
+    /// usable with [`Self::play`] immediately (mpsc FIFO guarantees the thread
+    /// pushes the clip before processing any later command).
+    pub fn add_clip(&mut self, clip: AudioClip) -> usize {
+        let index = self.clip_count;
+        self.clip_count += 1;
+        let _ = self.sender.send(AudioCommand::AddClip { clip });
+        index
+    }
+
+    /// Hot-reload: replace the clip behind an existing `clip_index` in place.
+    /// Instances already playing sample the new data on the next mix block; if
+    /// their position exceeds the new length they end (or loop) naturally.
+    /// Out-of-range indices are ignored (fire-and-forget, like [`Self::stop`]).
+    pub fn replace_clip(&self, clip_index: usize, clip: AudioClip) {
+        let _ = self.sender.send(AudioCommand::ReplaceClip { clip_index, clip });
     }
 
     /// Start playing a clip at the given volume and looping setting.
@@ -164,7 +210,7 @@ impl Drop for AudioSystem {
 ///
 /// On Windows, initializes WasapiDevice and drives playback.
 /// On other platforms, runs in a silent "null" mode (processes commands only).
-fn audio_thread(rx: mpsc::Receiver<AudioCommand>, clips: Arc<Vec<AudioClip>>) {
+fn audio_thread(rx: mpsc::Receiver<AudioCommand>, clips: Vec<AudioClip>) {
     #[cfg(target_os = "windows")]
     audio_thread_windows(rx, clips);
 
@@ -177,7 +223,7 @@ fn audio_thread(rx: mpsc::Receiver<AudioCommand>, clips: Arc<Vec<AudioClip>>) {
 // ---------------------------------------------------------------------------
 
 #[cfg(target_os = "windows")]
-fn audio_thread_windows(rx: mpsc::Receiver<AudioCommand>, clips: Arc<Vec<AudioClip>>) {
+fn audio_thread_windows(rx: mpsc::Receiver<AudioCommand>, mut clips: Vec<AudioClip>) {
     use crate::wasapi::WasapiDevice;
 
     let device = match WasapiDevice::new() {
@@ -235,6 +281,12 @@ fn audio_thread_windows(rx: mpsc::Receiver<AudioCommand>, clips: Arc<Vec<AudioCl
                         AudioCommand::FadeGroup { group, target, duration } => {
                             mixer.fade(group, target, duration);
                         }
+                        AudioCommand::AddClip { clip } => {
+                            clips.push(clip);
+                        }
+                        AudioCommand::ReplaceClip { clip_index, clip } => {
+                            replace_clip_in(&mut clips, clip_index, clip);
+                        }
                         AudioCommand::Shutdown => {
                             return;
                         }
@@ -278,19 +330,26 @@ fn audio_thread_windows(rx: mpsc::Receiver<AudioCommand>, clips: Arc<Vec<AudioCl
 // ---------------------------------------------------------------------------
 
 #[cfg(not(target_os = "windows"))]
-fn audio_thread_null(rx: mpsc::Receiver<AudioCommand>, clips: Arc<Vec<AudioClip>>) {
+fn audio_thread_null(rx: mpsc::Receiver<AudioCommand>, clips: Vec<AudioClip>) {
     audio_thread_null_impl(rx, clips);
 }
 
 #[cfg(target_os = "windows")]
-fn audio_thread_null(rx: mpsc::Receiver<AudioCommand>, _clips: Arc<Vec<AudioClip>>) {
+fn audio_thread_null(rx: mpsc::Receiver<AudioCommand>, _clips: Vec<AudioClip>) {
     audio_thread_null_impl(rx, _clips);
 }
 
-fn audio_thread_null_impl(rx: mpsc::Receiver<AudioCommand>, _clips: Arc<Vec<AudioClip>>) {
+fn audio_thread_null_impl(rx: mpsc::Receiver<AudioCommand>, mut clips: Vec<AudioClip>) {
     loop {
         match rx.recv() {
             Ok(AudioCommand::Shutdown) | Err(_) => return,
+            // Keep the clip list in lockstep even in silent mode so `play`
+            // after `add_clip` stays index-consistent if a real backend is
+            // ever swapped in mid-session (and for symmetry with windows).
+            Ok(AudioCommand::AddClip { clip }) => clips.push(clip),
+            Ok(AudioCommand::ReplaceClip { clip_index, clip }) => {
+                replace_clip_in(&mut clips, clip_index, clip);
+            }
             Ok(_) => {}
         }
     }
@@ -329,5 +388,44 @@ mod tests {
         sys.stop(0);
         sys.stop_all();
         // All sends must succeed without panic.
+    }
+
+    #[test]
+    fn add_clip_hands_out_sequential_indices_after_initial_clips() {
+        let mut sys = AudioSystem::new(vec![silence_clip(), silence_clip()])
+            .expect("AudioSystem::new failed");
+
+        assert_eq!(sys.add_clip(silence_clip()), 2);
+        assert_eq!(sys.add_clip(silence_clip()), 3);
+        // The new index is immediately playable (FIFO: AddClip lands first).
+        sys.play(3, 1.0, false);
+    }
+
+    #[test]
+    fn add_clip_on_empty_system_starts_at_zero() {
+        let mut sys = AudioSystem::new(vec![]).expect("AudioSystem::new failed");
+        assert_eq!(sys.add_clip(silence_clip()), 0);
+    }
+
+    #[test]
+    fn replace_clip_sends_without_panic_even_out_of_range() {
+        let sys = AudioSystem::new(vec![silence_clip()]).expect("AudioSystem::new failed");
+        sys.replace_clip(0, silence_clip()); // in range
+        sys.replace_clip(99, silence_clip()); // out of range → thread-side no-op
+    }
+
+    #[test]
+    fn replace_clip_in_swaps_in_range_and_ignores_out_of_range() {
+        let mut clips = vec![silence_clip()];
+        let replacement = AudioClip::new(vec![0.5f32; 100], 22050, 1);
+
+        assert!(replace_clip_in(&mut clips, 0, replacement));
+        assert_eq!(clips[0].sample_rate, 22050);
+        assert_eq!(clips[0].samples.len(), 100);
+
+        let other = AudioClip::new(vec![0.1f32; 10], 48000, 1);
+        assert!(!replace_clip_in(&mut clips, 5, other));
+        // Original slot untouched by the out-of-range attempt.
+        assert_eq!(clips[0].sample_rate, 22050);
     }
 }
