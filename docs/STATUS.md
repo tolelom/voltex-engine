@@ -173,6 +173,22 @@
 
 v1.0.9 부터는 **서비스 배포 완성도** 로드맵 (`docs/superpowers/specs/2026-05-21-service-readiness-roadmap.md`) 기준으로 진행.
 
+### 2026-06-04 — 인스펙터 컴포넌트 목록 + Remove (v1.0.89, 자율 세션)
+
+E3 (AddComponent/RemoveComponent 커맨드 + undo + Add 버튼)의 마지막 UI 격차.
+엔티티에 어떤 컴포넌트가 붙어 있는지 보고 떼는 UI 가 없었다 — `RemoveComponent`
+는 undo 내부에서만 쓰이고 있었음.
+
+- **voltex_editor**: `attached_component_names(session, entity)` 순수 헬퍼
+  (registry `entries()` × `serialize().is_some()`) + 인스펙터 "Components"
+  섹션(`- name` 버튼 → `RemoveComponent` dispatch, 양방향 undo 는 E3 그대로) +
+  Add 버튼이 이미 부착된 컴포넌트를 숨김(멱등 semantics 불변, 표시만 정리).
+- `register_raw` 엔트리는 remove 가 no-op — 기존 커맨드 규약(no-op Ok) 유지.
+- 검증: 단위 +3 (attached 목록 / remove dispatch→undo prior-bytes 복원 /
+  Add 필터). voltex_editor 185 그린. build/clippy(-D warnings)/test 그린.
+- 설계: `docs/superpowers/specs/2026-06-04-inspector-component-list-design.md`.
+- 비범위(후속): 컴포넌트 값 표시/편집(리플렉션), 커스텀 컴포넌트 Add 동적 생성.
+
 ### 2026-06-04 — Mesh/Audio 핫리로드 (v1.0.88, 자율 세션)
 
 v1.0.87 (텍스처/씬)의 비범위 후속. 브라우저에서 Open한 메시(.obj/.gltf/.glb)와
@@ -1840,7 +1856,7 @@ crates/
 
 1. ~~**inspector 통합**~~ — ✅ Phase 8-6. 단일 `panels::*` 경로.
 2. ~~**scene 영속화 검증**~~ — ✅ Phase 8-7. 시드 엔티티가 `EditorCommand` dispatch 경로 통과 → 로그/Save/Load 일관성.
-3. **EditorCommand 확장 추가** — Undo/Redo ✅, AddChild/RemoveChild ✅. 남은 후보: AddComponent/RemoveComponent (Transform 외 컴포넌트 — ComponentRegistry 의 raw byte API 활용).
+3. ~~**EditorCommand 확장 추가**~~ — Undo/Redo ✅, AddChild/RemoveChild ✅, AddComponent/RemoveComponent ✅ E3 + 인스펙터 목록/Remove UI ✅ v1.0.89.
 4. **Despawn 정확한 undo** — 현재 v1은 history 클리어. `EntityAllocator::restore_at_generation(id, gen)` 추가 + 컴포넌트 스냅샷 백업 형태로 풀 undo 지원. World API 변경이라 별 commit 필요.
 5. ~~**viewport raycast 픽킹**~~ — ✅ Phase 8-7. 좌클릭 → ray cast → `session.selected` (sphere 근사). **gizmo (translate/rotate/scale 핸들)** 은 미구현 — 다음 chunk 후보.
 6. ~~**Lua API 확장**~~ — ✅ Phase 8-7 (15개 함수). 다음: get_world_transform, query 결과를 Lua iterator 로 노출 등.

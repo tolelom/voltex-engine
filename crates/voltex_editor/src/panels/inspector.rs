@@ -99,6 +99,20 @@ fn changed(a: f32, b: f32) -> bool {
     (a - b).abs() > EPSILON
 }
 
+/// Names of registered components currently attached to `entity`, in
+/// registry order. Drives the Inspector's "Components" list and the
+/// filtering of its "Add Component" buttons; exposed so headless tests and
+/// external tools can share the exact UI logic.
+pub fn attached_component_names(session: &EditorSession, entity: Entity) -> Vec<String> {
+    session
+        .registry
+        .entries()
+        .iter()
+        .filter(|e| (e.serialize)(&session.world, entity).is_some())
+        .map(|e| e.name.clone())
+        .collect()
+}
+
 /// Draw the inspector panel for the entity in `session.selected`. Any change
 /// produced by a slider or text input is dispatched as an EditorCommand so it
 /// is logged and persisted.
@@ -179,12 +193,32 @@ pub fn inspector_panel(
         ui.text(&parent_text);
     }
 
+    // ── Components (attached, with remove buttons) ────────────────────
+    // One `- name` button per registered component on this entity.
+    // RemoveComponent is fully undoable (the session captures prior bytes).
+    // `register_raw` entries have a no-op remove — the dispatch still
+    // succeeds (same "absent → no-op Ok" contract as the command itself).
+    let attached = attached_component_names(session, entity);
+    ui.text("-- Components --");
+    for name in &attached {
+        let label = format!("- {}", name);
+        if ui.button(&label) {
+            let _ = session.dispatch(EditorCommand::RemoveComponent {
+                entity,
+                name: name.clone(),
+            });
+        }
+    }
+
     // ── Add Component buttons (E3) ────────────────────────────────────
-    // One button per built-in registered component. AddComponent dispatches
-    // with the component's default_bytes — deserialize handles overwriting
-    // any existing instance, so clicking is idempotent.
+    // One button per built-in registered component not already attached.
+    // AddComponent dispatches with the component's default_bytes —
+    // deserialize handles overwriting, so a stale click stays idempotent.
     ui.text("-- Add Component --");
     for spec in &ADD_COMPONENT_BUTTONS {
+        if attached.iter().any(|n| n == spec.name) {
+            continue;
+        }
         let label = format!("+ {}", spec.name);
         if ui.button(&label) {
             if let Some(entry) = session.registry.find(spec.name) {
@@ -222,6 +256,72 @@ mod tests {
     fn cleanup(scene: &str) {
         let _ = std::fs::remove_file(scene);
         let _ = std::fs::remove_file(format!("{}.log", scene));
+    }
+
+    #[test]
+    fn attached_component_names_lists_only_attached() {
+        let scene = temp_path("voltex_insp_attached_names.vscn");
+        cleanup(&scene);
+        let mut session = EditorSession::new(scene.clone());
+        let e = session.dispatch(EditorCommand::Spawn).unwrap();
+
+        // Spawn attaches a default Transform only.
+        let names = attached_component_names(&session, e);
+        assert!(names.iter().any(|n| n == "transform"), "transform attached on spawn");
+        assert!(!names.iter().any(|n| n == "tag"), "no tag yet: {names:?}");
+        assert!(!names.iter().any(|n| n == "bounds"), "no bounds yet: {names:?}");
+
+        session
+            .dispatch(EditorCommand::SetTag { entity: e, tag: "Hero".into() })
+            .unwrap();
+        let names = attached_component_names(&session, e);
+        assert!(names.iter().any(|n| n == "tag"), "tag listed after SetTag");
+        cleanup(&scene);
+    }
+
+    #[test]
+    fn remove_button_dispatch_removes_and_undo_restores_prior_value() {
+        // Replicate the "- tag" button logic end-to-end without the GUI.
+        let scene = temp_path("voltex_insp_remove_dispatch.vscn");
+        cleanup(&scene);
+        let mut session = EditorSession::new(scene.clone());
+        let e = session.dispatch(EditorCommand::Spawn).unwrap();
+        session
+            .dispatch(EditorCommand::SetTag { entity: e, tag: "Hero".into() })
+            .unwrap();
+
+        session
+            .dispatch(EditorCommand::RemoveComponent { entity: e, name: "tag".into() })
+            .unwrap();
+        assert!(session.world.get::<Tag>(e).is_none(), "tag removed");
+        assert!(
+            !attached_component_names(&session, e).iter().any(|n| n == "tag"),
+            "components list reflects removal"
+        );
+
+        session.undo();
+        let tag = session.world.get::<Tag>(e).expect("undo restores tag");
+        assert_eq!(tag.0, "Hero", "undo restores the exact prior value");
+        cleanup(&scene);
+    }
+
+    #[test]
+    fn add_buttons_exclude_already_attached_components() {
+        // Replicate the Add-section filter: attached names are skipped.
+        let scene = temp_path("voltex_insp_add_filter.vscn");
+        cleanup(&scene);
+        let mut session = EditorSession::new(scene.clone());
+        let e = session.dispatch(EditorCommand::Spawn).unwrap();
+
+        let attached = attached_component_names(&session, e);
+        let offered: Vec<&str> = ADD_COMPONENT_BUTTONS
+            .iter()
+            .filter(|s| !attached.iter().any(|n| n == s.name))
+            .map(|s| s.name)
+            .collect();
+        assert!(!offered.contains(&"transform"), "attached transform filtered out");
+        assert!(offered.contains(&"bounds"), "unattached bounds still offered");
+        cleanup(&scene);
     }
 
     #[test]
