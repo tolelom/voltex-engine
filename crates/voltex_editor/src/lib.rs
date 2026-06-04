@@ -38,7 +38,8 @@ pub use ui_context::UiContext;
 pub use dock::{DockTree, DockNode, Axis, Rect, LeafLayout};
 pub use panels::hierarchy::{hierarchy_panel, count_entity_nodes};
 pub use panels::inspector::{
-    attached_component_names, component_value_summary, inspector_panel, InspectorState,
+    attached_component_names, bounds_bytes, component_value_summary, inspector_panel,
+    InspectorState,
 };
 pub use orbit_camera::OrbitCamera;
 pub use picking::pick_entity;

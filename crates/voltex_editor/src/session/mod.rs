@@ -321,12 +321,26 @@ impl EditorSession {
                 }
             }
             EditorCommand::AddComponent { entity, name, .. } => {
-                // Inverse is RemoveComponent — we don't capture pre-bytes
-                // because AddComponent semantics overwrite any prior value.
-                Some(Inverse::RemoveComponentByName {
-                    entity: *entity,
-                    name: name.clone(),
-                })
+                // AddComponent overwrites any prior value, so the inverse
+                // depends on whether one existed: editing an attached
+                // component undoes to its prior bytes (the inspector's value
+                // forms dispatch AddComponent on change), while a fresh add
+                // undoes to removal — the original E3 semantics.
+                let prior = self
+                    .registry
+                    .find(name)
+                    .and_then(|entry| (entry.serialize)(&self.world, *entity));
+                match prior {
+                    Some(data) => Some(Inverse::AddComponentByBytes {
+                        entity: *entity,
+                        name: name.clone(),
+                        data: Some(data),
+                    }),
+                    None => Some(Inverse::RemoveComponentByName {
+                        entity: *entity,
+                        name: name.clone(),
+                    }),
+                }
             }
             EditorCommand::RemoveComponent { entity, name } => {
                 // Capture prior bytes so undo can re-attach the exact value.

@@ -44,6 +44,50 @@ fn add_component_undo_removes_it() {
 }
 
 #[test]
+fn add_component_on_existing_undo_restores_prior_value() {
+    // Editing an attached component via AddComponent (the inspector's value
+    // forms) must undo to the prior VALUE, not to removal.
+    let scene = temp_path("voltex_e3_edit_undo.vscn");
+    cleanup(&scene);
+    let mut session = EditorSession::new(scene.clone());
+    let e = session.dispatch(EditorCommand::Spawn).unwrap();
+    session
+        .dispatch(EditorCommand::AddComponent {
+            entity: e,
+            name: "tag".into(),
+            data: b"Hero".to_vec(),
+        })
+        .unwrap();
+
+    session
+        .dispatch(EditorCommand::AddComponent {
+            entity: e,
+            name: "tag".into(),
+            data: b"Villain".to_vec(),
+        })
+        .unwrap();
+    assert_eq!(session.world.get::<voltex_ecs::scene::Tag>(e).unwrap().0, "Villain");
+
+    assert!(session.undo());
+    assert_eq!(
+        session.world.get::<voltex_ecs::scene::Tag>(e).unwrap().0,
+        "Hero",
+        "undoing an overwrite restores the prior value"
+    );
+
+    // Redo re-applies the overwrite; one more undo walks back to removal.
+    assert!(session.redo());
+    assert_eq!(session.world.get::<voltex_ecs::scene::Tag>(e).unwrap().0, "Villain");
+    assert!(session.undo());
+    assert!(session.undo());
+    assert!(
+        session.world.get::<voltex_ecs::scene::Tag>(e).is_none(),
+        "undoing the initial add still removes the component"
+    );
+    cleanup(&scene);
+}
+
+#[test]
 fn remove_component_undo_restores_prior_bytes() {
     let scene = temp_path("voltex_e3_remove_undo.vscn");
     cleanup(&scene);

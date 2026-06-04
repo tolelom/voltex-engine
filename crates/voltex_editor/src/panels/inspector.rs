@@ -135,6 +135,53 @@ pub fn component_value_summary(
     }
 }
 
+/// 24-byte LE payload for an `AddComponent { name: "bounds" }` dispatch.
+/// Must mirror `Bounds::serialize` (min.xyz then max.xyz) — layout drift is
+/// guarded by a registry round-trip test.
+pub fn bounds_bytes(min: Vec3, max: Vec3) -> Vec<u8> {
+    let mut data = Vec::with_capacity(24);
+    for v in [min.x, min.y, min.z, max.x, max.y, max.z] {
+        data.extend_from_slice(&v.to_le_bytes());
+    }
+    data
+}
+
+/// Six sliders editing the entity's [`Bounds`](voltex_ecs::Bounds) in place.
+/// A change dispatches `AddComponent` (deserialize overwrites — the E3
+/// idempotence contract), so every edit is logged, persisted, and undoes to
+/// the *prior value* (the session captures pre-bytes when the component
+/// already exists). Per-tick dispatch during a drag matches the Transform
+/// sliders' v1 behavior.
+fn bounds_edit_form(ui: &mut UiContext, session: &mut EditorSession, entity: Entity) {
+    let Some(b) = session.world.get::<voltex_ecs::Bounds>(entity) else {
+        return;
+    };
+    let (min, max) = (b.0.min, b.0.max);
+    let new_min = Vec3::new(
+        ui.slider("Min X", min.x, -50.0, 50.0),
+        ui.slider("Min Y", min.y, -50.0, 50.0),
+        ui.slider("Min Z", min.z, -50.0, 50.0),
+    );
+    let new_max = Vec3::new(
+        ui.slider("Max X", max.x, -50.0, 50.0),
+        ui.slider("Max Y", max.y, -50.0, 50.0),
+        ui.slider("Max Z", max.z, -50.0, 50.0),
+    );
+    let edited = changed(min.x, new_min.x)
+        || changed(min.y, new_min.y)
+        || changed(min.z, new_min.z)
+        || changed(max.x, new_max.x)
+        || changed(max.y, new_max.y)
+        || changed(max.z, new_max.z);
+    if edited {
+        let _ = session.dispatch(EditorCommand::AddComponent {
+            entity,
+            name: "bounds".to_string(),
+            data: bounds_bytes(new_min, new_max),
+        });
+    }
+}
+
 /// Names of registered components currently attached to `entity`, in
 /// registry order. Drives the Inspector's "Components" list and the
 /// filtering of its "Add Component" buttons; exposed so headless tests and
@@ -247,7 +294,11 @@ pub fn inspector_panel(
                 name: name.clone(),
             });
         }
-        if let Some(summary) = summary {
+        // Bounds gets an edit form instead of the read-only summary; other
+        // built-ins keep the v1.0.92 one-liner.
+        if name == "bounds" {
+            bounds_edit_form(ui, session, entity);
+        } else if let Some(summary) = summary {
             ui.text(&format!("  {}", summary));
         }
     }
@@ -298,6 +349,60 @@ mod tests {
     fn cleanup(scene: &str) {
         let _ = std::fs::remove_file(scene);
         let _ = std::fs::remove_file(format!("{}.log", scene));
+    }
+
+    #[test]
+    fn bounds_bytes_round_trips_through_registry_deserialize() {
+        // Guard the hand-mirrored layout against drift in Bounds::serialize.
+        let min = Vec3::new(-1.5, -2.0, -0.25);
+        let max = Vec3::new(3.0, 4.5, 0.75);
+        let bytes = bounds_bytes(min, max);
+        assert_eq!(bytes.len(), 24);
+
+        let mut registry = voltex_ecs::ComponentRegistry::new();
+        registry.register_defaults();
+        let mut world = voltex_ecs::World::new();
+        let e = world.spawn();
+        let entry = registry.find("bounds").expect("bounds registered");
+        (entry.deserialize)(&mut world, e, &bytes).expect("deserialize");
+        let b = world.get::<voltex_ecs::Bounds>(e).expect("Bounds attached");
+        assert_eq!(b.0.min, min);
+        assert_eq!(b.0.max, max);
+
+        // And the registry's own serialize emits the identical bytes.
+        let back = (entry.serialize)(&world, e).expect("serialize");
+        assert_eq!(back, bytes);
+    }
+
+    #[test]
+    fn bounds_edit_dispatch_overwrites_and_undoes_to_prior_value() {
+        // The exact command the edit form dispatches: overwrite + undo→prior.
+        let scene = temp_path("voltex_inspector_bounds_edit.vscn");
+        cleanup(&scene);
+        let mut session = EditorSession::new(scene.clone());
+        let e = session.dispatch(EditorCommand::Spawn).unwrap();
+        session
+            .dispatch(EditorCommand::AddComponent {
+                entity: e,
+                name: "bounds".into(),
+                data: bounds_bytes(Vec3::new(-1.0, -1.0, -1.0), Vec3::new(1.0, 1.0, 1.0)),
+            })
+            .unwrap();
+
+        session
+            .dispatch(EditorCommand::AddComponent {
+                entity: e,
+                name: "bounds".into(),
+                data: bounds_bytes(Vec3::new(-9.0, -1.0, -1.0), Vec3::new(1.0, 1.0, 1.0)),
+            })
+            .unwrap();
+        let b = session.world.get::<voltex_ecs::Bounds>(e).unwrap();
+        assert_eq!(b.0.min.x, -9.0, "edit overwrites in place");
+
+        assert!(session.undo());
+        let b = session.world.get::<voltex_ecs::Bounds>(e).unwrap();
+        assert_eq!(b.0.min.x, -1.0, "undo restores the prior bounds, not removal");
+        cleanup(&scene);
     }
 
     #[test]

@@ -173,6 +173,27 @@
 
 v1.0.9 부터는 **서비스 배포 완성도** 로드맵 (`docs/superpowers/specs/2026-05-21-service-readiness-roadmap.md`) 기준으로 진행.
 
+### 2026-06-04 — 인스펙터 Bounds 값 편집 폼 (v1.0.105, 자율 세션)
+
+v1.0.92 비범위 후속 (핸드오프 우선순위 4). Components 목록의 `bounds` 가
+read-only 요약 대신 **6 슬라이더 편집 폼** (Min/Max XYZ, ±50) — 변경 시
+`AddComponent` dispatch 로 로그/영속/undo.
+
+- **전제 격차 수정 (session)**: `capture_inverse` 의 AddComponent inverse 가
+  무조건 RemoveComponentByName — 기존 컴포넌트를 AddComponent 로 덮어쓰고
+  undo 하면 **복원이 아니라 삭제**였다. prior serialize 존재 시
+  `AddComponentByBytes(prior)` (RemoveComponent undo 메커니즘 재사용),
+  부재 시 기존 제거 의미 유지 (신규 "+ bounds" 클릭의 E3 의미 불변 — 기존
+  테스트 가드). 단위 +1 (덮어쓰기 undo→prior / redo / 신규 undo→제거).
+- **voltex_editor inspector**: `bounds_bytes(min, max)` 순수 헬퍼 (24-byte
+  LE, Bounds::serialize 미러 — registry round-trip 테스트로 drift 가드) +
+  `bounds_edit_form` (드래그 틱당 1 dispatch — Transform 슬라이더와 동일
+  v1 수용). 단위 +2. voltex_editor 196, inspector.rs 576줄 (600 한도 내).
+- build/clippy(-D warnings)/workspace test 그린.
+- 설계: `docs/superpowers/specs/2026-06-04-bounds-edit-form-design.md`.
+- 비범위(후속): mesh/material_handle·script 편집 폼, 커스텀 컴포넌트
+  리플렉션, 슬라이더 드래그 코얼레싱 (release 시 히스토리 1 entry).
+
 ### 2026-06-04 — 에셋 브라우저 폴더 그리드 뷰 (v1.0.104, 자율 세션)
 
 v1.0.93 비범위 후속 (핸드오프 우선순위 3). 브라우저가 텍스트 리스트 + 선택
