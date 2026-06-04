@@ -24,56 +24,16 @@ pub struct TextureHandle(pub Handle<GpuTexture>);
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TexturePath(pub String);
 
-impl voltex_ecs::Component for TexturePath {
-    const NAME: &'static str = "texture_path";
-
-    fn serialize(world: &voltex_ecs::World, entity: voltex_ecs::Entity) -> Option<Vec<u8>> {
-        let p = world.get::<TexturePath>(entity)?;
-        Some(p.0.as_bytes().to_vec())
-    }
-
-    fn deserialize(
-        world: &mut voltex_ecs::World,
-        entity: voltex_ecs::Entity,
-        data: &[u8],
-    ) -> voltex_ecs::Result<()> {
-        let s = std::str::from_utf8(data)
-            .map_err(|_| "texture_path: invalid UTF-8")?
-            .to_string();
-        world.add(entity, TexturePath(s));
-        Ok(())
-    }
-}
+voltex_ecs::path_component!(TexturePath, "texture_path");
 
 /// ECS component: the source *file path* of the mesh an entity's
 /// [`MeshHandle`](voltex_ecs::MeshHandle) was loaded from (`.obj` / `.gltf` /
 /// `.glb`). Same persistence contract as [`TexturePath`]: the handle is a
 /// runtime slot, the path survives in scenes and is re-resolved after load.
-/// (Deliberate plain duplication of the `TexturePath` impl — extract a macro
-/// if a third path component appears.)
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MeshPath(pub String);
 
-impl voltex_ecs::Component for MeshPath {
-    const NAME: &'static str = "mesh_path";
-
-    fn serialize(world: &voltex_ecs::World, entity: voltex_ecs::Entity) -> Option<Vec<u8>> {
-        let p = world.get::<MeshPath>(entity)?;
-        Some(p.0.as_bytes().to_vec())
-    }
-
-    fn deserialize(
-        world: &mut voltex_ecs::World,
-        entity: voltex_ecs::Entity,
-        data: &[u8],
-    ) -> voltex_ecs::Result<()> {
-        let s = std::str::from_utf8(data)
-            .map_err(|_| "mesh_path: invalid UTF-8")?
-            .to_string();
-        world.add(entity, MeshPath(s));
-        Ok(())
-    }
-}
+voltex_ecs::path_component!(MeshPath, "mesh_path");
 
 /// ECS component: extra PBR material maps for the runtime PBR pass (used only
 /// when `BasicRenderer` has PBR enabled). Each is optional; an absent map falls

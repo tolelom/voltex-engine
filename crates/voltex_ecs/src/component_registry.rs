@@ -49,6 +49,47 @@ pub trait Component: 'static + Sized {
     }
 }
 
+/// Implements [`Component`] for a *path component* — a tuple struct wrapping a
+/// `String` asset path (`struct X(pub String)`), serialized as plain UTF-8
+/// bytes. Invalid UTF-8 is rejected on load.
+///
+/// The struct definition (and its type-specific docs) stays hand-written; the
+/// macro only generates the boilerplate `Component` impl. Third use of the
+/// pattern (`TexturePath` / `MeshPath` / `AudioPath`) triggered the extraction.
+///
+/// ```ignore
+/// pub struct TexturePath(pub String);
+/// voltex_ecs::path_component!(TexturePath, "texture_path");
+/// ```
+#[macro_export]
+macro_rules! path_component {
+    ($ty:ident, $name:literal) => {
+        impl $crate::Component for $ty {
+            const NAME: &'static str = $name;
+
+            fn serialize(
+                world: &$crate::World,
+                entity: $crate::Entity,
+            ) -> Option<Vec<u8>> {
+                let p = world.get::<$ty>(entity)?;
+                Some(p.0.as_bytes().to_vec())
+            }
+
+            fn deserialize(
+                world: &mut $crate::World,
+                entity: $crate::Entity,
+                data: &[u8],
+            ) -> $crate::Result<()> {
+                let s = std::str::from_utf8(data)
+                    .map_err(|_| concat!($name, ": invalid UTF-8"))?
+                    .to_string();
+                world.add(entity, $ty(s));
+                Ok(())
+            }
+        }
+    };
+}
+
 /// Registered metadata for one component type.
 pub struct ComponentEntry {
     /// Name used in the on-disk scene format.
