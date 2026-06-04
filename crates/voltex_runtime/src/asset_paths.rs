@@ -89,16 +89,19 @@ pub fn resolve_asset_paths_with(
     (tex_n, mesh_n)
 }
 
-/// Real resolver: reads files from disk and uploads them (PNG/JPG textures via
+/// Real resolver: reads asset bytes **Vfs-first with fs fallback** (the same
+/// contract as scene/script loading, so `.vpkg`-bundled assets work without
+/// loose files) and uploads them (PNG/JPG textures via
 /// `RenderAssets::add_texture_png`, OBJ/glTF meshes via `Mesh::from_obj` /
 /// `from_gltf`). Failures are logged once and cached as `None` — see
-/// [`AssetPathCache`]. Vfs-aware reads are future work (design doc).
+/// [`AssetPathCache`].
 pub fn resolve_asset_paths(
     world: &mut World,
     assets: &mut RenderAssets,
     cache: &mut AssetPathCache,
     device: &wgpu::Device,
     queue: &wgpu::Queue,
+    vfs: Option<&voltex_asset::Vfs>,
 ) -> (usize, usize) {
     // The two loader closures need `assets` mutably but never concurrently —
     // resolve_asset_paths_with runs the texture pass before the mesh pass.
@@ -107,14 +110,12 @@ pub fn resolve_asset_paths(
     resolve_asset_paths_with(
         world,
         cache,
-        |path| match std::fs::read(path)
-            .map_err(|e| e.to_string())
-            .and_then(|bytes| {
-                assets
-                    .borrow_mut()
-                    .add_texture_png(device, queue, &bytes)
-                    .map_err(|e| e.to_string())
-            }) {
+        |path| match read_asset(vfs, path).and_then(|bytes| {
+            assets
+                .borrow_mut()
+                .add_texture_png(device, queue, &bytes)
+                .map_err(|e| e.to_string())
+        }) {
             Ok(h) => Some(h),
             Err(e) => {
                 crate::log_error!(
@@ -124,7 +125,7 @@ pub fn resolve_asset_paths(
                 None
             }
         },
-        |path| match load_mesh_file(device, path) {
+        |path| match read_asset(vfs, path).and_then(|bytes| decode_mesh(device, path, &bytes)) {
             Ok(mesh) => Some(assets.borrow_mut().add_mesh(mesh)),
             Err(e) => {
                 crate::log_error!(
@@ -137,21 +138,38 @@ pub fn resolve_asset_paths(
     )
 }
 
-/// Decode a mesh file (`.obj` / `.gltf` / `.glb`) into a GPU mesh.
-fn load_mesh_file(device: &wgpu::Device, path: &Path) -> Result<voltex_renderer::Mesh, String> {
+/// Read asset bytes: the Vfs (when present **and** it has the entry) wins,
+/// otherwise plain fs. The Vfs key is the path's forward-slash string form —
+/// matching the editor's persisted format (v1.0.99).
+pub(crate) fn read_asset(
+    vfs: Option<&voltex_asset::Vfs>,
+    path: &Path,
+) -> Result<Vec<u8>, String> {
+    if let Some(vfs) = vfs {
+        let key = path.to_string_lossy().replace('\\', "/");
+        if vfs.exists(&key) {
+            return vfs.read(&key).map_err(|e| e.to_string());
+        }
+    }
+    std::fs::read(path).map_err(|e| e.to_string())
+}
+
+/// Decode mesh bytes by the path's extension (`.obj` / `.gltf` / `.glb`).
+fn decode_mesh(
+    device: &wgpu::Device,
+    path: &Path,
+    bytes: &[u8],
+) -> Result<voltex_renderer::Mesh, String> {
     let ext = path
         .extension()
         .and_then(|e| e.to_str())
         .map(|e| e.to_ascii_lowercase());
     match ext.as_deref() {
         Some("obj") => {
-            let source = std::fs::read_to_string(path).map_err(|e| e.to_string())?;
-            Ok(voltex_renderer::Mesh::from_obj(device, &source))
+            let source = std::str::from_utf8(bytes).map_err(|e| e.to_string())?;
+            Ok(voltex_renderer::Mesh::from_obj(device, source))
         }
-        Some("gltf" | "glb") => {
-            let bytes = std::fs::read(path).map_err(|e| e.to_string())?;
-            voltex_renderer::Mesh::from_gltf(device, &bytes)
-        }
+        Some("gltf" | "glb") => voltex_renderer::Mesh::from_gltf(device, bytes),
         _ => Err(format!("unsupported mesh extension: {}", path.display())),
     }
 }
@@ -223,6 +241,42 @@ mod tests {
         assert_eq!(tex_n, 0);
         assert_eq!(calls, 0, "loader must not run for resolved entities");
         assert_eq!(world.get::<TextureHandle>(e).unwrap().0.id(), 1, "untouched");
+    }
+
+    #[test]
+    fn read_asset_prefers_vfs_and_falls_back_to_fs() {
+        let dir = std::env::temp_dir().join(format!("voltex_read_asset_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let loose = dir.join("loose.png");
+        std::fs::write(&loose, b"from-fs").unwrap();
+
+        // Archive vfs with one entry under the editor's canonical key form.
+        let bytes = voltex_asset::write_vpkg(&[(
+            "assets/hero.png".to_string(),
+            b"from-vfs".to_vec(),
+        )]);
+        let leaked: &'static [u8] = Box::leak(bytes.into_boxed_slice());
+        let vfs = voltex_asset::Vfs::archive_from_bytes(leaked).expect("vpkg parses");
+
+        // In the archive → vfs wins (no fs file needed).
+        assert_eq!(
+            read_asset(Some(&vfs), Path::new("assets/hero.png")).unwrap(),
+            b"from-vfs"
+        );
+        // Backslash spelling normalizes onto the same archive key.
+        assert_eq!(
+            read_asset(Some(&vfs), Path::new("assets\\hero.png")).unwrap(),
+            b"from-vfs"
+        );
+        // Not in the archive → fs fallback.
+        assert_eq!(read_asset(Some(&vfs), &loose).unwrap(), b"from-fs");
+        // Present in neither → Err.
+        assert!(read_asset(Some(&vfs), Path::new("missing.png")).is_err());
+        // No vfs at all → plain fs behaviour.
+        assert_eq!(read_asset(None, &loose).unwrap(), b"from-fs");
+
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]

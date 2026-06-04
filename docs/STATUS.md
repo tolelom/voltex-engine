@@ -173,6 +173,23 @@
 
 v1.0.9 부터는 **서비스 배포 완성도** 로드맵 (`docs/superpowers/specs/2026-05-21-service-readiness-roadmap.md`) 기준으로 진행.
 
+### 2026-06-04 — Vfs 경유 에셋 resolve (v1.0.100, 자율 세션)
+
+경로 영속화 체인의 마지막 배선. 런타임 에셋 resolve 가 씬/스크립트와 동일한
+**Vfs 우선 + fs fallback** 규약으로 읽음 — `.vpkg` 에 에셋이 들어 있으면
+디스크 없이 동작. v1.0.99 의 root-상대 forward-slash 형식이 그대로 아카이브 키.
+
+- **voltex_runtime::asset_paths**: `read_asset(vfs, path)`(vfs 존재+exists 시
+  vfs, 아니면 fs; 키 = `\`→`/` 정규화) + `resolve_asset_paths` 에 `vfs:
+  Option<&Vfs>` 파라미터 + 메시 디코드 bytes 기반 정리(`decode_mesh`).
+  handler 2개 호출부가 `config.vfs` 전달.
+- 검증: 단위 +1 (Archive vpkg 히트 / 백슬래시 표기 동일 키 / fs fallback /
+  양쪽 부재 Err / vfs 없음 — fs-Vfs 는 절대경로 join 의미상 fallback 이
+  트리거되지 않아 Archive 로 정직하게 테스트). voltex_runtime 97.
+  build/clippy(-D warnings)/test 그린.
+- 설계: `docs/superpowers/specs/2026-06-04-vfs-asset-resolve-design.md`.
+- 비범위(후속): `voltex_cli` 가 씬 참조 에셋을 `.vpkg` 에 자동 수집/동봉.
+
 ### 2026-06-04 — 에셋 상대경로 정규화 (v1.0.99, 자율 세션)
 
 v1.0.96~98 이 절대경로를 저장해 씬이 머신 간 이식 불가 + `.vpkg` 키와 매칭

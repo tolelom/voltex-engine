@@ -116,12 +116,13 @@ impl ApplicationHandler for RuntimeHandler {
                 // Editor-authored scenes carry TexturePath/MeshPath — resolve
                 // them now that the GPU exists (same contract as above).
                 crate::asset_paths::resolve_asset_paths(
-                    &mut app.world,
-                    &mut app.assets,
-                    &mut app.asset_path_cache,
-                    &st.gpu.device,
-                    &st.gpu.queue,
-                );
+                &mut app.world,
+                &mut app.assets,
+                &mut app.asset_path_cache,
+                &st.gpu.device,
+                &st.gpu.queue,
+                app.config.vfs.as_ref(),
+            );
             }
         }
     }
@@ -248,6 +249,7 @@ fn redraw(app: &mut RuntimeApp, event_loop: &ActiveEventLoop) {
                 &mut app.asset_path_cache,
                 &st.gpu.device,
                 &st.gpu.queue,
+                app.config.vfs.as_ref(),
             );
         }
     }
@@ -372,4 +374,5 @@ fn redraw(app: &mut RuntimeApp, event_loop: &ActiveEventLoop) {
     state.gpu.queue.submit(std::iter::once(encoder.finish()));
     output.present();
 }
+
 
