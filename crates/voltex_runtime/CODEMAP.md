@@ -14,6 +14,7 @@
 - `error` — RuntimeError enum + Result alias (src/error.rs)
 - `asset_paths` — `AssetPathCache`(경로별 핸들 공유 + 실패 None 캐시) + `resolve_asset_paths_with`(주입 로더 코어, GPU 무관 테스트 가능) + `resolve_asset_paths`(**Vfs 우선 + fs fallback** read → 업로드 실 래퍼; 키 = forward-slash 경로 = 에디터 영속 형식 = `.vpkg` 엔트리). 씬 영속 TexturePath/MeshPath → 핸들. handler 가 materialize 직후 매 프레임 호출(멱등), load_scene 이 clear_failures (v1.0.98~100). resolve 성공 시 1회 `resolved N texture path(s)` log_info — dist exe E2E 의 양성 증거 (v1.0.102) (src/asset_paths.rs)
 - `audio_sync` — `audio_sync_system` (AudioSource→AudioSystem 브릿지) + 순수 `decide_action` 엣지 로직 + `poll_audio_hot_reload(watcher, watched, audio)` (변경 파일 재디코드 → replace_clip; v1.0.90) (src/audio_sync.rs)
+- `audio_paths` — `AudioPath(String)` 컴포넌트(NAME `audio_path`, `path_component!` impl, 앱 registry 자동 등록) + `AudioClipCache`(경로별 ClipId 공유 + 실패 None 캐시) + `resolve_audio_paths_with`(주입 로더 코어) + `resolve_audio_paths`(Vfs 우선 read → `decode_clip_bytes` → `add_clip`). AudioSource 없으면 stopped 로 부착, 있으면 stale clip_id 재바인딩 — **AudioPath 보유 엔티티의 clip_id 는 resolver 소유** (수동 제어는 AudioPath 제거 후). tick audio 단계 첫머리 호출(멱등), load_scene 이 clear_failures. 성공 시 1회 `resolved N audio path(s)` log_info (v1.0.103) (src/audio_paths.rs)
 - `RuntimeApp::watch_audio_clip(path, clip_index)` — 오디오 파일 감시 등록 (전용 `audio_watcher`, script watcher 와 분리 — 그쪽은 pool 이 변경을 전부 소비). tick 의 audio 단계에서 자동 폴링 + 로그 (src/app.rs)
 - `handler` (crate-private) — winit ApplicationHandler 구현 (src/handler.rs)
 

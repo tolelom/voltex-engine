@@ -173,6 +173,39 @@
 
 v1.0.9 부터는 **서비스 배포 완성도** 로드맵 (`docs/superpowers/specs/2026-05-21-service-readiness-roadmap.md`) 기준으로 진행.
 
+### 2026-06-04 — Audio 경로 영속화 (v1.0.103, 자율 세션)
+
+TexturePath/MeshPath 체인의 오디오 완결편. `AudioSource.clip_id` 는 런타임
+클립 테이블 인덱스(런 간 무의미 — TextureHandle 과 동형)인데 씬에는 그것만
+저장되던 것을, `AudioPath`(파일 경로) 영속화 + 로드 후 재바인딩으로 해소.
+
+- **voltex_ecs**: `path_component!(Ty, "name")` 매크로 — 경로 컴포넌트
+  Component impl(UTF-8 round-trip) 생성. 3번째 사례(AudioPath) 등장으로
+  renderer_ecs CODEMAP 에 메모돼 있던 추출 실행, TexturePath/MeshPath 도
+  마이그레이션 (기존 round-trip 테스트가 회귀 가드).
+- **voltex_audio**: `decode_clip_bytes(path, bytes)` — load_clip_file 의
+  확장자 분기 디코드를 bytes 입력으로 추출 (Vfs/.vpkg 소스 전제). +2.
+- **voltex_runtime::audio_paths (신규)**: `AudioPath` 컴포넌트(NAME
+  `audio_path`, 앱 registry 자동 등록) + `AudioClipCache` +
+  `resolve_audio_paths_with`(주입 로더 코어, 헤드리스) +
+  `resolve_audio_paths`(Vfs 우선 read → decode → `add_clip`). AudioSource
+  없으면 stopped 부착, 있으면 stale clip_id 재바인딩(재생 플래그 보존) —
+  **AudioPath 보유 시 clip_id 는 resolver 소유** (doc 계약). tick audio
+  단계 첫머리(헤드리스 동작, GPU 불필요), load_scene 이 clear_failures,
+  성공 시 1회 `resolved N audio path(s)` log_info (v1.0.102 양성 증거
+  규약). 단위 +4 (부착/경로 공유 로더 1회/stale 재바인딩 플래그 보존/실패
+  캐시+clear 재시도, vpkg-vfs 실 래퍼 NullBackend). voltex_runtime 101.
+- **voltex_cli**: `scan_scene_asset_paths` 가 `audio_path` 도 수집 — 씬
+  참조 .wav/.ogg `.vpkg` 자동 동봉 + 누락 경고 (기존 테스트 확장).
+- **editor_demo**: Audio Open 시 선택 엔티티에 `AudioSource::new(idx)` +
+  `AudioPath(rel)` 부착 (선택 없으면 기존 프리뷰-만). AudioPath 는 로컬
+  정의 + 동일 매크로 (demo 는 runtime 미링크 — NAME 이 와이어 계약).
+- build/clippy(-D warnings)/workspace test 전부 그린.
+- 설계: `docs/superpowers/specs/2026-06-04-audio-path-persistence-design.md`.
+- 비범위(후속): 텍스처 E2E 의 오디오 확장, AudioPath 핫리로드 자동 watch,
+  에디터 audio_source 직렬화(편집 UI 부재로 현재 플래그 영속화 불가 —
+  runtime 의 stopped 부착이 기본), per-source 거리 파라미터.
+
 ### 2026-06-04 — CLI 텍스처 번들 E2E 실검증 (v1.0.102, 자율 세션)
 
 v1.0.96~101 체인의 끝단 실기기 통검: `voltex new` → `texture_path` 씬 →

@@ -9,7 +9,7 @@ use voltex_platform::{VoltexWindow, WindowConfig, InputState, GameTimer};
 use voltex_renderer::{GpuContext, LightUniform, MaterialUniform, Mesh, MeshVertex};
 use voltex_renderer_ecs::{BasicRenderer, MeshPath, RenderAssets, TextureHandle, TexturePath};
 use voltex_asset::FileWatcher;
-use voltex_audio::{AudioClip, AudioSystem};
+use voltex_audio::{AudioClip, AudioSource, AudioSystem};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
@@ -27,6 +27,15 @@ use voltex_ecs::entity::Entity;
 use voltex_ecs::{Bounds, MaterialHandle, MeshHandle};
 use voltex_math::{Quat, Vec3, AABB};
 use voltex_physics::{physics_step, Collider, PhysicsConfig, RigidBody};
+
+/// Scene-persisted audio clip file path. The canonical type lives in
+/// `voltex_runtime::audio_paths::AudioPath` (the demo doesn't link the
+/// runtime); the wire contract is just the NAME + UTF-8 bytes, which the
+/// shared `path_component!` macro pins on both sides.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct AudioPath(pub String);
+
+voltex_ecs::path_component!(AudioPath, "audio_path");
 
 struct EditorDemoApp {
     state: Option<AppState>,
@@ -366,6 +375,7 @@ impl ApplicationHandler for EditorDemoApp {
         // the resolve_* passes re-attach them after every load).
         session.registry.register::<TexturePath>();
         session.registry.register::<MeshPath>();
+        session.registry.register::<AudioPath>();
 
         let seed = |session: &mut EditorSession, pos: Vec3, tag: &str| -> Entity {
             let e = session.dispatch(EditorCommand::Spawn).unwrap();
@@ -861,7 +871,21 @@ impl ApplicationHandler for EditorDemoApp {
                                         }
                                     };
                                     state.audio.play(idx, 1.0, false);
-                                    state.status = format!("Playing audio: {}", name);
+                                    // With a selection, also apply to the entity —
+                                    // persist the *path* (the clip index is
+                                    // runtime-only; the game runtime re-resolves
+                                    // AudioPath after scene load). No selection →
+                                    // preview-only, the pre-v1.0.103 behavior.
+                                    if let Some(sel) = state.session.selected {
+                                        state
+                                            .session
+                                            .world
+                                            .add(sel, AudioSource::new(idx as u32));
+                                        state.session.world.add(sel, AudioPath(rel.clone()));
+                                        state.status = format!("Applied audio: {}", name);
+                                    } else {
+                                        state.status = format!("Playing audio: {}", name);
+                                    }
                                 }
                                 Err(e) => state.status = format!("Audio decode failed: {}", e),
                             }

@@ -25,6 +25,7 @@ ECS 코어 — Entity/Component/World/Query + Hierarchy + Scene 직렬화 + Syst
 - `World::live_entities()` — 살아있는 모든 entity iterator (src/world.rs, voltex_script::iter_entities 가 사용)
 - `ComponentRegistry::register::<T>()` — Component trait 기반 표준 등록 (src/component_registry.rs)
 - `ComponentRegistry::register_raw` — trait 구현 불가 타입용 escape hatch (src/component_registry.rs)
+- `path_component!(Ty, "name")` — `struct Ty(pub String)` 경로 컴포넌트의 Component impl 생성 매크로 (UTF-8 round-trip). TexturePath/MeshPath(renderer_ecs)/AudioPath(runtime) 가 사용 (src/component_registry.rs)
 - `Scheduler`, `DependencyScheduler` — 시스템 실행 (src/scheduler.rs, src/dependency_scheduler.rs)
 - `Archetype` — signature 기반 그룹 저장소 (src/archetype.rs)
 - `EcsError`, `Result` — thiserror 기반 에러 (Generic/Io) (src/error.rs)

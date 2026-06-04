@@ -147,6 +147,9 @@ pub struct RuntimeApp {
     /// Path → handle cache for scene-persisted asset paths
     /// (`TexturePath`/`MeshPath`); see [`crate::asset_paths`].
     pub(crate) asset_path_cache: crate::asset_paths::AssetPathCache,
+    /// Path → clip id cache for scene-persisted audio paths (`AudioPath`);
+    /// see [`crate::audio_paths`].
+    pub(crate) audio_clip_cache: crate::audio_paths::AudioClipCache,
     /// Watches audio files registered via [`Self::watch_audio_clip`]; separate
     /// from `file_watcher` because the script pool drains that one's changes.
     audio_watcher: FileWatcher,
@@ -199,6 +202,8 @@ impl RuntimeApp {
         // AudioSource lives in voltex_audio (no ECS dep), so it is registered
         // here via the register_raw escape hatch rather than register_defaults.
         crate::audio_sync::register_audio_source(&mut registry);
+        // AudioPath (scene-persisted clip file path) is runtime-owned.
+        registry.register::<crate::audio_paths::AudioPath>();
         // Declarative renderables (PrimitiveMesh / MaterialDesc) live in
         // voltex_renderer_ecs (L3), so they register here rather than in the
         // L1 register_defaults. Materialized to GPU resources in gpu_init.
@@ -296,6 +301,7 @@ impl RuntimeApp {
             script_input: voltex_script::ScriptInput::new(),
             audio,
             asset_path_cache: crate::asset_paths::AssetPathCache::new(),
+            audio_clip_cache: crate::audio_paths::AudioClipCache::new(),
             audio_watcher: FileWatcher::new(Duration::from_millis(300)),
             watched_audio_clips: std::collections::HashMap::new(),
             audio_listener: None,
@@ -567,10 +573,11 @@ impl RuntimeApp {
     /// entities are cleared first.
     pub fn load_scene(&mut self, path: &str) -> RuntimeResult<()> {
         self.world.clear();
-        // Give previously-failed TexturePath/MeshPath resolves another chance
-        // on every scene load (the file may exist by now). The actual resolve
-        // happens in the render handler where the GPU device lives.
+        // Give previously-failed TexturePath/MeshPath/AudioPath resolves
+        // another chance on every scene load (the file may exist by now). The
+        // actual resolve happens in the render handler (GPU) / audio tick.
         self.asset_path_cache.clear_failures();
+        self.audio_clip_cache.clear_failures();
         load_scene_via_vfs_or_disk(
             &mut self.world,
             &self.registry,
@@ -628,7 +635,17 @@ impl RuntimeApp {
         }
         // Audio runs last so it observes playback toggles / listener moves made
         // by user systems this same frame (lowest latency).
-        if let Some(audio) = self.audio.as_ref() {
+        if let Some(audio) = self.audio.as_mut() {
+            // Scene-persisted AudioPath → clip ids first, so a source bound
+            // this frame can already play this frame. Idempotent +
+            // failure-cached (mirrors the texture/mesh resolver in handler).
+            crate::audio_paths::resolve_audio_paths(
+                &mut self.world,
+                audio,
+                &mut self.audio_clip_cache,
+                self.config.vfs.as_ref(),
+            );
+            let audio = &*audio;
             crate::audio_sync::audio_sync_system(&mut self.world, audio, self.audio_listener);
             for (path, outcome) in crate::audio_sync::poll_audio_hot_reload(
                 &mut self.audio_watcher,

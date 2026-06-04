@@ -53,24 +53,32 @@ pub fn decode_ogg_vorbis_bytes(data: &[u8]) -> Result<AudioClip> {
     vorbis::decode_vorbis(&packets)
 }
 
-/// Read an audio file from disk and decode it into an [`AudioClip`] by
-/// extension: `.wav` → [`parse_wav`], `.ogg` → [`decode_ogg_vorbis_bytes`]
-/// (case-insensitive). Errors on read failure, decode failure, or any other
-/// extension. The one-call path for editors / hot-reload loops.
-pub fn load_clip_file(path: &std::path::Path) -> Result<AudioClip> {
-    let bytes = std::fs::read(path)?;
+/// Decode in-memory audio bytes into an [`AudioClip`] by `path`'s extension:
+/// `.wav` → [`parse_wav`], `.ogg` → [`decode_ogg_vorbis_bytes`]
+/// (case-insensitive). The path is only consulted for its extension and error
+/// messages — the bytes may come from anywhere (disk, `.vpkg` archive, network).
+pub fn decode_clip_bytes(path: &std::path::Path, bytes: &[u8]) -> Result<AudioClip> {
     let ext = path
         .extension()
         .and_then(|e| e.to_str())
         .map(|e| e.to_ascii_lowercase());
     match ext.as_deref() {
-        Some("wav") => parse_wav(&bytes),
-        Some("ogg") => decode_ogg_vorbis_bytes(&bytes),
+        Some("wav") => parse_wav(bytes),
+        Some("ogg") => decode_ogg_vorbis_bytes(bytes),
         _ => Err(AudioError::from(format!(
-            "load_clip_file: unsupported audio extension: {}",
+            "decode_clip_bytes: unsupported audio extension: {}",
             path.display()
         ))),
     }
+}
+
+/// Read an audio file from disk and decode it into an [`AudioClip`] —
+/// `fs::read` + [`decode_clip_bytes`]. Errors on read failure, decode
+/// failure, or an unsupported extension. The one-call path for editors /
+/// hot-reload loops.
+pub fn load_clip_file(path: &std::path::Path) -> Result<AudioClip> {
+    let bytes = std::fs::read(path)?;
+    decode_clip_bytes(path, &bytes)
 }
 pub use mixing::{PlayingSound, mix_sounds};
 pub use audio_system::AudioSystem;
@@ -132,5 +140,21 @@ mod lib_tests {
         std::fs::write(&path, b"RIFFnope").unwrap();
         assert!(load_clip_file(&path).is_err(), "corrupt wav is Err");
         let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
+    fn decode_clip_bytes_decodes_wav_without_touching_disk() {
+        // Path supplies only the extension — no file exists at it.
+        let phantom = std::path::Path::new("vpkg://sounds/beep.WAV");
+        let wav = generate_wav_bytes(&[0.25, -0.25], 44100);
+        let clip = decode_clip_bytes(phantom, &wav).expect("wav bytes decode");
+        assert_eq!(clip.sample_rate, 44100);
+        assert_eq!(clip.samples.len(), 2);
+    }
+
+    #[test]
+    fn decode_clip_bytes_rejects_unsupported_extension() {
+        let err = decode_clip_bytes(std::path::Path::new("a.mp3"), &[0u8; 4]);
+        assert!(err.is_err(), "mp3 is unsupported");
     }
 }

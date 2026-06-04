@@ -341,6 +341,7 @@ pub fn pack_archive(manifest_dir: &Path, manifest: &Manifest, out_path: &Path) -
 /// pointers — no closure capture).
 struct TexPathRef(String);
 struct MeshPathRef(String);
+struct AudioPathRef(String);
 
 fn deser_path_ref<T: 'static>(
     make: fn(String) -> T,
@@ -370,17 +371,26 @@ fn deser_mesh(
     deser_path_ref(MeshPathRef)(world, entity, data)
 }
 
-/// Extract the `texture_path` / `mesh_path` component payloads from a scene
-/// file. Format auto-detection: `VSCN` magic → binary, first non-whitespace
-/// `{` → JSON, anything else → legacy `.vscn` text (which never carries
-/// registry components — empty result is correct). Unknown components in the
-/// scene are skipped by the registry contract; parse failures yield an empty
-/// list (the build warns nothing — a malformed scene already fails at
-/// runtime with a clearer error).
+fn deser_audio(
+    world: &mut voltex_ecs::World,
+    entity: voltex_ecs::Entity,
+    data: &[u8],
+) -> voltex_ecs::Result<()> {
+    deser_path_ref(AudioPathRef)(world, entity, data)
+}
+
+/// Extract the `texture_path` / `mesh_path` / `audio_path` component payloads
+/// from a scene file. Format auto-detection: `VSCN` magic → binary, first
+/// non-whitespace `{` → JSON, anything else → legacy `.vscn` text (which
+/// never carries registry components — empty result is correct). Unknown
+/// components in the scene are skipped by the registry contract; parse
+/// failures yield an empty list (the build warns nothing — a malformed scene
+/// already fails at runtime with a clearer error).
 pub fn scan_scene_asset_paths(scene_bytes: &[u8]) -> Vec<String> {
     let mut registry = voltex_ecs::ComponentRegistry::new();
     registry.register_raw("texture_path", |_, _| None, deser_tex);
     registry.register_raw("mesh_path", |_, _| None, deser_mesh);
+    registry.register_raw("audio_path", |_, _| None, deser_audio);
 
     let mut world = voltex_ecs::World::new();
     if scene_bytes.starts_with(b"VSCN") {
@@ -396,6 +406,7 @@ pub fn scan_scene_asset_paths(scene_bytes: &[u8]) -> Vec<String> {
         .query::<TexPathRef>()
         .map(|(_, p)| p.0.clone())
         .chain(world.query::<MeshPathRef>().map(|(_, p)| p.0.clone()))
+        .chain(world.query::<AudioPathRef>().map(|(_, p)| p.0.clone()))
         .collect();
     paths.sort();
     paths.dedup();
@@ -499,19 +510,23 @@ mod tests {
 
     // ── v1.0.101: scene asset auto-bundle ──────────────────────────────────
 
-    /// Build a JSON scene whose one entity carries texture_path / mesh_path
-    /// payloads, using the same registry round-trip the editor uses.
-    fn make_scene_json(tex: &str, mesh: &str) -> String {
+    /// Build a JSON scene whose one entity carries texture_path / mesh_path /
+    /// audio_path payloads, using the same registry round-trip the editor uses.
+    fn make_scene_json(tex: &str, mesh: &str, audio: &str) -> String {
         fn ser_tex(world: &voltex_ecs::World, e: voltex_ecs::Entity) -> Option<Vec<u8>> {
             world.get::<TexPathRef>(e).map(|p| p.0.as_bytes().to_vec())
         }
         fn ser_mesh(world: &voltex_ecs::World, e: voltex_ecs::Entity) -> Option<Vec<u8>> {
             world.get::<MeshPathRef>(e).map(|p| p.0.as_bytes().to_vec())
         }
+        fn ser_audio(world: &voltex_ecs::World, e: voltex_ecs::Entity) -> Option<Vec<u8>> {
+            world.get::<AudioPathRef>(e).map(|p| p.0.as_bytes().to_vec())
+        }
         let mut registry = voltex_ecs::ComponentRegistry::new();
         registry.register::<voltex_ecs::Transform>();
         registry.register_raw("texture_path", ser_tex, deser_tex);
         registry.register_raw("mesh_path", ser_mesh, deser_mesh);
+        registry.register_raw("audio_path", ser_audio, deser_audio);
 
         let mut world = voltex_ecs::World::new();
         let e = world.spawn();
@@ -519,14 +534,18 @@ mod tests {
         world.add(e, voltex_ecs::Transform::default());
         world.add(e, TexPathRef(tex.to_string()));
         world.add(e, MeshPathRef(mesh.to_string()));
+        world.add(e, AudioPathRef(audio.to_string()));
         voltex_ecs::serialize_scene_json(&world, &registry)
     }
 
     #[test]
     fn scan_scene_asset_paths_extracts_from_json_and_ignores_text() {
-        let json = make_scene_json("assets/hero.png", "assets/ship.obj");
+        let json = make_scene_json("assets/hero.png", "assets/ship.obj", "assets/boom.wav");
         let paths = scan_scene_asset_paths(json.as_bytes());
-        assert_eq!(paths, vec!["assets/hero.png", "assets/ship.obj"]);
+        assert_eq!(
+            paths,
+            vec!["assets/boom.wav", "assets/hero.png", "assets/ship.obj"]
+        );
 
         // Legacy text scenes carry no registry components → empty, no panic.
         assert!(scan_scene_asset_paths(b"scene v1\nentity 0\n").is_empty());
@@ -542,12 +561,15 @@ mod tests {
             .unwrap_or(0);
         let root = std::env::temp_dir().join(format!("voltex_cli_autobundle_{}", stamp));
         let _ = std::fs::remove_dir_all(&root);
-        // `textures/` is OUTSIDE the manifest's declared assets dirs.
+        // `textures/` and `sounds/` are OUTSIDE the manifest's declared
+        // assets dirs.
         std::fs::create_dir_all(root.join("textures")).unwrap();
         std::fs::write(root.join("textures").join("extra.png"), "px").unwrap();
+        std::fs::create_dir_all(root.join("sounds")).unwrap();
+        std::fs::write(root.join("sounds").join("boom.wav"), "au").unwrap();
 
-        // Scene references one on-disk file and one missing file.
-        let json = make_scene_json("textures/extra.png", "models/gone.obj");
+        // Scene references two on-disk files and one missing file.
+        let json = make_scene_json("textures/extra.png", "models/gone.obj", "sounds/boom.wav");
         std::fs::write(root.join("scene.vscn"), json).unwrap();
 
         let m = dummy("X", 100, 100);
@@ -560,6 +582,10 @@ mod tests {
         assert!(
             paths.contains(&"textures/extra.png".to_string()),
             "referenced asset outside declared dirs is auto-bundled: {paths:?}"
+        );
+        assert!(
+            paths.contains(&"sounds/boom.wav".to_string()),
+            "scene-referenced audio is auto-bundled too: {paths:?}"
         );
         assert!(
             !paths.contains(&"models/gone.obj".to_string()),
