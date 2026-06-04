@@ -173,6 +173,24 @@
 
 v1.0.9 부터는 **서비스 배포 완성도** 로드맵 (`docs/superpowers/specs/2026-05-21-service-readiness-roadmap.md`) 기준으로 진행.
 
+### 2026-06-04 — 에셋 상대경로 정규화 (v1.0.99, 자율 세션)
+
+v1.0.96~98 이 절대경로를 저장해 씬이 머신 간 이식 불가 + `.vpkg` 키와 매칭
+불가였던 것을 정규화. **저장 형식 = 브라우저 root 상대 + forward slash**
+(`assets/hero.png`).
+
+- **voltex_editor**: `AssetBrowser::relative_to_root(path)` — root prefix
+  strip + `\`→`/`. 브라우저가 root 밖 탐색을 차단하므로 Open 경로는 항상
+  strip 가능 (밖이면 as-is fallback, 방어). 단위 +1.
+- **editor_demo**: Open 핸들러 첫머리에서 활성화 경로를 한 번 상대화 → 전
+  분기(영속 컴포넌트/watch 맵 키/thumb 키/fs read/LoadScene)가 동일 형태 —
+  한 파일이 절대/상대 두 키로 갈라지지 않음. root=CWD 라 상대 fs read 가
+  그대로 동작 (런타임 resolve 도 무변경 — `cargo run`/`voltex run` 규약).
+- 호환: 기존 절대경로 씬은 같은 머신에서 계속 동작 (resolve 는 형식 무관).
+- build/clippy(-D warnings)/test 그린.
+- 설계: `docs/superpowers/specs/2026-06-04-relative-asset-paths-design.md`.
+- 비범위(후속): Vfs 경유 resolve, `.vpkg` 에셋 동봉(이 형식이 키).
+
 ### 2026-06-04 — 런타임 에셋 경로 자동 resolve (v1.0.98, 자율 세션)
 
 v1.0.96~97 완결편. 에디터에서 텍스처/메시를 적용해 저장한 씬이 **게임

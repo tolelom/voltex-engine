@@ -734,7 +734,13 @@ impl ApplicationHandler for EditorDemoApp {
                 // ── Asset pipeline: consume a browser "Open" activation ──
                 // The editor crate is GPU-free, so the actual load/apply happens
                 // here in the integration layer (it owns gpu + render_assets).
-                if let Some((path, kind)) = state.asset_browser.take_activated() {
+                if let Some((abs_path, kind)) = state.asset_browser.take_activated() {
+                    // Canonical form for everything downstream — watch-map
+                    // keys, persisted TexturePath/MeshPath, fs reads (relative
+                    // to CWD = browser root) — so scenes stay portable and a
+                    // file is never watched under two spellings.
+                    let rel = state.asset_browser.relative_to_root(&abs_path);
+                    let path = PathBuf::from(&rel);
                     let name = path
                         .file_name()
                         .map(|n| n.to_string_lossy().into_owned())
@@ -790,10 +796,7 @@ impl ApplicationHandler for EditorDemoApp {
                                             state.session.world.add(sel, handle);
                                             // Persist the *path* — handles are
                                             // runtime-only and die with the run.
-                                            state.session.world.add(
-                                                sel,
-                                                TexturePath(path.to_string_lossy().into_owned()),
-                                            );
+                                            state.session.world.add(sel, TexturePath(rel.clone()));
                                             state.status = format!("Applied texture: {}", name);
                                             // Watch this file → hot-reload onto the same handle.
                                             state.watched_textures.insert(path.clone(), handle);
@@ -828,10 +831,7 @@ impl ApplicationHandler for EditorDemoApp {
                                         state.session.world.add(sel, Bounds(aabb));
                                         // Persist the *path* — handles are
                                         // runtime-only and die with the run.
-                                        state.session.world.add(
-                                            sel,
-                                            MeshPath(path.to_string_lossy().into_owned()),
-                                        );
+                                        state.session.world.add(sel, MeshPath(rel.clone()));
                                         state.status = format!("Applied mesh: {}", name);
                                         // Watch this file → hot-reload onto the same handle.
                                         state.watched_meshes.insert(path.clone(), handle);

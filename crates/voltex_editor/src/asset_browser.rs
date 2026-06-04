@@ -148,6 +148,17 @@ impl AssetBrowser {
         }
     }
 
+    /// `path` relative to the browser root, with forward slashes — the
+    /// canonical form for scene-persisted asset references (portable across
+    /// machines and into `.vpkg` bundles; relative fs reads resolve against
+    /// the CWD, which integration layers use as the browser root). Falls back
+    /// to the path as-is when it lies outside the root (cannot happen through
+    /// browser navigation — defensive).
+    pub fn relative_to_root(&self, path: &Path) -> String {
+        let rel = path.strip_prefix(&self.root).unwrap_or(path);
+        rel.to_string_lossy().replace('\\', "/")
+    }
+
     pub fn relative_path(&self) -> String {
         self.current
             .strip_prefix(&self.root)
@@ -285,6 +296,25 @@ mod tests {
         let _ = fs::remove_dir_all(&dir);
         fs::create_dir_all(&dir).unwrap();
         dir
+    }
+
+    #[test]
+    fn relative_to_root_strips_and_uses_forward_slashes() {
+        let dir = make_temp_dir("rel_root");
+        fs::create_dir_all(dir.join("assets")).unwrap();
+        let browser = AssetBrowser::new(dir.clone());
+
+        // Inside the root: stripped + forward slashes. Derive the probe from
+        // browser.root (canonicalized in new()) the way Open does via
+        // current.join.
+        let inside = browser.root.join("assets").join("hero.png");
+        assert_eq!(browser.relative_to_root(&inside), "assets/hero.png");
+
+        // Outside the root: falls back to the path as-is (slashes normalized).
+        let outside = PathBuf::from("Z:/elsewhere/x.png");
+        assert_eq!(browser.relative_to_root(&outside), "Z:/elsewhere/x.png");
+
+        let _ = fs::remove_dir_all(&dir);
     }
 
     #[test]

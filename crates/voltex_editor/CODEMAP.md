@@ -32,7 +32,7 @@ Immediate-mode UI 에디터 — 도킹/플로팅/뷰포트/인스펙터/에셋 �
 - `attached_component_names(session, entity) -> Vec<String>` — registry 기준 부착 컴포넌트 이름 목록 (UI/테스트 공용 순수 헬퍼, re-exported)
 - `component_value_summary(session, entity, name) -> Option<String>` — 빌트인(bounds/mesh_handle/material_handle/script) 한 줄 read-only 요약. transform/tag(전용 UI)·미지/raw 이름은 None (re-exported)
 - `count_entity_nodes(world, entity)` — 서브트리 노드 수 (re-exported)
-- `AssetBrowser`, `asset_browser_panel(ui, browser, rect, preview)`, `AssetKind` (src/asset_browser.rs) — 파일 트리 뷰 + 종류 분류(`AssetKind::from_path`: Texture/Scene/Mesh/Audio/Other) + "Open" 활성화 + 선택 파일 썸네일(`preview: Option<u32>` = register_texture 슬롯, 디코드/업로드는 통합 레이어). `selected_full_path()` / `selected_kind()` / `take_activated() -> Option<(PathBuf, AssetKind)>` 로 통합 레이어가 로드/적용(GPU 동작은 에디터 밖, editor_demo 가 수행 — 레이어링 유지)
+- `AssetBrowser`, `asset_browser_panel(ui, browser, rect, preview)`, `AssetKind` (src/asset_browser.rs) — 파일 트리 뷰 + 종류 분류(`AssetKind::from_path`: Texture/Scene/Mesh/Audio/Other) + "Open" 활성화 + 선택 파일 썸네일(`preview: Option<u32>` = register_texture 슬롯, 디코드/업로드는 통합 레이어). `selected_full_path()` / `selected_kind()` / `take_activated() -> Option<(PathBuf, AssetKind)>` 로 통합 레이어가 로드/적용(GPU 동작은 에디터 밖, editor_demo 가 수행 — 레이어링 유지). `relative_to_root(path) -> String` — root 상대 + forward slash 정규화 (씬 영속 에셋 참조의 canonical 형식, v1.0.99)
 - **UI 이미지 위젯 (v1.0.93)**: `DrawCommand.texture: Option<u32>` + `DrawList::add_image` + `UiRenderer::register_texture(device, &TextureView) -> u32`(슬롯 영구, 해제 없음) + `UiContext::image(slot, w, h)`(이미지 높이만큼 레이아웃 전진). 렌더는 슬롯 있는 command 만 `fs_image`(풀 RGBA) 파이프라인으로 전환 — 폰트 경로(`fs_main`, R 채널 알파)는 불변. 미등록 슬롯은 폰트 아틀라스 fallback(no panic)
 
 ### Editor Command / Error
