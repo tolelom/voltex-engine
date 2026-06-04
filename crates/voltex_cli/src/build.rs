@@ -277,14 +277,22 @@ fn main() -> voltex_runtime::RuntimeResult<()> {{
 /// Walk the manifest's scene + scripts + assets dirs and write a `.vpkg`.
 /// Paths inside the archive use forward slashes and are relative to the
 /// manifest directory (so `with_initial_scene("scene.vscn")` works).
+///
+/// The scene is additionally scanned for persisted asset references
+/// (`texture_path` / `mesh_path` — the editor's apply-and-save workflow);
+/// referenced files outside the declared asset dirs are auto-bundled, and
+/// references missing from disk produce a warning (the build continues — the
+/// runtime falls back to the white default texture / skips the mesh).
 pub fn pack_archive(manifest_dir: &Path, manifest: &Manifest, out_path: &Path) -> Result<()> {
     let mut entries: Vec<(String, Vec<u8>)> = Vec::new();
 
     // 1. scene
     let scene_path = manifest_dir.join(&manifest.build.scene);
+    let mut scene_bytes: Option<Vec<u8>> = None;
     if scene_path.exists() {
         let bytes = std::fs::read(&scene_path)?;
-        entries.push((manifest.build.scene.clone(), bytes));
+        entries.push((manifest.build.scene.clone(), bytes.clone()));
+        scene_bytes = Some(bytes);
     }
 
     // 2. scripts
@@ -296,6 +304,28 @@ pub fn pack_archive(manifest_dir: &Path, manifest: &Manifest, out_path: &Path) -
         collect_into_entries(&dir, manifest_dir, &mut entries)?;
     }
 
+    // 4. scene-referenced assets not covered by the declared dirs.
+    if let Some(bytes) = scene_bytes {
+        for path in scan_scene_asset_paths(&bytes) {
+            if entries.iter().any(|(key, _)| *key == path) {
+                continue; // already bundled via an assets dir
+            }
+            let on_disk = manifest_dir.join(&path);
+            match std::fs::read(&on_disk) {
+                Ok(data) => {
+                    eprintln!("voltex build: auto-bundled scene asset `{}`", path);
+                    entries.push((path, data));
+                }
+                Err(_) => eprintln!(
+                    "voltex build: warning: scene references missing asset `{}` \
+                     (not in the archive nor at {})",
+                    path,
+                    on_disk.display()
+                ),
+            }
+        }
+    }
+
     let archive = voltex_asset::write_vpkg(&entries);
     std::fs::write(out_path, archive)?;
     eprintln!(
@@ -304,6 +334,72 @@ pub fn pack_archive(manifest_dir: &Path, manifest: &Manifest, out_path: &Path) -
         out_path.display()
     );
     Ok(())
+}
+
+/// Marker components the raw deserializers below attach so the scan can
+/// collect paths through a `World` query (`register_raw` takes plain fn
+/// pointers — no closure capture).
+struct TexPathRef(String);
+struct MeshPathRef(String);
+
+fn deser_path_ref<T: 'static>(
+    make: fn(String) -> T,
+) -> impl Fn(&mut voltex_ecs::World, voltex_ecs::Entity, &[u8]) -> voltex_ecs::Result<()> {
+    move |world, entity, data| {
+        let s = std::str::from_utf8(data)
+            .map_err(|_| "asset path: invalid UTF-8")?
+            .to_string();
+        world.add(entity, make(s));
+        Ok(())
+    }
+}
+
+fn deser_tex(
+    world: &mut voltex_ecs::World,
+    entity: voltex_ecs::Entity,
+    data: &[u8],
+) -> voltex_ecs::Result<()> {
+    deser_path_ref(TexPathRef)(world, entity, data)
+}
+
+fn deser_mesh(
+    world: &mut voltex_ecs::World,
+    entity: voltex_ecs::Entity,
+    data: &[u8],
+) -> voltex_ecs::Result<()> {
+    deser_path_ref(MeshPathRef)(world, entity, data)
+}
+
+/// Extract the `texture_path` / `mesh_path` component payloads from a scene
+/// file. Format auto-detection: `VSCN` magic → binary, first non-whitespace
+/// `{` → JSON, anything else → legacy `.vscn` text (which never carries
+/// registry components — empty result is correct). Unknown components in the
+/// scene are skipped by the registry contract; parse failures yield an empty
+/// list (the build warns nothing — a malformed scene already fails at
+/// runtime with a clearer error).
+pub fn scan_scene_asset_paths(scene_bytes: &[u8]) -> Vec<String> {
+    let mut registry = voltex_ecs::ComponentRegistry::new();
+    registry.register_raw("texture_path", |_, _| None, deser_tex);
+    registry.register_raw("mesh_path", |_, _| None, deser_mesh);
+
+    let mut world = voltex_ecs::World::new();
+    if scene_bytes.starts_with(b"VSCN") {
+        let _ = voltex_ecs::deserialize_scene_binary(&mut world, scene_bytes, &registry);
+    } else if let Ok(text) = std::str::from_utf8(scene_bytes) {
+        if text.trim_start().starts_with('{') {
+            let _ = voltex_ecs::deserialize_scene_json(&mut world, text, &registry);
+        }
+        // else: legacy text scenes carry no registry components.
+    }
+
+    let mut paths: Vec<String> = world
+        .query::<TexPathRef>()
+        .map(|(_, p)| p.0.clone())
+        .chain(world.query::<MeshPathRef>().map(|(_, p)| p.0.clone()))
+        .collect();
+    paths.sort();
+    paths.dedup();
+    paths
 }
 
 fn collect_into_entries(
@@ -398,6 +494,77 @@ mod tests {
         assert!(paths.contains(&"scene.vscn".to_string()));
         assert!(paths.contains(&"scripts/a.lua".to_string()));
         assert!(paths.contains(&"assets/sub/b.png".to_string()));
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    // ── v1.0.101: scene asset auto-bundle ──────────────────────────────────
+
+    /// Build a JSON scene whose one entity carries texture_path / mesh_path
+    /// payloads, using the same registry round-trip the editor uses.
+    fn make_scene_json(tex: &str, mesh: &str) -> String {
+        fn ser_tex(world: &voltex_ecs::World, e: voltex_ecs::Entity) -> Option<Vec<u8>> {
+            world.get::<TexPathRef>(e).map(|p| p.0.as_bytes().to_vec())
+        }
+        fn ser_mesh(world: &voltex_ecs::World, e: voltex_ecs::Entity) -> Option<Vec<u8>> {
+            world.get::<MeshPathRef>(e).map(|p| p.0.as_bytes().to_vec())
+        }
+        let mut registry = voltex_ecs::ComponentRegistry::new();
+        registry.register::<voltex_ecs::Transform>();
+        registry.register_raw("texture_path", ser_tex, deser_tex);
+        registry.register_raw("mesh_path", ser_mesh, deser_mesh);
+
+        let mut world = voltex_ecs::World::new();
+        let e = world.spawn();
+        // Transform anchors the entity in the serialized scene.
+        world.add(e, voltex_ecs::Transform::default());
+        world.add(e, TexPathRef(tex.to_string()));
+        world.add(e, MeshPathRef(mesh.to_string()));
+        voltex_ecs::serialize_scene_json(&world, &registry)
+    }
+
+    #[test]
+    fn scan_scene_asset_paths_extracts_from_json_and_ignores_text() {
+        let json = make_scene_json("assets/hero.png", "assets/ship.obj");
+        let paths = scan_scene_asset_paths(json.as_bytes());
+        assert_eq!(paths, vec!["assets/hero.png", "assets/ship.obj"]);
+
+        // Legacy text scenes carry no registry components → empty, no panic.
+        assert!(scan_scene_asset_paths(b"scene v1\nentity 0\n").is_empty());
+        // Garbage bytes → empty, no panic.
+        assert!(scan_scene_asset_paths(&[0xFF, 0x00, 0x12]).is_empty());
+    }
+
+    #[test]
+    fn pack_archive_auto_bundles_scene_referenced_assets_and_warns_on_missing() {
+        let stamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_nanos())
+            .unwrap_or(0);
+        let root = std::env::temp_dir().join(format!("voltex_cli_autobundle_{}", stamp));
+        let _ = std::fs::remove_dir_all(&root);
+        // `textures/` is OUTSIDE the manifest's declared assets dirs.
+        std::fs::create_dir_all(root.join("textures")).unwrap();
+        std::fs::write(root.join("textures").join("extra.png"), "px").unwrap();
+
+        // Scene references one on-disk file and one missing file.
+        let json = make_scene_json("textures/extra.png", "models/gone.obj");
+        std::fs::write(root.join("scene.vscn"), json).unwrap();
+
+        let m = dummy("X", 100, 100);
+        let archive_path = root.join("out.vpkg");
+        pack_archive(&root, &m, &archive_path).unwrap();
+
+        let bytes = std::fs::read(&archive_path).unwrap();
+        let reader = voltex_asset::VpkgReader::parse(&bytes).unwrap();
+        let paths: Vec<String> = reader.list().map(|s| s.to_string()).collect();
+        assert!(
+            paths.contains(&"textures/extra.png".to_string()),
+            "referenced asset outside declared dirs is auto-bundled: {paths:?}"
+        );
+        assert!(
+            !paths.contains(&"models/gone.obj".to_string()),
+            "missing reference is warned about, not packed"
+        );
         let _ = std::fs::remove_dir_all(&root);
     }
 

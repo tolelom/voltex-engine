@@ -52,9 +52,10 @@ src/
 4. wrapper 디렉토리에서 `cargo build --release`
 5. `target/release/wrapper(.exe)` → `dist/<name>(.exe)` 복사
 6. `scene.vscn` / `scripts/` / `assets/` 를 dist 폴더에 복사 (없으면 silent skip)
+7. `.vpkg` 패킹 시 씬의 `texture_path`/`mesh_path` 참조 스캔 (`scan_scene_asset_paths`, 포맷 자동감지 VSCN/JSON/text) — 선언 디렉토리 밖 참조 파일 자동 동봉, 디스크에 없으면 경고 후 계속 (v1.0.101)
 
 ## 의존성
-- workspace 내부: **없음** (voltex_runtime 은 wrapper 의 의존, voltex_cli 의 의존 아님)
+- workspace 내부: voltex_asset (`.vpkg` write/read), voltex_ecs (빌드 시 씬 에셋 참조 스캔 `scan_scene_asset_paths` — v1.0.101). voltex_runtime 은 wrapper 의 의존, voltex_cli 의 의존 아님
 - 외부 crate: 없음 (TOML 파서 자체 구현)
 - 시스템 의존: `cargo` 가 PATH 에 있어야 함 (없으면 `CargoMissing` 친화 에러)
 

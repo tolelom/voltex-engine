@@ -173,6 +173,24 @@
 
 v1.0.9 부터는 **서비스 배포 완성도** 로드맵 (`docs/superpowers/specs/2026-05-21-service-readiness-roadmap.md`) 기준으로 진행.
 
+### 2026-06-04 — voltex build 씬 참조 에셋 자동 동봉 (v1.0.101, 자율 세션)
+
+에셋 영속화 체인(v1.0.96~100)의 최종 배선. `pack_archive` 가 이미 manifest
+선언 디렉토리를 v1.0.99 형식 키로 `.vpkg` 에 넣고 있었음을 확인 — 남은 격차는
+**선언 밖 씬 참조**와 **조용히 깨진 빌드** 둘.
+
+- **voltex_cli**: `voltex_ecs` 의존 추가 (workspace crate — 외부 dep 0 정책
+  유지). `scan_scene_asset_paths(bytes)` — 포맷 자동감지(VSCN 매직/JSON
+  `{`/legacy text=빈 결과), `register_raw` 가 fn 포인터라 클로저 캡처 불가 →
+  로컬 마커 컴포넌트(TexPathRef/MeshPathRef)를 deserializer 가 부착 후 query
+  수집. `pack_archive`: 참조 경로가 entries 에 없고 디스크에 있으면 자동 동봉
+  + 로그, 디스크에도 없으면 경고 후 계속 (런타임 fallback 이 안전).
+- 검증: 단위 +2 (JSON 추출/text·garbage 빈 결과, 선언 밖 자동 동봉 + 누락
+  미패킹). voltex_cli 57. CLAUDE.md 의존 그래프 + CODEMAP drift(workspace
+  의존 "없음" 표기) 정정. build/clippy(-D warnings)/test 그린.
+- 설계: `docs/superpowers/specs/2026-06-04-build-asset-autobundle-design.md`.
+- 비범위(후속): Audio 참조 수집, 중첩 씬 참조.
+
 ### 2026-06-04 — Vfs 경유 에셋 resolve (v1.0.100, 자율 세션)
 
 경로 영속화 체인의 마지막 배선. 런타임 에셋 resolve 가 씬/스크립트와 동일한

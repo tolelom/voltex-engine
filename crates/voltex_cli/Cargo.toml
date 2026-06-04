@@ -14,3 +14,6 @@ doc = false
 
 [dependencies]
 voltex_asset = { path = "../voltex_asset" }
+# Scene parsing for build-time asset-reference scanning (workspace crate —
+# the external-deps-zero policy holds; pulls only math/asset, no GPU).
+voltex_ecs = { path = "../voltex_ecs" }

@@ -65,7 +65,7 @@ L4 (facade):
                       (사용자 진입점, 신규/외부 코드는 여기부터 import; `voltex::image` 모듈 포함)
 
 Tools (워크스페이스 밖 진입점, 다른 crate가 의존하지 않음):
-  voltex_cli        → voltex_asset            (voltex new/build/run 빌드 파이프라인)
+  voltex_cli        → voltex_asset, voltex_ecs (voltex new/build/run 빌드 파이프라인; ecs 는 빌드 시 씬 에셋 참조 스캔용)
   voltex_capture    → math, ecs, asset, renderer, renderer_ecs, editor, voltex_image
                       (HeadlessGpu 오프스크린 render-to-PNG 시각 검증 하니스; encode_rgba8는 voltex_image 재export)
 ```
