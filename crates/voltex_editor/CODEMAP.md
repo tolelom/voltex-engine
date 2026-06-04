@@ -30,6 +30,7 @@ Immediate-mode UI 에디터 — 도킹/플로팅/뷰포트/인스펙터/에셋 �
 - `panels::hierarchy::hierarchy_panel` — 트리 뷰, click 으로 `session.selected` 설정 (src/panels/hierarchy.rs)
 - `panels::inspector::inspector_panel` + `InspectorState` — 슬라이더(transform) + text_input(tag) + 부착 컴포넌트 목록(`- name` 버튼 → RemoveComponent) + Add 버튼(미부착만 표시) → 모든 변경이 EditorCommand 로 dispatch (src/panels/inspector.rs)
 - `attached_component_names(session, entity) -> Vec<String>` — registry 기준 부착 컴포넌트 이름 목록 (UI/테스트 공용 순수 헬퍼, re-exported)
+- `component_value_summary(session, entity, name) -> Option<String>` — 빌트인(bounds/mesh_handle/material_handle/script) 한 줄 read-only 요약. transform/tag(전용 UI)·미지/raw 이름은 None (re-exported)
 - `count_entity_nodes(world, entity)` — 서브트리 노드 수 (re-exported)
 - `AssetBrowser`, `asset_browser_panel`, `AssetKind` (src/asset_browser.rs) — 파일 트리 뷰 + 종류 분류(`AssetKind::from_path`: Texture/Scene/Mesh/Audio/Other) + "Open" 활성화. `selected_full_path()` / `selected_kind()` / `take_activated() -> Option<(PathBuf, AssetKind)>` 로 통합 레이어가 로드/적용(GPU 동작은 에디터 밖, editor_demo 가 수행 — 레이어링 유지)
 

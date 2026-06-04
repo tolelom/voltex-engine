@@ -173,6 +173,22 @@
 
 v1.0.9 부터는 **서비스 배포 완성도** 로드맵 (`docs/superpowers/specs/2026-05-21-service-readiness-roadmap.md`) 기준으로 진행.
 
+### 2026-06-04 — 인스펙터 컴포넌트 값 표시 (v1.0.92, 자율 세션)
+
+v1.0.89 Components 목록이 이름만 보여주던 것에 빌트인 값 요약을 한 줄 추가
+(read-only). 리플렉션 인프라 없이 `world.get::<T>()` 직접 읽기 — 빌트인 한정.
+
+- **voltex_editor**: `component_value_summary(session, entity, name)` —
+  bounds → `min(…) max(…)`(소수 2자리), mesh/material_handle → `id=N gen=M`,
+  script → 경로(+바운드 시 `#instance_id`). transform/tag 는 전용 편집 UI 가
+  이미 값을 보여줘 생략, 미지/`register_raw` 이름은 None(에디터가 바이트를
+  해석 못함 — 의도된 한계). Components 목록에서 `- name` 버튼 아래 들여쓴
+  요약 줄로 렌더 (remove 클릭이 월드를 바꾸므로 버튼 전에 요약 캡처).
+- 검증: 단위 +1 (포맷/None 경계 일괄). voltex_editor 186 그린.
+- 설계: `docs/superpowers/specs/2026-06-04-inspector-value-summary-design.md`.
+- 비범위(후속): 값 편집 폼, 커스텀 컴포넌트 리플렉션, 핸들→에셋 이름 역참조.
+- build/clippy(-D warnings)/test 그린.
+
 ### 2026-06-04 — 디렉토리 감시 + 브라우저 자동 새로고침 (v1.0.91, 자율 세션)
 
 핫리로드 시리즈(v1.0.87~90) 비범위 후속. 에셋 브라우저가 보는 디렉토리에

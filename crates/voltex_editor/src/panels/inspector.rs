@@ -99,6 +99,42 @@ fn changed(a: f32, b: f32) -> bool {
     (a - b).abs() > EPSILON
 }
 
+/// One-line read-only value summary for a *built-in* component on `entity`,
+/// or `None` for components with their own editing UI (`transform`, `tag`),
+/// unknown / `register_raw` names (the editor cannot decode their bytes), and
+/// absent components. Built-ins are read directly via `world.get::<T>()` —
+/// no reflection infrastructure.
+pub fn component_value_summary(
+    session: &EditorSession,
+    entity: Entity,
+    name: &str,
+) -> Option<String> {
+    let world = &session.world;
+    match name {
+        "bounds" => world.get::<voltex_ecs::Bounds>(entity).map(|b| {
+            format!(
+                "min({:.2}, {:.2}, {:.2}) max({:.2}, {:.2}, {:.2})",
+                b.0.min.x, b.0.min.y, b.0.min.z, b.0.max.x, b.0.max.y, b.0.max.z
+            )
+        }),
+        "mesh_handle" => world
+            .get::<voltex_ecs::MeshHandle>(entity)
+            .map(|h| format!("id={} gen={}", h.0.id(), h.0.generation())),
+        "material_handle" => world
+            .get::<voltex_ecs::MaterialHandle>(entity)
+            .map(|h| format!("id={} gen={}", h.0.id(), h.0.generation())),
+        "script" => world.get::<voltex_ecs::ScriptComponent>(entity).map(|s| {
+            if s.instance_id == voltex_ecs::ScriptComponent::UNBOUND {
+                s.script_path.clone()
+            } else {
+                format!("{} #{}", s.script_path, s.instance_id)
+            }
+        }),
+        // transform / tag have dedicated editing UI above the list.
+        _ => None,
+    }
+}
+
 /// Names of registered components currently attached to `entity`, in
 /// registry order. Drives the Inspector's "Components" list and the
 /// filtering of its "Add Component" buttons; exposed so headless tests and
@@ -201,12 +237,18 @@ pub fn inspector_panel(
     let attached = attached_component_names(session, entity);
     ui.text("-- Components --");
     for name in &attached {
+        // Resolve the read-only summary before the button: a remove click
+        // mutates the world mid-loop and the value would be gone.
+        let summary = component_value_summary(session, entity, name);
         let label = format!("- {}", name);
         if ui.button(&label) {
             let _ = session.dispatch(EditorCommand::RemoveComponent {
                 entity,
                 name: name.clone(),
             });
+        }
+        if let Some(summary) = summary {
+            ui.text(&format!("  {}", summary));
         }
     }
 
@@ -256,6 +298,52 @@ mod tests {
     fn cleanup(scene: &str) {
         let _ = std::fs::remove_file(scene);
         let _ = std::fs::remove_file(format!("{}.log", scene));
+    }
+
+    #[test]
+    fn component_value_summary_formats_builtins() {
+        let scene = temp_path("voltex_insp_summary.vscn");
+        cleanup(&scene);
+        let mut session = EditorSession::new(scene.clone());
+        let e = session.dispatch(EditorCommand::Spawn).unwrap();
+
+        // Absent components → None.
+        assert_eq!(component_value_summary(&session, e, "bounds"), None);
+
+        session.world.add(
+            e,
+            voltex_ecs::Bounds(voltex_math::AABB::new(
+                Vec3::new(-1.0, 0.0, -1.0),
+                Vec3::new(1.0, 2.0, 1.0),
+            )),
+        );
+        assert_eq!(
+            component_value_summary(&session, e, "bounds").as_deref(),
+            Some("min(-1.00, 0.00, -1.00) max(1.00, 2.00, 1.00)")
+        );
+
+        session.world.add(
+            e,
+            voltex_ecs::MeshHandle(voltex_asset::Handle::from_raw_parts(3, 1)),
+        );
+        assert_eq!(
+            component_value_summary(&session, e, "mesh_handle").as_deref(),
+            Some("id=3 gen=1")
+        );
+
+        session
+            .world
+            .add(e, voltex_ecs::ScriptComponent::new("scripts/ai.lua"));
+        assert_eq!(
+            component_value_summary(&session, e, "script").as_deref(),
+            Some("scripts/ai.lua"),
+            "UNBOUND instance shows the path only"
+        );
+
+        // Dedicated-UI and unknown names → None even when attached.
+        assert_eq!(component_value_summary(&session, e, "transform"), None);
+        assert_eq!(component_value_summary(&session, e, "audio_source"), None);
+        cleanup(&scene);
     }
 
     #[test]
