@@ -173,6 +173,15 @@
 
 v1.0.9 부터는 **서비스 배포 완성도** 로드맵 (`docs/superpowers/specs/2026-05-21-service-readiness-roadmap.md`) 기준으로 진행.
 
+### 2026-06-04 — 썸네일 핫리로드 invalidation (v1.0.95, 자율 세션)
+
+v1.0.93 비범위 후속 (editor_demo 한정). 선택 텍스처 파일이 디스크에서 바뀌면
+썸네일 갱신: 썸네일 생성 시(성공/실패 모두) 파일 watch + poll 루프 첫 단계에서
+분기 무관 `thumb_cache.remove(&changed)` → 다음 프레임 자연 재디코드/재등록.
+실패-None 캐시가 파일 수정 후에도 영원히 남던 wart 도 함께 해소. 옛 슬롯은
+v1.0.93 영구-슬롯 계약대로 잔존. build/clippy 그린.
+설계: `docs/superpowers/specs/2026-06-04-thumbnail-invalidation-design.md`.
+
 ### 2026-06-04 — RuntimeConfig::with_audio_files (v1.0.94, 자율 세션)
 
 v1.0.90 비범위 후속 — 런타임 오디오 스토리 마무리. 게임이 클립을 직접

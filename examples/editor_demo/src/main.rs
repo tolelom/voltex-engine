@@ -584,10 +584,15 @@ impl ApplicationHandler for EditorDemoApp {
                                 == Some(voltex_editor::AssetKind::Texture)
                             {
                                 if let Some(path) = state.asset_browser.selected_full_path() {
+                                    let watcher = &mut state.watcher;
                                     preview = *state
                                         .thumb_cache
                                         .entry(path.clone())
                                         .or_insert_with(|| {
+                                            // Watch the file (success or not) so a
+                                            // disk edit invalidates this entry —
+                                            // see the poll loop below.
+                                            watcher.watch(path.clone());
                                             match make_thumbnail(
                                                 &state.gpu.device,
                                                 &state.gpu.queue,
@@ -745,6 +750,11 @@ impl ApplicationHandler for EditorDemoApp {
                         .file_name()
                         .map(|n| n.to_string_lossy().into_owned())
                         .unwrap_or_default();
+                    // Thumbnail invalidation runs independent of the branches
+                    // below — an Opened texture can also be the previewed one.
+                    // Next frame's selection lookup re-decodes + re-registers
+                    // (old slot stays per the permanent-slot contract).
+                    state.thumb_cache.remove(&changed);
                     if state.watched_scene.as_deref() == Some(changed.as_path()) {
                         let path_str = changed.to_string_lossy().into_owned();
                         match state.session.dispatch(EditorCommand::LoadScene { path: path_str }) {
