@@ -92,7 +92,7 @@ pub(crate) enum AudioCommand {
 /// Replace `clips[clip_index]` with `clip`, returning whether the index was
 /// in range. Out-of-range is a silent no-op — consistent with the
 /// fire-and-forget contract of the other clip commands (`stop`, `set_volume`).
-pub(crate) fn replace_clip_in(clips: &mut [AudioClip], clip_index: usize, clip: AudioClip) -> bool {
+fn replace_clip_in(clips: &mut [AudioClip], clip_index: usize, clip: AudioClip) -> bool {
     if let Some(slot) = clips.get_mut(clip_index) {
         *slot = clip;
         true
@@ -135,7 +135,9 @@ impl AudioSystem {
 
     /// Hot-load: append a decoded clip at runtime and return its `clip_index`,
     /// usable with [`Self::play`] immediately (mpsc FIFO guarantees the thread
-    /// pushes the clip before processing any later command).
+    /// pushes the clip before processing any later command). Like every other
+    /// command, the send is fire-and-forget: if the audio thread has died
+    /// (panic), the index is still handed out but all playback is silent.
     pub fn add_clip(&mut self, clip: AudioClip) -> usize {
         let index = self.clip_count;
         self.clip_count += 1;
@@ -335,8 +337,8 @@ fn audio_thread_null(rx: mpsc::Receiver<AudioCommand>, clips: Vec<AudioClip>) {
 }
 
 #[cfg(target_os = "windows")]
-fn audio_thread_null(rx: mpsc::Receiver<AudioCommand>, _clips: Vec<AudioClip>) {
-    audio_thread_null_impl(rx, _clips);
+fn audio_thread_null(rx: mpsc::Receiver<AudioCommand>, clips: Vec<AudioClip>) {
+    audio_thread_null_impl(rx, clips);
 }
 
 fn audio_thread_null_impl(rx: mpsc::Receiver<AudioCommand>, mut clips: Vec<AudioClip>) {

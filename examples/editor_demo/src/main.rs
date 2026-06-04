@@ -123,10 +123,11 @@ fn make_unit_ground(device: &wgpu::Device) -> Mesh {
     Mesh::new(device, &verts, &indices)
 }
 
-/// Local-space AABB over a vertex position iterator (assumes at least one).
+/// Local-space AABB over a vertex position iterator (assumes at least one —
+/// both call sites guard against empty vertex lists).
 fn aabb_from_positions(positions: impl Iterator<Item = [f32; 3]>) -> AABB {
-    let mut min = Vec3::new(f32::MAX, f32::MAX, f32::MAX);
-    let mut max = Vec3::new(f32::MIN, f32::MIN, f32::MIN);
+    let mut min = Vec3::new(f32::INFINITY, f32::INFINITY, f32::INFINITY);
+    let mut max = Vec3::new(f32::NEG_INFINITY, f32::NEG_INFINITY, f32::NEG_INFINITY);
     for [x, y, z] in positions {
         min = Vec3::new(min.x.min(x), min.y.min(y), min.z.min(z));
         max = Vec3::new(max.x.max(x), max.y.max(y), max.z.max(z));
@@ -609,9 +610,21 @@ impl ApplicationHandler for EditorDemoApp {
                         }
                         voltex_editor::AssetKind::Mesh => {
                             if let Some(sel) = state.session.selected {
-                                match load_mesh_from_path(&state.gpu.device, &path) {
-                                    Ok((mesh, aabb)) => {
-                                        let handle = state.render_assets.add_mesh(mesh);
+                                // Re-Open of a watched file replaces the mesh in
+                                // place (no slot leak); first Open registers anew.
+                                let result = load_mesh_from_path(&state.gpu.device, &path)
+                                    .and_then(|(mesh, aabb)| {
+                                        match state.watched_meshes.get(&path).copied() {
+                                            Some(h) => state
+                                                .render_assets
+                                                .replace_mesh(h, mesh)
+                                                .map(|_| (h, aabb))
+                                                .map_err(|e| e.to_string()),
+                                            None => Ok((state.render_assets.add_mesh(mesh), aabb)),
+                                        }
+                                    });
+                                match result {
+                                    Ok((handle, aabb)) => {
                                         state.session.world.add(sel, handle);
                                         state.session.world.add(sel, Bounds(aabb));
                                         state.status = format!("Applied mesh: {}", name);
