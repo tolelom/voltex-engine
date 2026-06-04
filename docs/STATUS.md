@@ -173,6 +173,25 @@
 
 v1.0.9 부터는 **서비스 배포 완성도** 로드맵 (`docs/superpowers/specs/2026-05-21-service-readiness-roadmap.md`) 기준으로 진행.
 
+### 2026-06-04 — 에디터 씬 로드 시 AudioPath 프리뷰 복원 (v1.0.107, 자율 세션)
+
+editor_demo 의 LoadScene 후 resolve 3종 대칭 완성. 저장된 씬을 다시 열면
+`AudioPath` 클립이 에디터 프리뷰 `AudioSystem` 에 재로드된다 — 이전엔
+texture/mesh 만 복원되고 오디오는 경로 컴포넌트만 남아 무음이었다.
+
+- **editor_demo**: `resolve_audio_paths(world, audio, watcher, watched_audio)`
+  — texture 버전 미러 (경로별 1회 디코드 + `add_clip`, 파일 공유 엔티티는
+  clip index 공유, `watched_audio` 가 캐시 겸 핫리로드 맵이라 기존 poll
+  분기의 `replace_clip` 이 추가 작업 없이 적용) + 엔티티에
+  `AudioSource::new(idx)`(stopped) 부착. LoadScene 두 분기(Open/씬
+  핫리로드) 배선, 상태 텍스트 `(N textures, M meshes, K audio)`.
+- 코어 로직은 voltex_runtime::audio_paths 단위 테스트가 커버 (demo 통합
+  레이어는 기존 texture/mesh resolve 와 동일하게 비대상).
+- build/clippy(-D warnings)/workspace test 그린.
+- 설계: `docs/superpowers/specs/2026-06-04-editor-audio-path-restore-design.md`.
+- 비범위(후속): 프리뷰 자동 재생, AudioSource 플래그 편집 UI + 직렬화,
+  인스펙터 audio 요약.
+
 ### 2026-06-04 — E2E 오디오 확장 + wrapper 오디오 활성화 (v1.0.106, 자율 세션)
 
 v1.0.103 비범위 후속. E2E 확장 중 **출하 격차 발견**: `enable_audio` 기본

@@ -277,6 +277,49 @@ fn resolve_mesh_paths(
     resolved
 }
 
+/// Re-attach `AudioSource`s after a scene load — the audio counterpart of
+/// [`resolve_texture_paths`]. Every entity carrying a persisted [`AudioPath`]
+/// gets its clip (re)loaded into the editor's preview [`AudioSystem`] and an
+/// `AudioSource` bound to the clip index (stopped — preview playback stays a
+/// browser Open action). Entities sharing one file share one clip index;
+/// `watched_audio` doubles as the load cache and the hot-reload map, so the
+/// existing poll branch swaps restored clips too. Returns how many entities
+/// were resolved; failures log and skip.
+fn resolve_audio_paths(
+    world: &mut voltex_ecs::World,
+    audio: &mut AudioSystem,
+    watcher: &mut FileWatcher,
+    watched_audio: &mut HashMap<PathBuf, usize>,
+) -> usize {
+    let targets: Vec<(Entity, PathBuf)> = world
+        .query::<AudioPath>()
+        .map(|(e, p)| (e, PathBuf::from(&p.0)))
+        .collect();
+    let mut resolved = 0;
+    for (entity, path) in targets {
+        let idx = match watched_audio.get(&path) {
+            Some(&i) => Some(i),
+            None => match load_clip_from_path(&path) {
+                Ok(clip) => {
+                    let i = audio.add_clip(clip);
+                    watched_audio.insert(path.clone(), i);
+                    watcher.watch(path.clone());
+                    Some(i)
+                }
+                Err(e) => {
+                    eprintln!("[scene] audio {} failed to resolve: {}", path.display(), e);
+                    None
+                }
+            },
+        };
+        if let Some(i) = idx {
+            world.add(entity, AudioSource::new(i as u32));
+            resolved += 1;
+        }
+    }
+    resolved
+}
+
 /// Decode an image file (.png / .jpg) and upload it for UI preview, returning
 /// the [`UiRenderer`] texture slot for [`asset_browser_panel`]'s thumbnail.
 fn make_thumbnail(
@@ -808,10 +851,16 @@ impl ApplicationHandler for EditorDemoApp {
                                         &mut state.watcher,
                                         &mut state.watched_meshes,
                                     );
-                                    state.status = if tex_n + mesh_n > 0 {
+                                    let audio_n = resolve_audio_paths(
+                                        &mut state.session.world,
+                                        &mut state.audio,
+                                        &mut state.watcher,
+                                        &mut state.watched_audio,
+                                    );
+                                    state.status = if tex_n + mesh_n + audio_n > 0 {
                                         format!(
-                                            "Loaded scene: {} ({} textures, {} meshes)",
-                                            name, tex_n, mesh_n
+                                            "Loaded scene: {} ({} textures, {} meshes, {} audio)",
+                                            name, tex_n, mesh_n, audio_n
                                         )
                                     } else {
                                         format!("Loaded scene: {}", name)
@@ -959,10 +1008,16 @@ impl ApplicationHandler for EditorDemoApp {
                                     &mut state.watcher,
                                     &mut state.watched_meshes,
                                 );
-                                state.status = if tex_n + mesh_n > 0 {
+                                let audio_n = resolve_audio_paths(
+                                    &mut state.session.world,
+                                    &mut state.audio,
+                                    &mut state.watcher,
+                                    &mut state.watched_audio,
+                                );
+                                state.status = if tex_n + mesh_n + audio_n > 0 {
                                     format!(
-                                        "Reloaded scene: {} ({} textures, {} meshes)",
-                                        name, tex_n, mesh_n
+                                        "Reloaded scene: {} ({} textures, {} meshes, {} audio)",
+                                        name, tex_n, mesh_n, audio_n
                                     )
                                 } else {
                                     format!("Reloaded scene: {}", name)
