@@ -74,6 +74,9 @@ struct AppState {
     // Directory the asset browser is showing — watched so external file
     // adds/removes auto-refresh the listing (dir mtime moves on entry change).
     watched_browser_dir: Option<PathBuf>,
+    // Selected-texture preview: path → UiRenderer texture slot (None = decode
+    // failed; cached so broken files don't re-decode every frame).
+    thumb_cache: HashMap<PathBuf, Option<u32>>,
     // Audio preview for browser-opened clips (starts empty; clips hot-loaded).
     audio: AudioSystem,
     // Mouse tracking
@@ -173,6 +176,29 @@ fn load_mesh_from_path(device: &wgpu::Device, path: &Path) -> Result<(Mesh, AABB
 /// [`voltex_audio::load_clip_file`] mapping the error into the demo's String.
 fn load_clip_from_path(path: &Path) -> Result<AudioClip, String> {
     voltex_audio::load_clip_file(path).map_err(|e| e.to_string())
+}
+
+/// Decode an image file (.png / .jpg) and upload it for UI preview, returning
+/// the [`UiRenderer`] texture slot for [`asset_browser_panel`]'s thumbnail.
+fn make_thumbnail(
+    device: &wgpu::Device,
+    queue: &wgpu::Queue,
+    ui_renderer: &mut UiRenderer,
+    path: &Path,
+) -> Result<u32, String> {
+    let bytes = std::fs::read(path).map_err(|e| e.to_string())?;
+    let ext = path
+        .extension()
+        .and_then(|e| e.to_str())
+        .map(|e| e.to_ascii_lowercase());
+    let (pixels, w, h) = match ext.as_deref() {
+        Some("png") => voltex_renderer::parse_png(&bytes).map_err(|e| e.to_string())?,
+        Some("jpg" | "jpeg") => voltex_renderer::parse_jpg(&bytes).map_err(|e| e.to_string())?,
+        _ => return Err(format!("unsupported image extension: {}", path.display())),
+    };
+    let layout = voltex_renderer::GpuTexture::bind_group_layout(device);
+    let tex = voltex_renderer::GpuTexture::from_rgba(device, queue, w, h, &pixels, &layout);
+    Ok(ui_renderer.register_texture(device, &tex.view))
 }
 
 impl ApplicationHandler for EditorDemoApp {
@@ -341,6 +367,7 @@ impl ApplicationHandler for EditorDemoApp {
             watched_meshes: HashMap::new(),
             watched_audio: HashMap::new(),
             watched_browser_dir: None,
+            thumb_cache: HashMap::new(),
             audio: AudioSystem::new(Vec::new())
                 .expect("voltex: audio thread spawn failed"),
             basic_renderer,
@@ -549,7 +576,43 @@ impl ApplicationHandler for EditorDemoApp {
                             );
                         }
                         3 => {
-                            asset_browser_panel(&mut state.ui, &mut state.asset_browser, rect);
+                            // Selected texture → UI thumbnail slot. Decoded and
+                            // registered once per path; failures cache None so a
+                            // broken file doesn't re-decode every frame.
+                            let mut preview = None;
+                            if state.asset_browser.selected_kind()
+                                == Some(voltex_editor::AssetKind::Texture)
+                            {
+                                if let Some(path) = state.asset_browser.selected_full_path() {
+                                    preview = *state
+                                        .thumb_cache
+                                        .entry(path.clone())
+                                        .or_insert_with(|| {
+                                            match make_thumbnail(
+                                                &state.gpu.device,
+                                                &state.gpu.queue,
+                                                &mut state.ui_renderer,
+                                                &path,
+                                            ) {
+                                                Ok(slot) => Some(slot),
+                                                Err(e) => {
+                                                    eprintln!(
+                                                        "[thumb] {}: {}",
+                                                        path.display(),
+                                                        e
+                                                    );
+                                                    None
+                                                }
+                                            }
+                                        });
+                                }
+                            }
+                            asset_browser_panel(
+                                &mut state.ui,
+                                &mut state.asset_browser,
+                                rect,
+                                preview,
+                            );
                         }
                         _ => {}
                     }

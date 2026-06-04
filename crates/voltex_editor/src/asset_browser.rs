@@ -13,6 +13,8 @@ use crate::layout::LayoutState;
 const COLOR_SELECTED: [u8; 4] = [0x44, 0x66, 0x88, 0xFF];
 const COLOR_TEXT: [u8; 4] = [0xEE, 0xEE, 0xEE, 0xFF];
 const PADDING: f32 = 4.0;
+/// Edge length of the selected-file preview thumbnail, in pixels.
+const PREVIEW_SIZE: f32 = 96.0;
 
 /// Coarse classification of a file by extension, used to decide what
 /// "Open" does in the integration layer (load a scene, apply a texture, …).
@@ -183,6 +185,7 @@ pub fn asset_browser_panel(
     ui: &mut UiContext,
     browser: &mut AssetBrowser,
     rect: &Rect,
+    preview: Option<u32>,
 ) {
     ui.layout = LayoutState::new(rect.x + PADDING, rect.y + PADDING);
 
@@ -257,6 +260,12 @@ pub fn asset_browser_panel(
                 let ext = &file_name[dot_pos..];
                 ui.text(&format!("Type: {}", ext));
             }
+        }
+        // Thumbnail — the integration layer decodes/uploads the selected
+        // texture and passes its `UiRenderer::register_texture` slot in
+        // (this panel stays GPU-free, same split as Open handling).
+        if let Some(slot) = preview {
+            ui.image(slot, PREVIEW_SIZE, PREVIEW_SIZE);
         }
         // Clicking "Open" stages an activation for the integration layer to
         // consume (load scene / apply texture). Cleared on directory change.
@@ -471,7 +480,7 @@ mod tests {
         let rect = Rect { x: 0.0, y: 0.0, w: 300.0, h: 400.0 };
 
         ui.begin_frame(0.0, 0.0, false);
-        asset_browser_panel(&mut ui, &mut browser, &rect);
+        asset_browser_panel(&mut ui, &mut browser, &rect, None);
         ui.end_frame();
 
         assert!(!ui.draw_list.commands.is_empty());

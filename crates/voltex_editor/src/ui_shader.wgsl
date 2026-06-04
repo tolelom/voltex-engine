@@ -32,3 +32,10 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let tex_alpha = textureSample(t_atlas, s_atlas, in.uv).r;
     return vec4<f32>(in.color.rgb * tex_alpha, in.color.a * tex_alpha);
 }
+
+// Image widgets: sample full RGBA from a registered texture (the font path
+// above reads only `.r` — the R8Unorm atlas alpha convention).
+@fragment
+fn fs_image(in: VertexOutput) -> @location(0) vec4<f32> {
+    return textureSample(t_atlas, s_atlas, in.uv) * in.color;
+}

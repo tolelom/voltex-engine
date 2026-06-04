@@ -89,6 +89,19 @@ impl UiContext {
         clicked
     }
 
+    /// Draw a registered UI texture (slot from `UiRenderer::register_texture`)
+    /// as a `w`×`h` image at the layout cursor. The layout advances past the
+    /// full image height — not just one text line — so following widgets land
+    /// below it. An unregistered slot renders via the font-atlas fallback.
+    pub fn image(&mut self, texture_slot: u32, w: f32, h: f32) {
+        let x = self.layout.cursor_x;
+        let y = self.layout.cursor_y;
+        self.draw_list.add_image(x, y, w, h, texture_slot);
+        self.layout.record(x, y, w);
+        self.layout.cursor_y = y + h + self.layout.padding;
+        self.layout.cursor_x = self.layout.indent;
+    }
+
     /// Draw a horizontal slider. Returns the (possibly new) value after interaction.
     pub fn slider(&mut self, label: &str, value: f32, min: f32, max: f32) -> f32 {
         let id = self.gen_id();
@@ -211,6 +224,25 @@ impl UiContext {
 #[cfg(test)]
 mod tests {
     use crate::ui_context::UiContext;
+
+    #[test]
+    fn image_widget_advances_layout_past_its_height() {
+        let mut ui = UiContext::new(800.0, 600.0);
+        ui.begin_frame(0.0, 0.0, false);
+        let y_before = ui.layout.cursor_y;
+
+        ui.image(0, 96.0, 96.0);
+
+        // The next widget must land BELOW the image, not one text line down.
+        assert!(
+            ui.layout.cursor_y >= y_before + 96.0,
+            "cursor_y advanced {} but image is 96 tall",
+            ui.layout.cursor_y - y_before
+        );
+        let cmd = ui.draw_list.commands.last().expect("image emitted a command");
+        assert_eq!(cmd.texture, Some(0));
+        ui.end_frame();
+    }
 
     #[test]
     fn buttons_stack_vertically_by_default() {

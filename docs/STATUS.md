@@ -173,6 +173,30 @@
 
 v1.0.9 부터는 **서비스 배포 완성도** 로드맵 (`docs/superpowers/specs/2026-05-21-service-readiness-roadmap.md`) 기준으로 진행.
 
+### 2026-06-04 — 에셋 프리뷰 썸네일 + UI 이미지 위젯 (v1.0.93, 자율 세션)
+
+v1.0.86 비범위 후속. 브라우저에서 텍스처 파일을 선택하면 패널 안에 96px 썸네일.
+이를 위해 에디터 UI 에 **임의 텍스처 이미지 위젯 인프라** 신설 — 기존 UI 는
+폰트 아틀라스(R8, `.r` 채널 알파 규약) 단일 텍스처뿐이었다.
+
+- **voltex_editor**: `DrawCommand.texture: Option<u32>` 슬롯(쿼드당 1 command
+  라 렌더 루프 변경 최소) + `DrawList::add_image` + `UiContext::image(slot,
+  w, h)`(이미지 높이만큼 레이아웃 전진) + `UiRenderer::register_texture` +
+  **`fs_image` 셰이더 엔트리/파이프라인** — 폰트 경로가 R 채널만 샘플해
+  RGBA 이미지가 깨지는 문제를 전용 풀-RGBA 파이프라인으로 해결 (동일
+  BGL/blend 공유, `build_ui_pipeline` 헬퍼로 중복 제거). 미등록 슬롯은 폰트
+  fallback(no panic). `asset_browser_panel` 에 `preview: Option<u32>` 파라미터.
+- **editor_demo**: `thumb_cache: HashMap<PathBuf, Option<u32>>` — 선택된
+  Texture 파일 최초 1회 `parse_png`/`parse_jpg` → `GpuTexture::from_rgba` →
+  `register_texture`. 실패는 None 캐시(재디코드 폭주 방지).
+- **voltex_capture**: `render_ui_image_widget`(마젠타/그린 체커 + 텍스트 공존)
+  + `ui_image_widget_renders_registered_texture_colors` RTX 4080 회귀 —
+  두 색 픽셀 각 2000+ 단언 (fs_image 경로 가드).
+- 검증: 단위 +2 (add_image 슬롯/UV, image 위젯 레이아웃 전진), voltex_editor
+  188. build/clippy(-D warnings)/test 그린.
+- 설계: `docs/superpowers/specs/2026-06-04-asset-preview-thumbnail-design.md`.
+- 비범위(후속): 슬롯 해제/LRU, 썸네일 핫리로드, 메시/씬 프리뷰, 폴더 그리드 뷰.
+
 ### 2026-06-04 — 인스펙터 컴포넌트 값 표시 (v1.0.92, 자율 세션)
 
 v1.0.89 Components 목록이 이름만 보여주던 것에 빌트인 값 요약을 한 줄 추가

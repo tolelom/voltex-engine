@@ -36,9 +36,15 @@ const VERTEX_LAYOUT: wgpu::VertexBufferLayout<'static> = wgpu::VertexBufferLayou
 /// GPU-side UI renderer that turns a DrawList into a rendered frame.
 pub struct UiRenderer {
     pipeline: wgpu::RenderPipeline,
+    /// Same layout/blend as `pipeline` but samples full RGBA (`fs_image`) —
+    /// used for commands carrying a registered texture slot.
+    image_pipeline: wgpu::RenderPipeline,
     bind_group_layout: wgpu::BindGroupLayout,
     sampler: wgpu::Sampler,
     font_bind_group: wgpu::BindGroup,
+    /// Bind groups for textures registered via [`Self::register_texture`],
+    /// indexed by the returned slot. Never freed (editor-lifetime scale).
+    textures: Vec<wgpu::BindGroup>,
     uniform_buffer: wgpu::Buffer,
     projection: [f32; 16],
     last_screen_w: f32,
@@ -107,51 +113,11 @@ impl UiRenderer {
             immediate_size: 0,
         });
 
-        // --- Render pipeline: alpha blend, no depth ---
-        let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some("UI Render Pipeline"),
-            layout: Some(&pipeline_layout),
-            vertex: wgpu::VertexState {
-                module: &shader,
-                entry_point: Some("vs_main"),
-                buffers: &[VERTEX_LAYOUT],
-                compilation_options: Default::default(),
-            },
-            fragment: Some(wgpu::FragmentState {
-                module: &shader,
-                entry_point: Some("fs_main"),
-                targets: &[Some(wgpu::ColorTargetState {
-                    format: surface_format,
-                    blend: Some(wgpu::BlendState {
-                        color: wgpu::BlendComponent {
-                            src_factor: wgpu::BlendFactor::SrcAlpha,
-                            dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
-                            operation: wgpu::BlendOperation::Add,
-                        },
-                        alpha: wgpu::BlendComponent {
-                            src_factor: wgpu::BlendFactor::One,
-                            dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
-                            operation: wgpu::BlendOperation::Add,
-                        },
-                    }),
-                    write_mask: wgpu::ColorWrites::ALL,
-                })],
-                compilation_options: Default::default(),
-            }),
-            primitive: wgpu::PrimitiveState {
-                topology: wgpu::PrimitiveTopology::TriangleList,
-                strip_index_format: None,
-                front_face: wgpu::FrontFace::Ccw,
-                cull_mode: None,
-                unclipped_depth: false,
-                polygon_mode: wgpu::PolygonMode::Fill,
-                conservative: false,
-            },
-            depth_stencil: None,
-            multisample: wgpu::MultisampleState::default(),
-            multiview_mask: None,
-            cache: None,
-        });
+        // --- Render pipelines: alpha blend, no depth. `fs_main` (font-alpha)
+        // for text/rects, `fs_image` (full RGBA) for registered textures. ---
+        let pipeline = build_ui_pipeline(device, &shader, &pipeline_layout, surface_format, "fs_main");
+        let image_pipeline =
+            build_ui_pipeline(device, &shader, &pipeline_layout, surface_format, "fs_image");
 
         // --- Font atlas GPU texture (R8Unorm) ---
         let atlas_texture = device.create_texture_with_data(
@@ -214,15 +180,46 @@ impl UiRenderer {
 
         UiRenderer {
             pipeline,
+            image_pipeline,
             bind_group_layout,
             sampler,
             font_bind_group,
+            textures: Vec::new(),
             uniform_buffer,
             projection,
             last_screen_w: 800.0,
             last_screen_h: 600.0,
             atlas_dirty: false,
         }
+    }
+
+    /// Register a texture view for UI image widgets and return its slot for
+    /// [`DrawList::add_image`] / [`UiContext::image`](crate::UiContext::image).
+    /// The view must outlive… nothing: wgpu bind groups keep the underlying
+    /// texture alive. Slots are never freed (editor-lifetime scale — see
+    /// design doc); registering per frame would leak, cache per asset instead.
+    pub fn register_texture(&mut self, device: &wgpu::Device, view: &wgpu::TextureView) -> u32 {
+        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("UI Image Bind Group"),
+            layout: &self.bind_group_layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: self.uniform_buffer.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::TextureView(view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 2,
+                    resource: wgpu::BindingResource::Sampler(&self.sampler),
+                },
+            ],
+        });
+        let slot = self.textures.len() as u32;
+        self.textures.push(bind_group);
+        slot
     }
 
     /// Replace the font atlas texture with new data (e.g., TTF atlas).
@@ -364,8 +361,29 @@ impl UiRenderer {
             pass.set_vertex_buffer(0, vertex_buffer.slice(..));
             pass.set_index_buffer(index_buffer.slice(..), wgpu::IndexFormat::Uint16);
 
-            // Draw each command (with optional scissor clipping)
+            // Draw each command (with optional scissor clipping). Commands
+            // carrying a registered texture slot switch to the RGBA image
+            // pipeline + that texture's bind group; an unregistered slot
+            // falls back to the font path (visible glitch, never a panic).
+            // `was_image` tracks state so consecutive font commands (the
+            // overwhelming majority) don't re-bind.
+            let mut was_image = false;
             for cmd in &draw_list.commands {
+                let image_group = cmd.texture.and_then(|slot| self.textures.get(slot as usize));
+                match image_group {
+                    Some(group) => {
+                        pass.set_pipeline(&self.image_pipeline);
+                        pass.set_bind_group(0, group, &[]);
+                        was_image = true;
+                    }
+                    None => {
+                        if was_image {
+                            pass.set_pipeline(&self.pipeline);
+                            pass.set_bind_group(0, &self.font_bind_group, &[]);
+                            was_image = false;
+                        }
+                    }
+                }
                 if let Some(scissor) = &cmd.scissor {
                     pass.set_scissor_rect(scissor.x, scissor.y, scissor.w, scissor.h);
                 } else {
@@ -379,6 +397,62 @@ impl UiRenderer {
             }
         }
     }
+}
+
+/// Build one UI render pipeline (alpha blend, no depth) with the given
+/// fragment entry point — shared by the font (`fs_main`) and image
+/// (`fs_image`) pipelines so their state stays identical.
+fn build_ui_pipeline(
+    device: &wgpu::Device,
+    shader: &wgpu::ShaderModule,
+    pipeline_layout: &wgpu::PipelineLayout,
+    surface_format: wgpu::TextureFormat,
+    fragment_entry: &str,
+) -> wgpu::RenderPipeline {
+    device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+        label: Some("UI Render Pipeline"),
+        layout: Some(pipeline_layout),
+        vertex: wgpu::VertexState {
+            module: shader,
+            entry_point: Some("vs_main"),
+            buffers: &[VERTEX_LAYOUT],
+            compilation_options: Default::default(),
+        },
+        fragment: Some(wgpu::FragmentState {
+            module: shader,
+            entry_point: Some(fragment_entry),
+            targets: &[Some(wgpu::ColorTargetState {
+                format: surface_format,
+                blend: Some(wgpu::BlendState {
+                    color: wgpu::BlendComponent {
+                        src_factor: wgpu::BlendFactor::SrcAlpha,
+                        dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
+                        operation: wgpu::BlendOperation::Add,
+                    },
+                    alpha: wgpu::BlendComponent {
+                        src_factor: wgpu::BlendFactor::One,
+                        dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
+                        operation: wgpu::BlendOperation::Add,
+                    },
+                }),
+                write_mask: wgpu::ColorWrites::ALL,
+            })],
+            compilation_options: Default::default(),
+        }),
+        primitive: wgpu::PrimitiveState {
+            topology: wgpu::PrimitiveTopology::TriangleList,
+            strip_index_format: None,
+            front_face: wgpu::FrontFace::Ccw,
+            cull_mode: None,
+            unclipped_depth: false,
+            polygon_mode: wgpu::PolygonMode::Fill,
+            conservative: false,
+        },
+        depth_stencil: None,
+        multisample: wgpu::MultisampleState::default(),
+        multiview_mask: None,
+        cache: None,
+    })
 }
 
 /// Orthographic projection: left=0, right=w, top=0, bottom=h (Y down), near=-1, far=1.

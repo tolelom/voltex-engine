@@ -31,6 +31,9 @@ pub struct DrawCommand {
     pub index_count: u32,
     /// Optional scissor rect for clipping. None means no clipping.
     pub scissor: Option<ScissorRect>,
+    /// Texture slot from [`UiRenderer::register_texture`](crate::UiRenderer::register_texture)
+    /// to sample, or `None` for the font atlas (text / solid rects).
+    pub texture: Option<u32>,
 }
 
 pub struct DrawList {
@@ -113,7 +116,18 @@ impl DrawList {
             index_offset,
             index_count: 6,
             scissor: self.current_scissor(),
+            texture: None,
         });
+    }
+
+    /// Add a quad sampling a *registered* UI texture (full 0..1 UV, white
+    /// tint). `texture_slot` comes from `UiRenderer::register_texture`; an
+    /// unregistered slot falls back to the font atlas at render time.
+    pub fn add_image(&mut self, x: f32, y: f32, w: f32, h: f32, texture_slot: u32) {
+        self.add_rect_uv(x, y, w, h, 0.0, 0.0, 1.0, 1.0, [255, 255, 255, 255]);
+        if let Some(cmd) = self.commands.last_mut() {
+            cmd.texture = Some(texture_slot);
+        }
     }
 
     /// Add text at the given position. One quad per character, using glyph UVs from the atlas.
@@ -143,6 +157,21 @@ mod tests {
         assert_eq!(dl.commands.len(), 1);
         assert_eq!(dl.commands[0].index_count, 6);
         assert_eq!(dl.commands[0].index_offset, 0);
+    }
+
+    #[test]
+    fn add_image_records_texture_slot_and_full_uv() {
+        let mut dl = DrawList::new();
+        dl.add_rect(0.0, 0.0, 10.0, 10.0, [255, 0, 0, 255]);
+        dl.add_image(0.0, 20.0, 64.0, 64.0, 3);
+
+        assert_eq!(dl.commands.len(), 2);
+        assert_eq!(dl.commands[0].texture, None, "rects stay on the font path");
+        assert_eq!(dl.commands[1].texture, Some(3), "image carries its slot");
+        // Image quad spans the full 0..1 UV range (vertices 4..8).
+        assert_eq!(dl.vertices[4].uv, [0.0, 0.0]);
+        assert_eq!(dl.vertices[6].uv, [1.0, 1.0]);
+        assert_eq!(dl.vertices[4].color, [255, 255, 255, 255], "white tint");
     }
 
     #[test]
