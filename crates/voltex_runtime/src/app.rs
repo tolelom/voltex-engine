@@ -220,8 +220,31 @@ impl RuntimeApp {
 
         // Build the audio mixer up front (it only spawns a thread, no GPU /
         // window needed). Failure degrades to silent rather than aborting boot.
+        // `with_audio_files` paths are decoded here, appended after the
+        // pre-loaded clips (ClipId = clip count + file position), and queued
+        // for hot-reload watching (registered once the app struct exists).
+        let mut audio_watch_pairs: Vec<(std::path::PathBuf, usize)> = Vec::new();
         let audio = if config.enable_audio {
-            match AudioSystem::new(std::mem::take(&mut config.audio_clips)) {
+            let mut clips = std::mem::take(&mut config.audio_clips);
+            for (i, path) in std::mem::take(&mut config.audio_files).into_iter().enumerate() {
+                let index = clips.len();
+                match voltex_audio::load_clip_file(&path) {
+                    Ok(clip) => clips.push(clip),
+                    Err(e) => {
+                        // Silent placeholder keeps every later file's ClipId
+                        // stable; fixing the file hot-reloads it in place.
+                        crate::log_error!(
+                            "voltex_runtime: audio file {} failed to decode ({e}); \
+                             clip {} is a silent placeholder until the file is fixed",
+                            path.display(),
+                            i
+                        );
+                        clips.push(voltex_audio::AudioClip::new(vec![0.0], 44_100, 1));
+                    }
+                }
+                audio_watch_pairs.push((path, index));
+            }
+            match AudioSystem::new(clips) {
                 Ok(a) => Some(a),
                 Err(e) => {
                     crate::log_error!("voltex_runtime: audio init failed: {e}");
@@ -265,6 +288,11 @@ impl RuntimeApp {
             hud,
             config,
         };
+        // Register hot-reload watches for `with_audio_files` paths (decode
+        // already happened above; this only wires the file watcher).
+        for (path, index) in audio_watch_pairs {
+            app.watch_audio_clip(path, index);
+        }
         let system_setup = app.config.setup_systems.take();
         if let Some(setup) = system_setup {
             setup(&mut app);
@@ -733,6 +761,43 @@ mod tests {
         let order = order.take();
         assert_eq!(order, vec!["registry", "scene"]);
         assert_eq!(app.world.entity_count(), 1);
+    }
+
+    #[test]
+    fn with_audio_files_decodes_and_watches_with_stable_indices() {
+        let dir = std::env::temp_dir();
+        let good = dir.join(format!("voltex_waf_good_{}.wav", std::process::id()));
+        let bad = dir.join(format!("voltex_waf_bad_{}.wav", std::process::id()));
+        std::fs::write(&good, voltex_audio::generate_wav_bytes(&[0.1, -0.1], 44100)).unwrap();
+        std::fs::write(&bad, b"RIFFcorrupt").unwrap();
+
+        // One pre-loaded clip (index 0), then files: bad → placeholder at 1,
+        // good keeps its position at 2 (index stability is the contract).
+        let cfg = RuntimeConfig::new()
+            .with_audio(vec![voltex_audio::AudioClip::new(vec![0.0; 4], 44100, 1)])
+            .with_audio_files(vec![bad.clone(), good.clone()]);
+        let app = RuntimeApp::new(cfg).expect("decode failure must not abort boot");
+
+        assert!(app.audio.is_some(), "audio system built");
+        assert_eq!(app.watched_audio_clips.len(), 2, "both files watched");
+        assert_eq!(app.watched_audio_clips.get(&bad), Some(&1));
+        assert_eq!(app.watched_audio_clips.get(&good), Some(&2));
+
+        let _ = std::fs::remove_file(&good);
+        let _ = std::fs::remove_file(&bad);
+    }
+
+    #[test]
+    fn with_audio_files_alone_starts_indices_at_zero() {
+        let path = std::env::temp_dir()
+            .join(format!("voltex_waf_solo_{}.wav", std::process::id()));
+        std::fs::write(&path, voltex_audio::generate_wav_bytes(&[0.2], 22050)).unwrap();
+
+        let cfg = RuntimeConfig::new().with_audio_files(vec![path.clone()]);
+        let app = RuntimeApp::new(cfg).expect("RuntimeApp::new");
+        assert_eq!(app.watched_audio_clips.get(&path), Some(&0));
+
+        let _ = std::fs::remove_file(&path);
     }
 
     #[test]

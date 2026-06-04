@@ -41,6 +41,7 @@
 | `with_pbr(bool)` | new 직후 | 메시 패스를 colored Blinn-Phong → 풀 PBR로 전환 |
 | `with_light(dir, color, ambient)` | new 직후 | directional light (`set_light_fn` 로 매 프레임 day/night) |
 | `with_audio(clips)` | new 직후 | AudioSystem 생성 + audio_sync_system 활성화 |
+| `with_audio_files(paths)` | new 직후 | 파일 디코드(wav/ogg) + ClipId 자동 부여(audio_clips 뒤 이어붙음) + 핫리로드 자동 감시. 디코드 실패는 무음 placeholder 로 인덱스 안정 유지 (v1.0.94) |
 
 ## RuntimeApp::tick_systems_only(dt) 실행 순서
 0. `time.advance(dt)` — 프레임 클록 갱신(`elapsed_secs`/`delta_secs`/`frame_count`). `add_timed_system` + HUD 가 일관된 시간 관측

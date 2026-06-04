@@ -55,6 +55,10 @@ pub struct RuntimeConfig {
     /// Pre-loaded clips handed to the [`voltex_audio::AudioSystem`] when
     /// `enable_audio` is set. `AudioSource::clip_id` indexes into this list.
     pub audio_clips: Vec<voltex_audio::AudioClip>,
+    /// Audio files (`.wav` / `.ogg`) decoded at startup, appended after
+    /// [`Self::audio_clips`] (their `ClipId`s continue the sequence), and
+    /// auto-watched for hot-reload. Set via [`Self::with_audio_files`].
+    pub audio_files: Vec<PathBuf>,
     /// Optional virtual filesystem to consult first when loading scenes /
     /// scripts. When `None`, paths are read directly from disk.
     pub vfs: Option<voltex_asset::Vfs>,
@@ -115,6 +119,7 @@ impl Default for RuntimeConfig {
             enable_hud: false,
             enable_audio: false,
             audio_clips: Vec::new(),
+            audio_files: Vec::new(),
             vfs: None,
             enable_crash_log: true,
             crash_log_dir: None,
@@ -296,6 +301,18 @@ impl RuntimeConfig {
         self
     }
 
+    /// Enable audio from files in one call: each path is decoded at startup
+    /// (`.wav` / `.ogg`), its `ClipId` is the position in `paths` (offset by
+    /// any [`Self::with_audio`] clips), and the file is auto-watched so disk
+    /// edits hot-reload the clip. A file that fails to decode logs an error
+    /// and gets a **silent placeholder** at its index — later files keep
+    /// their ids, and fixing the file on disk hot-reloads it back to life.
+    pub fn with_audio_files(mut self, paths: Vec<PathBuf>) -> Self {
+        self.enable_audio = true;
+        self.audio_files = paths;
+        self
+    }
+
     /// Attach a `Vfs` (filesystem-rooted or embedded `.vpkg`). When set, the
     /// runtime reads scene / script files through the Vfs first; fs path
     /// fallback still applies for paths the Vfs cannot resolve.
@@ -413,6 +430,14 @@ mod tests {
         let c = RuntimeConfig::new().with_audio(Vec::new());
         assert!(c.enable_audio);
         assert!(c.audio_clips.is_empty());
+    }
+
+    #[test]
+    fn with_audio_files_enables_audio_and_stores_paths() {
+        let paths = vec![PathBuf::from("a.wav"), PathBuf::from("b.ogg")];
+        let c = RuntimeConfig::new().with_audio_files(paths.clone());
+        assert!(c.enable_audio);
+        assert_eq!(c.audio_files, paths);
     }
 
     #[test]

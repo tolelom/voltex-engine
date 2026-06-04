@@ -173,6 +173,22 @@
 
 v1.0.9 부터는 **서비스 배포 완성도** 로드맵 (`docs/superpowers/specs/2026-05-21-service-readiness-roadmap.md`) 기준으로 진행.
 
+### 2026-06-04 — RuntimeConfig::with_audio_files (v1.0.94, 자율 세션)
+
+v1.0.90 비범위 후속 — 런타임 오디오 스토리 마무리. 게임이 클립을 직접
+디코드하고 `watch_audio_clip` 을 수동 호출하던 것을 한 줄로:
+`with_audio_files(paths)` 가 디코드 + ClipId 부여 + 핫리로드 감시 자동.
+
+- **voltex_runtime**: `RuntimeConfig.audio_files` + builder (`enable_audio`
+  겸 설정). `RuntimeApp::new` 가 `audio_clips` 뒤에 파일을 순서대로 디코드해
+  append (ClipId = 클립 수 + 파일 순번). **디코드 실패는 무음 placeholder
+  push** — 실패 파일 때문에 뒤 ClipId 가 밀리지 않고, 파일을 고치면 같은
+  인덱스로 핫리로드 부활. 성공/실패 무관 전 경로 자동 watch.
+- 검증: 단위 +3 (인덱스 안정성 — 손상 파일 끼워넣기, 단독 사용 0-기점,
+  config builder). voltex_runtime 93. build/clippy(-D warnings)/test 그린.
+- 설계: `docs/superpowers/specs/2026-06-04-with-audio-files-design.md`.
+- 비범위(후속): Vfs 경유 로드, 비동기 디코드.
+
 ### 2026-06-04 — 에셋 프리뷰 썸네일 + UI 이미지 위젯 (v1.0.93, 자율 세션)
 
 v1.0.86 비범위 후속. 브라우저에서 텍스처 파일을 선택하면 패널 안에 96px 썸네일.
