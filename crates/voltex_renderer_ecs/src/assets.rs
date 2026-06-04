@@ -56,6 +56,24 @@ impl RenderAssets {
         self.assets.get(raw)
     }
 
+    /// Hot-reload: replace the GPU `Mesh` *behind an existing* [`MeshHandle`]
+    /// in place. The handle's id/generation are preserved, so every entity
+    /// already holding it draws the new geometry on the next render — no
+    /// re-attach needed. Decode with [`Mesh::from_obj`] / [`Mesh::from_gltf`]
+    /// first; this only swaps the uploaded mesh. Errors if `handle` is stale
+    /// (its slot was freed/reused).
+    pub fn replace_mesh(&mut self, handle: MeshHandle, mesh: Mesh) -> crate::Result<()> {
+        let raw: Handle<Mesh> = Handle::from_raw_parts(handle.0.id(), handle.0.generation());
+        let replaced = self.assets.storage_mut::<Mesh>().replace_in_place(raw, mesh);
+        if replaced {
+            Ok(())
+        } else {
+            Err(crate::RendererEcsError::from(
+                "replace_mesh: stale MeshHandle".to_string(),
+            ))
+        }
+    }
+
     /// Register a material (PBR params) and return a C0a `MaterialHandle`.
     pub fn add_material(&mut self, m: MaterialUniform) -> MaterialHandle {
         let h: Handle<MaterialUniform> = self.assets.insert(m);
