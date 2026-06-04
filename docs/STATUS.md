@@ -173,6 +173,30 @@
 
 v1.0.9 부터는 **서비스 배포 완성도** 로드맵 (`docs/superpowers/specs/2026-05-21-service-readiness-roadmap.md`) 기준으로 진행.
 
+### 2026-06-04 — 에셋 브라우저 폴더 그리드 뷰 (v1.0.104, 자율 세션)
+
+v1.0.93 비범위 후속 (핸드오프 우선순위 3). 브라우저가 텍스트 리스트 + 선택
+파일 1개 썸네일뿐이던 것에 폴더 단위 썸네일 그리드 추가.
+
+- **voltex_editor**: `BrowserView { List(기본), Grid }` + `AssetBrowser.view`
+  (navigation/refresh 에 유지) + 패널 `[Grid]`/`[List]` 토글 +
+  `asset_browser_panel` 마지막 파라미터 `thumbs: Option<&HashMap<String,
+  u32>>`(파일명→register_texture 슬롯). 그리드: 64px 셀 + truncate 라벨,
+  `grid_columns(avail_w, cell_w, pad)` 순수 함수(min 1), 셀 클릭 = 파일
+  선택/디렉토리 navigate (리스트와 동일 의미), thumbs 미등록 파일은 kind
+  접두 placeholder. File Info/Open 영역은 양 뷰 공통. 기존 리스트 로직은
+  `draw_entry_list` 로 추출 (동작 불변).
+- **editor_demo**: `thumb_slot_for(state, path, &mut budget)` — v1.0.93
+  thumb_cache 의 cache-or-decode 를 헬퍼로 추출 + **프레임당 신규 디코드
+  1개 제한** (큰 폴더 첫 진입 hitch 방지, 다음 프레임들에서 채워짐). 그리드
+  모드일 때 현재 디렉토리 Texture 파일들의 이름→슬롯 맵 구성. 실패 None
+  캐시/핫리로드 invalidation(v1.0.95) 그대로 적용.
+- 검증: 단위 +4 (grid_columns 경계 / view 기본값·유지 / 셀 클릭 선택·
+  navigate / thumbs 슬롯 vs placeholder — 2-프레임 마우스 주입).
+  voltex_editor 193. build/clippy(-D warnings)/workspace test 그린.
+- 설계: `docs/superpowers/specs/2026-06-04-asset-grid-view-design.md`.
+- 비범위(후속): 메시/씬 프리뷰, 슬롯 LRU, 그리드 스크롤, 더블클릭 Open.
+
 ### 2026-06-04 — Audio 경로 영속화 (v1.0.103, 자율 세션)
 
 TexturePath/MeshPath 체인의 오디오 완결편. `AudioSource.clip_id` 는 런타임

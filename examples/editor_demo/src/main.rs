@@ -300,6 +300,36 @@ fn make_thumbnail(
     Ok(ui_renderer.register_texture(device, &tex.view))
 }
 
+/// Cached thumbnail slot for `path`. Cache entries (success *and* failure)
+/// are free; a miss decodes + registers only while `decode_budget > 0`
+/// (decrementing it), so callers can cap per-frame decode work — the grid
+/// view passes 1 to fill big folders over a few frames instead of hitching.
+/// New entries are watched so a disk edit invalidates them (v1.0.95).
+fn thumb_slot_for(state: &mut AppState, path: &Path, decode_budget: &mut usize) -> Option<u32> {
+    if let Some(cached) = state.thumb_cache.get(path) {
+        return *cached;
+    }
+    if *decode_budget == 0 {
+        return None;
+    }
+    *decode_budget -= 1;
+    state.watcher.watch(path.to_path_buf());
+    let slot = match make_thumbnail(
+        &state.gpu.device,
+        &state.gpu.queue,
+        &mut state.ui_renderer,
+        path,
+    ) {
+        Ok(slot) => Some(slot),
+        Err(e) => {
+            eprintln!("[thumb] {}: {}", path.display(), e);
+            None
+        }
+    };
+    state.thumb_cache.insert(path.to_path_buf(), slot);
+    slot
+}
+
 impl ApplicationHandler for EditorDemoApp {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         let config = WindowConfig {
@@ -688,32 +718,32 @@ impl ApplicationHandler for EditorDemoApp {
                                 == Some(voltex_editor::AssetKind::Texture)
                             {
                                 if let Some(path) = state.asset_browser.selected_full_path() {
-                                    let watcher = &mut state.watcher;
-                                    preview = *state
-                                        .thumb_cache
-                                        .entry(path.clone())
-                                        .or_insert_with(|| {
-                                            // Watch the file (success or not) so a
-                                            // disk edit invalidates this entry —
-                                            // see the poll loop below.
-                                            watcher.watch(path.clone());
-                                            match make_thumbnail(
-                                                &state.gpu.device,
-                                                &state.gpu.queue,
-                                                &mut state.ui_renderer,
-                                                &path,
-                                            ) {
-                                                Ok(slot) => Some(slot),
-                                                Err(e) => {
-                                                    eprintln!(
-                                                        "[thumb] {}: {}",
-                                                        path.display(),
-                                                        e
-                                                    );
-                                                    None
-                                                }
-                                            }
-                                        });
+                                    preview = thumb_slot_for(state, &path, &mut 1);
+                                }
+                            }
+                            // Grid view: thumbnail slots for every texture file
+                            // in the current directory. At most one NEW decode
+                            // per frame so a big folder fills over a few frames
+                            // instead of hitching one (cached entries are free).
+                            let mut grid_thumbs: HashMap<String, u32> = HashMap::new();
+                            if state.asset_browser.view == voltex_editor::BrowserView::Grid {
+                                let texture_files: Vec<String> = state
+                                    .asset_browser
+                                    .entries
+                                    .iter()
+                                    .filter(|e| {
+                                        !e.is_dir && e.kind == voltex_editor::AssetKind::Texture
+                                    })
+                                    .map(|e| e.name.clone())
+                                    .collect();
+                                let mut decode_budget = 1usize;
+                                for file_name in texture_files {
+                                    let path = state.asset_browser.current.join(&file_name);
+                                    if let Some(slot) =
+                                        thumb_slot_for(state, &path, &mut decode_budget)
+                                    {
+                                        grid_thumbs.insert(file_name, slot);
+                                    }
                                 }
                             }
                             asset_browser_panel(
@@ -721,6 +751,7 @@ impl ApplicationHandler for EditorDemoApp {
                                 &mut state.asset_browser,
                                 rect,
                                 preview,
+                                Some(&grid_thumbs),
                             );
                         }
                         _ => {}

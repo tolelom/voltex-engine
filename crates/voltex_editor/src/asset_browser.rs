@@ -12,9 +12,12 @@ use crate::layout::LayoutState;
 
 const COLOR_SELECTED: [u8; 4] = [0x44, 0x66, 0x88, 0xFF];
 const COLOR_TEXT: [u8; 4] = [0xEE, 0xEE, 0xEE, 0xFF];
+const COLOR_CELL_BG: [u8; 4] = [0x30, 0x30, 0x38, 0xFF];
 const PADDING: f32 = 4.0;
 /// Edge length of the selected-file preview thumbnail, in pixels.
 const PREVIEW_SIZE: f32 = 96.0;
+/// Edge length of one grid-view thumbnail cell, in pixels.
+const GRID_CELL: f32 = 64.0;
 
 /// Coarse classification of a file by extension, used to decide what
 /// "Open" does in the integration layer (load a scene, apply a texture, …).
@@ -69,11 +72,30 @@ pub struct DirEntry {
     pub kind: AssetKind,
 }
 
+/// How [`asset_browser_panel`] lays out the current directory's entries.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum BrowserView {
+    /// One line per entry (the original layout).
+    #[default]
+    List,
+    /// Thumbnail cells ([`GRID_CELL`]px) in as many columns as fit.
+    Grid,
+}
+
+/// Number of grid columns that fit in `avail_w`, with `pad` between cells.
+/// Always at least 1 so a too-narrow panel degrades to a single column.
+pub fn grid_columns(avail_w: f32, cell_w: f32, pad: f32) -> usize {
+    (((avail_w + pad) / (cell_w + pad)).floor() as usize).max(1)
+}
+
 pub struct AssetBrowser {
     pub root: PathBuf,
     pub current: PathBuf,
     pub entries: Vec<DirEntry>,
     pub selected_file: Option<String>,
+    /// Current entry layout (list / thumbnail grid). Toggled from the panel,
+    /// persists across navigation.
+    pub view: BrowserView,
     /// Set when the user clicks "Open" on the selected file. Consumed by the
     /// integration layer via [`AssetBrowser::take_activated`]. Cleared whenever
     /// the directory changes so a stale activation can't leak across folders.
@@ -99,6 +121,7 @@ impl AssetBrowser {
             current,
             entries: Vec::new(),
             selected_file: None,
+            view: BrowserView::default(),
             activated: None,
         };
         browser.refresh();
@@ -197,11 +220,24 @@ pub fn asset_browser_panel(
     browser: &mut AssetBrowser,
     rect: &Rect,
     preview: Option<u32>,
+    thumbs: Option<&std::collections::HashMap<String, u32>>,
 ) {
     ui.layout = LayoutState::new(rect.x + PADDING, rect.y + PADDING);
 
     let path_text = format!("Path: /{}", browser.relative_path());
     ui.text(&path_text);
+
+    // View toggle — label shows the layout the click switches TO.
+    let toggle_label = match browser.view {
+        BrowserView::List => "[Grid]",
+        BrowserView::Grid => "[List]",
+    };
+    if ui.button(toggle_label) {
+        browser.view = match browser.view {
+            BrowserView::List => BrowserView::Grid,
+            BrowserView::Grid => BrowserView::List,
+        };
+    }
 
     // Go up button
     if browser.current != browser.root
@@ -210,51 +246,19 @@ pub fn asset_browser_panel(
             return;
         }
 
-    let gw = ui.font.glyph_width as f32;
-    let gh = ui.font.glyph_height as f32;
-    let line_h = gh + PADDING;
-
     // Collect click action to avoid borrow conflict
     let mut clicked_dir: Option<String> = None;
     let entries_snapshot: Vec<(String, bool, AssetKind)> = browser.entries.iter()
         .map(|e| (e.name.clone(), e.is_dir, e.kind))
         .collect();
 
-    for (name, is_dir, kind) in &entries_snapshot {
-        let y = ui.layout.cursor_y;
-        let x = rect.x + PADDING;
-
-        // Highlight selected file
-        if !is_dir
-            && browser.selected_file.as_deref() == Some(name.as_str()) {
-                ui.draw_list.add_rect(rect.x, y, rect.w, line_h, COLOR_SELECTED);
-            }
-
-        // Click
-        if ui.mouse_clicked && ui.mouse_in_rect(rect.x, y, rect.w, line_h) {
-            if *is_dir {
-                clicked_dir = Some(name.clone());
-            } else {
-                browser.selected_file = Some(name.clone());
-            }
+    match browser.view {
+        BrowserView::List => {
+            draw_entry_list(ui, browser, rect, &entries_snapshot, &mut clicked_dir)
         }
-
-        // Label — directories get [D], files get a kind prefix ([T]/[S]/…).
-        let label = if *is_dir {
-            format!("[D] {}", name)
-        } else {
-            format!("{}{}", kind.list_prefix(), name)
-        };
-
-        let text_y = y + (line_h - gh) * 0.5;
-        let mut cx = x;
-        for ch in label.chars() {
-            let (u0, v0, u1, v1) = ui.font.glyph_uv(ch);
-            ui.draw_list.add_rect_uv(cx, text_y, gw, gh, u0, v0, u1, v1, COLOR_TEXT);
-            cx += gw;
+        BrowserView::Grid => {
+            draw_entry_grid(ui, browser, rect, &entries_snapshot, thumbs, &mut clicked_dir)
         }
-
-        ui.layout.cursor_y += line_h;
     }
 
     if let Some(dir) = clicked_dir {
@@ -286,6 +290,135 @@ pub fn asset_browser_panel(
     }
 }
 
+/// One line per entry (the original layout).
+fn draw_entry_list(
+    ui: &mut UiContext,
+    browser: &mut AssetBrowser,
+    rect: &Rect,
+    entries: &[(String, bool, AssetKind)],
+    clicked_dir: &mut Option<String>,
+) {
+    let gw = ui.font.glyph_width as f32;
+    let gh = ui.font.glyph_height as f32;
+    let line_h = gh + PADDING;
+
+    for (name, is_dir, kind) in entries {
+        let y = ui.layout.cursor_y;
+        let x = rect.x + PADDING;
+
+        // Highlight selected file
+        if !is_dir
+            && browser.selected_file.as_deref() == Some(name.as_str()) {
+                ui.draw_list.add_rect(rect.x, y, rect.w, line_h, COLOR_SELECTED);
+            }
+
+        // Click
+        if ui.mouse_clicked && ui.mouse_in_rect(rect.x, y, rect.w, line_h) {
+            if *is_dir {
+                *clicked_dir = Some(name.clone());
+            } else {
+                browser.selected_file = Some(name.clone());
+            }
+        }
+
+        // Label — directories get [D], files get a kind prefix ([T]/[S]/…).
+        let label = if *is_dir {
+            format!("[D] {}", name)
+        } else {
+            format!("{}{}", kind.list_prefix(), name)
+        };
+
+        let text_y = y + (line_h - gh) * 0.5;
+        let mut cx = x;
+        for ch in label.chars() {
+            let (u0, v0, u1, v1) = ui.font.glyph_uv(ch);
+            ui.draw_list.add_rect_uv(cx, text_y, gw, gh, u0, v0, u1, v1, COLOR_TEXT);
+            cx += gw;
+        }
+
+        ui.layout.cursor_y += line_h;
+    }
+}
+
+/// Thumbnail-cell grid: [`GRID_CELL`]px image (or kind placeholder) + one
+/// truncated label line per entry. Clicking a file cell selects it; clicking
+/// a directory cell stages navigation (same semantics as the list).
+fn draw_entry_grid(
+    ui: &mut UiContext,
+    browser: &mut AssetBrowser,
+    rect: &Rect,
+    entries: &[(String, bool, AssetKind)],
+    thumbs: Option<&std::collections::HashMap<String, u32>>,
+    clicked_dir: &mut Option<String>,
+) {
+    let gw = ui.font.glyph_width as f32;
+    let gh = ui.font.glyph_height as f32;
+    let cell_w = GRID_CELL;
+    let cell_h = GRID_CELL + gh + PADDING;
+    let avail_w = (rect.w - 2.0 * PADDING).max(cell_w);
+    let cols = grid_columns(avail_w, cell_w, PADDING);
+    let origin_x = rect.x + PADDING;
+    let origin_y = ui.layout.cursor_y;
+    let label_chars = (cell_w / gw).floor() as usize;
+
+    for (i, (name, is_dir, kind)) in entries.iter().enumerate() {
+        let col = i % cols;
+        let row = i / cols;
+        let x = origin_x + col as f32 * (cell_w + PADDING);
+        let y = origin_y + row as f32 * (cell_h + PADDING);
+
+        // Cell background — selection highlight wins over the neutral bg.
+        let selected =
+            !is_dir && browser.selected_file.as_deref() == Some(name.as_str());
+        let bg = if selected { COLOR_SELECTED } else { COLOR_CELL_BG };
+        ui.draw_list.add_rect(x, y, cell_w, cell_h, bg);
+
+        // Thumbnail area: registered slot → image, otherwise a kind/[D] tag
+        // roughly centered in the square.
+        match thumbs.and_then(|m| m.get(name.as_str())) {
+            Some(&slot) if !is_dir => {
+                ui.draw_list.add_image(x, y, cell_w, cell_w, slot);
+            }
+            _ => {
+                let tag = if *is_dir { "[D]" } else { kind.list_prefix().trim() };
+                let tx = x + (cell_w - tag.chars().count() as f32 * gw) * 0.5;
+                let ty = y + (cell_w - gh) * 0.5;
+                let mut cx = tx;
+                for ch in tag.chars() {
+                    let (u0, v0, u1, v1) = ui.font.glyph_uv(ch);
+                    ui.draw_list.add_rect_uv(cx, ty, gw, gh, u0, v0, u1, v1, COLOR_TEXT);
+                    cx += gw;
+                }
+            }
+        }
+
+        // Label line under the thumbnail, truncated to the cell width.
+        let label: String = name.chars().take(label_chars).collect();
+        let mut cx = x;
+        let ly = y + GRID_CELL + PADDING * 0.5;
+        for ch in label.chars() {
+            let (u0, v0, u1, v1) = ui.font.glyph_uv(ch);
+            ui.draw_list.add_rect_uv(cx, ly, gw, gh, u0, v0, u1, v1, COLOR_TEXT);
+            cx += gw;
+        }
+
+        // Click
+        if ui.mouse_clicked && ui.mouse_in_rect(x, y, cell_w, cell_h) {
+            if *is_dir {
+                *clicked_dir = Some(name.clone());
+            } else {
+                browser.selected_file = Some(name.clone());
+            }
+        }
+    }
+
+    // Advance the layout cursor past the grid so File Info renders below.
+    if !entries.is_empty() {
+        let rows = entries.len().div_ceil(cols);
+        ui.layout.cursor_y = origin_y + rows as f32 * (cell_h + PADDING);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -296,6 +429,91 @@ mod tests {
         let _ = fs::remove_dir_all(&dir);
         fs::create_dir_all(&dir).unwrap();
         dir
+    }
+
+    // ── Grid view ──────────────────────────────────────────────────────────
+
+    #[test]
+    fn grid_columns_fits_and_clamps_to_one() {
+        // 4 cells of 64 + 3 gaps of 4 = 268 ≤ 292 < 5 cells.
+        assert_eq!(grid_columns(292.0, 64.0, 4.0), 4);
+        // Exactly three cells: 3*64 + 2*4 = 200.
+        assert_eq!(grid_columns(200.0, 64.0, 4.0), 3);
+        // Narrower than one cell still renders a single column.
+        assert_eq!(grid_columns(10.0, 64.0, 4.0), 1);
+    }
+
+    #[test]
+    fn browser_view_defaults_to_list_and_persists_across_refresh() {
+        let dir = make_temp_dir("grid_view_persist");
+        let mut browser = AssetBrowser::new(dir.clone());
+        assert_eq!(browser.view, BrowserView::List);
+        browser.view = BrowserView::Grid;
+        browser.refresh();
+        assert_eq!(browser.view, BrowserView::Grid, "refresh keeps the view mode");
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    /// Drive `draw_entry_grid` directly with a known layout origin so the
+    /// click geometry doesn't depend on the panel header's line count.
+    fn grid_click_at(
+        mx: f32,
+        my: f32,
+        entries: &[(String, bool, AssetKind)],
+        thumbs: Option<&std::collections::HashMap<String, u32>>,
+        browser: &mut AssetBrowser,
+    ) -> (Option<String>, crate::draw_list::DrawList) {
+        let mut ui = UiContext::new(800.0, 600.0);
+        let rect = Rect { x: 0.0, y: 0.0, w: 300.0, h: 400.0 };
+        // Frame 1: mouse up (establishes prev state).
+        ui.begin_frame(mx, my, false);
+        ui.end_frame();
+        // Frame 2: mouse down → mouse_clicked = rising edge.
+        ui.begin_frame(mx, my, true);
+        ui.layout = LayoutState::new(rect.x + PADDING, 50.0);
+        let mut clicked_dir = None;
+        draw_entry_grid(&mut ui, browser, &rect, entries, thumbs, &mut clicked_dir);
+        ui.end_frame();
+        (clicked_dir, ui.draw_list)
+    }
+
+    #[test]
+    fn grid_cell_click_selects_file_and_navigates_dir() {
+        let dir = make_temp_dir("grid_click");
+        let mut browser = AssetBrowser::new(dir.clone());
+        let entries = vec![
+            ("sub".to_string(), true, AssetKind::Other),
+            ("a.png".to_string(), false, AssetKind::Texture),
+        ];
+        // rect.w=300 → 4 columns; cell 0 at x=4, cell 1 at x=72 (origin_y=50).
+        // Click inside cell 1 (the file).
+        let (clicked_dir, _) = grid_click_at(80.0, 60.0, &entries, None, &mut browser);
+        assert_eq!(clicked_dir, None);
+        assert_eq!(browser.selected_file.as_deref(), Some("a.png"));
+
+        // Click inside cell 0 (the directory) → staged navigation.
+        let (clicked_dir, _) = grid_click_at(10.0, 60.0, &entries, None, &mut browser);
+        assert_eq!(clicked_dir.as_deref(), Some("sub"));
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn grid_uses_thumb_slot_when_registered_and_placeholder_otherwise() {
+        let dir = make_temp_dir("grid_thumbs");
+        let mut browser = AssetBrowser::new(dir.clone());
+        let entries = vec![
+            ("a.png".to_string(), false, AssetKind::Texture),
+            ("b.png".to_string(), false, AssetKind::Texture),
+        ];
+        let thumbs: std::collections::HashMap<String, u32> =
+            [("a.png".to_string(), 7u32)].into_iter().collect();
+
+        let (_, dl) = grid_click_at(-10.0, -10.0, &entries, Some(&thumbs), &mut browser);
+        let textured: Vec<u32> = dl.commands.iter().filter_map(|c| c.texture).collect();
+        assert_eq!(textured, vec![7], "only the registered file draws an image");
+
+        let _ = fs::remove_dir_all(&dir);
     }
 
     #[test]
@@ -510,7 +728,7 @@ mod tests {
         let rect = Rect { x: 0.0, y: 0.0, w: 300.0, h: 400.0 };
 
         ui.begin_frame(0.0, 0.0, false);
-        asset_browser_panel(&mut ui, &mut browser, &rect, None);
+        asset_browser_panel(&mut ui, &mut browser, &rect, None, None);
         ui.end_frame();
 
         assert!(!ui.draw_list.commands.is_empty());

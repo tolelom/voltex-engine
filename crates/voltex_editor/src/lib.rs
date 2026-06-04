@@ -56,7 +56,7 @@ pub mod viewport_renderer;
 pub use viewport_renderer::ViewportRenderer;
 
 pub mod asset_browser;
-pub use asset_browser::{AssetBrowser, AssetKind, asset_browser_panel};
+pub use asset_browser::{AssetBrowser, AssetKind, BrowserView, asset_browser_panel, grid_columns};
 
 pub mod ttf_parser;
 pub mod rasterizer;
