@@ -18,6 +18,7 @@
 //! ```
 
 pub mod app;
+pub mod asset_paths;
 pub mod audio_sync;
 pub mod config;
 pub mod crash;
@@ -30,6 +31,7 @@ pub mod log;
 pub mod time;
 
 pub use app::RuntimeApp;
+pub use asset_paths::{resolve_asset_paths, resolve_asset_paths_with, AssetPathCache};
 pub use time::{Time, Timer, TimerMode, Tween};
 pub use audio_sync::audio_sync_system;
 pub use config::RuntimeConfig;

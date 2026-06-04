@@ -144,6 +144,9 @@ pub struct RuntimeApp {
     /// Audio mixer, present only when `config.enable_audio` and init succeeded.
     /// Driven each frame by `audio_sync_system` from `AudioSource` components.
     pub audio: Option<AudioSystem>,
+    /// Path → handle cache for scene-persisted asset paths
+    /// (`TexturePath`/`MeshPath`); see [`crate::asset_paths`].
+    pub(crate) asset_path_cache: crate::asset_paths::AssetPathCache,
     /// Watches audio files registered via [`Self::watch_audio_clip`]; separate
     /// from `file_watcher` because the script pool drains that one's changes.
     audio_watcher: FileWatcher,
@@ -279,6 +282,7 @@ impl RuntimeApp {
             script_pool: ScriptInstancePool::new(),
             script_input: voltex_script::ScriptInput::new(),
             audio,
+            asset_path_cache: crate::asset_paths::AssetPathCache::new(),
             audio_watcher: FileWatcher::new(Duration::from_millis(300)),
             watched_audio_clips: std::collections::HashMap::new(),
             audio_listener: None,
@@ -550,6 +554,10 @@ impl RuntimeApp {
     /// entities are cleared first.
     pub fn load_scene(&mut self, path: &str) -> RuntimeResult<()> {
         self.world.clear();
+        // Give previously-failed TexturePath/MeshPath resolves another chance
+        // on every scene load (the file may exist by now). The actual resolve
+        // happens in the render handler where the GPU device lives.
+        self.asset_path_cache.clear_failures();
         load_scene_via_vfs_or_disk(
             &mut self.world,
             &self.registry,

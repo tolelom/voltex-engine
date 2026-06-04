@@ -113,6 +113,15 @@ impl ApplicationHandler for RuntimeHandler {
                     &mut app.assets,
                     &st.gpu.device,
                 );
+                // Editor-authored scenes carry TexturePath/MeshPath — resolve
+                // them now that the GPU exists (same contract as above).
+                crate::asset_paths::resolve_asset_paths(
+                    &mut app.world,
+                    &mut app.assets,
+                    &mut app.asset_path_cache,
+                    &st.gpu.device,
+                    &st.gpu.queue,
+                );
             }
         }
     }
@@ -229,6 +238,16 @@ fn redraw(app: &mut RuntimeApp, event_loop: &ActiveEventLoop) {
                 &mut app.world,
                 &mut app.assets,
                 &st.gpu.device,
+            );
+            // Scene-persisted asset paths (TexturePath/MeshPath) → handles.
+            // Idempotent + failure-cached, so the per-frame cost is a query
+            // over path-carrying entities once everything is resolved.
+            crate::asset_paths::resolve_asset_paths(
+                &mut app.world,
+                &mut app.assets,
+                &mut app.asset_path_cache,
+                &st.gpu.device,
+                &st.gpu.queue,
             );
         }
     }

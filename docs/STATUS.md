@@ -173,6 +173,25 @@
 
 v1.0.9 부터는 **서비스 배포 완성도** 로드맵 (`docs/superpowers/specs/2026-05-21-service-readiness-roadmap.md`) 기준으로 진행.
 
+### 2026-06-04 — 런타임 에셋 경로 자동 resolve (v1.0.98, 자율 세션)
+
+v1.0.96~97 완결편. 에디터에서 텍스처/메시를 적용해 저장한 씬이 **게임
+런타임에서도 그대로 보임** — 이전엔 TexturePath/MeshPath 가 로드만 되고
+재해석되지 않아 에디터 밖에선 흰 큐브였다.
+
+- **voltex_runtime::asset_paths (신규)**: `AssetPathCache`(경로별 핸들 공유 +
+  실패 None 캐시 — 매 프레임 fs 재시도/로그 스팸 방지, `clear_failures` 로
+  씬 로드 시 재시도) + `resolve_asset_paths_with`(**주입 로더 코어** — GPU
+  무관이라 헤드리스 단위 테스트) + `resolve_asset_paths`(fs→업로드 실 래퍼,
+  RefCell 로 두 로더의 assets 분할 차용).
+- **배선**: handler 의 materialize_renderables 2개 지점(resumed + per-frame)
+  직후 호출 — 런타임 스폰 엔티티 커버, 핸들 보유 엔티티 skip 멱등이라 저렴.
+  `load_scene` 이 `clear_failures()`.
+- 검증: 단위 +3 (경로 공유 = 로더 1회 / 멱등 skip / 실패 캐시 + clear 재시도).
+  voltex_runtime 96. build/clippy(-D warnings)/test 그린.
+- 설계: `docs/superpowers/specs/2026-06-04-runtime-asset-path-resolve-design.md`.
+- 비범위(후속): Vfs 경유 read, `.vpkg` 에셋 동봉, 런타임 핫리로드 watch.
+
 ### 2026-06-04 — 메시 에셋 경로 직렬화 (v1.0.97, 자율 세션)
 
 v1.0.96 패턴 반복. Open 으로 적용한 메시(`MeshHandle`)도 Save → Load 에서
