@@ -173,6 +173,22 @@
 
 v1.0.9 부터는 **서비스 배포 완성도** 로드맵 (`docs/superpowers/specs/2026-05-21-service-readiness-roadmap.md`) 기준으로 진행.
 
+### 2026-06-04 — 디렉토리 감시 + 브라우저 자동 새로고침 (v1.0.91, 자율 세션)
+
+핫리로드 시리즈(v1.0.87~90) 비범위 후속. 에셋 브라우저가 보는 디렉토리에
+파일이 추가/삭제/이름변경되면 목록 자동 갱신.
+
+- **voltex_asset**: 코드 변경 없음 — `FileWatcher` 의 mtime 폴링이 디렉토리에도
+  동작(엔트리 변경 시 디렉토리 mtime 이동)함을 doc + 회귀 테스트(+1, 생성/삭제
+  양방향)로 **계약화**. 내용 수정은 디렉토리 mtime 을 안 바꿈(개별 파일 감시의
+  역할) — doc 명시.
+- **editor_demo**: `watched_browser_dir` — 브라우저 탐색을 따라 watch 를 이동
+  (기존 메인 watcher 재사용), poll 분기에서 디렉토리 변경 시
+  `AssetBrowser::refresh()` + 상태 텍스트.
+- 설계: `docs/superpowers/specs/2026-06-04-directory-watch-design.md`.
+- 비범위(후속): 재귀 감시, OS 네이티브 알림, 부분 갱신.
+- build/clippy(-D warnings)/test 그린.
+
 ### 2026-06-04 — 런타임 오디오 클립 핫리로드 (v1.0.90, 자율 세션)
 
 v1.0.88 의 에디터 오디오 핫리로드를 게임 런타임(`RuntimeApp` + AudioSource ECS

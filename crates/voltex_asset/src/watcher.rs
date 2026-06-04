@@ -1,8 +1,13 @@
 //! mtime-polling file watcher used to trigger hot reload.
 //!
-//! No OS notifications — we read each watched file's `modified()` time at
+//! No OS notifications — we read each watched path's `modified()` time at
 //! `poll_interval` and report any whose timestamp moved. First poll establishes
 //! baseline (no false-positive change on first call).
+//!
+//! **Directories work too**: watching a directory reports a change whenever a
+//! file is added, removed, or renamed inside it (the directory's own mtime
+//! moves). Edits to a contained file's *content* do NOT touch the directory
+//! mtime — watch the file itself for that (the hot-reload paths do).
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -111,6 +116,37 @@ mod tests {
 
         let changes = watcher.poll_changes();
         assert!(changes.contains(&path));
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn watched_directory_reports_file_creation_and_removal() {
+        // Contract for asset-browser auto-refresh: a directory's mtime moves
+        // when entries are added or removed inside it.
+        let dir = std::env::temp_dir().join(format!("voltex_watcher_dir_{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+
+        let mut watcher = FileWatcher::new(Duration::from_millis(0));
+        watcher.watch(dir.clone());
+        let _ = watcher.poll_changes(); // baseline
+
+        // Create a file inside → the directory itself is reported.
+        std::thread::sleep(Duration::from_millis(50));
+        fs::write(dir.join("new_asset.png"), b"x").unwrap();
+        assert!(
+            watcher.poll_changes().contains(&dir),
+            "file creation must bump the directory mtime"
+        );
+
+        // Remove it → reported again.
+        std::thread::sleep(Duration::from_millis(50));
+        fs::remove_file(dir.join("new_asset.png")).unwrap();
+        assert!(
+            watcher.poll_changes().contains(&dir),
+            "file removal must bump the directory mtime"
+        );
 
         let _ = fs::remove_dir_all(&dir);
     }

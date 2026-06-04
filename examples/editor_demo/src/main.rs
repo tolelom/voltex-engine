@@ -71,6 +71,9 @@ struct AppState {
     watched_scene: Option<PathBuf>,
     watched_meshes: HashMap<PathBuf, MeshHandle>,
     watched_audio: HashMap<PathBuf, usize>,
+    // Directory the asset browser is showing — watched so external file
+    // adds/removes auto-refresh the listing (dir mtime moves on entry change).
+    watched_browser_dir: Option<PathBuf>,
     // Audio preview for browser-opened clips (starts empty; clips hot-loaded).
     audio: AudioSystem,
     // Mouse tracking
@@ -337,6 +340,7 @@ impl ApplicationHandler for EditorDemoApp {
             watched_scene: None,
             watched_meshes: HashMap::new(),
             watched_audio: HashMap::new(),
+            watched_browser_dir: None,
             audio: AudioSystem::new(Vec::new())
                 .expect("voltex: audio thread spawn failed"),
             basic_renderer,
@@ -553,6 +557,18 @@ impl ApplicationHandler for EditorDemoApp {
 
                 state.ui.end_frame();
 
+                // ── Browser directory watch: follow navigation ──
+                // Watching the directory's mtime detects external file
+                // adds/removes (not content edits — per-file watches do that).
+                if state.watched_browser_dir.as_ref() != Some(&state.asset_browser.current) {
+                    if let Some(old) = state.watched_browser_dir.take() {
+                        state.watcher.unwatch(&old);
+                    }
+                    let dir = state.asset_browser.current.clone();
+                    state.watcher.watch(dir.clone());
+                    state.watched_browser_dir = Some(dir);
+                }
+
                 // ── Asset pipeline: consume a browser "Open" activation ──
                 // The editor crate is GPU-free, so the actual load/apply happens
                 // here in the integration layer (it owns gpu + render_assets).
@@ -710,6 +726,12 @@ impl ApplicationHandler for EditorDemoApp {
                             }
                             Err(e) => state.status = format!("Audio reload failed: {}", e),
                         }
+                    } else if state.watched_browser_dir.as_deref() == Some(changed.as_path()) {
+                        // Entry added/removed in the visible directory →
+                        // re-list. refresh() clears selection/activation by
+                        // design (the old selection may no longer exist).
+                        state.asset_browser.refresh();
+                        state.status = format!("Refreshed folder: {}", name);
                     }
                     eprintln!("[hot-reload] {}", state.status);
                 }

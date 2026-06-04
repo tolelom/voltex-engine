@@ -8,7 +8,7 @@
 - `AssetStorage<T>` — 타입별 저장소 (ref counting) (src/storage.rs)
 - `Assets` — type-erased 다중 저장소 (src/assets.rs)
 - `AssetLoader` — 워커 스레드 비동기 로딩 (src/loader.rs)
-- `FileWatcher` — mtime 폴링 변경 감지 (src/watcher.rs)
+- `FileWatcher` — mtime 폴링 변경 감지. 디렉토리도 감시 가능: 파일 추가/삭제/이름변경 시 보고 (내용 수정은 미감지 — 개별 파일 감시 사용) (src/watcher.rs)
 - `VpkgReader`, `write_vpkg`, `VpkgEntry`, `VPKG_MAGIC`, `VPKG_VERSION` — `.vpkg` 아카이브 (src/vpkg.rs)
 - `Vfs`, `VpkgReaderOwned` — Filesystem / Archive 백엔드 통합 read API (src/vfs.rs)
 - `AssetError`, `Result` — thiserror 기반 에러 (Generic/Io) (src/error.rs)
