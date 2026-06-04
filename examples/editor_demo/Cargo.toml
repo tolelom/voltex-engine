@@ -13,6 +13,7 @@ voltex_editor.workspace = true
 voltex_math.workspace = true
 voltex_ecs.workspace = true
 voltex_physics.workspace = true
+voltex_audio.workspace = true
 wgpu.workspace = true
 winit.workspace = true
 bytemuck.workspace = true

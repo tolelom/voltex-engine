@@ -502,6 +502,7 @@ dependencies = [
  "log",
  "pollster",
  "voltex_asset",
+ "voltex_audio",
  "voltex_ecs",
  "voltex_editor",
  "voltex_math",

@@ -9,8 +9,9 @@ use voltex_platform::{VoltexWindow, WindowConfig, InputState, GameTimer};
 use voltex_renderer::{GpuContext, LightUniform, MaterialUniform, Mesh, MeshVertex};
 use voltex_renderer_ecs::{BasicRenderer, RenderAssets, TextureHandle};
 use voltex_asset::FileWatcher;
+use voltex_audio::{AudioClip, AudioSystem};
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::time::Duration;
 use voltex_editor::{
     UiContext, UiRenderer, DockTree, DockNode, Axis, Rect,
@@ -68,6 +69,10 @@ struct AppState {
     watcher: FileWatcher,
     watched_textures: HashMap<PathBuf, TextureHandle>,
     watched_scene: Option<PathBuf>,
+    watched_meshes: HashMap<PathBuf, MeshHandle>,
+    watched_audio: HashMap<PathBuf, usize>,
+    // Audio preview for browser-opened clips (starts empty; clips hot-loaded).
+    audio: AudioSystem,
     // Mouse tracking
     prev_mouse: (f32, f32),
     left_dragging: bool,
@@ -116,6 +121,62 @@ fn make_unit_ground(device: &wgpu::Device) -> Mesh {
     ];
     let indices = vec![0u32, 1, 2, 0, 2, 3];
     Mesh::new(device, &verts, &indices)
+}
+
+/// Local-space AABB over a vertex position iterator (assumes at least one).
+fn aabb_from_positions(positions: impl Iterator<Item = [f32; 3]>) -> AABB {
+    let mut min = Vec3::new(f32::MAX, f32::MAX, f32::MAX);
+    let mut max = Vec3::new(f32::MIN, f32::MIN, f32::MIN);
+    for [x, y, z] in positions {
+        min = Vec3::new(min.x.min(x), min.y.min(y), min.z.min(z));
+        max = Vec3::new(max.x.max(x), max.y.max(y), max.z.max(z));
+    }
+    AABB::new(min, max)
+}
+
+/// Decode a mesh file (.obj / .gltf / .glb) and upload it as a GPU mesh,
+/// also returning its local-space AABB (for the entity's `Bounds`).
+fn load_mesh_from_path(device: &wgpu::Device, path: &Path) -> Result<(Mesh, AABB), String> {
+    let ext = path
+        .extension()
+        .and_then(|e| e.to_str())
+        .map(|e| e.to_ascii_lowercase());
+    match ext.as_deref() {
+        Some("obj") => {
+            let source = std::fs::read_to_string(path).map_err(|e| e.to_string())?;
+            let data = voltex_renderer::obj::parse_obj(&source);
+            if data.vertices.is_empty() {
+                return Err("OBJ has no vertices".to_string());
+            }
+            let aabb = aabb_from_positions(data.vertices.iter().map(|v| v.position));
+            Ok((Mesh::new(device, &data.vertices, &data.indices), aabb))
+        }
+        Some("gltf" | "glb") => {
+            let bytes = std::fs::read(path).map_err(|e| e.to_string())?;
+            let data = voltex_renderer::parse_gltf(&bytes).map_err(|e| e.to_string())?;
+            let prim = data.meshes.first().ok_or("glTF has no meshes")?;
+            if prim.vertices.is_empty() {
+                return Err("glTF mesh has no vertices".to_string());
+            }
+            let aabb = aabb_from_positions(prim.vertices.iter().map(|v| v.position));
+            Ok((Mesh::new(device, &prim.vertices, &prim.indices), aabb))
+        }
+        _ => Err(format!("unsupported mesh extension: {}", path.display())),
+    }
+}
+
+/// Decode an audio file (.wav / .ogg) into an [`AudioClip`].
+fn load_clip_from_path(path: &Path) -> Result<AudioClip, String> {
+    let bytes = std::fs::read(path).map_err(|e| e.to_string())?;
+    let ext = path
+        .extension()
+        .and_then(|e| e.to_str())
+        .map(|e| e.to_ascii_lowercase());
+    match ext.as_deref() {
+        Some("wav") => voltex_audio::parse_wav(&bytes).map_err(|e| e.to_string()),
+        Some("ogg") => voltex_audio::decode_ogg_vorbis_bytes(&bytes).map_err(|e| e.to_string()),
+        _ => Err(format!("unsupported audio extension: {}", path.display())),
+    }
 }
 
 impl ApplicationHandler for EditorDemoApp {
@@ -281,6 +342,10 @@ impl ApplicationHandler for EditorDemoApp {
             watcher: FileWatcher::new(Duration::from_millis(300)),
             watched_textures: HashMap::new(),
             watched_scene: None,
+            watched_meshes: HashMap::new(),
+            watched_audio: HashMap::new(),
+            audio: AudioSystem::new(Vec::new())
+                .expect("voltex: audio thread spawn failed"),
             basic_renderer,
             cube_mesh_h,
             ground_mesh_h,
@@ -542,8 +607,49 @@ impl ApplicationHandler for EditorDemoApp {
                                 Err(e) => state.status = format!("Read failed: {}", e),
                             }
                         }
-                        other => {
-                            state.status = format!("{:?} import not yet wired", other);
+                        voltex_editor::AssetKind::Mesh => {
+                            if let Some(sel) = state.session.selected {
+                                match load_mesh_from_path(&state.gpu.device, &path) {
+                                    Ok((mesh, aabb)) => {
+                                        let handle = state.render_assets.add_mesh(mesh);
+                                        state.session.world.add(sel, handle);
+                                        state.session.world.add(sel, Bounds(aabb));
+                                        state.status = format!("Applied mesh: {}", name);
+                                        // Watch this file → hot-reload onto the same handle.
+                                        state.watched_meshes.insert(path.clone(), handle);
+                                        state.watcher.watch(path.clone());
+                                    }
+                                    Err(e) => state.status = format!("Mesh load failed: {}", e),
+                                }
+                            } else {
+                                state.status = "Select an entity first".to_string();
+                            }
+                        }
+                        voltex_editor::AssetKind::Audio => {
+                            match load_clip_from_path(&path) {
+                                Ok(clip) => {
+                                    // Re-Open of a watched file replaces its clip
+                                    // in place; first Open hot-loads a new one.
+                                    let idx = match state.watched_audio.get(&path) {
+                                        Some(&i) => {
+                                            state.audio.replace_clip(i, clip);
+                                            i
+                                        }
+                                        None => {
+                                            let i = state.audio.add_clip(clip);
+                                            state.watched_audio.insert(path.clone(), i);
+                                            state.watcher.watch(path.clone());
+                                            i
+                                        }
+                                    };
+                                    state.audio.play(idx, 1.0, false);
+                                    state.status = format!("Playing audio: {}", name);
+                                }
+                                Err(e) => state.status = format!("Audio decode failed: {}", e),
+                            }
+                        }
+                        voltex_editor::AssetKind::Other => {
+                            state.status = "Other import not yet wired".to_string();
                         }
                     }
                     eprintln!("[asset] {}", state.status);
@@ -576,6 +682,28 @@ impl ApplicationHandler for EditorDemoApp {
                                 Err(e) => state.status = format!("Texture reload failed: {}", e),
                             },
                             Err(e) => state.status = format!("Reread failed: {}", e),
+                        }
+                    } else if let Some(&handle) = state.watched_meshes.get(&changed) {
+                        // Bounds is NOT refreshed on reload — the handle may be
+                        // shared by entities this frame doesn't track (v1 limit).
+                        match load_mesh_from_path(&state.gpu.device, &changed) {
+                            Ok((mesh, _aabb)) => {
+                                match state.render_assets.replace_mesh(handle, mesh) {
+                                    Ok(()) => state.status = format!("Reloaded mesh: {}", name),
+                                    Err(e) => state.status = format!("Mesh reload failed: {}", e),
+                                }
+                            }
+                            Err(e) => state.status = format!("Mesh reload failed: {}", e),
+                        }
+                    } else if let Some(&idx) = state.watched_audio.get(&changed) {
+                        match load_clip_from_path(&changed) {
+                            Ok(clip) => {
+                                state.audio.replace_clip(idx, clip);
+                                // Re-preview so the change is audible immediately.
+                                state.audio.play(idx, 1.0, false);
+                                state.status = format!("Reloaded audio: {}", name);
+                            }
+                            Err(e) => state.status = format!("Audio reload failed: {}", e),
                         }
                     }
                     eprintln!("[hot-reload] {}", state.status);
