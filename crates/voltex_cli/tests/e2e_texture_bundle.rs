@@ -1,8 +1,8 @@
-//! End-to-end test for the editor-asset → shipped-exe chain (v1.0.96~101):
+//! End-to-end test for the editor-asset → shipped-exe chain (v1.0.96~103):
 //!
-//!   scene carries `texture_path` → `voltex build` auto-bundles the file
-//!   into `.vpkg` → the dist exe resolves it through the Vfs from a
-//!   directory where no loose asset files exist.
+//!   scene carries `texture_path` + `audio_path` → `voltex build`
+//!   auto-bundles the files into `.vpkg` → the dist exe resolves both
+//!   through the Vfs from a directory where no loose asset files exist.
 //!
 //! Why it exists: v1.0.96~101 verified each link with unit tests, but the
 //! chain as a whole had never been executed in one pass. Per the v1.0.3 /
@@ -26,10 +26,15 @@ use voltex_ecs::{ComponentRegistry, Entity, Transform, World};
 // `src/build.rs`.
 
 struct TexPathRef(String);
+struct AudioPathRef(String);
 struct PrimBytes(Vec<u8>);
 
 fn ser_tex(world: &World, e: Entity) -> Option<Vec<u8>> {
     world.get::<TexPathRef>(e).map(|p| p.0.as_bytes().to_vec())
+}
+
+fn ser_audio(world: &World, e: Entity) -> Option<Vec<u8>> {
+    world.get::<AudioPathRef>(e).map(|p| p.0.as_bytes().to_vec())
 }
 
 fn ser_prim(world: &World, e: Entity) -> Option<Vec<u8>> {
@@ -49,18 +54,21 @@ fn prim_cube_bytes(size: f32) -> Vec<u8> {
     data
 }
 
-/// One entity: identity Transform + unit cube + texture_path reference.
-/// This is the shape the editor's apply-and-save workflow persists.
-fn make_scene_json(tex_path: &str) -> String {
+/// One entity: identity Transform + unit cube + texture_path + audio_path
+/// references. This is the shape the editor's apply-and-save workflow
+/// persists.
+fn make_scene_json(tex_path: &str, audio_path: &str) -> String {
     let mut registry = ComponentRegistry::new();
     registry.register::<Transform>();
     registry.register_raw("texture_path", ser_tex, deser_noop);
+    registry.register_raw("audio_path", ser_audio, deser_noop);
     registry.register_raw("primitive_mesh", ser_prim, deser_noop);
 
     let mut world = World::new();
     let e = world.spawn();
     world.add(e, Transform::default());
     world.add(e, TexPathRef(tex_path.to_string()));
+    world.add(e, AudioPathRef(audio_path.to_string()));
     world.add(e, PrimBytes(prim_cube_bytes(1.0)));
     voltex_ecs::serialize_scene_json(&world, &registry)
 }
@@ -101,13 +109,25 @@ fn e2e_scene_texture_is_bundled_and_resolves_from_foreign_dir() {
         .expect("spawn voltex new");
     assert!(status.success(), "voltex new exit={:?}", status.code());
 
-    // ── 2. texture OUTSIDE the declared assets dir + referencing scene ──
-    // `textures/` is not in the manifest's `assets = ["assets/**/*"]`, so
-    // the file only reaches the archive through the v1.0.101 auto-bundle.
+    // ── 2. assets OUTSIDE the declared assets dir + referencing scene ──
+    // `textures/` and `sounds/` are not in the manifest's
+    // `assets = ["assets/**/*"]`, so the files only reach the archive
+    // through the v1.0.101/103 auto-bundle.
     let tex_rel = "textures/checker.png";
     std::fs::create_dir_all(scratch.join("textures")).expect("mkdir textures");
     std::fs::write(scratch.join(tex_rel), checker_png()).expect("write png");
-    std::fs::write(scratch.join("scene.vscn"), make_scene_json(tex_rel)).expect("write scene");
+    let audio_rel = "sounds/beep.wav";
+    std::fs::create_dir_all(scratch.join("sounds")).expect("mkdir sounds");
+    std::fs::write(
+        scratch.join(audio_rel),
+        voltex_audio::generate_wav_bytes(&[0.25, -0.25, 0.5, -0.5], 44_100),
+    )
+    .expect("write wav");
+    std::fs::write(
+        scratch.join("scene.vscn"),
+        make_scene_json(tex_rel, audio_rel),
+    )
+    .expect("write scene");
 
     // ── 3. voltex build — capture stderr for the auto-bundle log ────────
     let output = Command::new(voltex_bin)
@@ -128,19 +148,26 @@ fn e2e_scene_texture_is_bundled_and_resolves_from_foreign_dir() {
     );
     assert!(
         build_stderr.contains("auto-bundled scene asset `textures/checker.png`"),
-        "expected auto-bundle log in build stderr:\n{}",
+        "expected texture auto-bundle log in build stderr:\n{}",
+        build_stderr
+    );
+    assert!(
+        build_stderr.contains("auto-bundled scene asset `sounds/beep.wav`"),
+        "expected audio auto-bundle log in build stderr:\n{}",
         build_stderr
     );
 
-    // ── 4. archive really contains the texture under the scene's key ────
+    // ── 4. archive really contains both assets under the scene's keys ───
     let vpkg_bytes = std::fs::read(scratch.join("dist").join("wrapper").join("voltex_archive.vpkg"))
         .expect("read voltex_archive.vpkg");
     let reader = voltex_asset::VpkgReader::parse(&vpkg_bytes).expect("parse vpkg");
-    assert!(
-        reader.list().any(|key| key == tex_rel),
-        "vpkg should contain {tex_rel}; got {:?}",
-        reader.list().collect::<Vec<_>>()
-    );
+    for key in [tex_rel, audio_rel] {
+        assert!(
+            reader.list().any(|k| k == key),
+            "vpkg should contain {key}; got {:?}",
+            reader.list().collect::<Vec<_>>()
+        );
+    }
 
     // ── 5. run the exe from a directory with NO loose assets ────────────
     // From a foreign cwd the runtime's fs fallback cannot find
@@ -205,6 +232,13 @@ fn e2e_scene_texture_is_bundled_and_resolves_from_foreign_dir() {
     assert!(
         run_log.contains("resolved 1 texture path(s)"),
         "expected texture resolve log:\n{}",
+        run_log
+    );
+    // Audio resolves in the tick's audio stage (no GPU needed) — only runs
+    // because the wrapper enables audio (v1.0.106).
+    assert!(
+        run_log.contains("resolved 1 audio path(s)"),
+        "expected audio resolve log:\n{}",
         run_log
     );
 

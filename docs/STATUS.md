@@ -173,6 +173,25 @@
 
 v1.0.9 부터는 **서비스 배포 완성도** 로드맵 (`docs/superpowers/specs/2026-05-21-service-readiness-roadmap.md`) 기준으로 진행.
 
+### 2026-06-04 — E2E 오디오 확장 + wrapper 오디오 활성화 (v1.0.106, 자율 세션)
+
+v1.0.103 비범위 후속. E2E 확장 중 **출하 격차 발견**: `enable_audio` 기본
+false + wrapper 코드젠이 audio 미활성 → AudioPath resolve 가 tick 의 audio
+단계 안에 있어 **dist exe 에서 v1.0.103 체인 전체가 실행되지 않았다**
+(에디터에서 오디오 적용해 저장한 씬이 빌드된 게임에서 무음).
+
+- **voltex_cli**: `render_wrapper_main` 에 `.with_audio(Vec::new())` —
+  출하물은 오디오 믹서 상시 초기화 (씬 스캔 기반 조건부는 스크립트 spawn
+  오디오를 놓침; 디바이스 실패는 기존 graceful 무음). 코드젠 단언 +1.
+- **E2E (`e2e_texture_bundle.rs`)**: 씬에 `audio_path("sounds/beep.wav")`
+  추가 (선언 밖 — 자동 동봉 경로), wav 는 `voltex_audio::generate_wav_bytes`
+  dev-dep. 단언: 오디오 자동 동봉 로그 / vpkg 키 / foreign cwd 런 로그
+  `resolved 1 audio path(s)`. 1회 완주 통과.
+- build/clippy(-D warnings)/test 그린.
+- 설계: `docs/superpowers/specs/2026-06-04-e2e-audio-bundle-design.md`.
+- 비범위(후속): manifest audio opt-out, 에디터 Load 시 AudioPath 프리뷰
+  복원, 메시 동봉 E2E.
+
 ### 2026-06-04 — 인스펙터 Bounds 값 편집 폼 (v1.0.105, 자율 세션)
 
 v1.0.92 비범위 후속 (핸드오프 우선순위 4). Components 목록의 `bounds` 가

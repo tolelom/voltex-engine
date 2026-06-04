@@ -19,6 +19,7 @@ voltex_asset = { path = "../voltex_asset" }
 voltex_ecs = { path = "../voltex_ecs" }
 
 [dev-dependencies]
-# E2E texture-bundle test encodes a real PNG the engine's own decoder reads
-# (workspace crate — external-deps-zero policy holds for dev deps too).
+# E2E bundle test encodes a real PNG / WAV the engine's own decoders read
+# (workspace crates — external-deps-zero policy holds for dev deps too).
 voltex_image = { path = "../voltex_image" }
+voltex_audio = { path = "../voltex_audio" }

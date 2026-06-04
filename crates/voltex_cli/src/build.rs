@@ -259,9 +259,13 @@ const ARCHIVE_BYTES: &[u8] = include_bytes!("../voltex_archive.vpkg");
 fn main() -> voltex_runtime::RuntimeResult<()> {{
     let vfs = Vfs::archive_from_bytes(ARCHIVE_BYTES)
         .map_err(|e| voltex_runtime::RuntimeError::Generic(format!("vfs: {{}}", e)))?;
+    // Audio is always on in shipped builds: scene-persisted AudioPath
+    // resolution and script-spawned sources both live behind it, and a
+    // failed device init degrades to silence gracefully.
     let mut cfg = RuntimeConfig::new()
         .with_window_title("{title}")
         .with_window_size({w}, {h})
+        .with_audio(Vec::new())
         .with_vfs(vfs);
     cfg = cfg.with_initial_scene("{scene}");
     RuntimeApp::new(cfg)?.run()
@@ -479,6 +483,9 @@ mod tests {
         assert!(body.contains("with_initial_scene"));
         assert!(body.contains("include_bytes!"));
         assert!(body.contains("with_vfs"));
+        // Shipped builds always run the audio stage (AudioPath resolve +
+        // script-spawned sources live behind it).
+        assert!(body.contains("with_audio(Vec::new())"));
     }
 
     #[test]

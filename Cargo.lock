@@ -2187,6 +2187,7 @@ name = "voltex_cli"
 version = "1.0.61"
 dependencies = [
  "voltex_asset",
+ "voltex_audio",
  "voltex_ecs",
  "voltex_image",
 ]

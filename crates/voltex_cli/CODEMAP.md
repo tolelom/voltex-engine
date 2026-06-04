@@ -48,7 +48,7 @@ src/
 2. `--target` 또는 `manifest.build.targets[0]` 또는 host triple 결정
 3. `<project>/dist/wrapper/{Cargo.toml,src/main.rs}` 생성
    - `Cargo.toml`: `voltex_runtime` path 의존 (engine_path 의 `crates/voltex_runtime`)
-   - `src/main.rs`: `RuntimeApp::new(RuntimeConfig::new().with_window_title(<manifest.window_title>).with_window_size(...).with_initial_scene(scene_path_next_to_exe(...)))?.run()`
+   - `src/main.rs`: `RuntimeApp::new(RuntimeConfig::new().with_window_title(...).with_window_size(...).with_audio(Vec::new()).with_vfs(...).with_initial_scene(...))?.run()` — **오디오 상시 활성** (AudioPath resolve/스크립트 오디오가 audio 단계 뒤에 있음; 디바이스 실패는 graceful 무음 — v1.0.106)
 4. wrapper 디렉토리에서 `cargo build --release`
 5. `target/release/wrapper(.exe)` → `dist/<name>(.exe)` 복사
 6. `scene.vscn` / `scripts/` / `assets/` 를 dist 폴더에 복사 (없으면 silent skip)
@@ -56,7 +56,7 @@ src/
 
 ## 의존성
 - workspace 내부: voltex_asset (`.vpkg` write/read), voltex_ecs (빌드 시 씬 에셋 참조 스캔 `scan_scene_asset_paths` — v1.0.101). voltex_runtime 은 wrapper 의 의존, voltex_cli 의 의존 아님
-- dev-dependency: voltex_image (E2E 텍스처 번들 테스트의 PNG 인코딩)
+- dev-dependency: voltex_image (E2E 번들 테스트의 PNG 인코딩), voltex_audio (동 테스트의 WAV 생성)
 - 외부 crate: 없음 (TOML 파서 자체 구현)
 - 시스템 의존: `cargo` 가 PATH 에 있어야 함 (없으면 `CargoMissing` 친화 에러)
 
@@ -71,7 +71,7 @@ src/
 - 실행: `cargo test -p voltex_cli`
 - E2E (`tests/`, 전부 `#[ignore]` — `cargo test -p voltex_cli -- --ignored` 로 명시 실행, wrapper 의 release 엔진 링크 ~2-5분):
   - `e2e_new_build.rs` — `voltex new` → `voltex build` → dist exe + 라이선스 번들 확인
-  - `e2e_texture_bundle.rs` — v1.0.96~101 체인 통검: `texture_path` 씬 → 자동 동봉 로그 + `.vpkg` 키 확인 → exe 를 루즈 파일 없는 디렉토리에서 12초 구동, `initial scene ... loaded` + `resolved 1 texture path(s)` 양성 로그 단언 (실창/GPU 필요)
+  - `e2e_texture_bundle.rs` — v1.0.96~103 체인 통검: `texture_path` + `audio_path` 씬 → 자동 동봉 로그 + `.vpkg` 키 확인 → exe 를 루즈 파일 없는 디렉토리에서 12초 구동, `initial scene ... loaded` + `resolved 1 texture path(s)` + `resolved 1 audio path(s)` 양성 로그 단언 (실창/GPU 필요)
 
 ## 수동 검증 절차
 ```bash
