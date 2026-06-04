@@ -173,6 +173,19 @@
 
 v1.0.9 부터는 **서비스 배포 완성도** 로드맵 (`docs/superpowers/specs/2026-05-21-service-readiness-roadmap.md`) 기준으로 진행.
 
+### 2026-06-04 — E2E 메시 레그 (v1.0.108, 자율 세션)
+
+3종 에셋 E2E 커버리지 완결. `e2e_texture_bundle.rs` 에 `mesh_path
+("models/tri.obj", 선언 밖)` 레그 추가 — 자동 동봉 로그 / `.vpkg` 키 /
+foreign cwd 런 로그 `1 mesh path(s)` 단언.
+
+- 설계 포인트: mesh_path 는 **전용 두 번째 엔티티** — 기존 엔티티의
+  `primitive_mesh` 가 materialize 에서 MeshHandle 을 먼저 부착하면
+  resolve 가 멱등 skip 하므로 같은 엔티티로는 검증 불가. 씬 로드 단언도
+  `(2 entities)` 로 갱신. OBJ 는 최소 삼각형 텍스트 (`Mesh::from_obj`).
+- E2E 1회 완주 통과. clippy/test 그린.
+- 설계: `docs/superpowers/specs/2026-06-04-e2e-mesh-bundle-design.md`.
+
 ### 2026-06-04 — 에디터 씬 로드 시 AudioPath 프리뷰 복원 (v1.0.107, 자율 세션)
 
 editor_demo 의 LoadScene 후 resolve 3종 대칭 완성. 저장된 씬을 다시 열면

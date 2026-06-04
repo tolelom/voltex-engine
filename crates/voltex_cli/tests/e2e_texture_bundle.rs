@@ -27,6 +27,7 @@ use voltex_ecs::{ComponentRegistry, Entity, Transform, World};
 
 struct TexPathRef(String);
 struct AudioPathRef(String);
+struct MeshPathRef(String);
 struct PrimBytes(Vec<u8>);
 
 fn ser_tex(world: &World, e: Entity) -> Option<Vec<u8>> {
@@ -35,6 +36,10 @@ fn ser_tex(world: &World, e: Entity) -> Option<Vec<u8>> {
 
 fn ser_audio(world: &World, e: Entity) -> Option<Vec<u8>> {
     world.get::<AudioPathRef>(e).map(|p| p.0.as_bytes().to_vec())
+}
+
+fn ser_mesh(world: &World, e: Entity) -> Option<Vec<u8>> {
+    world.get::<MeshPathRef>(e).map(|p| p.0.as_bytes().to_vec())
 }
 
 fn ser_prim(world: &World, e: Entity) -> Option<Vec<u8>> {
@@ -54,14 +59,17 @@ fn prim_cube_bytes(size: f32) -> Vec<u8> {
     data
 }
 
-/// One entity: identity Transform + unit cube + texture_path + audio_path
-/// references. This is the shape the editor's apply-and-save workflow
-/// persists.
-fn make_scene_json(tex_path: &str, audio_path: &str) -> String {
+/// Two entities, the shape the editor's apply-and-save workflow persists:
+/// 1. identity Transform + unit cube + texture_path + audio_path,
+/// 2. identity Transform + mesh_path ONLY — `primitive_mesh` would
+///    materialize a MeshHandle first and the idempotent resolver would then
+///    skip the persisted path, so the mesh leg needs its own entity.
+fn make_scene_json(tex_path: &str, audio_path: &str, mesh_path: &str) -> String {
     let mut registry = ComponentRegistry::new();
     registry.register::<Transform>();
     registry.register_raw("texture_path", ser_tex, deser_noop);
     registry.register_raw("audio_path", ser_audio, deser_noop);
+    registry.register_raw("mesh_path", ser_mesh, deser_noop);
     registry.register_raw("primitive_mesh", ser_prim, deser_noop);
 
     let mut world = World::new();
@@ -70,8 +78,14 @@ fn make_scene_json(tex_path: &str, audio_path: &str) -> String {
     world.add(e, TexPathRef(tex_path.to_string()));
     world.add(e, AudioPathRef(audio_path.to_string()));
     world.add(e, PrimBytes(prim_cube_bytes(1.0)));
+    let m = world.spawn();
+    world.add(m, Transform::default());
+    world.add(m, MeshPathRef(mesh_path.to_string()));
     voltex_ecs::serialize_scene_json(&world, &registry)
 }
+
+/// Minimal one-triangle OBJ source `Mesh::from_obj` decodes.
+const TRI_OBJ: &str = "v 0 0 0\nv 1 0 0\nv 0 1 0\nvn 0 0 1\nvt 0 0\nvt 1 0\nvt 0 1\nf 1/1/1 2/2/1 3/3/1\n";
 
 /// 2x2 red/green checker PNG via the engine's own encoder, so the engine's
 /// own decoder is guaranteed to read it back.
@@ -123,9 +137,12 @@ fn e2e_scene_texture_is_bundled_and_resolves_from_foreign_dir() {
         voltex_audio::generate_wav_bytes(&[0.25, -0.25, 0.5, -0.5], 44_100),
     )
     .expect("write wav");
+    let mesh_rel = "models/tri.obj";
+    std::fs::create_dir_all(scratch.join("models")).expect("mkdir models");
+    std::fs::write(scratch.join(mesh_rel), TRI_OBJ).expect("write obj");
     std::fs::write(
         scratch.join("scene.vscn"),
-        make_scene_json(tex_rel, audio_rel),
+        make_scene_json(tex_rel, audio_rel, mesh_rel),
     )
     .expect("write scene");
 
@@ -156,12 +173,17 @@ fn e2e_scene_texture_is_bundled_and_resolves_from_foreign_dir() {
         "expected audio auto-bundle log in build stderr:\n{}",
         build_stderr
     );
+    assert!(
+        build_stderr.contains("auto-bundled scene asset `models/tri.obj`"),
+        "expected mesh auto-bundle log in build stderr:\n{}",
+        build_stderr
+    );
 
-    // ── 4. archive really contains both assets under the scene's keys ───
+    // ── 4. archive really contains all three assets under scene keys ────
     let vpkg_bytes = std::fs::read(scratch.join("dist").join("wrapper").join("voltex_archive.vpkg"))
         .expect("read voltex_archive.vpkg");
     let reader = voltex_asset::VpkgReader::parse(&vpkg_bytes).expect("parse vpkg");
-    for key in [tex_rel, audio_rel] {
+    for key in [tex_rel, audio_rel, mesh_rel] {
         assert!(
             reader.list().any(|k| k == key),
             "vpkg should contain {key}; got {:?}",
@@ -225,7 +247,7 @@ fn e2e_scene_texture_is_bundled_and_resolves_from_foreign_dir() {
     // from vpkg" from "scene never loaded" (the initial-scene load degrades
     // to an empty world on failure).
     assert!(
-        run_log.contains("initial scene `scene.vscn` loaded (1 entities)"),
+        run_log.contains("initial scene `scene.vscn` loaded (2 entities)"),
         "expected initial-scene load log:\n{}",
         run_log
     );
@@ -239,6 +261,14 @@ fn e2e_scene_texture_is_bundled_and_resolves_from_foreign_dir() {
     assert!(
         run_log.contains("resolved 1 audio path(s)"),
         "expected audio resolve log:\n{}",
+        run_log
+    );
+    // The mesh leg shares the texture resolver's log line — "resolved
+    // {t} texture path(s), {m} mesh path(s)" — so substring-match the
+    // mesh half (same frame or not, the count line appears once nonzero).
+    assert!(
+        run_log.contains("1 mesh path(s)"),
+        "expected mesh resolve log:\n{}",
         run_log
     );
 

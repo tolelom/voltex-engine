@@ -71,7 +71,7 @@ src/
 - 실행: `cargo test -p voltex_cli`
 - E2E (`tests/`, 전부 `#[ignore]` — `cargo test -p voltex_cli -- --ignored` 로 명시 실행, wrapper 의 release 엔진 링크 ~2-5분):
   - `e2e_new_build.rs` — `voltex new` → `voltex build` → dist exe + 라이선스 번들 확인
-  - `e2e_texture_bundle.rs` — v1.0.96~103 체인 통검: `texture_path` + `audio_path` 씬 → 자동 동봉 로그 + `.vpkg` 키 확인 → exe 를 루즈 파일 없는 디렉토리에서 12초 구동, `initial scene ... loaded` + `resolved 1 texture path(s)` + `resolved 1 audio path(s)` 양성 로그 단언 (실창/GPU 필요)
+  - `e2e_texture_bundle.rs` — v1.0.96~103 체인 통검 (3종 에셋): `texture_path` + `audio_path` + `mesh_path` 씬 → 자동 동봉 로그 + `.vpkg` 키 확인 → exe 를 루즈 파일 없는 디렉토리에서 12초 구동, `initial scene ... loaded` + texture/audio/mesh resolve 양성 로그 단언 (실창/GPU 필요). mesh_path 는 전용 엔티티 — primitive_mesh 가 있으면 materialize 가 MeshHandle 을 먼저 부착해 resolve 가 멱등 skip
 
 ## 수동 검증 절차
 ```bash
