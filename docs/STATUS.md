@@ -173,6 +173,33 @@
 
 v1.0.9 부터는 **서비스 배포 완성도** 로드맵 (`docs/superpowers/specs/2026-05-21-service-readiness-roadmap.md`) 기준으로 진행.
 
+### 2026-06-04 — Mesh/Audio 핫리로드 (v1.0.88, 자율 세션)
+
+v1.0.87 (텍스처/씬)의 비범위 후속. 브라우저에서 Open한 메시(.obj/.gltf/.glb)와
+오디오(.wav/.ogg)가 에디터에서 실제로 동작하고, 디스크 변경 시 즉시 반영.
+`AssetKind::Mesh`/`Audio` 분류(v1.0.86)에 Open 배선 + 교체 메커니즘을 연결.
+
+- **voltex_audio**: 클립 목록이 생성 시점 고정이던 것을 런타임 변경 가능으로 —
+  `AudioCommand::AddClip`/`ReplaceClip` + `AudioSystem::add_clip(&mut)->usize`
+  (FIFO lockstep 인덱스 발급) / `replace_clip(idx, clip)`(out-of-range 무시).
+  오디오 스레드가 `Arc<Vec>` 대신 `Vec<AudioClip>` 단독 소유(mut). 재생 중 짧은
+  클립으로 교체 시 믹서 자연 종료/루프 회귀 테스트 +2, 시스템/핸들러 단위 +4.
+- **voltex_renderer_ecs**: `RenderAssets::replace_mesh(handle, mesh)` — 기존
+  `MeshHandle` 뒤 GPU Mesh in-place 교체 (`replace_texture_png` 대칭). 디코드는
+  호출자가 `Mesh::from_obj`/`from_gltf` 로 (원콜 이미 존재, wrapper 중복 회피).
+- **editor_demo**: Mesh Open → 선택 엔티티에 `MeshHandle` + 정점 AABB 기반
+  `Bounds` 부착 + watch. Audio Open → `AudioSystem`(빈 클립 시작) `add_clip` +
+  즉시 프리뷰 재생 + watch (re-Open 은 in-place 교체). poll 분기: 메시 재디코드 →
+  `replace_mesh`, 오디오 재디코드 → `replace_clip` + 프리뷰 재재생.
+- **voltex_capture**: `render_mesh_hot_reload`(같은 핸들에서 작은 큐브→큰 큐브
+  교체 후 재렌더) + `mesh_hot_reload_swaps_rendered_geometry` RTX 4080 회귀
+  (실루엣 커버리지 2배+ 증가 단언).
+- 설계: `docs/superpowers/specs/2026-06-04-mesh-audio-hot-reload-design.md`.
+- 비범위(후속): 씬-로드 메시 경로 추적, 교체 시 다중 엔티티 Bounds 일괄 갱신,
+  스킨드 메시 핫리로드, AudioSource(ECS) 경로 클립 핫리로드, 디렉토리 감시.
+- v1 한계(문서화): 메시 핫리로드는 Bounds 미갱신(핸들 공유 엔티티 추적 없음).
+- build/clippy(-D warnings)/test 그린.
+
 ### 2026-06-04 — 에셋 핫리로드 (v1.0.87, 자율 세션)
 
 v1.0.86 파이프라인의 후속. 브라우저에서 Open한 텍스처/씬이 디스크에서 바뀌면 뷰포트에

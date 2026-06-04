@@ -14,6 +14,7 @@ ECS World ↔ voltex_renderer 브릿지. C0a 의 `MeshHandle` / `MaterialHandle`
 | 항목 | 파일 | 메모 |
 |---|---|---|
 | `RenderAssets::new()` / `add_mesh(Mesh) -> MeshHandle` / `mesh(MeshHandle) -> Option<&Mesh>` | `assets.rs` | 머티리얼도 동일 패턴 (`add_material` / `material`) |
+| `RenderAssets::replace_mesh(handle, Mesh) -> Result` | `assets.rs` | 핫리로드 — 기존 `MeshHandle` 뒤 GPU Mesh를 in-place 교체(generation 보존, 엔티티 재부착 불필요). 디코드는 호출자가 `Mesh::from_obj`/`from_gltf` 로. stale handle → Err |
 | `RenderItem { entity, model, mesh, material, texture }` | `items.rs` | per-frame 데이터 단위 (texture: Option<TextureHandle>) |
 | `collect_render_items(&mut World, &RenderAssets) -> Vec<RenderItem>` | `items.rs` | `propagate_transforms` 자동 호출 |
 | `BasicRenderer::new(device, queue, target_format, max_entities)` | `basic_renderer.rs` | mesh_shader.wgsl pipeline 소유 |
