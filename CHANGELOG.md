@@ -10,6 +10,32 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## [v1.0.109] — 2026-06-12 — 도그푸딩 게임 1편: Voltex Depths
+
+`games/voltex_depths` — 탑다운 트윈스틱 던전 슈터, 게임 로직 100% Rust (Lua 주도
+flagship voltex_survivor의 대칭). 적 3종(추적자/사수/보스) + region 기반 문 진행.
+
+### Additive
+
+- **games/voltex_depths** — ASCII 맵 → 레벨/NavMesh 빌드, 마우스 조준
+  unprojection, 절차 생성 SFX/BGM(`gen_sfx`), 헤드리스 풀 플레이스루 +
+  GPU 시각 회귀 테스트.
+- **`voltex_capture::scene::render_world`** — 게임 crate가 임의 World를
+  오프스크린 렌더해 픽셀 검증하는 공개 진입점 (고정 라이트/FOV 45°/
+  1024 entity 상한 — doc 주석 참고).
+
+### Fix
+
+- **voltex_ai NavMeshBuilder 배선** — `navmesh_builder/` 모듈이 M3 분리 이후
+  lib.rs 미선언으로 죽은 코드였음. 배선 + bitrot 수정, 잠자던 테스트 7개 통과.
+
+### 검증
+
+- voltex_depths 단위 29 + 플레이스루 + GPU 시각 회귀 그린. debug/release
+  스모크 런 panic/wgpu validation error 0.
+- 도그푸딩 마찰 8건 기록 (`docs/dogfood-friction.md`) — `voltex build`가
+  Rust 로직 게임 패키징 불가(#8) 등 P1 4건이 다음 엔진 사이클 입력.
+
 ## [v1.0.85] — 2026-06-04 — Lua `find_in_radius` (spatial query for scripts)
 
 Lua 스크립트가 v1.0.76 `SpatialGrid` 를 통해 근접 쿼리를 할 수 있게 — Lua AI 가 근처

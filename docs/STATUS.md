@@ -173,6 +173,26 @@
 
 v1.0.9 부터는 **서비스 배포 완성도** 로드맵 (`docs/superpowers/specs/2026-05-21-service-readiness-roadmap.md`) 기준으로 진행.
 
+### 2026-06-12 — 도그푸딩 게임 1편: Voltex Depths (v1.0.109)
+
+`games/voltex_depths` — 탑다운 트윈스틱 던전 슈터. voltex_survivor(Lua 주도)와
+반대로 게임 로직 **100% Rust**: ASCII 맵 → 레벨/NavMesh 빌드, 적 3종
+(추적자/사수/보스) + region 기반 문 진행, 마우스 조준 unprojection, 절차 생성
+SFX/BGM. 엔진 Rust API 워크플로 도그푸딩이 목적.
+
+- **NavMeshBuilder 미배선 발견·복구** — `navmesh_builder/` 모듈이 M3 분리 이후
+  lib.rs에 선언되지 않아 테스트 7개째 한 번도 컴파일된 적 없는 죽은 코드였음.
+  lib.rs 배선 + bitrot 수정 후 잠자던 테스트 7개 전부 통과 (friction #1).
+- **voltex_capture::render_world 공개** — 게임 crate가 임의 World를 오프스크린
+  픽셀 검증하는 진입점 (friction #7 해소). depths GPU 시각 회귀가 사용.
+- **검증**: 단위 29 + 헤드리스 풀 플레이스루(`tests/playthrough.rs`) + GPU 시각
+  회귀(`tests/visual.rs`) 그린. debug/release 스모크 런 panic/validation 0.
+- **friction 로그 8건** (P1 6건 중 2건 해소, P2 2건) — `docs/dogfood-friction.md`
+  머리말에 다음 엔진 사이클 후보 정리. `voltex build`가 Rust 로직 게임을
+  패키징 못 하는 갭(friction #8) 포함.
+- 스펙: `docs/superpowers/specs/2026-06-11-voltex-depths-game-design.md`,
+  플랜: `docs/superpowers/plans/2026-06-11-voltex-depths.md`.
+
 ### 2026-06-04 — E2E 메시 레그 (v1.0.108, 자율 세션)
 
 3종 에셋 E2E 커버리지 완결. `e2e_texture_bundle.rs` 에 `mesh_path

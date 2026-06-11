@@ -3,6 +3,22 @@
 게임 제작 중 발견한 엔진 워크플로 마찰. 항목: 하려던 것 / 없거나 어색했던 것 / 우회 / 제안(P0~P2).
 엔진 즉석 수정은 진행을 실제로 막을 때만. 이 로그가 v1.1 로드맵 입력이 된다.
 
+## 현재 상태 요약 + 다음 엔진 사이클 후보 (P 순)
+
+게임 완성 시점(2026-06-12) 기준 총 8건 — P0 없음 (진행을 완전히 막은 마찰은 즉석 수정으로 해소), P1 6건 중 2건 해소, P2 2건.
+
+**P1 — 다음 엔진 사이클 후보:**
+- #2 `NavAgent.target` 직접 대입 footgun — 캡슐화 또는 target 변경 감지 repath (+ 소이동 retarget)
+- #3 `follow_path` 도달 판정이 3D 거리 — XZ 거리로 (게임플레이 y 유지 시 가라앉음)
+- #4 action system에서 창 크기 접근 불가 — InputState/콜백에 화면 크기 노출
+- #8 `voltex build`가 Rust 로직 게임 패키징 불가 — wrapper에 게임 crate 훅 또는 `kind = "rust"` 빌드 모드
+- ~~#1 NavMeshBuilder 미배선 (침묵하는 죽은 코드)~~ — **해소** (lib.rs 배선 + bitrot 수정; 미배선 .rs CI 검출은 후속 후보로 잔존)
+- ~~#7 게임 crate의 임의 World 픽셀 검증 진입점 부재~~ — **해소** (`voltex_capture::render_world` 공개)
+
+**P2:**
+- #5 오디오 경로 이원화 (`with_audio_files` vs `AudioPath` 이중 디코드) — path→ClipId 매핑 시드로 통합
+- #6 게임 에셋 루트 개념 부재 (cwd/절대경로 의존) — RuntimeConfig asset root + exe 기준 해석 (#8과 연계)
+
 | # | 하려던 것 | 마찰 | 우회 | 제안 | P |
 |---|---|---|---|---|---|
 | 1 | 레벨 바닥 지오메트리로 NavMesh 자동 생성 (`NavMeshBuilder`) | `navmesh_builder/`가 M3 분리 이후 lib.rs에 미선언 — 모듈·테스트 7개가 한 번도 컴파일된 적 없는 죽은 코드였고 CODEMAP은 공개 API로 등재 (obstacle.rs도 동일 상태로 남아 있음) | lib.rs 배선 + 첫 컴파일에서 드러난 bitrot(visibility/dead_code/clippy) 수정 후 사용 — 배선 후 7개 테스트·게임 detour 테스트 전부 그린, 파라미터(cell_size 0.5, agent_radius 0.4)는 기본 플랜 그대로 동작 | 모듈 분리 리팩토링 시 "선언 누락 = 침묵하는 죽은 코드" 감지 수단 필요 (CI에서 src/ 하위 미배선 .rs 검출 스크립트 등). obstacle.rs 배선 여부 결정 필요 | P1 |
@@ -12,3 +28,4 @@
 | 5 | 효과음/BGM 재생: `with_audio_files`로 프리로드한 클립 사용 | 오디오 경로가 이원화 — `with_audio_files`(인덱스=ClipId, 핫리로드 워치)와 `AudioPath`(경로→clip 런타임 resolve, resolver가 clip_id 소유). 둘을 같이 쓰면 같은 파일을 이중 디코드해 별도 슬롯에 올리고, AudioPath가 resolve한 클립은 핫리로드 대상이 아님 | `AudioPath`를 쓰지 않고 `with_audio_files` 인덱스를 CLIP_* 상수로 직접 사용 | with_audio_files가 등록한 path→ClipId 매핑을 AudioPath resolver(AudioClipCache)에 시드해 두 경로를 합치기 | P2 |
 | 6 | 에셋 경로를 cwd 무관하게 지정 | 런타임에 "게임 에셋 루트" 개념이 없음 — 상대 경로는 cwd 의존, Vfs는 씬/스크립트 로드에만 적용 | `concat!(env!("CARGO_MANIFEST_DIR"), "/assets")` — 빌드 머신 절대 경로라 배포 exe에선 깨짐 | RuntimeConfig에 asset root 설정 + exe 기준 상대 해석 (voltex_cli 빌드 파이프라인과 연계) | P2 |
 | 7 | 게임이 자기 던전 씬을 GPU 픽셀로 회귀 검증 | voltex_capture의 `render_*`가 전부 자기 씬을 하드코딩 — 게임 crate가 임의 World를 오프스크린 렌더할 공개 진입점 부재 | **해소됨(이 커밋)**: `render_declarative_colored_scene`에서 렌더 경로를 기계적 추출해 `voltex_capture::render_world(gpu, w, h, &mut world, cam_pos, yaw, pitch)` 공개 | — | P1 |
+| 8 | 완성된 게임을 `voltex build`로 릴리스 패키징 | `voltex build`의 wrapper 코드젠이 데이터 주도 게임(scene.vscn + Lua) 전제 — `build.scene` 부재 시 즉시 실패하고, 더미 씬을 넣어도 wrapper exe엔 runtime+vpkg만 담겨 게임 crate의 Rust 시스템이 통째로 빠짐. Rust 로직 게임은 CLI 빌드 파이프라인(에셋 번들·라이선스 동봉 포함)을 아예 못 탐 | `cargo build --release -p voltex_depths`로 대체 — 단 에셋 번들링 없음 (#6 절대경로 문제와 결합돼 배포 exe 불가) | wrapper 코드젠에 "게임 crate를 dependency로 추가 + 사용자 `fn configure(RuntimeConfig)->RuntimeConfig` 훅 호출" 모드, 또는 manifest에 `[build] kind = "rust"` 추가해 cargo build + 에셋 번들만 수행하는 경로 신설 | P1 |
