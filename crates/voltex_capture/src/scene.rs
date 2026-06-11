@@ -347,17 +347,69 @@ pub fn render_boids_swarm(gpu: &HeadlessGpu, width: u32, height: u32) -> Vec<u8>
     target.read_rgba8(&gpu.device, &gpu.queue)
 }
 
+/// Render an arbitrary caller-built `World` of *declarative* renderables
+/// (`PrimitiveMesh` + `MaterialDesc` entities): materialize → `BasicRenderer`
+/// → RGBA8. The public entry point for game crates to pixel-verify their own
+/// scenes (added for voltex_depths dogfooding). Camera looks from `cam_pos`
+/// with the given yaw/pitch (radians) and the renderer's default FOV; light is
+/// one asymmetric directional.
+pub fn render_world(
+    gpu: &HeadlessGpu,
+    width: u32,
+    height: u32,
+    world: &mut World,
+    cam_pos: Vec3,
+    cam_yaw: f32,
+    cam_pitch: f32,
+) -> Vec<u8> {
+    use voltex_renderer_ecs::materialize_renderables;
+
+    let target = OffscreenTarget::new(&gpu.device, width, height);
+    let renderer = BasicRenderer::new(&gpu.device, &gpu.queue, CAPTURE_FORMAT, 1024);
+    let mut assets = RenderAssets::new();
+    materialize_renderables(world, &mut assets, &gpu.device);
+
+    let mut camera = Camera::new(cam_pos, width as f32 / height as f32);
+    camera.yaw = cam_yaw;
+    camera.pitch = cam_pitch;
+    let view_proj = camera.view_projection();
+    let mut light = LightUniform::new();
+    light.direction = [-0.4, -1.0, -0.6];
+
+    let mut encoder = gpu
+        .device
+        .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+            label: Some("capture render_world"),
+        });
+    renderer.render(
+        &gpu.queue,
+        &mut encoder,
+        &target.color_view,
+        &target.depth_view,
+        wgpu::Color {
+            r: 0.05,
+            g: 0.05,
+            b: 0.08,
+            a: 1.0,
+        },
+        world,
+        &assets,
+        view_proj,
+        camera.position,
+        light,
+    );
+    gpu.queue.submit(Some(encoder.finish()));
+    target.read_rgba8(&gpu.device, &gpu.queue)
+}
+
 /// Render `voltex_survivor`'s seed scene through the *declarative* path it now
 /// uses (v1.0.70): a gray ground, a green player, and a red enemy declared with
 /// `PrimitiveMesh` + `MaterialDesc`, materialized, and drawn with the runtime's
 /// elevated camera. Proves the flagship's per-object colors survive
 /// materialize→render (they were all white before the modernization). RGBA8.
 pub fn render_declarative_colored_scene(gpu: &HeadlessGpu, width: u32, height: u32) -> Vec<u8> {
-    use voltex_renderer_ecs::{materialize_renderables, MaterialDesc, PrimitiveMesh};
+    use voltex_renderer_ecs::{MaterialDesc, PrimitiveMesh};
 
-    let target = OffscreenTarget::new(&gpu.device, width, height);
-    let renderer = BasicRenderer::new(&gpu.device, &gpu.queue, CAPTURE_FORMAT, 16);
-    let mut assets = RenderAssets::new();
     let mut world = World::new();
 
     // Mirror voltex_survivor::setup_scene roles (gray ground, green player) plus
@@ -379,38 +431,8 @@ pub fn render_declarative_colored_scene(gpu: &HeadlessGpu, width: u32, height: u
         PrimitiveMesh::cube(1.0),
         MaterialDesc::color([0.90, 0.25, 0.20, 1.0]),
     ));
-    materialize_renderables(&mut world, &mut assets, &gpu.device);
 
-    let mut camera = Camera::new(Vec3::new(0.0, 4.0, 8.0), width as f32 / height as f32);
-    camera.pitch = -0.45;
-    let view_proj = camera.view_projection();
-    let mut light = LightUniform::new();
-    light.direction = [-0.4, -1.0, -0.6];
-
-    let mut encoder = gpu
-        .device
-        .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-            label: Some("capture declarative_colored_scene"),
-        });
-    renderer.render(
-        &gpu.queue,
-        &mut encoder,
-        &target.color_view,
-        &target.depth_view,
-        wgpu::Color {
-            r: 0.05,
-            g: 0.05,
-            b: 0.08,
-            a: 1.0,
-        },
-        &mut world,
-        &assets,
-        view_proj,
-        camera.position,
-        light,
-    );
-    gpu.queue.submit(Some(encoder.finish()));
-    target.read_rgba8(&gpu.device, &gpu.queue)
+    render_world(gpu, width, height, &mut world, Vec3::new(0.0, 4.0, 8.0), 0.0, -0.45)
 }
 
 /// Render the canonical PBR test: a 7×7 grid of spheres with metallic varying
