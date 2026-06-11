@@ -1,6 +1,7 @@
 //! ASCII 그리드 → 레벨 데이터. 전부 순수 (GPU/World 무관).
-use voltex::prelude::*;
 use crate::components::EnemyKind;
+use voltex::ai::{NavMesh, NavMeshBuilder};
+use voltex::prelude::*;
 
 // NOTE: 아래 개별 #[allow(dead_code)]는 main이 아직 level 모듈을 안 써서 임시.
 // 후속 태스크(엔티티 스폰/게임 루프 연결)에서 호출자가 생기는 대로 제거.
@@ -249,6 +250,44 @@ impl LevelMap {
     }
 }
 
+/// NavMesh 입력용 바닥 지오메트리: Floor + Door 셀당 y=0 쿼드(삼각형 2개).
+/// 벽은 지오메트리에 없으므로 워크블 경계가 곧 벽이다.
+#[allow(dead_code)]
+pub fn level_geometry(map: &LevelMap) -> (Vec<Vec3>, Vec<u32>) {
+    let mut verts = Vec::new();
+    let mut idx = Vec::new();
+    let half = CELL / 2.0;
+    for z in 0..map.h {
+        for x in 0..map.w {
+            if map.is_blocked(x, z) && map.cell(x, z) != Cell::Door {
+                continue;
+            }
+            let c = map.world_pos(x, z, 0.0);
+            let base = verts.len() as u32;
+            verts.push(Vec3::new(c.x - half, 0.0, c.z - half));
+            verts.push(Vec3::new(c.x + half, 0.0, c.z - half));
+            verts.push(Vec3::new(c.x + half, 0.0, c.z + half));
+            verts.push(Vec3::new(c.x - half, 0.0, c.z + half));
+            idx.extend_from_slice(&[base, base + 1, base + 2, base, base + 2, base + 3]);
+        }
+    }
+    (verts, idx)
+}
+
+/// 레벨 전체 NavMesh 빌드. 문은 항상 워크블 — 닫힌 문 통과는 적 활성화 로직이 막는다.
+#[allow(dead_code)]
+pub fn build_navmesh(map: &LevelMap) -> NavMesh {
+    let (verts, idx) = level_geometry(map);
+    NavMeshBuilder {
+        cell_size: 0.5,
+        cell_height: 0.2,
+        agent_height: 2.0,
+        agent_radius: 0.4,
+        max_slope: 45.0,
+    }
+    .build(&verts, &idx)
+}
+
 /// 축 분리 이동: x/z 각각 독립으로 시도 → 벽에 비비면 미끄러진다.
 #[allow(dead_code)]
 pub fn try_move(map: &LevelMap, from: Vec3, delta: Vec3, radius: f32) -> Vec3 {
@@ -364,6 +403,45 @@ mod tests {
         m.open_door((4, 2));
         let passed = try_move(&m, before, Vec3::new(CELL, 0.0, 0.0), 0.4);
         assert!(passed.x > blocked.x, "open door passes");
+    }
+
+    #[test]
+    fn geometry_emits_quads_for_walkable_cells_only() {
+        let m = LevelMap::parse(&["####", "#P.#", "####"]).unwrap();
+        let (verts, idx) = level_geometry(&m);
+        assert_eq!(verts.len(), 2 * 4); // 2 walkable cells × 4 verts
+        assert_eq!(idx.len(), 2 * 6); // × 2 tri × 3
+        assert!(verts.iter().all(|v| v.y == 0.0));
+    }
+
+    #[test]
+    fn navmesh_path_detours_around_wall() {
+        // 가운데 벽 기둥을 우회해야 하는 ㄷ자 맵
+        let m = LevelMap::parse(&[
+            "#######",
+            "#P....#",
+            "#.###.#",
+            "#.....#",
+            "#######",
+        ])
+        .unwrap();
+        let nav = build_navmesh(&m);
+        let start = m.world_pos(1, 1, 0.0);
+        let goal = m.world_pos(5, 1, 0.0);
+        let path = voltex::ai::find_path(&nav, start, goal)
+            .expect("path must exist around the pillar");
+        // 직선이면 2 waypoint — 우회는 더 많다
+        assert!(path.len() > 2, "expected detour, got straight line: {path:?}");
+        // 경로 위 샘플이 벽을 통과하지 않는다
+        for w in path.windows(2) {
+            assert!(
+                m.los_clear(
+                    Vec3::new(w[0].x, 0.5, w[0].z),
+                    Vec3::new(w[1].x, 0.5, w[1].z),
+                ),
+                "path segment crosses a wall: {w:?}"
+            );
+        }
     }
 
     #[test]
