@@ -5,14 +5,12 @@ use voltex::prelude::*;
 
 /// 화면 픽셀 (mx, my) → NDC (x, y).
 /// NDC x: [-1, 1] (좌 → 우), y: [-1, 1] (아래 → 위).
-#[allow(dead_code)] // 호출자: Task 11 게임 루프
 pub fn ndc_from_mouse(mx: f64, my: f64, w: f32, h: f32) -> (f32, f32) {
     ((2.0 * mx as f32 / w) - 1.0, 1.0 - (2.0 * my as f32 / h))
 }
 
 /// NDC 좌표 → 월드 레이 → y=plane_y 평면 교점.
 /// 레이가 평면과 평행하거나 교점이 카메라 뒤면 None.
-#[allow(dead_code)] // 호출자: Task 11 게임 루프
 pub fn unproject_to_plane(vp_inv: &Mat4, ndc: (f32, f32), plane_y: f32) -> Option<Vec3> {
     let homo_div = |v: Vec4| -> Option<Vec3> {
         if v.w.abs() < 1e-5 {
@@ -70,7 +68,6 @@ pub fn spawn_projectile(
 }
 
 /// 투사체 이동 + 벽 셀 진입 시 즉시 소멸 (Lifetime은 안전망).
-#[allow(dead_code)] // 호출자: Task 11 게임 루프
 pub fn projectile_system(world: &mut World, map: &LevelMap, dt: f32) {
     // 스냅샷 패턴: query 중 world.get_mut 빌림 충돌 방지
     let moves: Vec<(Entity, Vec3)> = world
@@ -95,11 +92,19 @@ pub fn projectile_system(world: &mut World, map: &LevelMap, dt: f32) {
     }
 }
 
+/// 원샷 효과음: AudioSource 엔티티 스폰 → audio_sync가 재생, Lifetime이 정리.
+/// `clip`은 main의 with_audio_files 목록 인덱스 (CLIP_* 상수).
+pub fn play_sfx(world: &mut World, clip: u32, pos: Vec3) {
+    let mut src = voltex::audio::AudioSource::new(clip);
+    src.playing = true;
+    src.volume = 0.8;
+    world.spawn_bundle((Transform::from_position(pos), src, Lifetime::new(1.5)));
+}
+
 // ── Task 10: 접촉 데미지 매트릭스 + 사망 처리 ────────────────────────────
 
 /// 투사체×엔티티 / Enemy 접촉 데미지 처리.
 /// touch 쿨다운 tick은 적 AI 시스템(Task 11)이 담당 — 여기선 finished 검사/리셋만.
-#[allow(dead_code)] // 호출자: Task 11 게임 루프
 pub fn handle_contacts(contacts: &[voltex::physics::ContactPoint], world: &mut World) {
     use voltex::ecs::Tag;
 
@@ -159,7 +164,6 @@ pub struct DeathOutcome {
     pub boss_died: bool,
 }
 
-#[allow(dead_code)] // 호출자: Task 11 게임 루프
 pub fn death_system(world: &mut World) -> DeathOutcome {
     use voltex::ecs::Tag;
 

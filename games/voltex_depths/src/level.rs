@@ -5,7 +5,6 @@ use voltex::ecs::Tag;
 use voltex::physics::Collider;
 use voltex::prelude::*;
 
-// NOTE: 아래 개별 #[allow(dead_code)]는 main이 아직 level 모듈을 안 써서 임시.
 // 후속 태스크(엔티티 스폰/게임 루프 연결)에서 호출자가 생기는 대로 제거.
 pub const CELL: f32 = 2.0;
 pub const WALL_H: f32 = 3.0;
@@ -32,7 +31,6 @@ pub struct LevelMap {
 }
 
 impl LevelMap {
-    #[allow(dead_code)]
     pub fn parse(rows: &[&str]) -> Result<Self, String> {
         let h = rows.len();
         let w = rows.first().map(|r| r.len()).ok_or("empty map")?;
@@ -228,7 +226,6 @@ impl LevelMap {
     }
 
     /// 문 개방: Door → Floor. region 데이터는 재계산하지 않는다.
-    #[allow(dead_code)]
     pub fn open_door(&mut self, (x, z): (usize, usize)) {
         self.cells[z * self.w + x] = Cell::Floor;
     }
@@ -249,7 +246,6 @@ impl LevelMap {
 
 /// NavMesh 입력용 바닥 지오메트리: Floor + Door 셀당 y=0 쿼드(삼각형 2개).
 /// 벽은 지오메트리에 없으므로 워크블 경계가 곧 벽이다.
-#[allow(dead_code)]
 pub fn level_geometry(map: &LevelMap) -> (Vec<Vec3>, Vec<u32>) {
     let mut verts = Vec::new();
     let mut idx = Vec::new();
@@ -272,7 +268,6 @@ pub fn level_geometry(map: &LevelMap) -> (Vec<Vec3>, Vec<u32>) {
 }
 
 /// 레벨 전체 NavMesh 빌드. 문은 항상 워크블 — 닫힌 문 통과는 적 활성화 로직이 막는다.
-#[allow(dead_code)]
 pub fn build_navmesh(map: &LevelMap) -> NavMesh {
     let (verts, idx) = level_geometry(map);
     NavMeshBuilder {
@@ -288,7 +283,6 @@ pub fn build_navmesh(map: &LevelMap) -> NavMesh {
 pub const PLAYER_Y: f32 = 0.5;
 
 /// World에 레벨 메시(바닥/벽/문) + 플레이어 + 적 + 리소스를 시딩한다.
-#[allow(dead_code)]
 pub fn build_level(world: &mut World, map: &LevelMap) {
     // 바닥 — 맵 전체 크기의 납작 큐브
     let mut t = Transform::from_position(Vec3::new(0.0, -0.05, 0.0));

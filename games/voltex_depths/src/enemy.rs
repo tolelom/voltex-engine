@@ -14,7 +14,6 @@ const SHOOTER_DEAD_ZONE: f32 = 1.5;
 // waypoint 도달 판정이 3D 거리라 여기서 y를 PLAYER_Y로 강제하면 중간 waypoint에
 // 영원히 도달 못 함 — y 보정은 넣지 않는다. 최종 goal(p_pos)은 y=PLAYER_Y라
 // 도달 시 복귀하고, 테스트 거리 단언은 양 끝점만 보므로 영향 없음.
-#[allow(dead_code)] // 호출자: 게임 루프 (후속 태스크)
 pub fn enemy_ai_system(world: &mut World, map: &LevelMap, dt: f32, repath: bool) {
     let Some(player) = world.find_by_tag("player") else { return };
     let p_pos = match world.get::<Transform>(player) {
@@ -129,7 +128,6 @@ pub fn enemy_ai_system(world: &mut World, map: &LevelMap, dt: f32, repath: bool)
 
 /// Velocity를 가진 모든 Enemy를 적분 — 현재는 보스 dash만 0이 아니지만, 넉백 등 다른 시스템이 Velocity를 쓰면 그대로 적용됨.
 /// 보스 돌진 적분 + 감쇠. 벽은 try_move로 슬라이드.
-#[allow(dead_code)] // 호출자: 게임 루프 (후속 태스크)
 pub fn velocity_system(world: &mut World, map: &LevelMap, dt: f32) {
     let ids: Vec<(Entity, Vec3)> = world
         .query::<Enemy>()

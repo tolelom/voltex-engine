@@ -1,11 +1,11 @@
-//! 문 개방 / 시작·재시작. (HUD는 Task 13)
+//! 문 개방 / 시작·재시작 / HUD.
 use crate::components::*;
 use crate::level::{build_level, LevelMap};
+use voltex::editor::UiContext;
 use voltex::prelude::*;
 
 /// 매 프레임 호출: EnemyKilled 이벤트를 소비해 RegionCounts 갱신,
 /// count가 0이 된 gate region의 문을 개방(despawn + map.open_door).
-#[allow(dead_code)] // 호출자: 게임 루프 (후속 태스크)
 pub fn door_system(world: &mut World, map: &mut LevelMap) {
     // 1) 이번 프레임 kill 이벤트 소비 → RegionCounts 갱신
     let kills = world.drain_events::<EnemyKilled>();
@@ -39,11 +39,68 @@ pub fn door_system(world: &mut World, map: &mut LevelMap) {
 }
 
 /// Playing 진입: 월드 리셋 + 레벨/리소스 재구성. (NavMesh는 불변 — 재빌드 불필요)
-#[allow(dead_code)] // 호출자: 게임 루프 (후속 태스크)
 pub fn start_game(world: &mut World, map: &mut LevelMap, source: &LevelMap) {
     world.clear();
     *map = source.clone();
     build_level(world, map);
+}
+
+/// 인-윈도우 HUD: phase별 오버레이 + Playing 중 HP/점수.
+pub fn draw_hud(ui: &mut UiContext, world: &World, phase: GamePhase) {
+    let (w, h) = (ui.screen_width, ui.screen_height);
+    match phase {
+        GamePhase::Title => {
+            ui.draw_rect(0.0, 0.0, w, h, [10, 10, 20, 230]);
+            ui.draw_text("VOLTEX DEPTHS", w / 2.0 - 120.0, h / 2.0 - 40.0, [240, 220, 120, 255]);
+            ui.draw_text(
+                "WASD move / mouse aim+fire",
+                w / 2.0 - 140.0,
+                h / 2.0,
+                [200, 200, 200, 255],
+            );
+            ui.draw_text(
+                "press SPACE to start",
+                w / 2.0 - 110.0,
+                h / 2.0 + 24.0,
+                [120, 230, 140, 255],
+            );
+        }
+        GamePhase::Playing => {
+            let hp = world
+                .find_by_tag("player")
+                .and_then(|p| world.get::<Health>(p))
+                .map(|h| h.hp)
+                .unwrap_or(0);
+            let score = world.resource::<Score>().map(|s| s.0).unwrap_or(0);
+            ui.draw_text(&format!("HP {hp}"), 16.0, 16.0, [240, 90, 90, 255]);
+            ui.draw_text(&format!("SCORE {score}"), 16.0, 36.0, [240, 220, 120, 255]);
+        }
+        GamePhase::GameOver => {
+            ui.draw_rect(0.0, 0.0, w, h, [30, 5, 5, 200]);
+            ui.draw_text("YOU DIED", w / 2.0 - 70.0, h / 2.0 - 12.0, [240, 80, 80, 255]);
+            ui.draw_text(
+                "press R to restart",
+                w / 2.0 - 100.0,
+                h / 2.0 + 16.0,
+                [200, 200, 200, 255],
+            );
+        }
+        GamePhase::Victory => {
+            ui.draw_rect(0.0, 0.0, w, h, [5, 25, 10, 200]);
+            ui.draw_text(
+                "DUNGEON CLEARED!",
+                w / 2.0 - 110.0,
+                h / 2.0 - 12.0,
+                [120, 240, 140, 255],
+            );
+            ui.draw_text(
+                "press R for title",
+                w / 2.0 - 95.0,
+                h / 2.0 + 16.0,
+                [200, 200, 200, 255],
+            );
+        }
+    }
 }
 
 #[cfg(test)]
