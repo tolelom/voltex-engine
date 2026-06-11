@@ -337,7 +337,8 @@ pub fn build_level(world: &mut World, map: &LevelMap) {
     // 적 + region 카운트
     let mut counts = vec![0u32; map.region_count.max(1)];
     for &(x, z, kind) in &map.enemies {
-        let region = map.region_at((x, z)).unwrap_or(0);
+        let region = map.region_at((x, z))
+            .expect("enemy spawn on Floor — region must exist after compute_regions");
         counts[region] += 1;
         let (size, color, speed, hp) = match kind {
             EnemyKind::Chaser  => (0.45, [0.90_f32, 0.25, 0.20, 1.0], 3.2_f32, 2_i32),
@@ -352,7 +353,7 @@ pub fn build_level(world: &mut World, map: &LevelMap) {
             NavAgent::new(speed),
             Health { hp },
             Collider::Sphere { radius: size },
-            Velocity(Vec3::new(0.0, 0.0, 0.0)),
+            Velocity(Vec3::ZERO),
         ));
     }
     world.insert_resource(RegionCounts(counts));
