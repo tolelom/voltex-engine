@@ -1,6 +1,10 @@
 //! ASCII 그리드 → 레벨 데이터. 전부 순수 (GPU/World 무관).
-use crate::components::EnemyKind;
-use voltex::ai::{NavMesh, NavMeshBuilder};
+// NOTE: PLAYER_Y/build_level 등은 main이 연결 전까지 임시. 후속 태스크에서 제거.
+#![allow(dead_code)]
+use crate::components::{Door, Enemy, EnemyKind, Health, RegionCounts, Score, Velocity};
+use voltex::ai::{NavAgent, NavMesh, NavMeshBuilder};
+use voltex::ecs::Tag;
+use voltex::physics::Collider;
 use voltex::prelude::*;
 
 // NOTE: 아래 개별 #[allow(dead_code)]는 main이 아직 level 모듈을 안 써서 임시.
@@ -288,6 +292,77 @@ pub fn build_navmesh(map: &LevelMap) -> NavMesh {
     .build(&verts, &idx)
 }
 
+pub const PLAYER_Y: f32 = 0.5;
+
+/// World에 레벨 메시(바닥/벽/문) + 플레이어 + 적 + 리소스를 시딩한다.
+pub fn build_level(world: &mut World, map: &LevelMap) {
+    // 바닥 — 맵 전체 크기의 납작 큐브
+    let mut t = Transform::from_position(Vec3::new(0.0, -0.05, 0.0));
+    t.scale = Vec3::new(map.w as f32 * CELL, 0.1, map.h as f32 * CELL);
+    world.spawn_bundle((t, PrimitiveMesh::cube(1.0), MaterialDesc::color([0.22, 0.22, 0.26, 1.0])));
+
+    // 벽 + 문
+    for z in 0..map.h {
+        for x in 0..map.w {
+            match map.cell(x, z) {
+                Cell::Wall => {
+                    let mut t = Transform::from_position(map.world_pos(x, z, WALL_H / 2.0));
+                    t.scale = Vec3::new(CELL, WALL_H, CELL);
+                    world.spawn_bundle((t, PrimitiveMesh::cube(1.0), MaterialDesc::color([0.45, 0.42, 0.50, 1.0])));
+                }
+                Cell::Door => {
+                    let mut t = Transform::from_position(map.world_pos(x, z, WALL_H / 2.0));
+                    t.scale = Vec3::new(CELL, WALL_H, CELL);
+                    let gate = map.doors.iter().position(|&d| d == (x, z))
+                        .map(|i| map.door_gates[i]).unwrap_or(0);
+                    world.spawn_bundle((
+                        t,
+                        PrimitiveMesh::cube(1.0),
+                        MaterialDesc::color([0.85, 0.65, 0.20, 1.0]),
+                        Door { gate_region: gate, cell: (x, z) },
+                        Tag("door".into()),
+                    ));
+                }
+                Cell::Floor => {}
+            }
+        }
+    }
+
+    // 플레이어
+    world.spawn_bundle((
+        Transform::from_position(map.world_pos(map.player_spawn.0, map.player_spawn.1, PLAYER_Y)),
+        Tag("player".into()),
+        PrimitiveMesh::cube(0.8),
+        MaterialDesc::color([0.20, 0.85, 0.35, 1.0]),
+        Health { hp: 5 },
+        Collider::Sphere { radius: 0.5 },
+    ));
+
+    // 적 + region 카운트
+    let mut counts = vec![0u32; map.region_count.max(1)];
+    for &(x, z, kind) in &map.enemies {
+        let region = map.region_at((x, z)).unwrap_or(0);
+        counts[region] += 1;
+        let (size, color, speed, hp) = match kind {
+            EnemyKind::Chaser  => (0.45, [0.90_f32, 0.25, 0.20, 1.0], 3.2_f32, 2_i32),
+            EnemyKind::Shooter => (0.45, [0.95_f32, 0.55, 0.15, 1.0], 2.4_f32, 2_i32),
+            EnemyKind::Boss    => (1.1,  [0.60_f32, 0.20, 0.80, 1.0], 2.0_f32, 30_i32),
+        };
+        world.spawn_bundle((
+            Transform::from_position(map.world_pos(x, z, PLAYER_Y)),
+            PrimitiveMesh::sphere_default(size),
+            MaterialDesc::color(color),
+            Enemy::new(kind, region),
+            NavAgent::new(speed),
+            Health { hp },
+            Collider::Sphere { radius: size },
+            Velocity(Vec3::new(0.0, 0.0, 0.0)),
+        ));
+    }
+    world.insert_resource(RegionCounts(counts));
+    world.insert_resource(Score(0));
+}
+
 /// 축 분리 이동: x/z 각각 독립으로 시도 → 벽에 비비면 미끄러진다.
 #[allow(dead_code)]
 pub fn try_move(map: &LevelMap, from: Vec3, delta: Vec3, radius: f32) -> Vec3 {
@@ -314,6 +389,7 @@ pub fn try_move(map: &LevelMap, from: Vec3, delta: Vec3, radius: f32) -> Vec3 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use voltex::prelude::World;
 
     pub(crate) const T_MAP: &[&str] = &[
         "#########",
@@ -442,6 +518,23 @@ mod tests {
                 "path segment crosses a wall: {w:?}"
             );
         }
+    }
+
+    #[test]
+    fn build_level_seeds_entities_and_region_counts() {
+        let m = LevelMap::parse(T_MAP).unwrap();
+        let mut w = World::new();
+        build_level(&mut w, &m);
+        assert!(w.find_by_tag("player").is_some());
+        let enemies: Vec<_> = w.query::<crate::components::Enemy>().collect();
+        assert_eq!(enemies.len(), 2);
+        let doors: Vec<_> = w.query::<crate::components::Door>().collect();
+        assert_eq!(doors.len(), 1);
+        let rc = w.resource::<crate::components::RegionCounts>().unwrap();
+        assert_eq!(rc.0.iter().sum::<u32>(), 2);
+        let p = w.find_by_tag("player").unwrap();
+        assert_eq!(w.get::<crate::components::Health>(p).unwrap().hp, 5);
+        assert!(w.get::<voltex::physics::Collider>(p).is_some());
     }
 
     #[test]

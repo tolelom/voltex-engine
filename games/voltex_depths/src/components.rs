@@ -1,4 +1,6 @@
 //! 게임 컴포넌트/리소스/이벤트. 씬 직렬화 안 하므로 Component trait 불필요.
+// NOTE: main이 아직 시스템을 연결하지 않아 임시. 후속 태스크(게임 루프)에서 제거.
+#![allow(dead_code)]
 use voltex::prelude::*;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
