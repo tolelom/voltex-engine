@@ -324,6 +324,56 @@ mod tests {
     }
 
     #[test]
+    fn touch_damage_survives_interleaved_ticks() {
+        // 접촉 전에 AI tick이 여러 번 끼어도 첫 접촉은 즉시 데미지,
+        // 이후 쿨다운 중엔 무시, 0.8s 경과 후 다시 데미지.
+        // (Repeating finished()==just_finished 의존 회귀 방지 — Once sticky 필요)
+        let mut w = World::new();
+        let player = w.spawn_bundle((
+            Transform::new(),
+            voltex::ecs::Tag("player".into()),
+            Health { hp: 5 },
+        ));
+        let enemy = w.spawn_bundle((
+            Transform::new(),
+            crate::components::Enemy::new(EnemyKind::Chaser, 0),
+            Health { hp: 2 },
+        ));
+        // 스폰 후 AI가 먼저 여러 프레임 tick (접촉 없음)
+        for _ in 0..10 {
+            if let Some(e) = w.get_mut::<crate::components::Enemy>(enemy) {
+                e.touch.tick(1.0 / 60.0);
+            }
+        }
+        handle_contacts(&[contact(enemy, player)], &mut w);
+        assert_eq!(
+            w.get::<Health>(player).unwrap().hp,
+            4,
+            "first touch must damage immediately even after prior ticks"
+        );
+        // 쿨다운 중
+        for _ in 0..10 {
+            if let Some(e) = w.get_mut::<crate::components::Enemy>(enemy) {
+                e.touch.tick(1.0 / 60.0);
+            }
+        }
+        handle_contacts(&[contact(enemy, player)], &mut w);
+        assert_eq!(w.get::<Health>(player).unwrap().hp, 4, "cooldown must block");
+        // 0.8s 경과
+        for _ in 0..60 {
+            if let Some(e) = w.get_mut::<crate::components::Enemy>(enemy) {
+                e.touch.tick(1.0 / 60.0);
+            }
+        }
+        handle_contacts(&[contact(enemy, player)], &mut w);
+        assert_eq!(
+            w.get::<Health>(player).unwrap().hp,
+            3,
+            "after cooldown damage again"
+        );
+    }
+
+    #[test]
     fn death_sweep_despawns_sends_event_and_reports() {
         let mut w = World::new();
         // player(hp5) + chaser(hp0, region1) + boss(hp0, region0)

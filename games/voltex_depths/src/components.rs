@@ -59,9 +59,12 @@ impl Enemy {
             EnemyKind::Boss => Timer::repeating(2.5),
             EnemyKind::Chaser => Timer::repeating(1_000_000.0),
         };
-        // touch Timer를 "이미 만료" 상태로 초기화: 첫 접촉에서 즉시 데미지.
-        // Repeating의 finished() == just_finished() 이므로 한 주기 tick 으로 만든다.
-        let mut touch = Timer::repeating(0.8);
+        // touch는 Once 타이머: finished()가 만료 후 sticky true라
+        // "finished=타격 가능, reset 후 0.8s 경과 시 다시 가능" 의미가 된다.
+        // (Repeating은 finished()==just_finished()라 wrap 프레임 1프레임만 true
+        //  → 루프 순서에 따라 첫 데미지가 최대 0.8s 지연되는 fragile 의존이 있었음)
+        // 생성 시 만료 상태로 — 첫 접촉에서 즉시 데미지.
+        let mut touch = Timer::once(0.8);
         touch.tick(0.8);
         Self {
             kind,
