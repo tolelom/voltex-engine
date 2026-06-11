@@ -7,7 +7,8 @@ use voltex::ai::NavAgent;
 use voltex::prelude::*;
 
 const SHOOTER_RANGE: f32 = 9.0;
-const SHOOTER_KEEP: f32 = 5.0;
+/// 이 거리 이내에선 발사 억제 — 총구가 플레이어 안에서 터지는 그림 방지.
+const SHOOTER_DEAD_ZONE: f32 = 1.5;
 
 // NOTE: nav 경로 추적 중 적의 y는 waypoint(y=0)로 가라앉는다. follow_path의
 // waypoint 도달 판정이 3D 거리라 여기서 y를 PLAYER_Y로 강제하면 중간 waypoint에
@@ -40,9 +41,9 @@ pub fn enemy_ai_system(world: &mut World, map: &LevelMap, dt: f32, repath: bool)
             en.touch.tick(dt);
             if !active {
                 en.shoot.tick(dt); // 쿨다운은 흘려보냄
-                continue;
             }
         }
+        if !active { continue; }
         match kind {
             EnemyKind::Chaser => {
                 if repath {
@@ -64,7 +65,7 @@ pub fn enemy_ai_system(world: &mut World, map: &LevelMap, dt: f32, repath: bool)
                         .get_mut::<Enemy>(e)
                         .map(|en| en.shoot.tick(dt).just_finished())
                         .unwrap_or(false);
-                    if fire && dist > SHOOTER_KEEP * 0.3 {
+                    if fire && dist > SHOOTER_DEAD_ZONE {
                         shots.push((pos, p_pos - pos));
                     }
                 } else {
@@ -126,6 +127,7 @@ pub fn enemy_ai_system(world: &mut World, map: &LevelMap, dt: f32, repath: bool)
     }
 }
 
+/// Velocity를 가진 모든 Enemy를 적분 — 현재는 보스 dash만 0이 아니지만, 넉백 등 다른 시스템이 Velocity를 쓰면 그대로 적용됨.
 /// 보스 돌진 적분 + 감쇠. 벽은 try_move로 슬라이드.
 #[allow(dead_code)] // 호출자: 게임 루프 (후속 태스크)
 pub fn velocity_system(world: &mut World, map: &LevelMap, dt: f32) {
