@@ -14,15 +14,15 @@ pub fn ndc_from_mouse(mx: f64, my: f64, w: f32, h: f32) -> (f32, f32) {
 /// 레이가 평면과 평행하거나 교점이 카메라 뒤면 None.
 #[allow(dead_code)] // 호출자: Task 11 게임 루프
 pub fn unproject_to_plane(vp_inv: &Mat4, ndc: (f32, f32), plane_y: f32) -> Option<Vec3> {
-    let h = |v: Vec4| -> Option<Vec3> {
-        if v.w.abs() < 1e-9 {
+    let homo_div = |v: Vec4| -> Option<Vec3> {
+        if v.w.abs() < 1e-5 {
             return None;
         }
         Some(Vec3::new(v.x / v.w, v.y / v.w, v.z / v.w))
     };
     // wgpu NDC z: near=0.0, far=1.0
-    let near = h(vp_inv.mul_vec4(Vec4::new(ndc.0, ndc.1, 0.0, 1.0)))?;
-    let far = h(vp_inv.mul_vec4(Vec4::new(ndc.0, ndc.1, 1.0, 1.0)))?;
+    let near = homo_div(vp_inv.mul_vec4(Vec4::new(ndc.0, ndc.1, 0.0, 1.0)))?;
+    let far = homo_div(vp_inv.mul_vec4(Vec4::new(ndc.0, ndc.1, 1.0, 1.0)))?;
     let dir = far - near;
     if dir.y.abs() < 1e-6 {
         return None;
@@ -154,6 +154,7 @@ pub fn handle_contacts(contacts: &[voltex::physics::ContactPoint], world: &mut W
     }
 }
 
+// 동시 true 가능. 호출부는 boss_died를 먼저 검사해야 Victory 우선이 됨.
 pub struct DeathOutcome {
     pub player_died: bool,
     pub boss_died: bool,
