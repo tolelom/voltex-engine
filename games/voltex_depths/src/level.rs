@@ -211,6 +211,55 @@ impl LevelMap {
             })
             .collect();
     }
+
+    pub fn is_blocked(&self, x: usize, z: usize) -> bool {
+        !matches!(self.cell(x, z), Cell::Floor)
+    }
+
+    pub fn blocked_at(&self, p: Vec3) -> bool {
+        let (x, z) = self.cell_of(p);
+        self.is_blocked(x, z)
+    }
+
+    /// 문 개방: Door → Floor. region 데이터는 재계산하지 않는다.
+    pub fn open_door(&mut self, (x, z): (usize, usize)) {
+        self.cells[z * self.w + x] = Cell::Floor;
+    }
+
+    /// 0.25셀 간격 샘플링 시야 체크.
+    pub fn los_clear(&self, a: Vec3, b: Vec3) -> bool {
+        let d = b - a;
+        let steps = ((d.length() / (CELL * 0.25)).ceil() as usize).max(1);
+        for i in 0..=steps {
+            let t = i as f32 / steps as f32;
+            if self.blocked_at(a + d * t) {
+                return false;
+            }
+        }
+        true
+    }
+}
+
+/// 축 분리 이동: x/z 각각 독립으로 시도 → 벽에 비비면 미끄러진다.
+pub fn try_move(map: &LevelMap, from: Vec3, delta: Vec3, radius: f32) -> Vec3 {
+    let mut pos = from;
+    let probe_x = Vec3::new(
+        pos.x + delta.x + delta.x.signum() * radius,
+        pos.y,
+        pos.z,
+    );
+    if !map.blocked_at(probe_x) {
+        pos.x += delta.x;
+    }
+    let probe_z = Vec3::new(
+        pos.x,
+        pos.y,
+        pos.z + delta.z + delta.z.signum() * radius,
+    );
+    if !map.blocked_at(probe_z) {
+        pos.z += delta.z;
+    }
+    pos
 }
 
 #[cfg(test)]
@@ -282,5 +331,38 @@ mod tests {
         let r1 = m.region_at((5, 1)).unwrap();
         assert_eq!(m.door_gates[0], r0);
         assert_eq!(m.door_gates[1], r1);
+    }
+
+    #[test]
+    fn try_move_blocks_walls_and_slides() {
+        let m = LevelMap::parse(T_MAP).unwrap();
+        let p = m.world_pos(1, 1, 0.5);
+        let out = try_move(&m, p, Vec3::new(-1.0, 0.0, 0.6), 0.4);
+        assert!(out.x >= p.x - 1e-4, "wall must block -x");
+        assert!(out.z > p.z, "z component must slide");
+    }
+
+    #[test]
+    fn closed_door_blocks_open_door_passes() {
+        let mut m = LevelMap::parse(T_MAP).unwrap();
+        let before = m.world_pos(3, 2, 0.5);
+        let blocked = try_move(&m, before, Vec3::new(CELL, 0.0, 0.0), 0.4);
+        assert!(
+            blocked.x < m.world_pos(4, 2, 0.0).x - 0.5,
+            "closed door blocks"
+        );
+        m.open_door((4, 2));
+        let passed = try_move(&m, before, Vec3::new(CELL, 0.0, 0.0), 0.4);
+        assert!(passed.x > blocked.x, "open door passes");
+    }
+
+    #[test]
+    fn los_blocked_by_wall_clear_in_open() {
+        let m = LevelMap::parse(T_MAP).unwrap();
+        let a = m.world_pos(1, 1, 0.5);
+        let b = m.world_pos(1, 3, 0.5);
+        assert!(m.los_clear(a, b));
+        let c = m.world_pos(6, 2, 0.5);
+        assert!(!m.los_clear(a, c));
     }
 }
