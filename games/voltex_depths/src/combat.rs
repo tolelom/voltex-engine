@@ -39,7 +39,7 @@ pub fn unproject_to_plane(vp_inv: &Mat4, ndc: (f32, f32), plane_y: f32) -> Optio
 use voltex::physics::Collider;
 use voltex_runtime::Lifetime;
 
-use crate::components::{Projectile, Team, Velocity};
+use crate::components::{Enemy, EnemyKind, EnemyKilled, Health, Projectile, Score, Team, Velocity};
 use crate::level::LevelMap;
 
 #[allow(dead_code)] // 호출자: Task 11 게임 루프
@@ -96,12 +96,117 @@ pub fn projectile_system(world: &mut World, map: &LevelMap, dt: f32) {
     }
 }
 
+// ── Task 10: 접촉 데미지 매트릭스 + 사망 처리 ────────────────────────────
+
+/// 투사체×엔티티 / Enemy 접촉 데미지 처리.
+/// touch 쿨다운 tick은 적 AI 시스템(Task 11)이 담당 — 여기선 finished 검사/리셋만.
+#[allow(dead_code)] // 호출자: Task 11 게임 루프
+pub fn handle_contacts(contacts: &[voltex::physics::ContactPoint], world: &mut World) {
+    use voltex::ecs::Tag;
+
+    for c in contacts {
+        // (x)가 (y)를 타격하는 방향 양쪽 시도
+        for &(x, y) in &[(c.entity_a, c.entity_b), (c.entity_b, c.entity_a)] {
+            if !world.is_alive(x) || !world.is_alive(y) {
+                continue;
+            }
+
+            // ── 투사체가 x일 경우 ──
+            if let Some(p) = world.get::<Projectile>(x).copied() {
+                let hit_enemy =
+                    p.team == Team::Player && world.get::<Enemy>(y).is_some();
+                let hit_player = p.team == Team::Enemy
+                    && world
+                        .get::<Tag>(y)
+                        .map(|t| t.0 == "player")
+                        .unwrap_or(false);
+                if hit_enemy || hit_player {
+                    if let Some(h) = world.get_mut::<Health>(y) {
+                        h.hp -= p.damage;
+                    }
+                    if world.is_alive(x) {
+                        voltex::ecs::despawn_recursive(world, x);
+                    }
+                    break; // 이 (x, y) 쌍 처리 완료
+                }
+            }
+
+            // ── Enemy 접촉 데미지 (Chaser/Boss × player) ──
+            let is_player = world
+                .get::<Tag>(y)
+                .map(|t| t.0 == "player")
+                .unwrap_or(false);
+            if is_player {
+                let ready = world
+                    .get::<Enemy>(x)
+                    .map(|e| e.kind != EnemyKind::Shooter && e.touch.finished())
+                    .unwrap_or(false);
+                if ready {
+                    if let Some(h) = world.get_mut::<Health>(y) {
+                        h.hp -= 1;
+                    }
+                    if let Some(e) = world.get_mut::<Enemy>(x) {
+                        e.touch.reset();
+                    }
+                }
+            }
+        }
+    }
+}
+
+pub struct DeathOutcome {
+    pub player_died: bool,
+    pub boss_died: bool,
+}
+
+#[allow(dead_code)] // 호출자: Task 11 게임 루프
+pub fn death_system(world: &mut World) -> DeathOutcome {
+    use voltex::ecs::Tag;
+
+    let mut out = DeathOutcome {
+        player_died: false,
+        boss_died: false,
+    };
+
+    let dead: Vec<Entity> = world
+        .query::<Health>()
+        .filter(|(_, h)| h.hp <= 0)
+        .map(|(e, _)| e)
+        .collect();
+
+    let mut killed: Vec<EnemyKilled> = Vec::new();
+    for e in dead {
+        if let Some(en) = world.get::<Enemy>(e) {
+            if en.kind == EnemyKind::Boss {
+                out.boss_died = true;
+            }
+            killed.push(EnemyKilled { region: en.region });
+            voltex::ecs::despawn_recursive(world, e);
+        } else if world
+            .get::<Tag>(e)
+            .map(|t| t.0 == "player")
+            .unwrap_or(false)
+        {
+            out.player_died = true;
+            // despawn 안 함 — phase 전환이 처리
+        }
+    }
+
+    for k in killed {
+        if let Some(s) = world.resource_mut::<Score>() {
+            s.0 += 100;
+        }
+        world.send_event(k);
+    }
+
+    out
+}
+
 // ── Tests ──────────────────────────────────────────────────────────────────
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use voltex::prelude::*;
 
     // ── Task 8 ──
 
@@ -157,5 +262,93 @@ mod tests {
             projectile_system(&mut w, &map, 0.1);
         }
         assert!(!w.is_alive(e), "projectile must despawn on wall");
+    }
+
+    // ── Task 10 ──
+
+    use voltex::physics::ContactPoint;
+    use crate::components::{EnemyKind, Health, Projectile, Team};
+
+    fn contact(a: Entity, b: Entity) -> ContactPoint {
+        ContactPoint {
+            entity_a: a,
+            entity_b: b,
+            normal: Vec3::new(0.0, 1.0, 0.0),
+            depth: 0.1,
+            point_on_a: Vec3::ZERO,
+            point_on_b: Vec3::ZERO,
+        }
+    }
+
+    #[test]
+    fn player_projectile_damages_enemy_and_despawns() {
+        let mut w = World::new();
+        let enemy = w.spawn_bundle((
+            Transform::new(),
+            crate::components::Enemy::new(EnemyKind::Chaser, 0),
+            Health { hp: 2 },
+        ));
+        let proj = w.spawn_bundle((
+            Transform::new(),
+            Projectile {
+                team: Team::Player,
+                damage: 1,
+            },
+            Velocity(Vec3::ZERO),
+        ));
+        handle_contacts(&[contact(proj, enemy)], &mut w);
+        assert_eq!(w.get::<Health>(enemy).unwrap().hp, 1);
+        assert!(!w.is_alive(proj));
+    }
+
+    #[test]
+    fn chaser_touch_damages_player_once_per_cooldown() {
+        let mut w = World::new();
+        let player = w.spawn_bundle((
+            Transform::new(),
+            voltex::ecs::Tag("player".into()),
+            Health { hp: 5 },
+        ));
+        let enemy = w.spawn_bundle((
+            Transform::new(),
+            crate::components::Enemy::new(EnemyKind::Chaser, 0),
+            Health { hp: 2 },
+        ));
+        handle_contacts(&[contact(enemy, player)], &mut w);
+        handle_contacts(&[contact(enemy, player)], &mut w);
+        assert_eq!(
+            w.get::<Health>(player).unwrap().hp,
+            4,
+            "touch damage must respect cooldown"
+        );
+    }
+
+    #[test]
+    fn death_sweep_despawns_sends_event_and_reports() {
+        let mut w = World::new();
+        // player(hp5) + chaser(hp0, region1) + boss(hp0, region0)
+        w.spawn_bundle((
+            Transform::new(),
+            voltex::ecs::Tag("player".into()),
+            Health { hp: 5 },
+        ));
+        w.spawn_bundle((
+            Transform::new(),
+            crate::components::Enemy::new(EnemyKind::Chaser, 1),
+            Health { hp: 0 },
+        ));
+        w.spawn_bundle((
+            Transform::new(),
+            crate::components::Enemy::new(EnemyKind::Boss, 0),
+            Health { hp: 0 },
+        ));
+        w.insert_resource(crate::components::Score(0));
+        let out = death_system(&mut w);
+        assert!(out.boss_died);
+        assert!(!out.player_died);
+        let killed = w.drain_events::<crate::components::EnemyKilled>();
+        assert_eq!(killed.len(), 2);
+        assert_eq!(w.query::<crate::components::Enemy>().count(), 0);
+        assert_eq!(w.resource::<crate::components::Score>().unwrap().0, 200);
     }
 }
