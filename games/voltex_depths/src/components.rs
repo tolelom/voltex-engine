@@ -12,7 +12,6 @@ pub enum GamePhase {
     Victory,
 }
 
-#[allow(dead_code)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Team {
     Player,
@@ -26,24 +25,20 @@ pub enum EnemyKind {
     Boss,
 }
 
-#[allow(dead_code)] // 필드(.0) 읽기는 이동 시스템에서 생김
 #[derive(Debug, Clone, Copy)]
 pub struct Velocity(pub Vec3);
 
-#[allow(dead_code)] // hp 읽기는 데미지/HUD 시스템에서 생김
 #[derive(Debug, Clone, Copy)]
 pub struct Health {
     pub hp: i32,
 }
 
-#[allow(dead_code)]
 #[derive(Debug, Clone, Copy)]
 pub struct Projectile {
     pub team: Team,
     pub damage: i32,
 }
 
-#[allow(dead_code)] // 필드 읽기는 적 AI 시스템에서 생김
 pub struct Enemy {
     pub kind: EnemyKind,
     pub region: usize,

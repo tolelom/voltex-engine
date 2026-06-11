@@ -113,7 +113,6 @@ impl LevelMap {
         self.regions[z * self.w + x]
     }
 
-    #[allow(dead_code)]
     pub fn region_of(&self, p: Vec3) -> Option<usize> {
         self.region_at(self.cell_of(p))
     }
@@ -235,7 +234,6 @@ impl LevelMap {
     }
 
     /// 0.25셀 간격 샘플링 시야 체크.
-    #[allow(dead_code)]
     pub fn los_clear(&self, a: Vec3, b: Vec3) -> bool {
         let d = b - a;
         let steps = ((d.length() / (CELL * 0.25)).ceil() as usize).max(1);
@@ -361,7 +359,6 @@ pub fn build_level(world: &mut World, map: &LevelMap) {
 }
 
 /// 축 분리 이동: x/z 각각 독립으로 시도 → 벽에 비비면 미끄러진다.
-#[allow(dead_code)]
 pub fn try_move(map: &LevelMap, from: Vec3, delta: Vec3, radius: f32) -> Vec3 {
     let mut pos = from;
     let probe_x = Vec3::new(

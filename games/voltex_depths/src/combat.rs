@@ -42,7 +42,6 @@ use voltex_runtime::Lifetime;
 use crate::components::{Enemy, EnemyKind, EnemyKilled, Health, Projectile, Score, Team, Velocity};
 use crate::level::LevelMap;
 
-#[allow(dead_code)] // 호출자: Task 11 게임 루프
 pub fn spawn_projectile(
     world: &mut World,
     from: Vec3,
