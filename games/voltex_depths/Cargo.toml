@@ -1,0 +1,10 @@
+[package]
+name = "voltex_depths"
+version = "0.1.0"
+edition = "2021"
+license.workspace = true
+
+[dependencies]
+voltex.workspace = true
+voltex_runtime.workspace = true
+env_logger = { workspace = true }

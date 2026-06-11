@@ -2193,6 +2193,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "voltex_depths"
+version = "0.1.0"
+dependencies = [
+ "env_logger",
+ "voltex",
+ "voltex_runtime",
+]
+
+[[package]]
 name = "voltex_ecs"
 version = "1.0.61"
 dependencies = [

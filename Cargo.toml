@@ -36,6 +36,7 @@ members = [
     "examples/game_ready_demo",
     "examples/boids_demo",
     "games/voltex_survivor",
+    "games/voltex_depths",
 ]
 
 [workspace.package]

@@ -1,0 +1,8 @@
+[project]
+name = "voltex_depths"
+version = "0.1.0"
+
+[build]
+assets = ["assets/**/*"]
+window_title = "Voltex Depths"
+window_size = [1280, 720]
