@@ -1,11 +1,5 @@
 //! Voltex Depths — 탑다운 트윈스틱 던전. 도그푸딩 게임 1편.
 //! 설계: docs/superpowers/specs/2026-06-11-voltex-depths-game-design.md
-mod combat;
-mod components;
-mod enemy;
-mod game_state;
-mod level;
-
 use std::cell::RefCell;
 use std::path::PathBuf;
 use std::rc::Rc;
@@ -15,9 +9,10 @@ use voltex::ecs::Tag;
 use voltex::prelude::*;
 use voltex_runtime::{RuntimeApp, RuntimeConfig, RuntimeResult, Timer};
 
-use combat::*;
-use components::*;
-use level::*;
+use voltex_depths::{combat, enemy, game_state};
+use voltex_depths::combat::*;
+use voltex_depths::components::*;
+use voltex_depths::level::*;
 
 const MAP: &[&str] = &[
     "#############################################################",
@@ -249,7 +244,7 @@ fn spawn_bgm(world: &mut World) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::components::EnemyKind;
+    use voltex_depths::components::EnemyKind;
 
     #[test]
     fn main_map_parses_with_expected_structure() {
