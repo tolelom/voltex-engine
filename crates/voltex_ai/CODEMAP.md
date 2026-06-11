@@ -11,7 +11,7 @@ AI 기초 — NavMesh (수동 + 자동 voxelization), A* + Funnel, steering, 동
 - Flocking (boid) — `separation`, `cohesion`, `alignment` 순수 함수 + `Boid` 컴포넌트 + `BoidParams` + `flocking_system(world, &params, dt)` ECS 시스템 (src/flocking.rs). 시스템이 `SpatialGrid` 로 이웃 수집(~O(n)) 후 3법칙 가중합 → 속도/위치 적분(max_speed clamp). 스냅샷 후 일괄 기록(순서 무관)
 - `NavAgent` — ECS 컴포넌트 (src/nav_agent.rs)
 - `nav_agent_system(world, navmesh, dt)` — NavAgent 엔티티 경로 추적 ECS 시스템 (src/nav_agent_system.rs)
-- `Obstacle`, velocity obstacle 회피 (src/obstacle.rs)
+- ~~`Obstacle`, velocity obstacle 회피 (src/obstacle.rs)~~ — **미배선**: lib.rs에 모듈 선언이 없어 컴파일되지 않음 (배선 시 bitrot 점검 필요)
 - `AiError`, `Result` — thiserror 기반 에러 (Generic/Io) (src/error.rs)
 
 ## 모듈 구조
@@ -29,7 +29,8 @@ AI 기초 — NavMesh (수동 + 자동 voxelization), A* + Funnel, steering, 동
 - 외부 crate: 없음
 
 ## 변경 시 주의점
-- navmesh_builder는 src/navmesh_builder/ 디렉토리로 분리됨 (M3 완료)
+- navmesh_builder는 src/navmesh_builder/ 디렉토리로 분리됨 (M3 완료). 분리 후 lib.rs 미배선으로 죽어 있다가 voltex_depths 투입 시점에 배선 (`pub use NavMeshBuilder`) — 파이프라인 단계 fn(voxelize 등)은 pub(crate)
+- voxelize는 삼각형 winding 무관 (normal 미사용, 높이차로 slope 판정). agent_radius erosion은 `ceil(radius/cell_size)` 보크셀 단위
 - navmesh.rs는 497줄
 - VNAV 바이너리 포맷 변경 시 저장된 내비메시 호환 깨짐
 - nav_agent_system은 kinematic(위치 적분) — RigidBody velocity 커플링은 호출자/후속 사이클. NavMesh는 호출자 소유로 매 프레임 주입
@@ -37,4 +38,4 @@ AI 기초 — NavMesh (수동 + 자동 voxelization), A* + Funnel, steering, 동
 ## 테스트
 - 단위 테스트: src/**/*.rs `#[cfg(test)]`
 - 실행: `cargo test -p voltex_ai --lib`
-- 현재 테스트 개수: 48개
+- 현재 테스트 개수: 63개 (navmesh_builder 배선으로 +7 등)
