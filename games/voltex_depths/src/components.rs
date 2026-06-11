@@ -59,11 +59,15 @@ impl Enemy {
             EnemyKind::Boss => Timer::repeating(2.5),
             EnemyKind::Chaser => Timer::repeating(1_000_000.0),
         };
+        // touch Timer를 "이미 만료" 상태로 초기화: 첫 접촉에서 즉시 데미지.
+        // Repeating의 finished() == just_finished() 이므로 한 주기 tick 으로 만든다.
+        let mut touch = Timer::repeating(0.8);
+        touch.tick(0.8);
         Self {
             kind,
             region,
             shoot,
-            touch: Timer::repeating(0.8),
+            touch,
             boss_dash_next: true,
         }
     }
