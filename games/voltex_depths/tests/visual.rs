@@ -38,10 +38,15 @@ fn dungeon_scene_renders_walls_player_enemies() {
     let (mut green, mut red) = (false, false);
     for p in rgba.chunks_exact(4) {
         let (r, g, b) = (p[0] as i32, p[1] as i32, p[2] as i32);
-        if g > r + 30 && g > b + 30 {
+        // 비율 기반 — 셰이딩 스케일 무관, 문 주황 false-positive 배제.
+        // 주의: 프레임버퍼는 sRGB라 선형 비율이 감마 압축됨 (비율^(1/2.4)).
+        //   적   [0.90,0.25,0.20] r/g 선형 3.6 → 감마 후 실측 1.93
+        //   플레이어 [0.20,0.85,0.35] g/r 1.98, g/b 1.5 (실측)
+        //   문   [0.85,0.65,0.20] r/g 선형 1.3 → 감마 후 ≈1.12 (배제 대상)
+        if g > 60 && g as f32 > r as f32 * 1.5 && g as f32 > b as f32 * 1.25 {
             green = true;
         }
-        if r > g + 30 && r > b + 30 {
+        if r > 60 && r as f32 > g as f32 * 1.5 && r as f32 > b as f32 * 1.5 {
             red = true;
         }
     }
