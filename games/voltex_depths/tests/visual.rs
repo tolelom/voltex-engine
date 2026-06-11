@@ -54,14 +54,15 @@ fn dungeon_scene_renders_walls_player_enemies() {
         green && red,
         "player(green)/enemy(red) must be visible (green={green} red={red})"
     );
-    // 스크린샷 산출물 (README/docs용)
+    // 스크린샷 산출물 (README/docs용) — 저장 실패는 픽셀 단언과 무관하므로 비치명.
     let png = voltex_capture::encode_rgba8(320, 240, &rgba);
-    std::fs::write(
+    if let Err(e) = std::fs::write(
         concat!(
             env!("CARGO_MANIFEST_DIR"),
             "/../../docs/visual/depths_dungeon.png"
         ),
         png,
-    )
-    .unwrap();
+    ) {
+        eprintln!("screenshot write failed: {e}");
+    }
 }

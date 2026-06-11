@@ -350,9 +350,15 @@ pub fn render_boids_swarm(gpu: &HeadlessGpu, width: u32, height: u32) -> Vec<u8>
 /// Render an arbitrary caller-built `World` of *declarative* renderables
 /// (`PrimitiveMesh` + `MaterialDesc` entities): materialize → `BasicRenderer`
 /// → RGBA8. The public entry point for game crates to pixel-verify their own
-/// scenes (added for voltex_depths dogfooding). Camera looks from `cam_pos`
-/// with the given yaw/pitch (radians) and the renderer's default FOV; light is
-/// one asymmetric directional.
+/// scenes (added for voltex_depths dogfooding).
+///
+/// Fixed contract (not parameters — parameterize when a second game needs it):
+/// - Light: one asymmetric directional, direction `[-0.4, -1.0, -0.6]`
+///   (`LightUniform::new()` defaults otherwise).
+/// - Camera: perspective, default FOV 45° (`FRAC_PI_4`), near 0.1 / far 100;
+///   looks from `cam_pos` with the given yaw/pitch (radians).
+/// - Capacity: `max_entities = 1024` — entities beyond the cap are
+///   **silently dropped** from the frame.
 pub fn render_world(
     gpu: &HeadlessGpu,
     width: u32,

@@ -19,6 +19,7 @@ Headless offscreen 렌더링 + PNG 캡처. 윈도우 없는 환경에서 *실제
 | `encode_rgba8(w, h, &[u8]) -> Vec<u8>` / `save_png(path, w, h, &[u8])` | `png_encode.rs`, `lib.rs` | stored deflate, 무압축 |
 | `ImageStats::analyze(&[u8])` / `looks_blank()` | `lib.rs` | blank/단색 프레임 자동 탐지 |
 | `scene::render_single_cube` / `render_cube_grid` / `render_pbr_grid` | `scene.rs` | `(gpu, w, h) -> Vec<u8>` |
+| `scene::render_world(gpu, w, h, &mut World, cam_pos, yaw, pitch) -> Vec<u8>` | `scene.rs` | 외부 게임 crate가 자기 씬을 픽셀 검증하는 공개 진입점 (voltex_depths 도그푸딩용). 고정 라이트/FOV/1024 entity 상한 — doc 주석 참고 |
 | bin `capture` | `bin/capture.rs` | `cargo run -p voltex_capture --bin capture [out_dir]` |
 
 ## 의존성
