@@ -1,5 +1,6 @@
 //! GPU 없는 풀 플레이스루: 스크립트된 입력으로 던전 한 판을 끝까지 시뮬레이션.
-//! main.rs의 게임플레이 시스템 블록과 동일한 호출 순서로 직접 조합한다.
+//! RuntimeApp::tick_systems_only의 실제 실행 순서(collision_fn → user_systems)를
+//! 따라 main.rs의 시스템들을 직접 조합한다.
 use voltex::prelude::*;
 use voltex_depths::{combat, components::*, game_state, level};
 
@@ -53,16 +54,18 @@ fn full_playthrough_kill_unlock_boss_victory() {
             w.get_mut::<Transform>(player).unwrap().position = next;
         }
 
-        // === main.rs add_system 블록과 동일 순서 ===
-        let due = frame % 30 == 0;
+        // === RuntimeApp::tick_systems_only 실순서 재현 ===
+        // collision_fn은 user_systems보다 먼저 실행됨 (app.rs: physics/collision
+        // → user_systems). 그 아래는 main.rs add_system 블록과 동일 순서.
+        let contacts = voltex::physics::detect_collisions(&w);
+        combat::handle_contacts(&contacts, &mut w);
+        // main.rs repath = Timer::repeating(0.5) → frame 29에 첫 발화.
+        let due = frame % 30 == 29;
         let m = map.clone();
         voltex_depths::enemy::enemy_ai_system(&mut w, &m, dt, due);
         voltex::ai::nav_agent_system(&mut w, &nav, dt);
         voltex_depths::enemy::velocity_system(&mut w, &m, dt);
         combat::projectile_system(&mut w, &m, dt);
-        // collision_fn 대체: detect_collisions 직접
-        let contacts = voltex::physics::detect_collisions(&w);
-        combat::handle_contacts(&contacts, &mut w);
         let out = combat::death_system(&mut w);
         game_state::door_system(&mut w, &mut map);
         voltex_runtime::update_lifetimes(&mut w, dt);
