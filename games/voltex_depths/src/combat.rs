@@ -405,4 +405,21 @@ mod tests {
         assert_eq!(w.query::<crate::components::Enemy>().count(), 0);
         assert_eq!(w.resource::<crate::components::Score>().unwrap().0, 200);
     }
+
+    // ── Task 14 ──
+
+    #[test]
+    fn generated_wavs_parse_with_engine_decoder() {
+        for name in ["sfx_shoot", "sfx_hit", "sfx_clear", "bgm"] {
+            let path = format!("{}/assets/{name}.wav", env!("CARGO_MANIFEST_DIR"));
+            let bytes = std::fs::read(&path).expect("run gen_sfx first");
+            let clip = voltex::audio::parse_wav(&bytes).expect(name);
+            assert!(
+                clip.sample_rate == 44_100 && !clip.samples.is_empty(),
+                "{name}: sample_rate={} samples={}",
+                clip.sample_rate,
+                clip.samples.len()
+            );
+        }
+    }
 }

@@ -37,8 +37,10 @@ const SCREEN: (f32, f32) = (1280.0, 720.0);
 /// 에셋은 cwd 무관하게 crate 기준 절대 경로 (배포 exe에선 깨짐 — known limitation).
 const ASSET_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/assets");
 
-// ClipId = with_audio_files 목록 인덱스. 1=sfx_hit, 2=sfx_clear 는 T14에서 사용 예정.
+// ClipId = with_audio_files 목록 인덱스.
 const CLIP_SHOOT: u32 = 0;
+const CLIP_HIT: u32 = 1;
+const CLIP_CLEAR: u32 = 2;
 const CLIP_BGM: u32 = 3;
 
 fn main() -> RuntimeResult<()> {
@@ -178,7 +180,17 @@ fn main() -> RuntimeResult<()> {
             enemy::velocity_system(world, &m, dt);
             combat::projectile_system(world, &m, dt);
             let out = combat::death_system(world);
+            // 방 클리어음: door_system 전후 Door 수 비교
+            let doors_before = world.query::<Door>().count();
             game_state::door_system(world, &mut map.borrow_mut());
+            let doors_after = world.query::<Door>().count();
+            if doors_after < doors_before {
+                let player_pos = world
+                    .find_by_tag("player")
+                    .and_then(|p| world.get::<Transform>(p).map(|t| t.position))
+                    .unwrap_or(Vec3::ZERO);
+                play_sfx(world, CLIP_CLEAR, player_pos);
+            }
             if out.boss_died {
                 *phase.borrow_mut() = GamePhase::Victory;
             } else if out.player_died {
@@ -191,8 +203,25 @@ fn main() -> RuntimeResult<()> {
     {
         let phase = phase.clone();
         app.set_collision_fn(move |contacts, world, _dt| {
-            if *phase.borrow() == GamePhase::Playing {
-                combat::handle_contacts(contacts, world);
+            if *phase.borrow() != GamePhase::Playing {
+                return;
+            }
+            // 플레이어 피격음: HP 스냅샷 비교
+            let hp_before = world
+                .find_by_tag("player")
+                .and_then(|p| world.get::<Health>(p).map(|h| h.hp));
+            combat::handle_contacts(contacts, world);
+            let hp_after = world
+                .find_by_tag("player")
+                .and_then(|p| world.get::<Health>(p).map(|h| h.hp));
+            if let (Some(b), Some(a)) = (hp_before, hp_after) {
+                if a < b {
+                    let player_pos = world
+                        .find_by_tag("player")
+                        .and_then(|p| world.get::<Transform>(p).map(|t| t.position))
+                        .unwrap_or(Vec3::ZERO);
+                    play_sfx(world, CLIP_HIT, player_pos);
+                }
             }
         });
     }
