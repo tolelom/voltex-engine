@@ -2,7 +2,7 @@ use super::{NavMeshBuilder, RegionMap, WalkableMap};
 
 impl NavMeshBuilder {
     /// Step 3: Flood-fill connected walkable areas into regions.
-    pub fn build_regions(&self, wm: &WalkableMap) -> RegionMap {
+    pub(crate) fn build_regions(&self, wm: &WalkableMap) -> RegionMap {
         let n = wm.width * wm.depth;
         let mut regions = vec![0u32; n];
         let mut current_region = 0u32;

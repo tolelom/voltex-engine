@@ -1,3 +1,6 @@
+//! Automatic [`NavMesh`] generation from triangle geometry
+//! (voxelize → mark walkable → flood-fill regions → triangulate).
+
 mod voxelize;
 mod walkable;
 mod regions;
@@ -39,15 +42,8 @@ pub(crate) struct Heightfield {
     pub(crate) min_x: f32,
     pub(crate) min_z: f32,
     pub(crate) cell_size: f32,
-    pub(crate) cell_height: f32,
     /// For each cell (x, z), store (min_y, max_y). None if empty.
     pub(crate) cells: Vec<Option<(f32, f32)>>,
-}
-
-impl Heightfield {
-    pub(crate) fn cell_index(&self, x: usize, z: usize) -> usize {
-        z * self.width + x
-    }
 }
 
 /// Map of walkable cells. True if the cell is walkable.
@@ -62,12 +58,6 @@ pub(crate) struct WalkableMap {
     pub(crate) heights: Vec<f32>,
 }
 
-impl WalkableMap {
-    pub(crate) fn cell_index(&self, x: usize, z: usize) -> usize {
-        z * self.width + x
-    }
-}
-
 /// A region of connected walkable cells (flood-fill result).
 pub(crate) struct RegionMap {
     pub(crate) width: usize,
@@ -78,10 +68,13 @@ pub(crate) struct RegionMap {
     /// Region ID per cell. 0 = not walkable, 1+ = region ID.
     pub(crate) regions: Vec<u32>,
     pub(crate) heights: Vec<f32>,
+    /// Number of distinct regions (read by tests; lib code uses `regions` directly).
+    #[allow(dead_code)]
     pub(crate) num_regions: u32,
 }
 
 impl NavMeshBuilder {
+    /// Builder with default parameters (see field docs).
     pub fn new() -> Self {
         Self::default()
     }
@@ -122,7 +115,7 @@ mod tests {
         // 10x10 grid of 1x1 quads, skip 4<=x<6 && 4<=z<6
         for z in 0..10 {
             for x in 0..10 {
-                if x >= 4 && x < 6 && z >= 4 && z < 6 {
+                if (4..6).contains(&x) && (4..6).contains(&z) {
                     continue; // obstacle
                 }
                 let vi = vertices.len() as u32;

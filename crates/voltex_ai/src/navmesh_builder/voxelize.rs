@@ -3,7 +3,7 @@ use voltex_math::Vec3;
 
 impl NavMeshBuilder {
     /// Step 1: Rasterize triangles into a heightfield grid.
-    pub fn voxelize(&self, vertices: &[Vec3], indices: &[u32]) -> Heightfield {
+    pub(crate) fn voxelize(&self, vertices: &[Vec3], indices: &[u32]) -> Heightfield {
         // Find bounding box
         let mut min_x = f32::INFINITY;
         let mut max_x = f32::NEG_INFINITY;
@@ -81,7 +81,6 @@ impl NavMeshBuilder {
             min_x,
             min_z,
             cell_size: self.cell_size,
-            cell_height: self.cell_height,
             cells,
         }
     }

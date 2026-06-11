@@ -2,7 +2,7 @@ use super::{Heightfield, NavMeshBuilder, WalkableMap};
 
 impl NavMeshBuilder {
     /// Step 2: Mark walkable cells based on slope and agent height clearance.
-    pub fn mark_walkable(&self, hf: &Heightfield) -> WalkableMap {
+    pub(crate) fn mark_walkable(&self, hf: &Heightfield) -> WalkableMap {
         let max_slope_cos = (self.max_slope * std::f32::consts::PI / 180.0).cos();
         let n = hf.width * hf.depth;
         let mut walkable = vec![false; n];

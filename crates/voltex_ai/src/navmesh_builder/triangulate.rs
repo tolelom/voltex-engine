@@ -5,7 +5,7 @@ use voltex_math::Vec3;
 impl NavMeshBuilder {
     /// Steps 4-5 combined: Convert walkable grid cells directly into a NavMesh.
     /// Each walkable cell becomes a quad (2 triangles), with adjacency computed.
-    pub fn triangulate(&self, rm: &RegionMap) -> NavMesh {
+    pub(crate) fn triangulate(&self, rm: &RegionMap) -> NavMesh {
         let mut vertices = Vec::new();
         let mut triangles = Vec::new();
 
@@ -73,7 +73,7 @@ impl NavMeshBuilder {
                 if cell_tri_map[idx].is_none() {
                     continue;
                 }
-                let (ta, tb) = cell_tri_map[idx].unwrap();
+                let (ta, _tb) = cell_tri_map[idx].unwrap();
 
                 // Bottom neighbor (z-1): A's edge 0 connects to neighbor's B edge 1 (TR->TL = top)
                 if z > 0 {
