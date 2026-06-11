@@ -34,6 +34,7 @@ fn tone(freq: f32, secs: f32, decay: f32) -> Vec<f32> {
 
 fn main() -> std::io::Result<()> {
     let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/assets");
+    std::fs::create_dir_all(dir)?;
     write_wav(&format!("{dir}/sfx_shoot.wav"), &tone(880.0, 0.09, 35.0))?;
     write_wav(&format!("{dir}/sfx_hit.wav"), &tone(180.0, 0.15, 18.0))?;
     let mut clear = tone(523.0, 0.12, 8.0);

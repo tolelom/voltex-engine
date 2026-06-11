@@ -215,6 +215,7 @@ fn main() -> RuntimeResult<()> {
                 .find_by_tag("player")
                 .and_then(|p| world.get::<Health>(p).map(|h| h.hp));
             if let (Some(b), Some(a)) = (hp_before, hp_after) {
+                // 치사 타격 프레임에도 피격음 재생 — 의도 (죽는 순간 무음 방지).
                 if a < b {
                     let player_pos = world
                         .find_by_tag("player")
