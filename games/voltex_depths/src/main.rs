@@ -1,6 +1,7 @@
 mod combat;
 mod components;
 mod enemy;
+mod game_state;
 mod level;
 
 use voltex_runtime::{RuntimeApp, RuntimeConfig, RuntimeResult};
