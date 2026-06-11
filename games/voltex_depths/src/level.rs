@@ -1,6 +1,4 @@
 //! ASCII 그리드 → 레벨 데이터. 전부 순수 (GPU/World 무관).
-// NOTE: PLAYER_Y/build_level 등은 main이 연결 전까지 임시. 후속 태스크에서 제거.
-#![allow(dead_code)]
 use crate::components::{Door, Enemy, EnemyKind, Health, RegionCounts, Score, Velocity};
 use voltex::ai::{NavAgent, NavMesh, NavMeshBuilder};
 use voltex::ecs::Tag;
@@ -10,7 +8,6 @@ use voltex::prelude::*;
 // NOTE: 아래 개별 #[allow(dead_code)]는 main이 아직 level 모듈을 안 써서 임시.
 // 후속 태스크(엔티티 스폰/게임 루프 연결)에서 호출자가 생기는 대로 제거.
 pub const CELL: f32 = 2.0;
-#[allow(dead_code)]
 pub const WALL_H: f32 = 3.0;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -26,7 +23,6 @@ pub struct LevelMap {
     pub h: usize,
     cells: Vec<Cell>,
     pub player_spawn: (usize, usize),
-    #[allow(dead_code)]
     pub enemies: Vec<(usize, usize, EnemyKind)>,
     pub doors: Vec<(usize, usize)>,
     pub regions: Vec<Option<usize>>,
@@ -96,7 +92,6 @@ impl LevelMap {
     }
 
     /// 맵 중심이 월드 원점. +x = 그리드 x 증가, +z = 그리드 z 증가.
-    #[allow(dead_code)]
     pub fn world_pos(&self, x: usize, z: usize, y: f32) -> Vec3 {
         Vec3::new(
             (x as f32 - self.w as f32 / 2.0 + 0.5) * CELL,
@@ -295,6 +290,7 @@ pub fn build_navmesh(map: &LevelMap) -> NavMesh {
 pub const PLAYER_Y: f32 = 0.5;
 
 /// World에 레벨 메시(바닥/벽/문) + 플레이어 + 적 + 리소스를 시딩한다.
+#[allow(dead_code)]
 pub fn build_level(world: &mut World, map: &LevelMap) {
     // 바닥 — 맵 전체 크기의 납작 큐브
     let mut t = Transform::from_position(Vec3::new(0.0, -0.05, 0.0));
