@@ -1,3 +1,6 @@
+mod components;
+mod level;
+
 use voltex_runtime::{RuntimeApp, RuntimeConfig, RuntimeResult};
 
 fn main() -> RuntimeResult<()> {
