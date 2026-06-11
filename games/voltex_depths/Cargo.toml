@@ -8,3 +8,6 @@ license.workspace = true
 voltex.workspace = true
 voltex_runtime.workspace = true
 env_logger = { workspace = true }
+
+[dev-dependencies]
+voltex_capture.workspace = true

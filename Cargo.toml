@@ -66,6 +66,7 @@ voltex_script = { path = "crates/voltex_script" }
 voltex_editor = { path = "crates/voltex_editor" }
 voltex_runtime = { path = "crates/voltex_runtime" }
 voltex_cli = { path = "crates/voltex_cli" }
+voltex_capture = { path = "crates/voltex_capture" }
 wgpu = "28.0"
 winit = "0.30"
 bytemuck = { version = "1", features = ["derive"] }
