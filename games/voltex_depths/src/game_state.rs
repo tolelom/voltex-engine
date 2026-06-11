@@ -61,7 +61,9 @@ mod tests {
             "#########",
         ])
         .unwrap();
-        // 적은 오른쪽 region — 문 gate는 왼쪽(시작, 적 0) region이므로 즉시 열려야 함
+        // gate는 BFS depth 계산 결과 — 플레이어 시작 region에서 가까운 쪽이 gate.
+        // 이 맵에선 왼쪽(시작) 방이 gate. 적은 오른쪽 region뿐이므로
+        // gate(시작 방, 적 0)가 빈 문은 즉시 열려야 함.
         let mut map = m.clone();
         let mut w = World::new();
         build_level(&mut w, &map);
@@ -72,9 +74,11 @@ mod tests {
 
     #[test]
     fn door_with_enemies_in_gate_waits_for_kill_events() {
+        // 가운데 방에도 c를 둬서 doors[1]의 gate(가운데 방) count가 0이 아니게 함
+        // — 첫 kill 후 doors[1]이 여전히 닫혀 있음을 단언하기 위한 전제.
         let m = LevelMap::parse(&[
             "###########",
-            "#P.c#..#B.#",
+            "#P.c#.c#B.#",
             "#...D..D..#",
             "###########",
         ])
@@ -83,6 +87,7 @@ mod tests {
         let mut w = World::new();
         build_level(&mut w, &map);
         let first_door_cell = map.doors[0];
+        let second_door_cell = map.doors[1];
         door_system(&mut w, &mut map);
         assert!(
             map.blocked_at(map.world_pos(first_door_cell.0, first_door_cell.1, 0.5)),
@@ -96,6 +101,10 @@ mod tests {
             first_door_cell.1,
             0.5
         )));
+        assert!(
+            map.blocked_at(map.world_pos(second_door_cell.0, second_door_cell.1, 0.5)),
+            "두 번째 문은 가운데 방 c 생존 동안 여전히 닫힘"
+        );
     }
 
     #[test]
@@ -115,6 +124,7 @@ mod tests {
         map.open_door((4, 2));
         let enemy = w.query::<Enemy>().map(|(e, _)| e).next().unwrap();
         voltex::ecs::despawn_recursive(&mut w, enemy);
+        w.resource_mut::<Score>().unwrap().0 = 999; // 더티 상태 — 리셋이 0으로 되돌리는지
         // 리셋
         start_game(&mut w, &mut map, &source);
         assert_eq!(w.query::<Enemy>().count(), 1, "enemy reseeded");
