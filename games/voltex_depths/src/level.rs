@@ -1,9 +1,11 @@
 //! ASCII 그리드 → 레벨 데이터. 전부 순수 (GPU/World 무관).
-#![allow(dead_code)]
 use voltex::prelude::*;
 use crate::components::EnemyKind;
 
+// NOTE: 아래 개별 #[allow(dead_code)]는 main이 아직 level 모듈을 안 써서 임시.
+// 후속 태스크(엔티티 스폰/게임 루프 연결)에서 호출자가 생기는 대로 제거.
 pub const CELL: f32 = 2.0;
+#[allow(dead_code)]
 pub const WALL_H: f32 = 3.0;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -19,14 +21,17 @@ pub struct LevelMap {
     pub h: usize,
     cells: Vec<Cell>,
     pub player_spawn: (usize, usize),
+    #[allow(dead_code)]
     pub enemies: Vec<(usize, usize, EnemyKind)>,
     pub doors: Vec<(usize, usize)>,
-    pub regions: Vec<Option<usize>>, // Task 3
-    pub region_count: usize,         // Task 3
-    pub door_gates: Vec<usize>,      // Task 3
+    pub regions: Vec<Option<usize>>,
+    pub region_count: usize,
+    /// 문 i의 gate = 플레이어 출발 지점에 가까운 쪽 region id (BFS depth 기준) — 그 region 클리어 시 개방.
+    pub door_gates: Vec<usize>,
 }
 
 impl LevelMap {
+    #[allow(dead_code)]
     pub fn parse(rows: &[&str]) -> Result<Self, String> {
         let h = rows.len();
         let w = rows.first().map(|r| r.len()).ok_or("empty map")?;
@@ -86,6 +91,7 @@ impl LevelMap {
     }
 
     /// 맵 중심이 월드 원점. +x = 그리드 x 증가, +z = 그리드 z 증가.
+    #[allow(dead_code)]
     pub fn world_pos(&self, x: usize, z: usize, y: f32) -> Vec3 {
         Vec3::new(
             (x as f32 - self.w as f32 / 2.0 + 0.5) * CELL,
@@ -107,6 +113,7 @@ impl LevelMap {
         self.regions[z * self.w + x]
     }
 
+    #[allow(dead_code)]
     pub fn region_of(&self, p: Vec3) -> Option<usize> {
         self.region_at(self.cell_of(p))
     }
@@ -222,11 +229,13 @@ impl LevelMap {
     }
 
     /// 문 개방: Door → Floor. region 데이터는 재계산하지 않는다.
+    #[allow(dead_code)]
     pub fn open_door(&mut self, (x, z): (usize, usize)) {
         self.cells[z * self.w + x] = Cell::Floor;
     }
 
     /// 0.25셀 간격 샘플링 시야 체크.
+    #[allow(dead_code)]
     pub fn los_clear(&self, a: Vec3, b: Vec3) -> bool {
         let d = b - a;
         let steps = ((d.length() / (CELL * 0.25)).ceil() as usize).max(1);
@@ -241,6 +250,7 @@ impl LevelMap {
 }
 
 /// 축 분리 이동: x/z 각각 독립으로 시도 → 벽에 비비면 미끄러진다.
+#[allow(dead_code)]
 pub fn try_move(map: &LevelMap, from: Vec3, delta: Vec3, radius: f32) -> Vec3 {
     let mut pos = from;
     let probe_x = Vec3::new(
