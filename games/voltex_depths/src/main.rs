@@ -116,7 +116,23 @@ fn main() -> RuntimeResult<()> {
                 }
                 GamePhase::GameOver | GamePhase::Victory => {
                     if input.is_key_just_pressed(KeyCode::KeyR) {
-                        world.clear();
+                        // world.clear()는 여기서 하지 않는다 — BGM AudioSource를
+                        // despawn하면 playing=false 엣지가 영원히 오지 않아 루핑
+                        // voice가 mixer에 잔류하고, 재시작마다 BGM이 중첩된다
+                        // (엔진 갭; dogfood-friction #9).
+                        //
+                        // 대신 BGM 소스의 playing을 false로 내린다. audio_sync는
+                        // tick_systems_only의 맨 마지막(action_systems 이후)에 돌아
+                        // 같은 프레임 내에 (playing=false, active=true) 엣지를 보고
+                        // mixer에 Stop을 즉시 발행한다.
+                        //
+                        // 잔존 씬 엔티티는 Title 오버레이(alpha 230)가 가리며,
+                        // Space의 start_game이 world.clear()로 정리한다.
+                        if let Some(bgm) = world.find_by_tag("bgm") {
+                            if let Some(src) = world.get_mut::<AudioSource>(bgm) {
+                                src.stop();
+                            }
+                        }
                         *phase.borrow_mut() = GamePhase::Title;
                     }
                 }

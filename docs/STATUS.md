@@ -185,7 +185,7 @@ SFX/BGM. 엔진 Rust API 워크플로 도그푸딩이 목적.
   lib.rs 배선 + bitrot 수정 후 잠자던 테스트 7개 전부 통과 (friction #1).
 - **voltex_capture::render_world 공개** — 게임 crate가 임의 World를 오프스크린
   픽셀 검증하는 진입점 (friction #7 해소). depths GPU 시각 회귀가 사용.
-- **검증**: 단위 29 + 헤드리스 풀 플레이스루(`tests/playthrough.rs`) + GPU 시각
+- **검증**: 단위 28 (lib 27 + main 1) + 헤드리스 풀 플레이스루(`tests/playthrough.rs`) + GPU 시각
   회귀(`tests/visual.rs`) 그린. debug/release 스모크 런 panic/validation 0.
 - **friction 로그 8건** (P1 6건 중 2건 해소, P2 2건) — `docs/dogfood-friction.md`
   머리말에 다음 엔진 사이클 후보 정리. `voltex build`가 Rust 로직 게임을

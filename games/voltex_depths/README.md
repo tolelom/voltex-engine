@@ -62,6 +62,9 @@ cargo test -p voltex_depths --test visual -- --ignored  # GPU 시각 회귀 (GPU
 
 - **창 크기 1280x720 고정 조준** — action system에서 창 크기를 읽을 경로가
   없어 상수로 고정. 리사이즈하면 마우스 조준이 틀어짐 (friction #4).
+- **Windows 디스플레이 배율(DPI) 100% 가정** — `mouse_position()`은 물리
+  픽셀, 창은 논리 크기라 배율 125%+에서 조준이 어긋남 (friction #4 물리/논리
+  픽셀 불일치 연관).
 - **에셋 절대경로** — `CARGO_MANIFEST_DIR` 기준이라 빌드 머신 밖 배포 exe는
   소리가 안 남 (friction #6, #8).
 - **navmesh가 닫힌 문을 워크블 취급** — 적이 문 너머로 경로를 잡을 수 있어
