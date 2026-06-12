@@ -26,9 +26,9 @@ const MAP: &[&str] = &[
 
 const PLAYER_SPEED: f32 = 6.0;
 const FIRE_COOLDOWN: f32 = 0.18;
-/// 조준 NDC 변환용 화면 크기. 창 리사이즈는 반영 안 됨 — known limitation
-/// (action system에서 현재 창 크기를 읽을 경로가 없음, friction 기록).
-const SCREEN: (f32, f32) = (1280.0, 720.0);
+/// 초기 창 크기 (논리 픽셀). 조준 NDC 변환은 이 상수가 아니라
+/// `input.window_size()`(물리 픽셀, 리사이즈/DPI 반영)를 쓴다 — friction #4 해소.
+const SCREEN: (u32, u32) = (1280, 720);
 /// 에셋은 cwd 무관하게 crate 기준 절대 경로 (배포 exe에선 깨짐 — known limitation).
 const ASSET_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/assets");
 
@@ -47,6 +47,10 @@ fn main() -> RuntimeResult<()> {
     // 카메라 VP 공유 — 조준 unprojection용. camera_fn이 시스템 tick 뒤에 돌아
     // action system은 직전 프레임 VP를 본다 (1프레임 지연 허용).
     let cam_vp = Rc::new(RefCell::new(Mat4::IDENTITY));
+    // 이번 프레임 조준점 (Playing 중 마우스 unproject 결과). action system이
+    // 쓰고 debug_draw_fn이 읽는다 — debug_fn 시그니처(|d, world, dt|)에
+    // input이 없어 Rc 공유로 전달.
+    let aim_point: Rc<RefCell<Option<Vec3>>> = Rc::new(RefCell::new(None));
 
     // 오디오 파일은 T14에서 생성됨. with_audio_files는 부재/디코드 실패 시
     // silent placeholder로 부트를 계속하고, 파일이 생기면 핫리로드로 살아난다.
@@ -58,7 +62,7 @@ fn main() -> RuntimeResult<()> {
     let mut app = RuntimeApp::new(
         RuntimeConfig::new()
             .with_window_title("Voltex Depths")
-            .with_window_size(SCREEN.0 as u32, SCREEN.1 as u32)
+            .with_window_size(SCREEN.0, SCREEN.1)
             .with_shadows(true)
             .with_hud(true)
             .with_audio_files(audio_files)
@@ -98,6 +102,7 @@ fn main() -> RuntimeResult<()> {
         let phase = phase.clone();
         let map = map.clone();
         let cam_vp = cam_vp.clone();
+        let aim_point = aim_point.clone();
         let source = source.clone();
         // Once + 만료 시작: 첫 클릭 즉시 발사, 이후 finished/reset 쿨다운
         // (components.rs touch 타이머와 같은 sticky 패턴 — Repeating
@@ -106,6 +111,7 @@ fn main() -> RuntimeResult<()> {
         fire_cd.tick(FIRE_COOLDOWN);
         app.add_action_system(move |world, input, imap, dt| {
             let ph = *phase.borrow();
+            *aim_point.borrow_mut() = None; // Playing 분기에서만 채움
             match ph {
                 GamePhase::Title => {
                     if input.is_key_just_pressed(KeyCode::Space) {
@@ -146,27 +152,36 @@ fn main() -> RuntimeResult<()> {
                         }
                     }
                     fire_cd.tick(dt);
-                    if input.is_mouse_button_pressed(MouseButton::Left) && fire_cd.finished() {
+                    // 조준점: 마우스(물리 픽셀) → NDC → 플레이어 평면 unproject.
+                    // 창 크기는 input.window_size()(물리 픽셀) — mouse_position과
+                    // 단위가 같아 리사이즈/DPI 배율 무관 (friction #4 해소).
+                    // 매 프레임 계산해 발사와 디버그 마커가 공유.
+                    let (ww, wh) = input.window_size();
+                    let aim = if ww > 0 && wh > 0 {
                         let (mx, my) = input.mouse_position();
-                        let ndc = ndc_from_mouse(mx, my, SCREEN.0, SCREEN.1);
-                        if let Some(inv) = cam_vp.borrow().inverse() {
-                            if let (Some(p), Some(aim)) = (
-                                world.find_by_tag("player"),
-                                unproject_to_plane(&inv, ndc, PLAYER_Y),
-                            ) {
-                                if let Some(from) = world.get::<Transform>(p).map(|t| t.position) {
-                                    fire_cd.reset();
-                                    let dir = Vec3::new(aim.x - from.x, 0.0, aim.z - from.z);
-                                    spawn_projectile(
-                                        world,
-                                        Vec3::new(from.x, 0.6, from.z),
-                                        dir,
-                                        Team::Player,
-                                        1,
-                                        14.0,
-                                    );
-                                    play_sfx(world, CLIP_SHOOT, from);
-                                }
+                        let ndc = ndc_from_mouse(mx, my, ww as f32, wh as f32);
+                        cam_vp
+                            .borrow()
+                            .inverse()
+                            .and_then(|inv| unproject_to_plane(&inv, ndc, PLAYER_Y))
+                    } else {
+                        None
+                    };
+                    *aim_point.borrow_mut() = aim;
+                    if input.is_mouse_button_pressed(MouseButton::Left) && fire_cd.finished() {
+                        if let (Some(p), Some(aim)) = (world.find_by_tag("player"), aim) {
+                            if let Some(from) = world.get::<Transform>(p).map(|t| t.position) {
+                                fire_cd.reset();
+                                let dir = Vec3::new(aim.x - from.x, 0.0, aim.z - from.z);
+                                spawn_projectile(
+                                    world,
+                                    Vec3::new(from.x, 0.6, from.z),
+                                    dir,
+                                    Team::Player,
+                                    1,
+                                    14.0,
+                                );
+                                play_sfx(world, CLIP_SHOOT, from);
                             }
                         }
                     }
@@ -234,6 +249,18 @@ fn main() -> RuntimeResult<()> {
                         .unwrap_or(Vec3::ZERO);
                     play_sfx(world, CLIP_HIT, player_pos);
                 }
+            }
+        });
+    }
+
+    // ---- 조준점 디버그 마커: 게임이 인식한 마우스 unproject 지점에 십자 표시.
+    // 도그푸딩 게임이라 항상 켜둠 — 조준이 어긋나면 "마커 위치 = 게임이 본
+    // 클릭 위치"라 화면만 보고 입력 좌표계 문제를 진단할 수 있다 (friction #4).
+    {
+        let aim_point = aim_point.clone();
+        app.set_debug_draw_fn(move |d, _world, _dt| {
+            if let Some(aim) = *aim_point.borrow() {
+                d.cross(aim, 0.4, [1.0, 0.9, 0.2]);
             }
         });
     }
