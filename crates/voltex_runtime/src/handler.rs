@@ -23,6 +23,14 @@ impl ApplicationHandler for RuntimeHandler {
             return;
         }
         let window = voltex_platform::VoltexWindow::new(event_loop, &app.config.window);
+        // Seed InputState with the real window size in PHYSICAL pixels —
+        // same unit as CursorMoved positions, so games can do screen→NDC
+        // math that stays correct at any DPI scale (the config size is
+        // logical; at 125% scale physical = logical × 1.25).
+        {
+            let (w, h) = window.inner_size();
+            app.input.set_window_size(w, h);
+        }
         let gpu = match GpuContext::new(window.handle.clone()) {
             Ok(gpu) => gpu,
             Err(e) => {
@@ -163,6 +171,11 @@ impl ApplicationHandler for RuntimeHandler {
                 if size.width > 0 && size.height > 0 {
                     state.gpu.resize(size.width, size.height);
                     state.camera.aspect = size.width as f32 / size.height as f32;
+                    // Keep InputState's physical window size current so
+                    // screen→NDC math in game systems tracks resizes. The
+                    // 0x0 minimise event is skipped with the GPU resize —
+                    // the last valid size is kept.
+                    app.input.set_window_size(size.width, size.height);
                 }
             }
             WindowEvent::CursorMoved { position, .. } => {

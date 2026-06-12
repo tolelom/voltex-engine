@@ -16,7 +16,7 @@
 - `audio_sync` — `audio_sync_system` (AudioSource→AudioSystem 브릿지) + 순수 `decide_action` 엣지 로직 + `poll_audio_hot_reload(watcher, watched, audio)` (변경 파일 재디코드 → replace_clip; v1.0.90) (src/audio_sync.rs)
 - `audio_paths` — `AudioPath(String)` 컴포넌트(NAME `audio_path`, `path_component!` impl, 앱 registry 자동 등록) + `AudioClipCache`(경로별 ClipId 공유 + 실패 None 캐시) + `resolve_audio_paths_with`(주입 로더 코어) + `resolve_audio_paths`(Vfs 우선 read → `decode_clip_bytes` → `add_clip`). AudioSource 없으면 stopped 로 부착, 있으면 stale clip_id 재바인딩 — **AudioPath 보유 엔티티의 clip_id 는 resolver 소유** (수동 제어는 AudioPath 제거 후). tick audio 단계 첫머리 호출(멱등), load_scene 이 clear_failures. 성공 시 1회 `resolved N audio path(s)` log_info (v1.0.103) (src/audio_paths.rs)
 - `RuntimeApp::watch_audio_clip(path, clip_index)` — 오디오 파일 감시 등록 (전용 `audio_watcher`, script watcher 와 분리 — 그쪽은 pool 이 변경을 전부 소비). tick 의 audio 단계에서 자동 폴링 + 로그 (src/app.rs)
-- `handler` (crate-private) — winit ApplicationHandler 구현 (src/handler.rs)
+- `handler` (crate-private) — winit ApplicationHandler 구현. 창 생성 직후(`resumed`) + `Resized` 이벤트에서 `app.input.set_window_size(물리 픽셀)` 주입 — 게임 시스템이 `input.window_size()`로 DPI/리사이즈 무관 screen→NDC 변환 가능 (0x0 최소화 이벤트는 skip, 마지막 유효 크기 유지) (src/handler.rs)
 
 ## 의존성
 - voltex crate: voltex_math, voltex_platform, voltex_ecs, voltex_asset, voltex_renderer, voltex_renderer_ecs, voltex_physics, voltex_script, voltex_editor (HUD UiContext/UiRenderer), voltex_audio (AudioSystem)

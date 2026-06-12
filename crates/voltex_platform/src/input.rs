@@ -29,6 +29,12 @@ pub struct InputState {
     mouse_buttons_just_pressed: HashSet<MouseButton>,
     mouse_buttons_just_released: HashSet<MouseButton>,
     mouse_scroll_delta: f32,
+    /// Current window inner size in **physical pixels** — same unit as
+    /// [`mouse_position`](Self::mouse_position), so screen→NDC math works
+    /// at any DPI scale. `(0, 0)` until the runtime injects the real size
+    /// via [`set_window_size`](Self::set_window_size); callers must guard
+    /// against zero before dividing.
+    window_size: (u32, u32),
 }
 
 impl Default for InputState {
@@ -52,6 +58,7 @@ impl InputState {
             mouse_buttons_just_pressed: HashSet::new(),
             mouse_buttons_just_released: HashSet::new(),
             mouse_scroll_delta: 0.0,
+            window_size: (0, 0),
         }
     }
 
@@ -96,6 +103,20 @@ impl InputState {
     /// [`begin_frame`](Self::begin_frame). Sign: positive = up / away.
     pub fn mouse_scroll(&self) -> f32 {
         self.mouse_scroll_delta
+    }
+
+    /// Window inner size in **physical pixels** (same unit as
+    /// [`mouse_position`](Self::mouse_position)). Returns `(0, 0)` if the
+    /// runtime has not injected a size yet — guard before dividing.
+    pub fn window_size(&self) -> (u32, u32) {
+        self.window_size
+    }
+
+    /// Record the window inner size in physical pixels. Called by the
+    /// runtime on window creation and on every `Resized` event. Persists
+    /// across [`begin_frame`](Self::begin_frame) like `mouse_seen`.
+    pub fn set_window_size(&mut self, width: u32, height: u32) {
+        self.window_size = (width, height);
     }
 
     /// Clear the `just_*` sets and reset mouse / scroll deltas to zero.
@@ -241,6 +262,26 @@ mod tests {
         // A release after begin_frame still produces a just_released edge.
         input.process_key(KeyCode::KeyW, false);
         assert!(input.is_key_just_released(KeyCode::KeyW), "release edge after begin_frame");
+    }
+
+    #[test]
+    fn window_size_set_get_roundtrip() {
+        // Default is (0, 0) = "not yet known" — callers must guard before
+        // dividing (NDC conversion). After injection the exact value comes back.
+        let mut input = InputState::new();
+        assert_eq!(input.window_size(), (0, 0), "unset window size is (0, 0)");
+        input.set_window_size(1600, 900);
+        assert_eq!(input.window_size(), (1600, 900));
+    }
+
+    #[test]
+    fn window_size_survives_begin_frame() {
+        // Window size is persistent state (like mouse_seen), not a per-frame
+        // accumulator — begin_frame must not reset it.
+        let mut input = InputState::new();
+        input.set_window_size(1600, 900);
+        input.begin_frame();
+        assert_eq!(input.window_size(), (1600, 900), "begin_frame keeps window size");
     }
 
     #[test]

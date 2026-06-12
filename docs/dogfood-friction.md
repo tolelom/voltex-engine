@@ -5,15 +5,15 @@
 
 ## 현재 상태 요약 + 다음 엔진 사이클 후보 (P 순)
 
-게임 완성 시점(2026-06-12) 기준 총 9건 — P0 없음 (진행을 완전히 막은 마찰은 즉석 수정으로 해소), P1 7건 중 2건 해소, P2 2건.
+게임 완성 시점(2026-06-12) 기준 총 9건 — P0 없음 (진행을 완전히 막은 마찰은 즉석 수정으로 해소), P1 7건 중 3건 해소, P2 2건.
 
 **P1 — 다음 엔진 사이클 후보:**
 - #2 `NavAgent.target` 직접 대입 footgun — 캡슐화 또는 target 변경 감지 repath (+ 소이동 retarget)
 - #3 `follow_path` 도달 판정이 3D 거리 — XZ 거리로 (게임플레이 y 유지 시 가라앉음)
-- #4 action system에서 창 크기 접근 불가 — InputState/콜백에 화면 크기 노출 (물리/논리 픽셀 불일치: mouse_position()은 물리 픽셀, 창은 논리 크기라 DPI 배율 125%+에서 조준이 어긋남)
 - #8 `voltex build`가 Rust 로직 게임 패키징 불가 — wrapper에 게임 crate 훅 또는 `kind = "rust"` 빌드 모드
 - #9 루핑 AudioSource 엔티티를 despawn하면 voice가 mixer에 영구 잔류 (Stop 엣지 유실) — audio_sync가 자기가 발행한 voice를 entity별로 추적해 entity 소멸 시 orphan voice를 stop해야 함. 우회: despawn 전 playing=false 한 프레임 유지 (이 게임의 R 핸들러 방식; audio_sync가 action_systems 직후 같은 프레임에 Stop을 발행하므로 실제로는 0프레임 대기)
 - ~~#1 NavMeshBuilder 미배선 (침묵하는 죽은 코드)~~ — **해소** (lib.rs 배선 + bitrot 수정; 미배선 .rs CI 검출은 후속 후보로 잔존)
+- ~~#4 action system에서 창 크기 접근 불가~~ — **해소** (`InputState::window_size()` 물리 픽셀 노출, runtime이 resumed/Resized에서 주입; 게임은 SCREEN 상수 제거 + 실제 창 크기로 NDC 계산 → DPI/리사이즈 조준 버그 수정)
 - ~~#7 게임 crate의 임의 World 픽셀 검증 진입점 부재~~ — **해소** (`voltex_capture::render_world` 공개)
 
 **P2:**
@@ -25,7 +25,7 @@
 | 1 | 레벨 바닥 지오메트리로 NavMesh 자동 생성 (`NavMeshBuilder`) | `navmesh_builder/`가 M3 분리 이후 lib.rs에 미선언 — 모듈·테스트 7개가 한 번도 컴파일된 적 없는 죽은 코드였고 CODEMAP은 공개 API로 등재 (obstacle.rs도 동일 상태로 남아 있음) | lib.rs 배선 + 첫 컴파일에서 드러난 bitrot(visibility/dead_code/clippy) 수정 후 사용 — 배선 후 7개 테스트·게임 detour 테스트 전부 그린, 파라미터(cell_size 0.5, agent_radius 0.4)는 기본 플랜 그대로 동작 | 모듈 분리 리팩토링 시 "선언 누락 = 침묵하는 죽은 코드" 감지 수단 필요 (CI에서 src/ 하위 미배선 .rs 검출 스크립트 등). obstacle.rs 배선 여부 결정 필요 | P1 |
 | 2 | 추적자가 움직이는 플레이어를 따라가도록 매 repath 틱마다 `NavAgent` 목표 갱신 | `agent.target = Some(p)` 직접 대입은 캐시된 `path`/`reached`를 무효화하지 않음 — `nav_agent_system`은 `path.is_empty() && !reached`일 때만 재탐색하므로 직접 대입은 조용히 무시되고, 도달 후엔 영구 정지하는 footgun. 필드가 `pub`이라 컴파일러가 못 막음 | `set_target()` 사용 (path/reached 리셋 → 재탐색). 단 set_target은 목표가 거의 안 움직였어도 전체 A* 재계산 | NavAgent 필드 캡슐화(target을 직접 대입 불가로) 또는 nav_agent_system이 target 변경을 감지해 스스로 repath. 보너스: 목표 이동량이 작으면 기존 path 재사용하는 retarget API | P1 |
 | 3 | 적이 NavMesh 경로(waypoint y=0)를 따라가되 게임플레이 y(=0.5) 유지 | `follow_path`의 waypoint 도달 판정이 3D 거리 — 호출자가 y를 고정하면 dist≥0.5 > 도달 반경이라 중간 waypoint에 영원히 못 도달. 보정 안 하면 에이전트가 navmesh 평면(y=0)으로 가라앉음 | y 보정 없이 가라앉게 둠 (최종 goal이 y=0.5라 도달 시 복귀; 렌더 높이는 후속 태스크에서 처리 예정) | 경로 추종/도달 판정을 XZ 거리로 (A* 휴리스틱은 이미 `distance_xz` 사용 — follow_path만 3D) | P1 |
-| 4 | 마우스 조준: 화면 픽셀 → NDC 변환에 현재 창 크기 필요 | action system(`add_action_system`)에서 현재 창/서피스 크기를 읽을 경로가 없음 — `InputState`는 마우스 좌표만 주고 창 크기는 RuntimeState 내부에만 있음 | 창 크기를 상수(`SCREEN`)로 고정 — 리사이즈하면 조준이 틀어짐 | InputState 또는 콜백 인자에 화면 크기 노출 (UiContext는 이미 screen_width를 가짐 — 입력 쪽에도 동일하게) | P1 |
+| 4 | 마우스 조준: 화면 픽셀 → NDC 변환에 현재 창 크기 필요 | action system(`add_action_system`)에서 현재 창/서피스 크기를 읽을 경로가 없음 — `InputState`는 마우스 좌표만 주고 창 크기는 RuntimeState 내부에만 있음. 추가로 상수 우회는 물리/논리 픽셀 불일치(mouse_position은 물리, 창 설정은 논리)로 DPI 배율 125%+에서 조준이 어긋남 | **해소됨**: `InputState::window_size()`/`set_window_size()` 추가 (물리 픽셀 — mouse_position과 동일 단위), runtime handler가 창 생성(resumed) + Resized에서 주입. 게임은 SCREEN 상수 대신 실제 창 크기로 NDC 계산 + 조준점 디버그 마커(DebugLines cross)로 가시화 | — | P1 |
 | 5 | 효과음/BGM 재생: `with_audio_files`로 프리로드한 클립 사용 | 오디오 경로가 이원화 — `with_audio_files`(인덱스=ClipId, 핫리로드 워치)와 `AudioPath`(경로→clip 런타임 resolve, resolver가 clip_id 소유). 둘을 같이 쓰면 같은 파일을 이중 디코드해 별도 슬롯에 올리고, AudioPath가 resolve한 클립은 핫리로드 대상이 아님 | `AudioPath`를 쓰지 않고 `with_audio_files` 인덱스를 CLIP_* 상수로 직접 사용 | with_audio_files가 등록한 path→ClipId 매핑을 AudioPath resolver(AudioClipCache)에 시드해 두 경로를 합치기 | P2 |
 | 6 | 에셋 경로를 cwd 무관하게 지정 | 런타임에 "게임 에셋 루트" 개념이 없음 — 상대 경로는 cwd 의존, Vfs는 씬/스크립트 로드에만 적용 | `concat!(env!("CARGO_MANIFEST_DIR"), "/assets")` — 빌드 머신 절대 경로라 배포 exe에선 깨짐 | RuntimeConfig에 asset root 설정 + exe 기준 상대 해석 (voltex_cli 빌드 파이프라인과 연계) | P2 |
 | 7 | 게임이 자기 던전 씬을 GPU 픽셀로 회귀 검증 | voltex_capture의 `render_*`가 전부 자기 씬을 하드코딩 — 게임 crate가 임의 World를 오프스크린 렌더할 공개 진입점 부재 | **해소됨(이 커밋)**: `render_declarative_colored_scene`에서 렌더 경로를 기계적 추출해 `voltex_capture::render_world(gpu, w, h, &mut world, cam_pos, yaw, pitch)` 공개 | — | P1 |
