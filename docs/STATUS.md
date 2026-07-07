@@ -173,6 +173,32 @@
 
 v1.0.9 부터는 **서비스 배포 완성도** 로드맵 (`docs/superpowers/specs/2026-05-21-service-readiness-roadmap.md`) 기준으로 진행.
 
+### 2026-07-07 — 도그푸딩 마찰 일괄 해소 9/9 (v1.0.110)
+
+Depths friction 로그의 잔여 6건(P1 4 + P2 2)을 TDD로 일괄 해소 + 미배선 모듈
+CI 가드 신설. 커밋 7개 (항목당 atomic). 상세는 CHANGELOG v1.0.110 /
+`docs/dogfood-friction.md`(전 항목 취소선).
+
+- **#3 planar follow_path** — waypoint를 에이전트 y 평면에 투영 (도달 XZ,
+  force 평면 유지, goal snap y 보존). 게임플레이 y≠0 에이전트의 침하/정지 해소.
+- **#2 NavAgent target 변경 감지** — `planned_target` 추적으로 직접 대입도
+  자동 repath; 같은 삼각형 내 이동은 path 끝점 교체만 (A* 재실행 없음).
+- **#9 orphan voice 자동 stop** — voltex_audio `VoiceId`/`stop_voice` 신설,
+  `AudioVoiceTracker` 가 entity 소멸 시 발행 voice 자동 정지. audio_sync_system
+  시그니처에 tracker 파라미터 추가 (breaking, 호출부 갱신).
+- **#6 asset root** — `RuntimeConfig::with_asset_root` (상대 루트 = exe 기준).
+  read_asset: Vfs → asset_root → cwd.
+- **#8 kind="rust" 빌드** — voltex build가 Rust 로직 게임을 패키징 (게임 crate
+  빌드 + dist 루즈 에셋 + 라이선스). depths 가 실사용으로 검증 — dev 에셋 숨긴
+  외부 cwd에서 dist exe 부팅 OK.
+- **#5 오디오 경로 통합** — with_audio_files 매핑을 `AudioClipCache::seed` 로
+  AudioPath resolver에 시드 (이중 디코드 제거, 핫리로드 공유).
+- **module_wiring 가드** — `crates/voltex/tests/module_wiring.rs` 가 미배선
+  .rs 적발. 첫 실행에서 obstacle.rs / coroutine.rs / **sandbox.rs (문서화된
+  보안 기능이 미컴파일)** 3건 발견·배선, 테스트 23개 부활 (ai 75, script 75).
+- 검증: workspace lib/clippy(-D warnings) 그린, depths 전 스위트 그린,
+  rust-kind E2E 통과.
+
 ### 2026-06-12 — 도그푸딩 게임 1편: Voltex Depths (v1.0.109)
 
 `games/voltex_depths` — 탑다운 트윈스틱 던전 슈터. voltex_survivor(Lua 주도)와

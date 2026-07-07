@@ -10,6 +10,60 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## [v1.0.110] — 2026-07-07 — 도그푸딩 마찰 일괄 해소 (friction 9/9)
+
+Voltex Depths 도그푸딩이 남긴 마찰 6건(P1 4 + P2 2)을 한 세션에서 해소 +
+미배선 모듈 가드 신설. 상세는 `docs/dogfood-friction.md`.
+
+### Breaking (시그니처 변경 — 워크스페이스 내 호출부 전부 갱신됨)
+
+- **voltex_audio `play`/`play_3d`** 가 `VoiceId` 반환 (기존 호출부는 반환값
+  무시로 무변경 동작). `AudioCommand::Play{,3d}` 에 `voice` 필드.
+- **voltex_runtime `audio_sync_system(world, audio, listener, &mut
+  AudioVoiceTracker)`** — voice 추적자 파라미터 추가.
+- **voltex_runtime `resolve_asset_paths` / `resolve_audio_paths`** —
+  `asset_root: Option<&Path>` 파라미터 추가.
+
+### Additive
+
+- **voltex_audio `VoiceId` + `stop_voice`** — 재생 인스턴스 단위 정지.
+  스레드 커맨드 처리를 `apply_command` 로 추출 (디바이스 없이 단위 테스트).
+- **voltex_runtime `AudioVoiceTracker`** — entity별 발행 voice 추적, entity
+  소멸(despawn/clear/컴포넌트 제거) 시 orphan voice 자동 stop (friction #9).
+- **voltex_runtime `RuntimeConfig::with_asset_root`** — 상대 에셋 경로의
+  루트 디렉토리; 상대 루트는 exe 디렉토리 기준 해석 (friction #6).
+- **voltex_runtime `AudioClipCache::seed/get`** — with_audio_files 매핑을
+  AudioPath resolver에 시드, 이중 디코드 제거 (friction #5).
+- **voltex_cli `[build] kind = "rust"`** — Rust 로직 게임 패키징: 게임 crate
+  cargo build → dist에 exe + 루즈 에셋 + 라이선스 (friction #8). rust kind는
+  build.scene 불요구, scripts 기본값 []. `pick_executable` 이 project.name
+  일치 bin 우선.
+- **voltex_ai retarget** — nav_agent_system이 `planned_target` 로 target 변경
+  감지 후 자동 repath; 같은 삼각형 내 이동은 A* 없이 path 끝점만 교체
+  (friction #2 — `agent.target = Some(p)` 직접 대입이 이제 그냥 동작).
+- **module_wiring 가드** (`crates/voltex/tests/module_wiring.rs`) — 미배선
+  .rs 를 CI에서 적발 (friction #1 후속). 첫 실행에서 3건 적발·배선:
+  voltex_ai `obstacle.rs`(velocity obstacle 회피), voltex_script
+  `coroutine.rs`(LuaCoroutine), `sandbox.rs`(create_sandbox — 문서에 있던
+  보안 기능이 컴파일조차 안 되고 있었음). 잠자던 테스트 23개 부활.
+
+### Fix
+
+- **voltex_ai `follow_path` 평면화** — waypoint를 에이전트 y 평면에 투영:
+  도달 판정 XZ + 조향 force가 y를 건드리지 않음 + goal snap이 agent y 보존
+  (friction #3 — 게임플레이 y 유지 시 waypoint 통과 불가/침하 해소).
+
+### 게임 (voltex_depths)
+
+- `voltex.toml` kind="rust" + `with_asset_root` dev/dist 패턴으로 마이그레이션
+  (CARGO_MANIFEST_DIR 절대경로 해킹 제거). `voltex build` → dist exe가 dev
+  에셋 숨긴 외부 cwd에서 부팅·오디오 resolve 검증 통과.
+
+### 검증
+
+- 전 crate TDD (RED 확인 후 구현). workspace lib 테스트/clippy(-D warnings)
+  그린, depths 27 + 플레이스루 그린, rust-kind E2E(#[ignore]) 1회 통과.
+
 ## [v1.0.109] — 2026-06-12 — 도그푸딩 게임 1편: Voltex Depths
 
 `games/voltex_depths` — 탑다운 트윈스틱 던전 슈터, 게임 로직 100% Rust (Lua 주도

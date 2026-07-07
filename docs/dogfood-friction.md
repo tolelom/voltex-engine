@@ -3,22 +3,19 @@
 게임 제작 중 발견한 엔진 워크플로 마찰. 항목: 하려던 것 / 없거나 어색했던 것 / 우회 / 제안(P0~P2).
 엔진 즉석 수정은 진행을 실제로 막을 때만. 이 로그가 v1.1 로드맵 입력이 된다.
 
-## 현재 상태 요약 + 다음 엔진 사이클 후보 (P 순)
+## 현재 상태 요약
 
-게임 완성 시점(2026-06-12) 기준 총 9건 — P0 없음 (진행을 완전히 막은 마찰은 즉석 수정으로 해소), P1 7건 중 3건 해소, P2 2건.
+**2026-07-07: 전 항목 해소 완료 (9/9).** 게임 완성 시점(2026-06-12) 기준 총 9건 중 3건은 게임 제작 중 해소, 잔여 6건(P1 4 + P2 2)은 2026-07-07 엔진 세션에서 일괄 해소. 이 로그는 v1.1 로드맵 입력으로서 소임을 다했고, 다음 도그푸딩에서 새 로그를 시작한다.
 
-**P1 — 다음 엔진 사이클 후보:**
-- #2 `NavAgent.target` 직접 대입 footgun — 캡슐화 또는 target 변경 감지 repath (+ 소이동 retarget)
-- #3 `follow_path` 도달 판정이 3D 거리 — XZ 거리로 (게임플레이 y 유지 시 가라앉음)
-- #8 `voltex build`가 Rust 로직 게임 패키징 불가 — wrapper에 게임 crate 훅 또는 `kind = "rust"` 빌드 모드
-- #9 루핑 AudioSource 엔티티를 despawn하면 voice가 mixer에 영구 잔류 (Stop 엣지 유실) — audio_sync가 자기가 발행한 voice를 entity별로 추적해 entity 소멸 시 orphan voice를 stop해야 함. 우회: despawn 전 playing=false 한 프레임 유지 (이 게임의 R 핸들러 방식; audio_sync가 action_systems 직후 같은 프레임에 Stop을 발행하므로 실제로는 0프레임 대기)
-- ~~#1 NavMeshBuilder 미배선 (침묵하는 죽은 코드)~~ — **해소** (lib.rs 배선 + bitrot 수정; 미배선 .rs CI 검출은 후속 후보로 잔존)
-- ~~#4 action system에서 창 크기 접근 불가~~ — **해소** (`InputState::window_size()` 물리 픽셀 노출, runtime이 resumed/Resized에서 주입; 게임은 SCREEN 상수 제거 + 실제 창 크기로 NDC 계산 → DPI/리사이즈 조준 버그 수정)
+- ~~#1 NavMeshBuilder 미배선 (침묵하는 죽은 코드)~~ — **해소** (lib.rs 배선 + bitrot 수정). 후속이던 미배선 .rs 검출도 **해소** — `crates/voltex/tests/module_wiring.rs` 워크스페이스 가드 신설, 첫 실행에서 obstacle.rs / coroutine.rs / sandbox.rs 3건 추가 적발·배선 (+23 테스트 부활)
+- ~~#2 `NavAgent.target` 직접 대입 footgun~~ — **해소** (`planned_target` 추적으로 시스템이 target 변경 감지 후 자동 repath; 새 target이 기존 path 끝점과 같은 삼각형이면 A* 없이 끝점만 교체하는 retarget)
+- ~~#3 `follow_path` 도달 판정 3D 거리~~ — **해소** (waypoint를 에이전트 y 평면에 투영 — 도달 판정 XZ + 조향 force 평면 유지, goal snap이 agent y 보존. 가라앉음 자체가 사라짐)
+- ~~#4 action system에서 창 크기 접근 불가~~ — **해소** (`InputState::window_size()` 물리 픽셀 노출, runtime이 resumed/Resized에서 주입)
+- ~~#5 오디오 경로 이원화~~ — **해소** (`AudioClipCache::seed` — RuntimeApp 부트가 with_audio_files 매핑을 시드, 같은 파일 AudioPath는 기존 클립 재사용 + 핫리로드 공유)
+- ~~#6 게임 에셋 루트 개념 부재~~ — **해소** (`RuntimeConfig::with_asset_root`; 상대 루트는 exe 디렉토리 기준 해석. read_asset 순서: Vfs → asset_root → cwd)
 - ~~#7 게임 crate의 임의 World 픽셀 검증 진입점 부재~~ — **해소** (`voltex_capture::render_world` 공개)
-
-**P2:**
-- #5 오디오 경로 이원화 (`with_audio_files` vs `AudioPath` 이중 디코드) — path→ClipId 매핑 시드로 통합
-- #6 게임 에셋 루트 개념 부재 (cwd/절대경로 의존) — RuntimeConfig asset root + exe 기준 해석 (#8과 연계)
+- ~~#8 `voltex build`가 Rust 로직 게임 패키징 불가~~ — **해소** (`[build] kind = "rust"` — 게임 crate cargo build + dist에 exe/에셋/라이선스 레이아웃; depths가 실제 사용, 외부 cwd 실행 검증 통과)
+- ~~#9 루핑 AudioSource despawn 시 voice 잔류~~ — **해소** (voltex_audio에 `VoiceId`/`stop_voice` 신설, audio_sync가 entity별 voice 추적 + entity 소멸 시 orphan voice 자동 stop — 수동 stop 우회 불필요)
 
 | # | 하려던 것 | 마찰 | 우회 | 제안 | P |
 |---|---|---|---|---|---|
