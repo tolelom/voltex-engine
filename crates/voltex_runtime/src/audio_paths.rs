@@ -52,6 +52,20 @@ impl AudioClipCache {
     pub fn clear_failures(&mut self) {
         self.clips.retain(|_, v| v.is_some());
     }
+
+    /// Pre-bind `path` to an already-loaded clip id, so an [`AudioPath`] for
+    /// the same file reuses it instead of decoding a duplicate into a second
+    /// slot. `RuntimeApp` seeds every `with_audio_files` entry through this —
+    /// unifying the two audio loading routes (they also share hot-reload,
+    /// since the `with_audio_files` watch replaces the same clip index).
+    pub fn seed(&mut self, path: impl Into<PathBuf>, clip_id: u32) {
+        self.clips.insert(path.into(), Some(clip_id));
+    }
+
+    /// The clip id `path` is bound to, if resolved or seeded.
+    pub fn get(&self, path: &Path) -> Option<u32> {
+        self.clips.get(path).copied().flatten()
+    }
 }
 
 /// Injected-loader core of [`resolve_audio_paths`]. For every entity carrying
@@ -174,6 +188,27 @@ mod tests {
             panic!("cache hit expected — loader must not run")
         });
         assert_eq!(n2, 0, "idempotent");
+    }
+
+    #[test]
+    fn seeded_paths_bind_without_loading() {
+        // `with_audio_files` already decoded these clips at boot — seeding the
+        // cache lets an `AudioPath` for the same file reuse the ClipId instead
+        // of decoding a duplicate into a separate slot (dogfood friction #5).
+        let (mut world, e) = world_with_audio_path("assets/bgm.wav");
+        let mut cache = AudioClipCache::new();
+        cache.seed("assets/bgm.wav", 3);
+        assert_eq!(cache.get(Path::new("assets/bgm.wav")), Some(3));
+
+        let n = resolve_audio_paths_with(&mut world, &mut cache, |_| {
+            panic!("seeded path must not hit the loader")
+        });
+        assert_eq!(n, 1);
+        assert_eq!(
+            world.get::<AudioSource>(e).unwrap().clip_id.0,
+            3,
+            "source binds to the seeded with_audio_files clip"
+        );
     }
 
     #[test]

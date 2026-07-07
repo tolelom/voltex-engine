@@ -255,18 +255,22 @@ impl RuntimeApp {
         // pre-loaded clips (ClipId = clip count + file position), and queued
         // for hot-reload watching (registered once the app struct exists).
         let mut audio_watch_pairs: Vec<(std::path::PathBuf, usize)> = Vec::new();
+        // (as-configured path, clip index) — seeds the AudioPath resolver cache
+        // below so scene `AudioPath`s reuse these clips instead of re-decoding.
+        let mut audio_seed_pairs: Vec<(std::path::PathBuf, usize)> = Vec::new();
         let audio = if config.enable_audio {
             let mut clips = std::mem::take(&mut config.audio_clips);
-            for (i, path) in std::mem::take(&mut config.audio_files).into_iter().enumerate() {
+            for (i, orig_path) in std::mem::take(&mut config.audio_files).into_iter().enumerate() {
                 let index = clips.len();
                 // Relative paths anchor at the asset root (when configured and
                 // the rooted file exists) — same contract as read_asset.
                 let path = match asset_root.as_deref() {
-                    Some(root) if path.is_relative() && root.join(&path).is_file() => {
-                        root.join(&path)
+                    Some(root) if orig_path.is_relative() && root.join(&orig_path).is_file() => {
+                        root.join(&orig_path)
                     }
-                    _ => path,
+                    _ => orig_path.clone(),
                 };
+                audio_seed_pairs.push((orig_path, index));
                 match voltex_audio::load_clip_file(&path) {
                     Ok(clip) => clips.push(clip),
                     Err(e) => {
@@ -335,6 +339,13 @@ impl RuntimeApp {
         // already happened above; this only wires the file watcher).
         for (path, index) in audio_watch_pairs {
             app.watch_audio_clip(path, index);
+        }
+        // Seed the AudioPath resolver with the with_audio_files mapping —
+        // a scene AudioPath naming the same file binds to the existing clip
+        // (no duplicate decode, shared hot-reload). Keyed by the path as
+        // configured (the form scenes are expected to carry).
+        for (path, index) in audio_seed_pairs {
+            app.audio_clip_cache.seed(path, index as u32);
         }
         let system_setup = app.config.setup_systems.take();
         if let Some(setup) = system_setup {
@@ -846,6 +857,11 @@ mod tests {
         assert_eq!(app.watched_audio_clips.len(), 2, "both files watched");
         assert_eq!(app.watched_audio_clips.get(&bad), Some(&1));
         assert_eq!(app.watched_audio_clips.get(&good), Some(&2));
+
+        // with_audio_files mapping is seeded into the AudioPath resolver —
+        // a scene AudioPath for the same file reuses the clip (friction #5).
+        assert_eq!(app.audio_clip_cache.get(&good), Some(2));
+        assert_eq!(app.audio_clip_cache.get(&bad), Some(1), "placeholder id seeded too");
 
         let _ = std::fs::remove_file(&good);
         let _ = std::fs::remove_file(&bad);
