@@ -266,6 +266,96 @@ icon = "android.png"
 
 // ── v1.0.11: validate_paths ────────────────────────────────────────────────
 
+#[test]
+fn kind_defaults_to_scene_and_parses_rust() {
+    let m = Manifest::parse(MINIMAL).unwrap();
+    assert_eq!(m.build.kind, BuildKind::Scene);
+
+    let m = Manifest::parse(
+        r#"
+[project]
+name = "g"
+version = "0.1.0"
+[build]
+kind = "rust"
+"#,
+    )
+    .unwrap();
+    assert_eq!(m.build.kind, BuildKind::Rust);
+    // A Rust-logic game has no Lua wrapper scripts — the scripts default must
+    // be empty so validate_paths doesn't demand a scripts/ dir.
+    assert!(m.build.scripts.is_empty(), "rust kind defaults scripts to []");
+
+    // Explicit "scene" also accepted.
+    let m = Manifest::parse(
+        r#"
+[project]
+name = "g"
+version = "0.1.0"
+[build]
+kind = "scene"
+"#,
+    )
+    .unwrap();
+    assert_eq!(m.build.kind, BuildKind::Scene);
+}
+
+#[test]
+fn kind_with_unknown_value_is_rejected() {
+    let err = Manifest::parse(
+        r#"
+[project]
+name = "g"
+version = "0.1.0"
+[build]
+kind = "cpp"
+"#,
+    )
+    .unwrap_err();
+    match err {
+        CliError::InvalidValue { field, .. } => assert_eq!(field, "kind"),
+        other => panic!("expected InvalidValue, got {:?}", other),
+    }
+}
+
+#[test]
+fn validate_paths_skips_scene_for_rust_kind() {
+    // A Rust-logic game has no scene.vscn — `kind = "rust"` must not demand
+    // one, while still validating the assets dirs it will bundle.
+    let tmp = std::env::temp_dir().join(format!(
+        "voltex_cli_validate_paths_rust_{}",
+        std::process::id()
+    ));
+    let _ = std::fs::remove_dir_all(&tmp);
+    write_manifest_to_dir(
+        &tmp,
+        r#"
+[project]
+name = "g"
+version = "0.1.0"
+[build]
+kind = "rust"
+scripts = ["scripts/**/*.lua"]
+assets = ["assets/**/*"]
+"#,
+    );
+    std::fs::create_dir_all(tmp.join("scripts")).unwrap();
+    std::fs::create_dir_all(tmp.join("assets")).unwrap();
+
+    let m = Manifest::load_from_dir(&tmp).unwrap();
+    m.validate_paths(&tmp).expect("rust kind must not require build.scene");
+
+    // Assets dirs are still validated.
+    std::fs::remove_dir_all(tmp.join("assets")).unwrap();
+    let err = m.validate_paths(&tmp).unwrap_err();
+    match err {
+        CliError::ManifestPathMissing { field, .. } => assert_eq!(field, "build.assets"),
+        other => panic!("expected ManifestPathMissing, got {:?}", other),
+    }
+
+    let _ = std::fs::remove_dir_all(&tmp);
+}
+
 fn write_manifest_to_dir(dir: &std::path::Path, body: &str) {
     std::fs::create_dir_all(dir).unwrap();
     std::fs::write(dir.join("voltex.toml"), body).unwrap();

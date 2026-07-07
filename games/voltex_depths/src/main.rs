@@ -1,7 +1,7 @@
 //! Voltex Depths — 탑다운 트윈스틱 던전. 도그푸딩 게임 1편.
 //! 설계: docs/superpowers/specs/2026-06-11-voltex-depths-game-design.md
 use std::cell::RefCell;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::rc::Rc;
 
 use voltex::audio::AudioSource;
@@ -29,8 +29,17 @@ const FIRE_COOLDOWN: f32 = 0.18;
 /// 초기 창 크기 (논리 픽셀). 조준 NDC 변환은 이 상수가 아니라
 /// `input.window_size()`(물리 픽셀, 리사이즈/DPI 반영)를 쓴다 — friction #4 해소.
 const SCREEN: (u32, u32) = (1280, 720);
-/// 에셋은 cwd 무관하게 crate 기준 절대 경로 (배포 exe에선 깨짐 — known limitation).
-const ASSET_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/assets");
+/// 에셋 루트: dev 체크아웃에선 crate의 assets/(컴파일 타임 경로), 배포에선
+/// exe 옆 assets/ (`voltex build`의 kind="rust" dist 레이아웃 —
+/// RuntimeConfig::with_asset_root가 상대 루트를 exe 기준으로 해석).
+fn asset_root() -> PathBuf {
+    let dev = Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/assets"));
+    if dev.is_dir() {
+        dev.to_path_buf()
+    } else {
+        PathBuf::from("assets")
+    }
+}
 
 // ClipId = with_audio_files 목록 인덱스.
 const CLIP_SHOOT: u32 = 0;
@@ -54,9 +63,10 @@ fn main() -> RuntimeResult<()> {
 
     // 오디오 파일은 T14에서 생성됨. with_audio_files는 부재/디코드 실패 시
     // silent placeholder로 부트를 계속하고, 파일이 생기면 핫리로드로 살아난다.
+    // 경로는 asset root 상대 (dev: crate assets/, dist: exe 옆 assets/).
     let audio_files: Vec<PathBuf> = ["sfx_shoot.wav", "sfx_hit.wav", "sfx_clear.wav", "bgm.wav"]
         .iter()
-        .map(|f| PathBuf::from(format!("{ASSET_DIR}/{f}")))
+        .map(|f| PathBuf::from(*f))
         .collect();
 
     let mut app = RuntimeApp::new(
@@ -65,6 +75,7 @@ fn main() -> RuntimeResult<()> {
             .with_window_size(SCREEN.0, SCREEN.1)
             .with_shadows(true)
             .with_hud(true)
+            .with_asset_root(asset_root())
             .with_audio_files(audio_files)
             .disable_physics()
             .disable_scripts(),
@@ -122,23 +133,17 @@ fn main() -> RuntimeResult<()> {
                 }
                 GamePhase::GameOver | GamePhase::Victory => {
                     if input.is_key_just_pressed(KeyCode::KeyR) {
-                        // world.clear()는 여기서 하지 않는다 — BGM AudioSource를
-                        // despawn하면 playing=false 엣지가 영원히 오지 않아 루핑
-                        // voice가 mixer에 잔류하고, 재시작마다 BGM이 중첩된다
-                        // (엔진 갭; dogfood-friction #9).
-                        //
-                        // 대신 BGM 소스의 playing을 false로 내린다. audio_sync는
-                        // tick_systems_only의 맨 마지막(action_systems 이후)에 돌아
-                        // 같은 프레임 내에 (playing=false, active=true) 엣지를 보고
-                        // mixer에 Stop을 즉시 발행한다.
-                        //
-                        // 잔존 씬 엔티티는 Title 오버레이(alpha 230)가 가리며,
-                        // Space의 start_game이 world.clear()로 정리한다.
+                        // BGM을 Title 화면에서 바로 끊기 위한 명시적 stop.
+                        // (despawn/clear로 인한 voice 잔류는 이제 엔진이 처리 —
+                        // audio_sync가 entity 소멸 시 orphan voice를 자동 stop.
+                        // friction #9 해소. 이 stop은 '즉시 무음'이라는 연출 의도.)
                         if let Some(bgm) = world.find_by_tag("bgm") {
                             if let Some(src) = world.get_mut::<AudioSource>(bgm) {
                                 src.stop();
                             }
                         }
+                        // 잔존 씬 엔티티는 Title 오버레이(alpha 230)가 가리며,
+                        // Space의 start_game이 world.clear()로 정리한다.
                         *phase.borrow_mut() = GamePhase::Title;
                     }
                 }

@@ -29,8 +29,23 @@ pub struct ProjectInfo {
     pub version: String,
 }
 
+/// How `voltex build` produces the shipped executable.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum BuildKind {
+    /// Data-driven game (default): generate a runtime wrapper exe that embeds
+    /// the `.vpkg` archive and boots `build.scene` (+ Lua scripts).
+    #[default]
+    Scene,
+    /// Rust-logic game: `cargo build --release` the game crate next to the
+    /// manifest and bundle its assets loose in `dist/` (pair with
+    /// `RuntimeConfig::with_asset_root("assets")` in the game). No scene
+    /// required, no wrapper codegen.
+    Rust,
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct BuildConfig {
+    pub kind: BuildKind,
     pub scene: String,
     pub scripts: Vec<String>,
     pub assets: Vec<String>,
@@ -106,13 +121,17 @@ impl Manifest {
     /// - Each glob in `build.scripts` / `build.assets` must have its root
     ///   directory (stripped of `**` / `*`) existing.
     pub fn validate_paths(&self, base_dir: &Path) -> Result<()> {
-        let scene = base_dir.join(&self.build.scene);
-        if !scene.is_file() {
-            return Err(CliError::ManifestPathMissing {
-                field: "build.scene",
-                path: scene,
-                base_dir: base_dir.to_path_buf(),
-            });
+        // Rust-logic games carry their scenes (if any) in code — `build.scene`
+        // is not required.
+        if self.build.kind == BuildKind::Scene {
+            let scene = base_dir.join(&self.build.scene);
+            if !scene.is_file() {
+                return Err(CliError::ManifestPathMissing {
+                    field: "build.scene",
+                    path: scene,
+                    base_dir: base_dir.to_path_buf(),
+                });
+            }
         }
         for pat in &self.build.scripts {
             let root = base_dir.join(strip_glob(pat));
@@ -158,6 +177,7 @@ impl Manifest {
 
 const VALID_PROJECT_KEYS: &[&str] = &["name", "version"];
 const VALID_BUILD_KEYS: &[&str] = &[
+    "kind",
     "scene",
     "scripts",
     "assets",
@@ -250,6 +270,7 @@ fn extract_build(section: Option<&TomlSection>, project_name: &str) -> Result<Bu
 
     let Some(s) = section else {
         return Ok(BuildConfig {
+            kind: BuildKind::default(),
             scene: default_scene,
             scripts: default_scripts,
             assets: default_assets,
@@ -257,6 +278,24 @@ fn extract_build(section: Option<&TomlSection>, project_name: &str) -> Result<Bu
             window_size: default_size,
             targets: default_targets,
         });
+    };
+
+    let kind = match s.get_string("kind") {
+        None | Some("scene") => BuildKind::Scene,
+        Some("rust") => BuildKind::Rust,
+        Some(other) => {
+            return Err(CliError::InvalidValue {
+                field: "kind".to_string(),
+                got: format!("`{other}` (expected \"scene\" or \"rust\")"),
+            });
+        }
+    };
+    // Rust-logic games have no Lua wrapper scripts — defaulting to the Lua
+    // glob would make validate_paths demand a scripts/ dir that never exists.
+    let default_scripts = if kind == BuildKind::Rust {
+        Vec::new()
+    } else {
+        default_scripts
     };
 
     let scene = s
@@ -282,6 +321,7 @@ fn extract_build(section: Option<&TomlSection>, project_name: &str) -> Result<Bu
     let targets = s.get_string_array("targets")?.unwrap_or(default_targets);
 
     Ok(BuildConfig {
+        kind,
         scene,
         scripts,
         assets,

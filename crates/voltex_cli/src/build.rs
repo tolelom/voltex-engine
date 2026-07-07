@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use crate::error::{CliError, Result};
-use crate::manifest::{host_triple, Manifest};
+use crate::manifest::{host_triple, BuildKind, Manifest};
 use crate::util::{
     canonicalize_friendly, copy_optional_dir, copy_optional_file, escape_for_rust_string,
 };
@@ -117,6 +117,10 @@ pub fn build_target(
         target
     );
 
+    if manifest.build.kind == BuildKind::Rust {
+        return build_rust_target(&manifest_dir, &engine_path, manifest);
+    }
+
     let dist_dir = manifest_dir.join("dist");
     let wrapper_dir = dist_dir.join("wrapper");
     std::fs::create_dir_all(wrapper_dir.join("src"))?;
@@ -164,6 +168,118 @@ pub fn build_target(
     }
 
     Ok(())
+}
+
+/// `kind = "rust"` build path (dogfood friction #8): the game is a normal
+/// cargo package whose `Cargo.toml` sits next to `voltex.toml`. Instead of
+/// generating a wrapper, we `cargo build --release` the game itself, copy the
+/// produced binary into `dist/`, and lay its declared asset dirs loose next
+/// to it — the shipped layout `RuntimeConfig::with_asset_root("assets")`
+/// expects. No `.vpkg` is packed: a Rust game owns its runtime config and can
+/// opt into a Vfs itself.
+fn build_rust_target(manifest_dir: &Path, engine_path: &Path, manifest: &Manifest) -> Result<()> {
+    if !manifest_dir.join("Cargo.toml").is_file() {
+        return Err(CliError::Io(format!(
+            "kind = \"rust\" expects a Cargo.toml next to voltex.toml (looked in {})",
+            manifest_dir.display()
+        )));
+    }
+
+    let cargo = which_cargo()?;
+    eprintln!("voltex build: running `cargo build --release` (game crate) ...");
+    let output = Command::new(cargo)
+        .args([
+            "build",
+            "--release",
+            "--message-format=json-render-diagnostics",
+        ])
+        .current_dir(manifest_dir)
+        // Diagnostics render to stderr (inherited); artifacts stream as JSON here.
+        .output()
+        .map_err(CliError::from)?;
+    std::io::Write::write_all(&mut std::io::stderr(), &output.stderr).ok();
+    if !output.status.success() {
+        return Err(CliError::CargoBuildFailed(output.status.code().unwrap_or(-1)));
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let exes = extract_executables(&stdout);
+    let Some(exe_src) = pick_executable(&exes, &manifest.project.name) else {
+        return Err(CliError::Io(
+            "cargo build succeeded but produced no executable — is the game crate a [[bin]]?"
+                .to_string(),
+        ));
+    };
+    if exes.len() > 1 {
+        eprintln!(
+            "voltex build: note — {} executables built; shipping {}",
+            exes.len(),
+            exe_src.display()
+        );
+    }
+
+    let dist_dir = manifest_dir.join("dist");
+    std::fs::create_dir_all(&dist_dir)?;
+    let exe_dst = dist_dir.join(if cfg!(windows) {
+        format!("{}.exe", manifest.project.name)
+    } else {
+        manifest.project.name.clone()
+    });
+    std::fs::copy(exe_src, &exe_dst)?;
+    eprintln!("voltex build: wrote {}", exe_dst.display());
+
+    copy_assets(manifest_dir, &dist_dir, manifest)?;
+
+    let licenses = copy_license_files(engine_path, &dist_dir)?;
+    if !licenses.is_empty() {
+        eprintln!("voltex build: bundled {} license file(s)", licenses.len());
+    }
+
+    Ok(())
+}
+
+/// Choose which built executable to ship: the one whose file stem matches the
+/// manifest's project name (multi-bin crates build asset generators etc. too),
+/// falling back to the last artifact when nothing matches.
+fn pick_executable<'a>(exes: &'a [PathBuf], project_name: &str) -> Option<&'a PathBuf> {
+    exes.iter()
+        .find(|p| p.file_stem().and_then(|s| s.to_str()) == Some(project_name))
+        .or_else(|| exes.last())
+}
+
+/// Pull every non-null `"executable":"…"` value out of cargo's
+/// `--message-format=json` stdout (one JSON object per line). A hand-rolled
+/// scan — the CLI's zero-dependency policy rules out serde, and the field is
+/// a plain JSON string (backslashes/quotes arrive `\\`/`\"`-escaped).
+fn extract_executables(cargo_json_stdout: &str) -> Vec<PathBuf> {
+    const KEY: &str = "\"executable\":\"";
+    let mut out = Vec::new();
+    for line in cargo_json_stdout.lines() {
+        let Some(start) = line.find(KEY) else { continue };
+        let rest = &line[start + KEY.len()..];
+        let mut path = String::new();
+        let mut chars = rest.chars();
+        while let Some(c) = chars.next() {
+            match c {
+                '"' => break,
+                '\\' => match chars.next() {
+                    Some('\\') => path.push('\\'),
+                    Some('"') => path.push('"'),
+                    Some('/') => path.push('/'),
+                    Some(other) => {
+                        path.push('\\');
+                        path.push(other);
+                    }
+                    None => break,
+                },
+                other => path.push(other),
+            }
+        }
+        if !path.is_empty() {
+            out.push(PathBuf::from(path));
+        }
+    }
+    out
 }
 
 fn which_cargo() -> Result<&'static str> {
@@ -452,7 +568,7 @@ fn write_wrapper_main(wrapper_dir: &Path, manifest: &Manifest) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::manifest::{BuildConfig, Manifest, ProjectInfo};
+    use crate::manifest::{BuildConfig, BuildKind, Manifest, ProjectInfo};
     use std::collections::HashMap;
 
     fn dummy(window_title: &str, w: u32, h: u32) -> Manifest {
@@ -462,6 +578,7 @@ mod tests {
                 version: "0.1.0".into(),
             },
             build: BuildConfig {
+                kind: BuildKind::Scene,
                 scene: "scene.vscn".into(),
                 scripts: vec!["scripts/**/*.lua".into()],
                 assets: vec!["assets/**/*".into()],
@@ -471,6 +588,45 @@ mod tests {
             },
             target_overrides: HashMap::new(),
         }
+    }
+
+    #[test]
+    fn extract_executables_parses_cargo_json_messages() {
+        // Two compiler-artifact lines (dep without executable, bin with one),
+        // Windows-style escaped path, plus noise lines that must be ignored.
+        let out = concat!(
+            r#"{"reason":"compiler-artifact","target":{"name":"dep"},"executable":null}"#,
+            "\n",
+            r#"{"reason":"compiler-artifact","target":{"name":"game"},"executable":"E:\\proj\\target\\release\\game.exe"}"#,
+            "\n",
+            r#"{"reason":"build-finished","success":true}"#,
+            "\n",
+        );
+        let exes = extract_executables(out);
+        assert_eq!(exes, vec![PathBuf::from(r"E:\proj\target\release\game.exe")]);
+
+        // Unix-style path without escapes.
+        let out = r#"{"reason":"compiler-artifact","executable":"/tmp/target/release/game"}"#;
+        assert_eq!(extract_executables(out), vec![PathBuf::from("/tmp/target/release/game")]);
+
+        // No artifacts → empty.
+        assert!(extract_executables("garbage\n").is_empty());
+    }
+
+    #[test]
+    fn pick_executable_prefers_project_name_match() {
+        let exes = vec![
+            PathBuf::from(r"t\release\voltex_depths.exe"),
+            PathBuf::from(r"t\release\gen_sfx.exe"),
+        ];
+        // Name match wins regardless of artifact order.
+        assert_eq!(
+            pick_executable(&exes, "voltex_depths"),
+            Some(&exes[0])
+        );
+        // No match → last artifact.
+        assert_eq!(pick_executable(&exes, "other"), Some(&exes[1]));
+        assert_eq!(pick_executable(&[], "x"), None);
     }
 
     #[test]
@@ -754,6 +910,58 @@ mod tests {
         assert!(s.contains("windows-x64"));
         assert!(s.contains("macos-arm64"));
         assert!(s.contains("cross-compile"));
+    }
+
+    /// End-to-end `kind = "rust"` build on a scaffolded dependency-free bin
+    /// crate. Spawns a real `cargo build` (~seconds) — run explicitly:
+    /// `cargo test -p voltex_cli -- --ignored rust_kind`.
+    #[test]
+    #[ignore]
+    fn rust_kind_build_ships_game_exe_and_loose_assets() {
+        let stamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_nanos())
+            .unwrap_or(0);
+        let root = std::env::temp_dir().join(format!("voltex_cli_rust_kind_{}", stamp));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(root.join("src")).unwrap();
+        std::fs::create_dir_all(root.join("assets")).unwrap();
+        std::fs::write(
+            root.join("Cargo.toml"),
+            "[package]\nname = \"mini_game\"\nversion = \"0.1.0\"\nedition = \"2021\"\n\n[workspace]\n",
+        )
+        .unwrap();
+        std::fs::write(root.join("src/main.rs"), "fn main() {}\n").unwrap();
+        std::fs::write(root.join("assets/level.txt"), "map").unwrap();
+
+        let mut m = dummy("Mini", 100, 100);
+        m.project.name = "mini_game".into();
+        m.build.kind = BuildKind::Rust;
+
+        // engine_path only feeds license copying; the repo root works.
+        let engine = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .unwrap()
+            .parent()
+            .unwrap()
+            .to_path_buf();
+
+        build_target(&root, &engine, &m, host_triple()).expect("rust-kind build succeeds");
+
+        let exe = root.join("dist").join(if cfg!(windows) {
+            "mini_game.exe"
+        } else {
+            "mini_game"
+        });
+        assert!(exe.is_file(), "game exe shipped to dist/: {}", exe.display());
+        assert!(
+            root.join("dist/assets/level.txt").is_file(),
+            "declared assets laid out loose next to the exe"
+        );
+        // No wrapper artifacts for rust kind.
+        assert!(!root.join("dist/wrapper").exists(), "no wrapper codegen for kind=rust");
+
+        let _ = std::fs::remove_dir_all(&root);
     }
 
     #[test]
