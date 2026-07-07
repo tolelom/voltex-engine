@@ -114,9 +114,13 @@ pub fn wander(agent: &SteeringAgent, wander_radius: f32, wander_distance: f32, a
     seek(agent, wander_target)
 }
 
-/// Follow path steering behavior.
-/// Seeks toward the current waypoint; advances to the next when within `waypoint_radius`.
-/// Uses `arrive` for the last waypoint.
+/// Follow path steering behavior — planar (XZ), matching NavMesh navigation.
+/// Seeks toward the current waypoint; advances to the next when within
+/// `waypoint_radius` **in XZ distance**. Uses `arrive` for the last waypoint.
+///
+/// Waypoints are projected onto the agent's y plane before steering, so the
+/// force never pulls the agent off its gameplay height even when the navmesh
+/// plane sits at a different y (e.g. waypoints at y=0, agent at y=0.5).
 ///
 /// Returns (steering_force, updated_current_waypoint_index).
 pub fn follow_path(
@@ -129,17 +133,22 @@ pub fn follow_path(
         return (Vec3::ZERO, 0);
     }
 
+    // Project a waypoint onto the agent's y plane: distances become XZ and
+    // seek/arrive forces stay parallel to that plane.
+    let on_agent_plane = |p: Vec3| Vec3::new(p.x, agent.position.y, p.z);
+
     let clamped = current_waypoint.min(path.len() - 1);
-    let waypoint = path[clamped];
+    let waypoint = on_agent_plane(path[clamped]);
     let dist = (waypoint - agent.position).length();
 
     // If we are close enough and there is a next waypoint, advance
     if dist < waypoint_radius && clamped + 1 < path.len() {
         let next = clamped + 1;
+        let target = on_agent_plane(path[next]);
         let force = if next == path.len() - 1 {
-            arrive(agent, path[next], waypoint_radius)
+            arrive(agent, target, waypoint_radius)
         } else {
-            seek(agent, path[next])
+            seek(agent, target)
         };
         return (force, next);
     }
@@ -237,5 +246,28 @@ mod tests {
         // agent has zero velocity, dist=1, slow_radius=2 → desired_speed=1/2*5=2.5 in +X
         // steering = desired - velocity = (2.5,0,0) - (0,0,0) = (2.5,0,0)
         assert!(force.x > 0.0, "arrive force should be toward last waypoint");
+    }
+
+    #[test]
+    fn test_follow_path_arrival_ignores_y() {
+        // Waypoints live on the navmesh plane (y=0) while gameplay keeps the
+        // agent elevated; arrival must be judged in XZ or the agent can never
+        // pass an intermediate waypoint whose y offset exceeds the radius.
+        let agent = SteeringAgent::new(Vec3::new(0.0, 0.5, 0.0), 5.0, 10.0);
+        let path = vec![Vec3::new(0.0, 0.0, 0.2), Vec3::new(0.0, 0.0, 10.0)];
+        let (_, next_wp) = follow_path(&agent, &path, 0, 0.4);
+        assert_eq!(next_wp, 1, "XZ dist 0.2 < radius 0.4 must advance despite 0.5 y offset");
+    }
+
+    #[test]
+    fn test_follow_path_force_stays_on_agent_plane() {
+        // Steering toward a waypoint below the agent must not pull it down.
+        let agent = SteeringAgent::new(Vec3::new(0.0, 0.5, 0.0), 5.0, 10.0);
+        let path = vec![Vec3::new(0.0, 0.0, 10.0)];
+        let (force, _) = follow_path(&agent, &path, 0, 0.4);
+        assert!(
+            force.y.abs() < 1e-6,
+            "follow_path must not steer the agent off its y plane, got {force:?}"
+        );
     }
 }

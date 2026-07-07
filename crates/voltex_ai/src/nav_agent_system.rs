@@ -73,9 +73,13 @@ pub fn nav_agent_system(world: &mut World, navmesh: &NavMesh, dt: f32) {
             };
             let candidate = t.position + dir * a.speed * dt;
             let goal = *a.path.last().expect("path non-empty checked above");
-            if (goal - candidate).length() <= radius {
+            // Arrival is judged in XZ (navmesh navigation is planar) and the
+            // snap keeps the agent's gameplay y — waypoints may sit on the
+            // navmesh plane at a different height.
+            let goal_on_plane = Vec3::new(goal.x, candidate.y, goal.z);
+            if (goal_on_plane - candidate).length() <= radius {
                 // Snap onto the goal so repeated runs are idempotent.
-                Step { entity, position: goal, waypoint, reached: true }
+                Step { entity, position: goal_on_plane, waypoint, reached: true }
             } else {
                 Step { entity, position: candidate, waypoint, reached: false }
             }
@@ -182,6 +186,35 @@ mod tests {
         let a = world.get::<NavAgent>(e).unwrap();
         assert!(a.target.is_none(), "unreachable target should be cleared");
         assert!(a.path.is_empty());
+    }
+
+    #[test]
+    fn agent_keeps_gameplay_y_while_following() {
+        // Gameplay places the agent above the navmesh plane (y=0.5); path
+        // following must be planar — reach the target in XZ without sinking
+        // the agent onto the navmesh plane. speed*dt = 0.2 < y offset 0.5 so
+        // a 3D acceptance radius could never trigger.
+        let mut world = World::new();
+        let e = world.spawn();
+        world.add(e, Transform::from_position(Vec3::new(0.0, 0.5, 0.0)));
+        let mut agent = NavAgent::new(2.0);
+        agent.set_target(Vec3::new(0.0, 0.0, 20.0));
+        world.add(e, agent);
+
+        let mesh = flat_navmesh();
+        let mut reached = false;
+        for _ in 0..2000 {
+            nav_agent_system(&mut world, &mesh, 0.1);
+            if world.get::<NavAgent>(e).unwrap().reached {
+                reached = true;
+                break;
+            }
+        }
+        assert!(reached, "agent must reach an on-mesh target despite its y offset");
+        let pos = world.get::<Transform>(e).unwrap().position;
+        assert!((pos.y - 0.5).abs() < 1e-3, "gameplay y must be preserved, got {pos:?}");
+        let goal_xz = Vec3::new(0.0, pos.y, 20.0);
+        assert!((pos - goal_xz).length() < 1.0, "agent should end near target in XZ, got {pos:?}");
     }
 
     #[test]
