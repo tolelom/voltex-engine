@@ -1,8 +1,10 @@
 //! AudioSystem: high-level audio playback management with a dedicated audio thread.
 
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::mpsc;
 use std::thread;
 
+use crate::mixing::VoiceId;
 use crate::{AudioClip, PlayingSound, mix_sounds};
 use crate::spatial::{Listener, SpatialParams};
 use crate::mix_group::{MixGroup, MixerState};
@@ -21,6 +23,8 @@ pub(crate) enum AudioCommand {
         volume: f32,
         /// Whether the clip restarts when it ends.
         looping: bool,
+        /// Pre-allocated voice handle for this instance.
+        voice: VoiceId,
     },
     /// Start playing a clip with 3D spatial parameters.
     Play3d {
@@ -32,6 +36,8 @@ pub(crate) enum AudioCommand {
         looping: bool,
         /// 3D emitter parameters (position + min/max distance).
         spatial: SpatialParams,
+        /// Pre-allocated voice handle for this instance.
+        voice: VoiceId,
     },
     /// Update the listener position and orientation.
     SetListener {
@@ -46,6 +52,11 @@ pub(crate) enum AudioCommand {
     Stop {
         /// Clip index whose instances should stop.
         clip_index: usize,
+    },
+    /// Stop exactly one playback instance by its voice handle.
+    StopVoice {
+        /// Voice handle returned by `play` / `play_3d`.
+        voice: VoiceId,
     },
     /// Change volume of all playing instances of a clip.
     SetVolume {
@@ -112,6 +123,8 @@ pub struct AudioSystem {
     /// `add_clip` index; stays in lockstep with the thread's `Vec` because
     /// `AddClip` commands are processed in mpsc FIFO order.
     clip_count: usize,
+    /// Next [`VoiceId`] to hand out; starts at 1 (`VoiceId(0)` = anonymous).
+    next_voice: AtomicU64,
 }
 
 impl AudioSystem {
@@ -130,7 +143,12 @@ impl AudioSystem {
             })
             .map_err(|e| crate::AudioError::from(format!("Failed to spawn audio thread: {}", e)))?;
 
-        Ok(AudioSystem { sender: tx, clip_count })
+        Ok(AudioSystem { sender: tx, clip_count, next_voice: AtomicU64::new(1) })
+    }
+
+    /// Allocate a fresh voice handle (thread-safe, monotonically increasing).
+    fn alloc_voice(&self) -> VoiceId {
+        VoiceId(self.next_voice.fetch_add(1, Ordering::Relaxed))
     }
 
     /// Hot-load: append a decoded clip at runtime and return its `clip_index`,
@@ -154,17 +172,33 @@ impl AudioSystem {
     }
 
     /// Start playing a clip at the given volume and looping setting.
-    pub fn play(&self, clip_index: usize, volume: f32, looping: bool) {
+    ///
+    /// Returns the instance's [`VoiceId`], usable with [`Self::stop_voice`] to
+    /// stop exactly this playback (unlike clip-index [`Self::stop`]).
+    pub fn play(&self, clip_index: usize, volume: f32, looping: bool) -> VoiceId {
+        let voice = self.alloc_voice();
         let _ = self.sender.send(AudioCommand::Play {
             clip_index,
             volume,
             looping,
+            voice,
         });
+        voice
     }
 
     /// Start playing a clip with 3D spatial audio parameters.
-    pub fn play_3d(&self, clip_index: usize, volume: f32, looping: bool, spatial: SpatialParams) {
-        let _ = self.sender.send(AudioCommand::Play3d { clip_index, volume, looping, spatial });
+    ///
+    /// Returns the instance's [`VoiceId`] (see [`Self::play`]).
+    pub fn play_3d(&self, clip_index: usize, volume: f32, looping: bool, spatial: SpatialParams) -> VoiceId {
+        let voice = self.alloc_voice();
+        let _ = self.sender.send(AudioCommand::Play3d { clip_index, volume, looping, spatial, voice });
+        voice
+    }
+
+    /// Stop exactly one playback instance. Unknown / already-finished voices
+    /// are a silent no-op (fire-and-forget, like [`Self::stop`]).
+    pub fn stop_voice(&self, voice: VoiceId) {
+        let _ = self.sender.send(AudioCommand::StopVoice { voice });
     }
 
     /// Update the listener position and orientation for 3D audio.
@@ -202,6 +236,65 @@ impl Drop for AudioSystem {
     fn drop(&mut self) {
         let _ = self.sender.send(AudioCommand::Shutdown);
     }
+}
+
+// ---------------------------------------------------------------------------
+// Command application (shared by the audio thread; unit-testable)
+// ---------------------------------------------------------------------------
+
+/// Apply one [`AudioCommand`] to the audio thread's state. Returns `true` for
+/// `Shutdown` (the caller should exit its loop). Extracted from the thread
+/// loop so the command semantics are unit-testable without a device.
+pub(crate) fn apply_command(
+    cmd: AudioCommand,
+    playing: &mut Vec<PlayingSound>,
+    clips: &mut Vec<AudioClip>,
+    listener: &mut Listener,
+    mixer: &mut MixerState,
+) -> bool {
+    match cmd {
+        AudioCommand::Play { clip_index, volume, looping, voice } => {
+            playing.push(PlayingSound::new(clip_index, volume, looping).with_voice(voice));
+        }
+        AudioCommand::Play3d { clip_index, volume, looping, spatial, voice } => {
+            playing.push(PlayingSound::new_3d(clip_index, volume, looping, spatial).with_voice(voice));
+        }
+        AudioCommand::SetListener { position, forward, right } => {
+            *listener = Listener { position, forward, right };
+        }
+        AudioCommand::Stop { clip_index } => {
+            playing.retain(|s| s.clip_index != clip_index);
+        }
+        AudioCommand::StopVoice { voice } => {
+            playing.retain(|s| s.voice != voice);
+        }
+        AudioCommand::SetVolume { clip_index, volume } => {
+            for s in playing.iter_mut() {
+                if s.clip_index == clip_index {
+                    s.volume = volume;
+                }
+            }
+        }
+        AudioCommand::StopAll => {
+            playing.clear();
+        }
+        AudioCommand::SetGroupVolume { group, volume } => {
+            mixer.set_volume(group, volume);
+        }
+        AudioCommand::FadeGroup { group, target, duration } => {
+            mixer.fade(group, target, duration);
+        }
+        AudioCommand::AddClip { clip } => {
+            clips.push(clip);
+        }
+        AudioCommand::ReplaceClip { clip_index, clip } => {
+            replace_clip_in(clips, clip_index, clip);
+        }
+        AudioCommand::Shutdown => {
+            return true;
+        }
+    }
+    false
 }
 
 // ---------------------------------------------------------------------------
@@ -254,44 +347,8 @@ fn audio_thread_windows(rx: mpsc::Receiver<AudioCommand>, mut clips: Vec<AudioCl
         loop {
             match rx.try_recv() {
                 Ok(cmd) => {
-                    match cmd {
-                        AudioCommand::Play { clip_index, volume, looping } => {
-                            playing.push(PlayingSound::new(clip_index, volume, looping));
-                        }
-                        AudioCommand::Play3d { clip_index, volume, looping, spatial } => {
-                            playing.push(PlayingSound::new_3d(clip_index, volume, looping, spatial));
-                        }
-                        AudioCommand::SetListener { position, forward, right } => {
-                            listener = Listener { position, forward, right };
-                        }
-                        AudioCommand::Stop { clip_index } => {
-                            playing.retain(|s| s.clip_index != clip_index);
-                        }
-                        AudioCommand::SetVolume { clip_index, volume } => {
-                            for s in playing.iter_mut() {
-                                if s.clip_index == clip_index {
-                                    s.volume = volume;
-                                }
-                            }
-                        }
-                        AudioCommand::StopAll => {
-                            playing.clear();
-                        }
-                        AudioCommand::SetGroupVolume { group, volume } => {
-                            mixer.set_volume(group, volume);
-                        }
-                        AudioCommand::FadeGroup { group, target, duration } => {
-                            mixer.fade(group, target, duration);
-                        }
-                        AudioCommand::AddClip { clip } => {
-                            clips.push(clip);
-                        }
-                        AudioCommand::ReplaceClip { clip_index, clip } => {
-                            replace_clip_in(&mut clips, clip_index, clip);
-                        }
-                        AudioCommand::Shutdown => {
-                            return;
-                        }
+                    if apply_command(cmd, &mut playing, &mut clips, &mut listener, &mut mixer) {
+                        return;
                     }
                 }
                 Err(mpsc::TryRecvError::Empty) => break,
@@ -414,6 +471,56 @@ mod tests {
         let sys = AudioSystem::new(vec![silence_clip()]).expect("AudioSystem::new failed");
         sys.replace_clip(0, silence_clip()); // in range
         sys.replace_clip(99, silence_clip()); // out of range → thread-side no-op
+    }
+
+    #[test]
+    fn play_returns_unique_voice_ids() {
+        let sys = AudioSystem::new(vec![silence_clip()]).expect("AudioSystem::new failed");
+        let a = sys.play(0, 1.0, true);
+        let b = sys.play(0, 1.0, true);
+        let c = sys.play_3d(0, 1.0, true, SpatialParams::new(voltex_math::Vec3::ZERO, 1.0, 50.0));
+        assert_ne!(a, b, "each play must hand out a fresh voice id");
+        assert_ne!(b, c, "play_3d shares the same voice id space");
+        sys.stop_voice(a); // fire-and-forget, must not panic
+    }
+
+    #[test]
+    fn apply_command_stop_voice_removes_only_that_voice() {
+        let mut playing: Vec<PlayingSound> = Vec::new();
+        let mut clips = vec![silence_clip()];
+        let mut listener = Listener::default();
+        let mut mixer = MixerState::new();
+        let mut apply = |cmd| apply_command(cmd, &mut playing, &mut clips, &mut listener, &mut mixer);
+
+        let v1 = VoiceId(1);
+        let v2 = VoiceId(2);
+        assert!(!apply(AudioCommand::Play { clip_index: 0, volume: 1.0, looping: true, voice: v1 }));
+        assert!(!apply(AudioCommand::Play { clip_index: 0, volume: 1.0, looping: true, voice: v2 }));
+        drop(apply);
+        assert_eq!(playing.len(), 2);
+
+        // Stopping one voice leaves the other instance of the SAME clip alive —
+        // this is what clip-index Stop cannot do.
+        let shutdown = apply_command(
+            AudioCommand::StopVoice { voice: v1 },
+            &mut playing,
+            &mut clips,
+            &mut listener,
+            &mut mixer,
+        );
+        assert!(!shutdown);
+        assert_eq!(playing.len(), 1);
+        assert_eq!(playing[0].voice, v2);
+
+        // Stopping an unknown / already-finished voice is a no-op.
+        apply_command(
+            AudioCommand::StopVoice { voice: VoiceId(999) },
+            &mut playing,
+            &mut clips,
+            &mut listener,
+            &mut mixer,
+        );
+        assert_eq!(playing.len(), 1);
     }
 
     #[test]

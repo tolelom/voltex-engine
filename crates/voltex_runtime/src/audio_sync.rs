@@ -10,9 +10,43 @@
 //!    `playing == true` does not spawn a new voice every frame.
 
 use voltex_audio::spatial::SpatialParams;
-use voltex_audio::{AudioSource, AudioSystem};
+use voltex_audio::{AudioSource, AudioSystem, VoiceId};
 use voltex_ecs::{Entity, Transform, World};
 use voltex_math::{Vec3, Vec4};
+
+/// Tracks the mixer voice issued for each entity's `AudioSource`, so the sync
+/// system can stop a voice whose entity died without a `playing = false` edge
+/// (despawn / `world.clear()`) — otherwise looping voices leak in the mixer
+/// forever (dogfood friction #9). Owned by the caller (`RuntimeApp`) because it
+/// must outlive the entities it tracks.
+#[derive(Debug, Default)]
+pub struct AudioVoiceTracker {
+    voices: std::collections::HashMap<Entity, VoiceId>,
+}
+
+impl AudioVoiceTracker {
+    /// Number of currently tracked (entity, voice) pairs.
+    pub fn len(&self) -> usize {
+        self.voices.len()
+    }
+
+    /// `true` when no voices are tracked.
+    pub fn is_empty(&self) -> bool {
+        self.voices.is_empty()
+    }
+
+    /// Stop + untrack every voice whose entity no longer exists or no longer
+    /// carries an `AudioSource`.
+    fn sweep_orphans(&mut self, world: &World, audio: &AudioSystem) {
+        self.voices.retain(|&entity, voice| {
+            let alive = world.is_alive(entity) && world.get::<AudioSource>(entity).is_some();
+            if !alive {
+                audio.stop_voice(*voice);
+            }
+            alive
+        });
+    }
+}
 
 /// Default 3D attenuation range used for spatial sources (per-source tuning is
 /// deferred to v1.1).
@@ -64,7 +98,20 @@ fn rotate(rotation: voltex_math::Quat, dir: Vec3) -> Vec3 {
 ///
 /// `listener` is the entity whose `Transform` positions the 3D listener (e.g.
 /// the camera or player); pass `None` to leave the listener unchanged.
-pub fn audio_sync_system(world: &mut World, audio: &AudioSystem, listener: Option<Entity>) {
+///
+/// `voices` tracks the mixer voice issued per entity: play edges register,
+/// stop edges release, and entities that disappeared since the last call
+/// (despawn / `world.clear()` / component removal) get their orphan voice
+/// stopped automatically — no manual `src.stop()` before despawn needed.
+pub fn audio_sync_system(
+    world: &mut World,
+    audio: &AudioSystem,
+    listener: Option<Entity>,
+    voices: &mut AudioVoiceTracker,
+) {
+    // 0. Orphan sweep: stop voices whose entity vanished without a stop edge.
+    voices.sweep_orphans(world, audio);
+
     // 1. Listener pose (forward = -Z, right = +X in the entity's local frame).
     if let Some(le) = listener {
         if let Some(t) = world.get::<Transform>(le) {
@@ -100,22 +147,28 @@ pub fn audio_sync_system(world: &mut World, audio: &AudioSystem, listener: Optio
     for plan in plans {
         match plan.action {
             AudioAction::Play { spatial } => {
-                if spatial {
+                let voice = if spatial {
                     let sp = SpatialParams::new(
                         plan.position,
                         DEFAULT_MIN_DISTANCE,
                         DEFAULT_MAX_DISTANCE,
                     );
-                    audio.play_3d(plan.clip_index, plan.volume, plan.looping, sp);
+                    audio.play_3d(plan.clip_index, plan.volume, plan.looping, sp)
                 } else {
-                    audio.play(plan.clip_index, plan.volume, plan.looping);
-                }
+                    audio.play(plan.clip_index, plan.volume, plan.looping)
+                };
+                voices.voices.insert(plan.entity, voice);
                 if let Some(src) = world.get_mut::<AudioSource>(plan.entity) {
                     src.active = true;
                 }
             }
             AudioAction::Stop => {
-                audio.stop(plan.clip_index);
+                // Stop exactly the voice we issued for this entity; fall back
+                // to clip-wide stop for sources never tracked (defensive).
+                match voices.voices.remove(&plan.entity) {
+                    Some(voice) => audio.stop_voice(voice),
+                    None => audio.stop(plan.clip_index),
+                }
                 if let Some(src) = world.get_mut::<AudioSource>(plan.entity) {
                     src.active = false;
                 }
@@ -309,6 +362,7 @@ mod tests {
         // accept fire-and-forget commands, so this runs headless.
         let audio = AudioSystem::new(Vec::new()).expect("audio system");
         let mut world = World::new();
+        let mut voices = AudioVoiceTracker::default();
         let e = world.spawn();
         world.add(e, Transform::from_position(Vec3::ZERO));
         let mut src = AudioSource::new(0u32);
@@ -316,16 +370,16 @@ mod tests {
         world.add(e, src);
 
         // First sync: rising edge → active becomes true.
-        audio_sync_system(&mut world, &audio, None);
+        audio_sync_system(&mut world, &audio, None, &mut voices);
         assert!(world.get::<AudioSource>(e).unwrap().active, "play edge sets active");
 
         // Second sync with still-playing: no change, stays active (idempotent).
-        audio_sync_system(&mut world, &audio, None);
+        audio_sync_system(&mut world, &audio, None, &mut voices);
         assert!(world.get::<AudioSource>(e).unwrap().active);
 
         // Toggle off → stop edge clears active.
         world.get_mut::<AudioSource>(e).unwrap().playing = false;
-        audio_sync_system(&mut world, &audio, None);
+        audio_sync_system(&mut world, &audio, None, &mut voices);
         assert!(!world.get::<AudioSource>(e).unwrap().active, "stop edge clears active");
     }
 
@@ -333,16 +387,97 @@ mod tests {
     fn non_spatial_source_without_transform_is_handled() {
         let audio = AudioSystem::new(Vec::new()).expect("audio system");
         let mut world = World::new();
+        let mut voices = AudioVoiceTracker::default();
         let e = world.spawn();
         // No Transform — a non-spatial UI/music source.
         let mut src = AudioSource::new(3u32);
         src.playing = true;
         world.add(e, src);
-        audio_sync_system(&mut world, &audio, None);
+        audio_sync_system(&mut world, &audio, None, &mut voices);
         assert!(
             world.get::<AudioSource>(e).unwrap().active,
             "non-spatial source without Transform should still start"
         );
+    }
+
+    #[test]
+    fn play_edge_tracks_voice_and_stop_edge_untracks() {
+        let audio = AudioSystem::new(Vec::new()).expect("audio system");
+        let mut world = World::new();
+        let mut voices = AudioVoiceTracker::default();
+        let e = world.spawn();
+        let mut src = AudioSource::new(0u32);
+        src.looping = true;
+        src.playing = true;
+        world.add(e, src);
+
+        audio_sync_system(&mut world, &audio, None, &mut voices);
+        assert_eq!(voices.len(), 1, "play edge must register the issued voice");
+
+        world.get_mut::<AudioSource>(e).unwrap().playing = false;
+        audio_sync_system(&mut world, &audio, None, &mut voices);
+        assert_eq!(voices.len(), 0, "stop edge must release the tracked voice");
+    }
+
+    #[test]
+    fn despawned_looping_source_voice_is_swept() {
+        // The dogfood friction #9 case: a looping BGM entity is despawned
+        // without ever toggling playing=false — no Stop edge fires, but the
+        // tracker must notice the dead entity and stop its orphan voice.
+        let audio = AudioSystem::new(Vec::new()).expect("audio system");
+        let mut world = World::new();
+        let mut voices = AudioVoiceTracker::default();
+        let e = world.spawn();
+        let mut src = AudioSource::new(0u32);
+        src.looping = true;
+        src.playing = true;
+        world.add(e, src);
+
+        audio_sync_system(&mut world, &audio, None, &mut voices);
+        assert_eq!(voices.len(), 1);
+
+        world.despawn(e);
+        audio_sync_system(&mut world, &audio, None, &mut voices);
+        assert_eq!(voices.len(), 0, "dead entity's voice must be stopped + untracked");
+    }
+
+    #[test]
+    fn world_clear_sweeps_all_tracked_voices() {
+        let audio = AudioSystem::new(Vec::new()).expect("audio system");
+        let mut world = World::new();
+        let mut voices = AudioVoiceTracker::default();
+        for clip in 0..3u32 {
+            let e = world.spawn();
+            let mut src = AudioSource::new(clip);
+            src.looping = true;
+            src.playing = true;
+            world.add(e, src);
+        }
+        audio_sync_system(&mut world, &audio, None, &mut voices);
+        assert_eq!(voices.len(), 3);
+
+        world.clear();
+        audio_sync_system(&mut world, &audio, None, &mut voices);
+        assert_eq!(voices.len(), 0, "world.clear() must orphan-sweep every voice");
+    }
+
+    #[test]
+    fn removed_audio_source_component_is_swept() {
+        let audio = AudioSystem::new(Vec::new()).expect("audio system");
+        let mut world = World::new();
+        let mut voices = AudioVoiceTracker::default();
+        let e = world.spawn();
+        let mut src = AudioSource::new(0u32);
+        src.looping = true;
+        src.playing = true;
+        world.add(e, src);
+
+        audio_sync_system(&mut world, &audio, None, &mut voices);
+        assert_eq!(voices.len(), 1);
+
+        world.remove::<AudioSource>(e);
+        audio_sync_system(&mut world, &audio, None, &mut voices);
+        assert_eq!(voices.len(), 0, "entity alive but source removed → voice swept");
     }
 
     #[test]

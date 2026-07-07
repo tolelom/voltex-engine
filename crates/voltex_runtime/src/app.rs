@@ -144,6 +144,9 @@ pub struct RuntimeApp {
     /// Audio mixer, present only when `config.enable_audio` and init succeeded.
     /// Driven each frame by `audio_sync_system` from `AudioSource` components.
     pub audio: Option<AudioSystem>,
+    /// Entity → mixer voice map maintained by `audio_sync_system`; stops
+    /// orphan voices when their entity despawns without a stop edge.
+    audio_voices: crate::audio_sync::AudioVoiceTracker,
     /// Path → handle cache for scene-persisted asset paths
     /// (`TexturePath`/`MeshPath`); see [`crate::asset_paths`].
     pub(crate) asset_path_cache: crate::asset_paths::AssetPathCache,
@@ -300,6 +303,7 @@ impl RuntimeApp {
             script_pool: ScriptInstancePool::new(),
             script_input: voltex_script::ScriptInput::new(),
             audio,
+            audio_voices: crate::audio_sync::AudioVoiceTracker::default(),
             asset_path_cache: crate::asset_paths::AssetPathCache::new(),
             audio_clip_cache: crate::audio_paths::AudioClipCache::new(),
             audio_watcher: FileWatcher::new(Duration::from_millis(300)),
@@ -646,7 +650,12 @@ impl RuntimeApp {
                 self.config.vfs.as_ref(),
             );
             let audio = &*audio;
-            crate::audio_sync::audio_sync_system(&mut self.world, audio, self.audio_listener);
+            crate::audio_sync::audio_sync_system(
+                &mut self.world,
+                audio,
+                self.audio_listener,
+                &mut self.audio_voices,
+            );
             for (path, outcome) in crate::audio_sync::poll_audio_hot_reload(
                 &mut self.audio_watcher,
                 &self.watched_audio_clips,

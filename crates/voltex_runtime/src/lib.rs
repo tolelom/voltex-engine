@@ -35,7 +35,7 @@ pub use app::RuntimeApp;
 pub use asset_paths::{resolve_asset_paths, resolve_asset_paths_with, AssetPathCache};
 pub use audio_paths::{resolve_audio_paths, resolve_audio_paths_with, AudioClipCache, AudioPath};
 pub use time::{Time, Timer, TimerMode, Tween};
-pub use audio_sync::audio_sync_system;
+pub use audio_sync::{audio_sync_system, AudioVoiceTracker};
 pub use config::RuntimeConfig;
 pub use crash::{crash_filename, format_crash_report, install_panic_hook};
 pub use debug_draw::DebugLines;

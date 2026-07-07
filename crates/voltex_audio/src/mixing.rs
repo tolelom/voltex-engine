@@ -5,6 +5,15 @@ use crate::AudioClip;
 use crate::spatial::{Listener, SpatialParams, compute_spatial_gains};
 use crate::mix_group::{MixGroup, MixerState};
 
+/// Handle identifying one playback instance (voice) in the mixer.
+///
+/// Handed out by `AudioSystem::play` / `play_3d`; lets callers stop exactly
+/// that instance via `AudioSystem::stop_voice` (clip-index `stop` kills every
+/// instance of the clip). `VoiceId(0)` is the anonymous default for sounds
+/// constructed without an id.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+pub struct VoiceId(pub u64);
+
 /// Represents a sound currently being played back.
 pub struct PlayingSound {
     /// Index into the clips slice passed to `mix_sounds`.
@@ -19,6 +28,8 @@ pub struct PlayingSound {
     pub spatial: Option<SpatialParams>,
     /// Mix group this sound belongs to.
     pub group: MixGroup,
+    /// Voice handle for targeted stop; `VoiceId(0)` when anonymous.
+    pub voice: VoiceId,
 }
 
 impl PlayingSound {
@@ -31,12 +42,27 @@ impl PlayingSound {
             looping,
             spatial: None,
             group: MixGroup::Sfx,
+            voice: VoiceId::default(),
         }
     }
 
     /// Creates a 3D-spatialised sound on the [`MixGroup::Sfx`] group.
     pub fn new_3d(clip_index: usize, volume: f32, looping: bool, spatial: SpatialParams) -> Self {
-        Self { clip_index, position: 0, volume, looping, spatial: Some(spatial), group: MixGroup::Sfx }
+        Self {
+            clip_index,
+            position: 0,
+            volume,
+            looping,
+            spatial: Some(spatial),
+            group: MixGroup::Sfx,
+            voice: VoiceId::default(),
+        }
+    }
+
+    /// Tags this sound with a voice handle (builder style).
+    pub fn with_voice(mut self, voice: VoiceId) -> Self {
+        self.voice = voice;
+        self
     }
 }
 

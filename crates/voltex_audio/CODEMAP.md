@@ -4,7 +4,8 @@
 오디오 — WAV/OGG 디코더, AudioBackend (WASAPI/ALSA/CoreAudio/Null), 3D 사운드, 믹서, 이펙트.
 
 ## 공개 API 진입점
-- `AudioSystem` — 메인 오디오 시스템. `add_clip(&mut, AudioClip) -> usize`(런타임 핫로드, FIFO 로 인덱스 lockstep) / `replace_clip(idx, AudioClip)`(핫리로드, out-of-range 는 무시) (src/audio_system.rs)
+- `AudioSystem` — 메인 오디오 시스템. `add_clip(&mut, AudioClip) -> usize`(런타임 핫로드, FIFO 로 인덱스 lockstep) / `replace_clip(idx, AudioClip)`(핫리로드, out-of-range 는 무시) / `play`/`play_3d` → `VoiceId` 반환(AtomicU64 발급) + `stop_voice(VoiceId)` 로 해당 인스턴스만 정지 — clip-index `stop` 은 그 클립의 전 인스턴스 정지 (src/audio_system.rs)
+- `VoiceId(u64)` — 재생 인스턴스(voice) 핸들, `VoiceId(0)` = 익명 기본값 (src/mixing.rs)
 - `AudioClip` — PCM 데이터 (src/audio_clip.rs)
 - `AudioSource` / `ClipId` — per-entity 재생 디스크립터 + 타입화된 clip 식별자. ECS 컴포넌트로 등록 가능하나 audio crate 자체는 ECS 무의존 (src/audio_source.rs)
 - `AsyncAudioLoader` — 비동기 로딩 (src/async_loader.rs)
@@ -49,4 +50,4 @@
 ## 테스트
 - 단위 테스트: src/**/*.rs `#[cfg(test)]`
 - 실행: `cargo test -p voltex_audio --lib`
-- 현재 테스트 개수: 89개 (Windows host 기준). B3 의 CoreAudio 테스트 +2 는 macOS host 에서만 컴파일/실행 (cfg(target_os = "macos")).
+- 현재 테스트 개수: 134개 (Windows host 기준; VoiceId/stop_voice/apply_command +2 포함). B3 의 CoreAudio 테스트 +2 는 macOS host 에서만 컴파일/실행 (cfg(target_os = "macos")).

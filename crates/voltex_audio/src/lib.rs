@@ -80,7 +80,7 @@ pub fn load_clip_file(path: &std::path::Path) -> Result<AudioClip> {
     let bytes = std::fs::read(path)?;
     decode_clip_bytes(path, &bytes)
 }
-pub use mixing::{PlayingSound, mix_sounds};
+pub use mixing::{PlayingSound, VoiceId, mix_sounds};
 pub use audio_system::AudioSystem;
 pub use spatial::{Listener, SpatialParams, distance_attenuation, stereo_pan, compute_spatial_gains};
 pub use mix_group::{MixGroup, MixerState};
