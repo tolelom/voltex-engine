@@ -7,10 +7,10 @@ AI 기초 — NavMesh (수동 + 자동 voxelization), A* + Funnel, steering, 동
 - `NavMesh` — 폴리곤 기반 내비메시 (src/navmesh.rs)
 - `NavMeshBuilder` — voxelization 기반 자동 생성 (src/navmesh_builder/)
 - `find_path` — A* + String Pulling (Funnel) (src/pathfinding.rs)
-- Steering — `seek`, `flee`, `arrive`, `wander` (src/steering.rs)
+- Steering — `seek`, `flee`, `arrive`, `wander`, `follow_path` (src/steering.rs). `follow_path` 는 평면(XZ) — waypoint 를 에이전트 y 평면에 투영해 도달 판정/조향 (게임플레이 y 유지, navmesh 평면으로 침하 없음)
 - Flocking (boid) — `separation`, `cohesion`, `alignment` 순수 함수 + `Boid` 컴포넌트 + `BoidParams` + `flocking_system(world, &params, dt)` ECS 시스템 (src/flocking.rs). 시스템이 `SpatialGrid` 로 이웃 수집(~O(n)) 후 3법칙 가중합 → 속도/위치 적분(max_speed clamp). 스냅샷 후 일괄 기록(순서 무관)
-- `NavAgent` — ECS 컴포넌트 (src/nav_agent.rs)
-- `nav_agent_system(world, navmesh, dt)` — NavAgent 엔티티 경로 추적 ECS 시스템 (src/nav_agent_system.rs)
+- `NavAgent` — ECS 컴포넌트 (src/nav_agent.rs). `target` 직접 대입도 동작 — 시스템이 `planned_target`(crate 내부)과 비교해 변경 감지 후 스스로 repath
+- `nav_agent_system(world, navmesh, dt)` — NavAgent 엔티티 경로 추적 ECS 시스템 (src/nav_agent_system.rs). target 변경 시 자동 repath; 새 target 이 기존 path 끝점과 같은 삼각형이면 A* 없이 끝점만 교체(retarget). 도달 판정 XZ, goal snap 은 agent y 보존
 - ~~`Obstacle`, velocity obstacle 회피 (src/obstacle.rs)~~ — **미배선**: lib.rs에 모듈 선언이 없어 컴파일되지 않음 (배선 시 bitrot 점검 필요)
 - `AiError`, `Result` — thiserror 기반 에러 (Generic/Io) (src/error.rs)
 
@@ -38,4 +38,4 @@ AI 기초 — NavMesh (수동 + 자동 voxelization), A* + Funnel, steering, 동
 ## 테스트
 - 단위 테스트: src/**/*.rs `#[cfg(test)]`
 - 실행: `cargo test -p voltex_ai --lib`
-- 현재 테스트 개수: 63개 (navmesh_builder 배선으로 +7 등)
+- 현재 테스트 개수: 69개 (planar follow_path +3, target 변경 감지 repath/retarget +3)

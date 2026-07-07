@@ -26,18 +26,49 @@ pub fn nav_agent_system(world: &mut World, navmesh: &NavMesh, dt: f32) {
         return;
     }
 
-    // Pass 1: (re)compute a path for agents that have a target but no cached path.
-    let need_path: Vec<(Entity, Vec3, Vec3)> = world
+    // Pass 1: (re)compute a path for agents whose target is new or has changed.
+    // `planned_target` records what `path` was computed for, so a direct
+    // `agent.target = Some(..)` assignment is picked up like `set_target`.
+    let need_path: Vec<(Entity, Vec3, Vec3, bool)> = world
         .query2::<NavAgent, Transform>()
-        .filter(|(_, a, _)| a.target.is_some() && a.path.is_empty() && !a.reached)
-        .map(|(e, a, t)| (e, t.position, a.target.expect("target is_some checked above")))
+        .filter(|(_, a, _)| {
+            a.target.is_some()
+                && (a.target != a.planned_target || (a.path.is_empty() && !a.reached))
+        })
+        .map(|(e, a, t)| {
+            let goal = a.target.expect("target is_some checked above");
+            (e, t.position, goal, !a.path.is_empty())
+        })
         .collect();
-    for (entity, start, goal) in need_path {
+    for (entity, start, goal, has_path) in need_path {
+        // Retarget fast path: the goal moved but stayed in the same navmesh
+        // triangle as the current path's endpoint — reuse the path and just
+        // move its endpoint instead of running A* again.
+        if has_path {
+            let endpoint = world
+                .get::<NavAgent>(entity)
+                .and_then(|a| a.path.last().copied())
+                .expect("has_path implies non-empty path");
+            if let (Some(goal_tri), Some(end_tri)) =
+                (navmesh.find_triangle(goal), navmesh.find_triangle(endpoint))
+            {
+                if goal_tri == end_tri {
+                    if let Some(a) = world.get_mut::<NavAgent>(entity) {
+                        *a.path.last_mut().expect("non-empty path") = goal;
+                        a.reached = false;
+                        a.planned_target = a.target;
+                    }
+                    continue;
+                }
+            }
+        }
         match find_path(navmesh, start, goal) {
             Some(path) => {
                 if let Some(a) = world.get_mut::<NavAgent>(entity) {
                     a.path = path;
                     a.current_waypoint = 0;
+                    a.reached = false;
+                    a.planned_target = a.target;
                 }
             }
             None => {
@@ -215,6 +246,112 @@ mod tests {
         assert!((pos.y - 0.5).abs() < 1e-3, "gameplay y must be preserved, got {pos:?}");
         let goal_xz = Vec3::new(0.0, pos.y, 20.0);
         assert!((pos - goal_xz).length() < 1.0, "agent should end near target in XZ, got {pos:?}");
+    }
+
+    #[test]
+    fn direct_target_assignment_repaths_after_reached() {
+        // Assigning `agent.target = Some(..)` directly (without set_target)
+        // must be picked up by the system — the historical footgun left the
+        // agent permanently parked on its old goal.
+        let mut world = World::new();
+        let e = world.spawn();
+        world.add(e, Transform::from_position(Vec3::ZERO));
+        let mut agent = NavAgent::new(10.0);
+        agent.set_target(Vec3::new(0.0, 0.0, 20.0));
+        world.add(e, agent);
+
+        let mesh = flat_navmesh();
+        for _ in 0..1000 {
+            nav_agent_system(&mut world, &mesh, 0.1);
+            if world.get::<NavAgent>(e).unwrap().reached {
+                break;
+            }
+        }
+        assert!(world.get::<NavAgent>(e).unwrap().reached, "precondition: first goal reached");
+
+        // Direct field assignment — no set_target.
+        world.get_mut::<NavAgent>(e).unwrap().target = Some(Vec3::new(20.0, 0.0, -20.0));
+
+        let mut reached_new = false;
+        for _ in 0..1000 {
+            nav_agent_system(&mut world, &mesh, 0.1);
+            let a = world.get::<NavAgent>(e).unwrap();
+            if a.reached {
+                reached_new = true;
+                break;
+            }
+        }
+        assert!(reached_new, "agent must chase a directly-assigned target");
+        let pos = world.get::<Transform>(e).unwrap().position;
+        assert!(
+            (pos - Vec3::new(20.0, 0.0, -20.0)).length() < 1.0,
+            "agent should end near the new target, got {pos:?}"
+        );
+    }
+
+    #[test]
+    fn direct_target_assignment_redirects_mid_path() {
+        // Changing the target while the agent is still walking must redirect it.
+        let mut world = World::new();
+        let e = world.spawn();
+        world.add(e, Transform::from_position(Vec3::ZERO));
+        let mut agent = NavAgent::new(5.0);
+        agent.set_target(Vec3::new(0.0, 0.0, 30.0));
+        world.add(e, agent);
+
+        let mesh = flat_navmesh();
+        for _ in 0..5 {
+            nav_agent_system(&mut world, &mesh, 0.1);
+        }
+        world.get_mut::<NavAgent>(e).unwrap().target = Some(Vec3::new(0.0, 0.0, -10.0));
+
+        let mut reached = false;
+        for _ in 0..1000 {
+            nav_agent_system(&mut world, &mesh, 0.1);
+            if world.get::<NavAgent>(e).unwrap().reached {
+                reached = true;
+                break;
+            }
+        }
+        assert!(reached, "agent must reach the redirected target");
+        let pos = world.get::<Transform>(e).unwrap().position;
+        assert!(
+            (pos - Vec3::new(0.0, 0.0, -10.0)).length() < 1.0,
+            "agent should end near the redirected target, got {pos:?}"
+        );
+    }
+
+    #[test]
+    fn small_target_move_reuses_path() {
+        // When the new target lies in the same navmesh triangle as the current
+        // path's endpoint, the system retargets by moving the endpoint instead
+        // of recomputing the whole path — path[0] keeps the original start.
+        let mut world = World::new();
+        let e = world.spawn();
+        world.add(e, Transform::from_position(Vec3::ZERO));
+        let mut agent = NavAgent::new(5.0);
+        agent.set_target(Vec3::new(0.0, 0.0, 30.0));
+        world.add(e, agent);
+
+        let mesh = flat_navmesh();
+        for _ in 0..5 {
+            nav_agent_system(&mut world, &mesh, 0.1);
+        }
+        let original_first = world.get::<NavAgent>(e).unwrap().path[0];
+
+        // Small move within the same (single) triangle.
+        world.get_mut::<NavAgent>(e).unwrap().target = Some(Vec3::new(1.0, 0.0, 29.0));
+        nav_agent_system(&mut world, &mesh, 0.1);
+
+        let a = world.get::<NavAgent>(e).unwrap();
+        assert!(
+            (*a.path.first().unwrap() - original_first).length() < 1e-6,
+            "retarget must reuse the existing path (full repath rewrites path[0])"
+        );
+        assert!(
+            (*a.path.last().unwrap() - Vec3::new(1.0, 0.0, 29.0)).length() < 1e-6,
+            "retarget must move the path endpoint to the new target"
+        );
     }
 
     #[test]

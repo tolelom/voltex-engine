@@ -15,6 +15,10 @@ pub struct NavAgent {
     pub current_waypoint: usize,
     /// `true` once the agent has reached the final waypoint.
     pub reached: bool,
+    /// The target `path` was planned for — owned by `nav_agent_system`, which
+    /// repaths whenever `target` no longer matches (so direct `target`
+    /// assignment works just like [`NavAgent::set_target`]).
+    pub(crate) planned_target: Option<Vec3>,
 }
 
 impl NavAgent {
@@ -26,6 +30,7 @@ impl NavAgent {
             path: Vec::new(),
             current_waypoint: 0,
             reached: false,
+            planned_target: None,
         }
     }
 
@@ -35,6 +40,7 @@ impl NavAgent {
         self.path.clear();
         self.current_waypoint = 0;
         self.reached = false;
+        self.planned_target = None;
     }
 
     /// Clears the target, cached path, and progress state — agent is idle again.
@@ -43,6 +49,7 @@ impl NavAgent {
         self.path.clear();
         self.current_waypoint = 0;
         self.reached = false;
+        self.planned_target = None;
     }
 }
 
