@@ -62,6 +62,13 @@ pub struct RuntimeConfig {
     /// Optional virtual filesystem to consult first when loading scenes /
     /// scripts. When `None`, paths are read directly from disk.
     pub vfs: Option<voltex_asset::Vfs>,
+    /// Root directory that **relative** asset paths (scene-persisted
+    /// `TexturePath` / `MeshPath` / `AudioPath`, [`Self::audio_files`]) resolve
+    /// against, making them cwd-independent. A relative root is itself anchored
+    /// at the running exe's directory (dist layout: `game.exe` + `assets/`).
+    /// `None` (default) keeps plain cwd-relative reads. Set via
+    /// [`Self::with_asset_root`].
+    pub asset_root: Option<PathBuf>,
     /// When `true` (default), [`crate::RuntimeApp::run`] installs a
     /// `std::panic::set_hook` that writes a crash log file alongside the
     /// default stderr behaviour. Set to `false` for headless tests or when
@@ -121,6 +128,7 @@ impl Default for RuntimeConfig {
             audio_clips: Vec::new(),
             audio_files: Vec::new(),
             vfs: None,
+            asset_root: None,
             enable_crash_log: true,
             crash_log_dir: None,
             // Matches the historical hardcoded runtime camera.
@@ -313,6 +321,27 @@ impl RuntimeConfig {
         self
     }
 
+    /// Set the game's asset root: relative asset paths (`TexturePath` /
+    /// `MeshPath` / `AudioPath` components, [`Self::with_audio_files`]) load
+    /// from this directory instead of the process cwd. A relative root is
+    /// resolved against the exe's directory at boot, so a shipped
+    /// `game.exe` + `assets/` folder works from any launch location.
+    pub fn with_asset_root(mut self, root: impl Into<PathBuf>) -> Self {
+        self.asset_root = Some(root.into());
+        self
+    }
+
+    /// Resolve [`Self::asset_root`] to the directory reads should use:
+    /// absolute roots pass through; relative roots anchor at the exe's
+    /// directory (cwd as a last resort when the exe path is unknown).
+    pub fn resolved_asset_root(&self) -> Option<PathBuf> {
+        let root = self.asset_root.as_deref()?;
+        let exe_dir = std::env::current_exe()
+            .ok()
+            .and_then(|p| p.parent().map(|d| d.to_path_buf()));
+        Some(resolve_asset_root_with(root, exe_dir.as_deref()))
+    }
+
     /// Attach a `Vfs` (filesystem-rooted or embedded `.vpkg`). When set, the
     /// runtime reads scene / script files through the Vfs first; fs path
     /// fallback still applies for paths the Vfs cannot resolve.
@@ -334,6 +363,18 @@ impl RuntimeConfig {
     pub fn disable_crash_log(mut self) -> Self {
         self.enable_crash_log = false;
         self
+    }
+}
+
+/// Pure core of [`RuntimeConfig::resolved_asset_root`]: anchor a relative
+/// `root` at `exe_dir` (absolute roots and unknown exe dirs pass through).
+pub fn resolve_asset_root_with(root: &std::path::Path, exe_dir: Option<&std::path::Path>) -> PathBuf {
+    if root.is_absolute() {
+        return root.to_path_buf();
+    }
+    match exe_dir {
+        Some(dir) => dir.join(root),
+        None => root.to_path_buf(),
     }
 }
 
@@ -438,6 +479,31 @@ mod tests {
         let c = RuntimeConfig::new().with_audio_files(paths.clone());
         assert!(c.enable_audio);
         assert_eq!(c.audio_files, paths);
+    }
+
+    #[test]
+    fn asset_root_default_none_and_builder_sets() {
+        assert!(RuntimeConfig::default().asset_root.is_none());
+        let c = RuntimeConfig::new().with_asset_root("assets");
+        assert_eq!(c.asset_root.as_deref(), Some(std::path::Path::new("assets")));
+    }
+
+    #[test]
+    fn resolve_asset_root_with_joins_relative_onto_exe_dir() {
+        let exe_dir = std::path::Path::new("C:/games/mygame");
+        // Relative root → anchored at the exe's directory (dist layout).
+        assert_eq!(
+            resolve_asset_root_with(std::path::Path::new("assets"), Some(exe_dir)),
+            std::path::PathBuf::from("C:/games/mygame").join("assets")
+        );
+        // Absolute root → used as-is.
+        let abs = std::env::temp_dir();
+        assert_eq!(resolve_asset_root_with(&abs, Some(exe_dir)), abs);
+        // No exe dir known → relative root left as-is (cwd semantics).
+        assert_eq!(
+            resolve_asset_root_with(std::path::Path::new("assets"), None),
+            std::path::PathBuf::from("assets")
+        );
     }
 
     #[test]

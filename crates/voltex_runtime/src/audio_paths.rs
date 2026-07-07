@@ -109,9 +109,10 @@ pub fn resolve_audio_paths(
     audio: &mut AudioSystem,
     cache: &mut AudioClipCache,
     vfs: Option<&voltex_asset::Vfs>,
+    asset_root: Option<&std::path::Path>,
 ) -> usize {
     let n = resolve_audio_paths_with(world, cache, |path| {
-        match crate::asset_paths::read_asset(vfs, path)
+        match crate::asset_paths::read_asset(vfs, asset_root, path)
             .and_then(|bytes| {
                 voltex_audio::decode_clip_bytes(path, &bytes).map_err(|e| e.to_string())
             }) {
@@ -230,14 +231,14 @@ mod tests {
         let mut audio = AudioSystem::new(Vec::new()).expect("audio system");
         let mut cache = AudioClipCache::new();
 
-        let n = resolve_audio_paths(&mut world, &mut audio, &mut cache, Some(&vfs));
+        let n = resolve_audio_paths(&mut world, &mut audio, &mut cache, Some(&vfs), None);
         assert_eq!(n, 1, "clip resolved from vpkg");
         assert_eq!(world.get::<AudioSource>(e).unwrap().clip_id.0, 0);
 
         // Missing path (nowhere) → failure cached, source absent, no panic.
         let m = world.spawn();
         world.add(m, AudioPath("sounds/gone.wav".to_string()));
-        let n2 = resolve_audio_paths(&mut world, &mut audio, &mut cache, Some(&vfs));
+        let n2 = resolve_audio_paths(&mut world, &mut audio, &mut cache, Some(&vfs), None);
         assert_eq!(n2, 0);
         assert!(world.get::<AudioSource>(m).is_none());
     }

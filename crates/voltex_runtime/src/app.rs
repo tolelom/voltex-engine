@@ -147,6 +147,9 @@ pub struct RuntimeApp {
     /// Entity → mixer voice map maintained by `audio_sync_system`; stops
     /// orphan voices when their entity despawns without a stop edge.
     audio_voices: crate::audio_sync::AudioVoiceTracker,
+    /// Resolved [`RuntimeConfig::asset_root`] (exe-dir anchored at boot);
+    /// relative asset paths load from here instead of the cwd.
+    pub(crate) asset_root: Option<std::path::PathBuf>,
     /// Path → handle cache for scene-persisted asset paths
     /// (`TexturePath`/`MeshPath`); see [`crate::asset_paths`].
     pub(crate) asset_path_cache: crate::asset_paths::AssetPathCache,
@@ -242,6 +245,10 @@ impl RuntimeApp {
             build(&mut world, &mut registry);
         }
 
+        // Resolve the configured asset root once (exe-dir anchoring involves a
+        // syscall); every relative asset read below and per-frame goes through it.
+        let asset_root = config.resolved_asset_root();
+
         // Build the audio mixer up front (it only spawns a thread, no GPU /
         // window needed). Failure degrades to silent rather than aborting boot.
         // `with_audio_files` paths are decoded here, appended after the
@@ -252,6 +259,14 @@ impl RuntimeApp {
             let mut clips = std::mem::take(&mut config.audio_clips);
             for (i, path) in std::mem::take(&mut config.audio_files).into_iter().enumerate() {
                 let index = clips.len();
+                // Relative paths anchor at the asset root (when configured and
+                // the rooted file exists) — same contract as read_asset.
+                let path = match asset_root.as_deref() {
+                    Some(root) if path.is_relative() && root.join(&path).is_file() => {
+                        root.join(&path)
+                    }
+                    _ => path,
+                };
                 match voltex_audio::load_clip_file(&path) {
                     Ok(clip) => clips.push(clip),
                     Err(e) => {
@@ -304,6 +319,7 @@ impl RuntimeApp {
             script_input: voltex_script::ScriptInput::new(),
             audio,
             audio_voices: crate::audio_sync::AudioVoiceTracker::default(),
+            asset_root,
             asset_path_cache: crate::asset_paths::AssetPathCache::new(),
             audio_clip_cache: crate::audio_paths::AudioClipCache::new(),
             audio_watcher: FileWatcher::new(Duration::from_millis(300)),
@@ -648,6 +664,7 @@ impl RuntimeApp {
                 audio,
                 &mut self.audio_clip_cache,
                 self.config.vfs.as_ref(),
+                self.asset_root.as_deref(),
             );
             let audio = &*audio;
             crate::audio_sync::audio_sync_system(

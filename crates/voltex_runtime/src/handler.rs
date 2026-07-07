@@ -130,6 +130,7 @@ impl ApplicationHandler for RuntimeHandler {
                 &st.gpu.device,
                 &st.gpu.queue,
                 app.config.vfs.as_ref(),
+                app.asset_root.as_deref(),
             );
             }
         }
@@ -263,6 +264,7 @@ fn redraw(app: &mut RuntimeApp, event_loop: &ActiveEventLoop) {
                 &st.gpu.device,
                 &st.gpu.queue,
                 app.config.vfs.as_ref(),
+                app.asset_root.as_deref(),
             );
         }
     }

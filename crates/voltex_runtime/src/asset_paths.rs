@@ -102,6 +102,7 @@ pub fn resolve_asset_paths(
     device: &wgpu::Device,
     queue: &wgpu::Queue,
     vfs: Option<&voltex_asset::Vfs>,
+    asset_root: Option<&Path>,
 ) -> (usize, usize) {
     // The two loader closures need `assets` mutably but never concurrently —
     // resolve_asset_paths_with runs the texture pass before the mesh pass.
@@ -110,7 +111,7 @@ pub fn resolve_asset_paths(
     let (tex_n, mesh_n) = resolve_asset_paths_with(
         world,
         cache,
-        |path| match read_asset(vfs, path).and_then(|bytes| {
+        |path| match read_asset(vfs, asset_root, path).and_then(|bytes| {
             assets
                 .borrow_mut()
                 .add_texture_png(device, queue, &bytes)
@@ -125,7 +126,7 @@ pub fn resolve_asset_paths(
                 None
             }
         },
-        |path| match read_asset(vfs, path).and_then(|bytes| decode_mesh(device, path, &bytes)) {
+        |path| match read_asset(vfs, asset_root, path).and_then(|bytes| decode_mesh(device, path, &bytes)) {
             Ok(mesh) => Some(assets.borrow_mut().add_mesh(mesh)),
             Err(e) => {
                 crate::log_error!(
@@ -147,16 +148,26 @@ pub fn resolve_asset_paths(
 }
 
 /// Read asset bytes: the Vfs (when present **and** it has the entry) wins,
-/// otherwise plain fs. The Vfs key is the path's forward-slash string form —
-/// matching the editor's persisted format (v1.0.99).
+/// then a **relative** path is tried under `asset_root` (cwd-independent game
+/// assets, friction #6), then plain fs as the last resort. The Vfs key is the
+/// path's forward-slash string form — matching the editor's persisted format
+/// (v1.0.99).
 pub(crate) fn read_asset(
     vfs: Option<&voltex_asset::Vfs>,
+    asset_root: Option<&Path>,
     path: &Path,
 ) -> Result<Vec<u8>, String> {
     if let Some(vfs) = vfs {
         let key = path.to_string_lossy().replace('\\', "/");
         if vfs.exists(&key) {
             return vfs.read(&key).map_err(|e| e.to_string());
+        }
+    }
+    if path.is_relative() {
+        if let Some(root) = asset_root {
+            if let Ok(bytes) = std::fs::read(root.join(path)) {
+                return Ok(bytes);
+            }
         }
     }
     std::fs::read(path).map_err(|e| e.to_string())
@@ -269,22 +280,58 @@ mod tests {
 
         // In the archive → vfs wins (no fs file needed).
         assert_eq!(
-            read_asset(Some(&vfs), Path::new("assets/hero.png")).unwrap(),
+            read_asset(Some(&vfs), None, Path::new("assets/hero.png")).unwrap(),
             b"from-vfs"
         );
         // Backslash spelling normalizes onto the same archive key.
         assert_eq!(
-            read_asset(Some(&vfs), Path::new("assets\\hero.png")).unwrap(),
+            read_asset(Some(&vfs), None, Path::new("assets\\hero.png")).unwrap(),
             b"from-vfs"
         );
         // Not in the archive → fs fallback.
-        assert_eq!(read_asset(Some(&vfs), &loose).unwrap(), b"from-fs");
+        assert_eq!(read_asset(Some(&vfs), None, &loose).unwrap(), b"from-fs");
         // Present in neither → Err.
-        assert!(read_asset(Some(&vfs), Path::new("missing.png")).is_err());
+        assert!(read_asset(Some(&vfs), None, Path::new("missing.png")).is_err());
         // No vfs at all → plain fs behaviour.
-        assert_eq!(read_asset(None, &loose).unwrap(), b"from-fs");
+        assert_eq!(read_asset(None, None, &loose).unwrap(), b"from-fs");
 
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn read_asset_resolves_relative_paths_against_asset_root() {
+        let root =
+            std::env::temp_dir().join(format!("voltex_asset_root_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(root.join("textures")).unwrap();
+        std::fs::write(root.join("textures/hero.png"), b"rooted").unwrap();
+
+        // Relative path + asset root → resolves under the root, regardless of
+        // cwd (the file does not exist relative to the test cwd).
+        assert_eq!(
+            read_asset(None, Some(&root), Path::new("textures/hero.png")).unwrap(),
+            b"rooted"
+        );
+        // Absolute paths bypass the root.
+        assert_eq!(
+            read_asset(None, Some(&root), &root.join("textures/hero.png")).unwrap(),
+            b"rooted"
+        );
+        // Missing everywhere → Err.
+        assert!(read_asset(None, Some(&root), Path::new("textures/nope.png")).is_err());
+        // Vfs still wins over the root for bundled entries.
+        let bytes = voltex_asset::write_vpkg(&[(
+            "textures/hero.png".to_string(),
+            b"from-vfs".to_vec(),
+        )]);
+        let leaked: &'static [u8] = Box::leak(bytes.into_boxed_slice());
+        let vfs = voltex_asset::Vfs::archive_from_bytes(leaked).expect("vpkg parses");
+        assert_eq!(
+            read_asset(Some(&vfs), Some(&root), Path::new("textures/hero.png")).unwrap(),
+            b"from-vfs"
+        );
+
+        let _ = std::fs::remove_dir_all(&root);
     }
 
     #[test]
