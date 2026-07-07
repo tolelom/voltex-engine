@@ -11,7 +11,7 @@ AI 기초 — NavMesh (수동 + 자동 voxelization), A* + Funnel, steering, 동
 - Flocking (boid) — `separation`, `cohesion`, `alignment` 순수 함수 + `Boid` 컴포넌트 + `BoidParams` + `flocking_system(world, &params, dt)` ECS 시스템 (src/flocking.rs). 시스템이 `SpatialGrid` 로 이웃 수집(~O(n)) 후 3법칙 가중합 → 속도/위치 적분(max_speed clamp). 스냅샷 후 일괄 기록(순서 무관)
 - `NavAgent` — ECS 컴포넌트 (src/nav_agent.rs). `target` 직접 대입도 동작 — 시스템이 `planned_target`(crate 내부)과 비교해 변경 감지 후 스스로 repath
 - `nav_agent_system(world, navmesh, dt)` — NavAgent 엔티티 경로 추적 ECS 시스템 (src/nav_agent_system.rs). target 변경 시 자동 repath; 새 target 이 기존 path 끝점과 같은 삼각형이면 A* 없이 끝점만 교체(retarget). 도달 판정 XZ, goal snap 은 agent y 보존
-- ~~`Obstacle`, velocity obstacle 회피 (src/obstacle.rs)~~ — **미배선**: lib.rs에 모듈 선언이 없어 컴파일되지 않음 (배선 시 bitrot 점검 필요)
+- `DynamicObstacle` + `avoid_obstacles(pos, vel, radius, &[obstacle], look_ahead)` — velocity obstacle 회피 조향 (src/obstacle.rs). M3 분리 후 미배선이었다가 module_wiring 가드 도입 시 배선 (+6 테스트 부활)
 - `AiError`, `Result` — thiserror 기반 에러 (Generic/Io) (src/error.rs)
 
 ## 모듈 구조
@@ -22,7 +22,7 @@ AI 기초 — NavMesh (수동 + 자동 voxelization), A* + Funnel, steering, 동
 - `flocking` — boid separation/cohesion/alignment (SpatialGrid 로 이웃 수집) (src/flocking.rs)
 - `nav_agent` — ECS 컴포넌트 (src/nav_agent.rs)
 - `nav_agent_system` — NavAgent 경로 추적 시스템 (src/nav_agent_system.rs)
-- `obstacle` — 동적 장애물 회피 (src/obstacle.rs)
+- `obstacle` — 동적 장애물 회피 (velocity obstacle) (src/obstacle.rs)
 
 ## 의존성
 - voltex crate: voltex_math, voltex_ecs
@@ -38,4 +38,4 @@ AI 기초 — NavMesh (수동 + 자동 voxelization), A* + Funnel, steering, 동
 ## 테스트
 - 단위 테스트: src/**/*.rs `#[cfg(test)]`
 - 실행: `cargo test -p voltex_ai --lib`
-- 현재 테스트 개수: 69개 (planar follow_path +3, target 변경 감지 repath/retarget +3)
+- 현재 테스트 개수: 75개 (planar follow_path +3, target 변경 감지 repath/retarget +3, obstacle 배선 +6)

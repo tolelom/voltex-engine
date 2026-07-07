@@ -5,8 +5,8 @@ Lua 5.4 내장 + 엔진 API 바인딩 + 샌드박싱 + 핫 리로드 + per-entit
 
 ## 공개 API 진입점
 - `LuaState` — Lua 인터프리터 (src/state.rs)
-- `LuaCoroutine` — 코루틴 (src/coroutine.rs)
-- `Sandbox` — os/io 차단 (src/sandbox.rs)
+- `LuaCoroutine` / `CoroutineStatus` — 코루틴 (create_coroutine/resume/is_finished) (src/coroutine.rs). M3 이후 미배선(침묵하는 죽은 코드)이었다가 module_wiring 가드 도입 시 배선
+- `create_sandbox(&LuaState)` — os/io/require/debug 등 위험 글로벌 제거. **자동 적용 아님** — 신뢰할 수 없는 스크립트 실행 전 명시 호출 (src/sandbox.rs). 동일하게 미배선이었다가 배선 (coroutine+sandbox 테스트 +17 부활)
 - engine_api — spawn/position/rotation/scale/destroy/tag/find/hierarchy/iter/find_in_radius (18 fns) (src/engine_api/)
 - engine_input — 읽기 전용 `input` Lua 테이블 + `ScriptInput` 스냅샷 + `set_current_input` (src/engine_input.rs)
 - bindings — voltex_print 등 (src/bindings.rs)
@@ -50,4 +50,4 @@ Lua 5.4 내장 + 엔진 API 바인딩 + 샌드박싱 + 핫 리로드 + per-entit
 ## 테스트
 - 단위 테스트: src/**/*.rs `#[cfg(test)]`
 - 실행: `cargo test -p voltex_script --lib`
-- 현재 테스트 개수: 59개 (engine_api find_in_radius +2)
+- 현재 테스트 개수: 75개 (coroutine/sandbox 배선으로 +17 부활 — 59 표기는 미배선 시절 수치)

@@ -18,10 +18,12 @@ pub mod nav_agent;
 pub mod nav_agent_system;
 pub mod navmesh;
 pub mod navmesh_builder;
+pub mod obstacle;
 pub mod pathfinding;
 pub mod steering;
 
 pub use error::{AiError, Result};
+pub use obstacle::{avoid_obstacles, DynamicObstacle};
 pub use flocking::{alignment, cohesion, flocking_system, separation, Boid, BoidParams};
 pub use nav_agent::NavAgent;
 pub use nav_agent_system::nav_agent_system;

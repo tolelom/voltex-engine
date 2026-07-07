@@ -1,10 +1,16 @@
+//! Lua coroutines over `lua_newthread`: create from a global function name,
+//! resume until finished. For multi-frame script logic (cutscenes, staged AI)
+//! that yields between engine ticks.
+
 use crate::ffi;
 use std::ffi::CString;
 
 /// Status returned by a coroutine resume.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CoroutineStatus {
+    /// The coroutine yielded and can be resumed again.
     Yielded,
+    /// The coroutine ran to completion — do not resume again.
     Finished,
 }
 

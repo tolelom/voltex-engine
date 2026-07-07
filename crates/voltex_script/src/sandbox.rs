@@ -1,3 +1,8 @@
+//! Lua sandboxing: strip dangerous globals (`os`, `io`, `require`, `debug`,
+//! …) from a [`LuaState`]. Not applied automatically — call
+//! [`create_sandbox`] after `LuaState::new()` before running untrusted
+//! scripts.
+
 use crate::state::LuaState;
 
 /// List of dangerous globals to remove for sandboxing.

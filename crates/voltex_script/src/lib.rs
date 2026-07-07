@@ -16,17 +16,21 @@
 #![allow(non_snake_case)]
 #![warn(missing_docs)]
 
-pub mod error;
-pub mod ffi;
-pub mod state;
 pub mod bindings;
+pub mod coroutine;
 pub mod engine_api;
 pub mod engine_input;
+pub mod error;
+pub mod ffi;
 pub mod instance;
 pub mod pool;
+pub mod sandbox;
+pub mod state;
 pub mod system;
 
+pub use coroutine::{CoroutineStatus, LuaCoroutine};
 pub use error::{ScriptError, Result};
+pub use sandbox::create_sandbox;
 pub use state::LuaState;
 pub use bindings::register_default_bindings;
 pub use engine_api::register_engine_api;

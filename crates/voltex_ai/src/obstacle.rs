@@ -1,10 +1,16 @@
+//! Dynamic obstacle avoidance: velocity-obstacle steering around moving
+//! circles (other agents, hazards). Composes with the steering behaviours —
+//! add the returned force to seek/follow_path output before integrating.
+
 use voltex_math::Vec3;
 
 /// A dynamic obstacle represented as a position and radius.
 #[derive(Debug, Clone)]
-pub(crate) struct DynamicObstacle {
-    pub(crate) position: Vec3,
-    pub(crate) radius: f32,
+pub struct DynamicObstacle {
+    /// World position of the obstacle's center.
+    pub position: Vec3,
+    /// Collision radius around [`Self::position`].
+    pub radius: f32,
 }
 
 /// Compute avoidance steering force using velocity obstacle approach.
@@ -12,7 +18,7 @@ pub(crate) struct DynamicObstacle {
 /// Projects the agent's velocity forward by `look_ahead` distance and checks
 /// for circle intersections with obstacles. Returns a steering force perpendicular
 /// to the approach direction to avoid the nearest threatening obstacle.
-pub(crate) fn avoid_obstacles(
+pub fn avoid_obstacles(
     agent_pos: Vec3,
     agent_vel: Vec3,
     agent_radius: f32,
