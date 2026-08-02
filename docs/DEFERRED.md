@@ -199,7 +199,7 @@
 - **HTML coverage 리포트 (codecov/coveralls upload)** — CI 가 실제 runner 에서 동작한 후. v1.1+.
 - **외부 의존 라이선스 고지** ✅ v1.0.7 — THIRD-PARTY-LICENSES.md (4,795 라인) + about.toml/hbs + CI license-check job. 284 transitive 모두 permissive, 0 copyleft.
 - **license-check advisory → blocking** — CI 첫 green run 후 승격. v1.1+.
-- **THIRD-PARTY-LICENSES.md 를 `voltex build` artifact 에 동봉** — 현재 `dist/<name>.exe` 옆에 안 들어감. v1.1+.
+- ~~**THIRD-PARTY-LICENSES.md 를 `voltex build` artifact 에 동봉**~~ ✅ v1.0.12 — 아래 "LICENSE-MIT/APACHE 파일 추가 + `voltex build` 라이선스 번들" 항목에서 함께 해소. `voltex_cli::build::copy_license_files` 가 엔진 루트의 THIRD-PARTY-LICENSES.md + LICENSE-MIT + LICENSE-APACHE 를 `dist/` 로 복사 (crates/voltex_cli/src/build.rs, +4 tests).
 - **`cargo-deny` 통합** — license + advisory + duplicate 통합 스캔. 현재 cargo-audit + cargo-about 으로 대체 가능. v1.1+.
 - **parser panic-resistance fuzz** ✅ v1.0.8 — 21 신규 test (PNG/JPG/WAV/GLTF/OBJ), panic 0건. 외부 dep 없는 inline xorshift32.
 - **OGG/Vorbis lib.rs 등록** ✅ v1.0.9 — `pub mod ogg; pub mod vorbis;` 등록 + clippy 27→0 (자동 5 + #![allow] 6 파일 + 진짜 fix 4) + `decode_ogg_vorbis_bytes` 진입점. 숨겨진 테스트 회귀 2건 (ogg invalid_capture_pattern, vorbis bitreader_basics) fix. voltex_audio 89→119 tests.

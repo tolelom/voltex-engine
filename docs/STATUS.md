@@ -2262,16 +2262,20 @@ crates/
 - **games/voltex_survivor (D3, v1.0 flagship)** — 4개 Lua 스크립트 + scene 으로 게임 로직 100% 표현. WASD 이동 + 자동 발사 + wave 시스템.
 - examples/survivor_game (ECS + voltex_physics + voltex facade로 재작성, 2026-05-20 — 대조용 archive)
 
-## 다음 작업 후보 (2026-05-20 8-7 이후)
+## 다음 작업 후보 (2026-05-20 8-7 이후) — ✅ 8/8 전부 해소 (역사 기록용)
+
+> **이 목록은 백로그가 아니다.** 2026-05-20 시점의 후보였고 8개 항목 모두 완료됐다
+> (최종 확인 v1.0.110). 미완 작업은 `docs/DEFERRED.md` 를 볼 것. 6번의 "다음:"
+> 후속 아이디어(`get_world_transform`, Lua query iterator)만 아직 미구현이다.
 
 1. ~~**inspector 통합**~~ — ✅ Phase 8-6. 단일 `panels::*` 경로.
 2. ~~**scene 영속화 검증**~~ — ✅ Phase 8-7. 시드 엔티티가 `EditorCommand` dispatch 경로 통과 → 로그/Save/Load 일관성.
 3. ~~**EditorCommand 확장 추가**~~ — Undo/Redo ✅, AddChild/RemoveChild ✅, AddComponent/RemoveComponent ✅ E3 + 인스펙터 목록/Remove UI ✅ v1.0.89.
-4. **Despawn 정확한 undo** — 현재 v1은 history 클리어. `EntityAllocator::restore_at_generation(id, gen)` 추가 + 컴포넌트 스냅샷 백업 형태로 풀 undo 지원. World API 변경이라 별 commit 필요.
-5. ~~**viewport raycast 픽킹**~~ — ✅ Phase 8-7. 좌클릭 → ray cast → `session.selected` (sphere 근사). **gizmo (translate/rotate/scale 핸들)** 은 미구현 — 다음 chunk 후보.
+4. ~~**Despawn 정확한 undo**~~ — ✅ Cycle 12 (E3). `EntityAllocator::restore_at_generation(id, gen)` (`crates/voltex_ecs/src/entity.rs`) + 등록된 모든 컴포넌트 snapshot/restore 로 풀 undo. 슬롯이 이미 재사용된 경우 silent skip.
+5. ~~**viewport raycast 픽킹**~~ — ✅ Phase 8-7. 좌클릭 → ray cast → `session.selected`. ~~**gizmo (translate/rotate/scale 핸들)** 은 미구현~~ ✅ Cycle 3 (E1) — `crates/voltex_editor/src/gizmo/` (translate/rotate/scale 3축 핸들 + LINE 파이프라인, end-drag 시 SetTransform 단일 undo 엔트리).
 6. ~~**Lua API 확장**~~ — ✅ Phase 8-7 (15개 함수). 다음: get_world_transform, query 결과를 Lua iterator 로 노출 등.
 7. ~~**survivor_game을 ECS/Physics로 재작성**~~ — ✅ 완료 (2026-05-20).
-8. **메시 AABB 기반 picking** — 현재 v1은 sphere 근사. ECS Transform 외에 mesh bounds 컴포넌트가 들어오면 OBB/AABB picking 으로 업그레이드.
+8. ~~**메시 AABB 기반 picking**~~ — ✅ Cycle 3 (E1). `Bounds` 컴포넌트를 가진 entity 는 local AABB 8-corner 를 `WorldTransform` 으로 변환 후 ray vs AABB (`crates/voltex_editor/src/picking.rs`), 없으면 sphere fallback.
 
 ## 다른 기기에서 이어서 작업하기
 
