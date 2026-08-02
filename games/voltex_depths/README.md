@@ -12,8 +12,8 @@ cargo run -p voltex_depths            # 개발 빌드
 cargo run -p voltex_depths --release  # 릴리스
 ```
 
-`voltex build`(CLI 패키징)는 현재 데이터 주도 게임(scene + Lua) 전제라
-Rust 로직 게임은 못 탄다 — friction #8 참고.
+`voltex build`(CLI 패키징)도 지원한다 — v1.0.110의 `kind = "rust"` 빌드
+모드를 이 게임의 `voltex.toml`이 사용 중이다 (friction #8 해소).
 
 ## 조작
 

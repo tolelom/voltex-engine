@@ -5,7 +5,7 @@
 > 스크립팅, 멀티 OS 빌드 파이프라인까지 제공한다. 자세한 카운트와 정책은
 > 아래 "의존성 정책" 섹션 참고.
 
-![status: v1.0.55](https://img.shields.io/badge/status-v1.0.55-brightgreen)
+![status: v1.0.110](https://img.shields.io/badge/status-v1.0.110-brightgreen)
 ![clippy: 0 warnings](https://img.shields.io/badge/clippy-0%20warnings-brightgreen)
 ![audit: 0 vulnerabilities](https://img.shields.io/badge/cargo--audit-0%20vulnerabilities-brightgreen)
 ![coverage: 82%](https://img.shields.io/badge/coverage-82%25%20lib-brightgreen)
