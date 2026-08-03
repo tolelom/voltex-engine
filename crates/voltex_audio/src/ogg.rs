@@ -22,7 +22,40 @@ pub struct OggPage {
     pub data: Vec<u8>,
 }
 
+/// Byte range of a page's own checksum field, which reads as zero while the
+/// checksum is being computed (RFC 3533 § 6).
+const CRC_FIELD: std::ops::Range<usize> = 22..26;
+
+/// OGG's CRC-32: polynomial `0x04c11db7`, zero initial value, no input or
+/// output reflection and no final inversion — *not* the zlib/PNG variant.
+///
+/// `page` must be exactly one whole page (header + segment table + body); its
+/// checksum field is treated as zero, so the result is comparable against the
+/// value stored there. Computed a bit at a time: page checksumming is far
+/// cheaper than the decode that follows it, so a lookup table would not pay
+/// for itself.
+fn page_crc32(page: &[u8]) -> u32 {
+    let mut crc: u32 = 0;
+    for (i, &raw) in page.iter().enumerate() {
+        let byte = if CRC_FIELD.contains(&i) { 0 } else { raw };
+        crc ^= (byte as u32) << 24;
+        for _ in 0..8 {
+            crc = if crc & 0x8000_0000 != 0 {
+                (crc << 1) ^ 0x04c1_1db7
+            } else {
+                crc << 1
+            };
+        }
+    }
+    crc
+}
+
 /// Parse all OGG pages from raw bytes.
+///
+/// Each page's CRC is verified — a mismatch is an error rather than a warning,
+/// because the alternative is handing corrupted bytes to the Vorbis decoder,
+/// which degrades damaged frames to silence and would report the damage (if at
+/// all) as a codec fault rather than a damaged file.
 pub(crate) fn parse_ogg_pages(data: &[u8]) -> crate::Result<Vec<OggPage>> {
     let mut pages = Vec::new();
     let mut offset = 0;
@@ -74,7 +107,12 @@ pub(crate) fn parse_ogg_pages(data: &[u8]) -> crate::Result<Vec<OggPage>> {
             data[offset + 21],
         ]);
 
-        // CRC at offset+22..+26 (skip verification for simplicity)
+        let stored_crc = u32::from_le_bytes([
+            data[offset + 22],
+            data[offset + 23],
+            data[offset + 24],
+            data[offset + 25],
+        ]);
 
         let segment_count = data[offset + 26] as usize;
 
@@ -91,7 +129,17 @@ pub(crate) fn parse_ogg_pages(data: &[u8]) -> crate::Result<Vec<OggPage>> {
             return Err("OGG page data extends beyond file".into());
         }
 
-        let page_data = data[data_start..data_start + total_data_size].to_vec();
+        let page_end = data_start + total_data_size;
+        let actual_crc = page_crc32(&data[offset..page_end]);
+        if actual_crc != stored_crc {
+            return Err(format!(
+                "OGG page {} failed CRC check (stored 0x{:08X}, computed 0x{:08X}) — file is corrupt",
+                page_sequence, stored_crc, actual_crc
+            )
+            .into());
+        }
+
+        let page_data = data[data_start..page_end].to_vec();
 
         pages.push(OggPage {
             header_type,
@@ -103,7 +151,7 @@ pub(crate) fn parse_ogg_pages(data: &[u8]) -> crate::Result<Vec<OggPage>> {
             data: page_data,
         });
 
-        offset = data_start + total_data_size;
+        offset = page_end;
     }
 
     if pages.is_empty() {
@@ -213,6 +261,10 @@ mod tests {
         // Data
         out.extend_from_slice(&page_data);
 
+        // Checksum last — it covers the finished page.
+        let crc = page_crc32(&out);
+        out[CRC_FIELD].copy_from_slice(&crc.to_le_bytes());
+
         out
     }
 
@@ -268,6 +320,56 @@ mod tests {
         let packets = parse_ogg(&page_bytes).expect("parse_ogg failed");
         assert_eq!(packets.len(), 1);
         assert_eq!(packets[0], large_packet);
+    }
+
+    #[test]
+    fn crc32_matches_the_reference_vector() {
+        // Check value of the standard "123456789" input under OGG's parameters
+        // (poly 0x04c11db7, init 0, no reflection, no final xor). Pinning it
+        // catches a silent swap to the reflected zlib/PNG variant, which would
+        // reject every real file rather than only corrupt ones.
+        //
+        // These parameters were confirmed against a libvorbis-encoded file:
+        // `page_crc32` reproduced all 9 stored page checksums exactly. Nothing
+        // in this repo is a real encoder, so that check cannot live in CI —
+        // this vector is the standing guard for it.
+        assert_eq!(page_crc32(b"123456789"), 0x89A1_897F);
+    }
+
+    #[test]
+    fn tampered_page_body_is_rejected() {
+        let mut page = build_ogg_page(0x02, 0, 1, 0, &[b"payload bytes"]);
+        parse_ogg_pages(&page).expect("untouched page must parse");
+
+        let last = page.len() - 1;
+        page[last] ^= 0x01;
+
+        let err = parse_ogg_pages(&page).expect_err("a flipped bit must be caught");
+        assert!(
+            err.to_string().contains("CRC"),
+            "expected a CRC diagnosis, got: {}",
+            err
+        );
+    }
+
+    #[test]
+    fn tampered_page_header_is_rejected() {
+        // Header fields are covered too — a rewritten granule position or
+        // serial number must not slip through.
+        let mut page = build_ogg_page(0x02, 0, 1, 0, &[b"payload bytes"]);
+        page[6] ^= 0xFF; // granule position, low byte
+
+        assert!(parse_ogg_pages(&page).is_err());
+    }
+
+    #[test]
+    fn zeroed_checksum_field_is_rejected() {
+        // Pages written by a lazy encoder that leaves the field blank are not
+        // silently accepted — otherwise the check buys nothing.
+        let mut page = build_ogg_page(0x02, 0, 1, 0, &[b"payload bytes"]);
+        page[22..26].copy_from_slice(&[0u8; 4]);
+
+        assert!(parse_ogg_pages(&page).is_err());
     }
 
     #[test]

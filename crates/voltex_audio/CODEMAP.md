@@ -43,6 +43,7 @@
 - ALSA / CoreAudio 초기화 실패 시 `make_backend()` 가 stderr 에 경고 출력 후 `NullBackend` 로 fallback — 헤드리스 환경에서도 audio 스레드 panic 없음.
 - CoreAudio (`backend::CoreAudioBackend`, cfg(target_os = "macos") only): AudioToolbox 의 AudioQueue API 사용. `#[link(name = "AudioToolbox", kind = "framework")]` — macOS 표준 framework 라 별도 설치 불필요. f32 LE stereo @48kHz 고정. 4 buffer × 1024 frame Condvar 동기화로 push-style trait 에 wrap.
 - ALSA / CoreAudio 둘 다 Windows dev 머신에서 작성됨 → 각 OS 에서 실제 cargo build + audio_demo 검증은 향후 (P1 spec § 8.1, B3 spec § 6).
+- `parse_ogg_pages` 는 페이지마다 CRC 를 검증하고 불일치는 **에러** — 깨진 바이트를 Vorbis 디코더에 넘기면 손상 프레임이 무음으로 degrade 돼 "파일 손상" 이 "코덱 실패" 로 오진된다. CRC 는 OGG 전용 파라미터(poly 0x04c11db7, init 0, 무반사, xorout 없음)라 zlib/PNG CRC 와 다르다 — 실 libvorbis 파일 9 페이지로 검증, `crc32_matches_the_reference_vector` 가 상시 가드
 - vorbis는 src/vorbis/ 디렉토리로 분리됨 (bit_reader, codebook, floor, residue, headers, imdct, decoder)
 - `decode_vorbis` 는 개별 audio 패킷 디코드 실패를 **건너뛰지만**(손상된 한 프레임이 클립 전체를 날리지 않도록), 모든 audio 패킷이 실패하면 첫 에러를 `Err` 로 반환한다 — 빈 클립은 호출부에서 "의도된 무음" 과 구분이 안 되기 때문. 패킷 내부의 floor/residue 실패는 여전히 해당 채널 무음으로 degrade (`decoder.rs`)
 - wasapi.rs는 521줄 (spec 만족, 분리 대상 아님)
@@ -52,4 +53,4 @@
 - 단위 테스트: src/**/*.rs `#[cfg(test)]`
 - 통합 테스트: `tests/ogg_vorbis_decode.rs` — 코드로 생성한 실제 Ogg/Vorbis 파일(실 CRC + spec 형태 setup 헤더)을 `decode_ogg_vorbis_bytes` 로 끝까지 디코드하는 회귀 5개. 여기 fixture 를 고칠 땐 디코더에 맞추지 말고 spec 에 맞춰야 한다 (그래야 디코더 drift 를 잡는다)
 - 실행: `cargo test -p voltex_audio --lib`
-- 현재 테스트 개수: 134개 (Windows host 기준; VoiceId/stop_voice/apply_command +2 포함). B3 의 CoreAudio 테스트 +2 는 macOS host 에서만 컴파일/실행 (cfg(target_os = "macos")).
+- 현재 테스트 개수: lib 138개 + 통합 5개 (Windows host 기준; VoiceId/stop_voice/apply_command +2, OGG CRC +4 포함). B3 의 CoreAudio 테스트 +2 는 macOS host 에서만 컴파일/실행 (cfg(target_os = "macos")).
