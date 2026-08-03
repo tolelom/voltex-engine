@@ -10,6 +10,43 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## [Unreleased] — OGG/Vorbis 디코드 경로 실검증 + 그 과정에서 드러난 갭 2건
+
+DEFERRED 의 "실제 `.ogg` 파일 디코드 검증" 항목 처리. 버전 미부여 (릴리스
+태그는 별도 결정).
+
+### Additive
+
+- **voltex_audio `tests/ogg_vorbis_decode.rs`** — 코드로 생성한 실 Ogg/Vorbis I
+  스트림을 `decode_ogg_vorbis_bytes` 로 끝까지 디코드하는 통합 회귀 5개.
+  실 CRC 페이지 프레이밍 + spec 형태 setup 헤더(flat 256-entry codebook /
+  floor type 1 / residue type 2 / 2 modes) + 지정 MDCT 스펙트럼 audio 패킷.
+  종전엔 100 바이트 이하 합성 입력의 *거부*만 검증돼 컨테이너 → 헤더 →
+  codebook/floor/residue → IMDCT → overlap-add 전 구간이 무검증이었다.
+  fixture 는 디코더가 읽는 순서가 아니라 spec 레이아웃 기준으로 작성 —
+  디코더가 spec 에서 벗어나면 테스트가 깨진다.
+
+### Fix
+
+- **voltex_audio `decode_vorbis`** — audio 패킷 디코드 실패를 전부 조용히
+  삼켜 모든 패킷이 깨진 파일도 `Ok(빈 클립)` 이었다. 호출부는 이걸 "의도된
+  무음" 과 구분할 수 없어 손상 파일이 무진단 무음으로 재생됐다. 개별 패킷
+  skip 은 유지(잘린 tail 은 흔함), 성공 0개일 때만 첫 에러 반환. 호출부
+  3곳 모두 이미 Err 를 로그 + graceful degrade 처리라 새 실패 경로 없음.
+- **voltex_audio `parse_ogg_pages`** — 컨테이너의 유일한 무결성 검사인 페이지
+  CRC 를 통째로 건너뛰고 있었다("skip verification for simplicity"). `page_crc32`
+  (poly 0x04c11db7, init 0, 무반사, xorout 없음 — zlib/PNG 변종 아님) 신설 +
+  불일치 시 page sequence 와 양쪽 값을 담은 에러. 실 libvorbis 인코딩 파일의
+  저장된 페이지 체크섬 9개를 정확히 재현함을 확인했고, 레포에 실 인코더가
+  없어 CI 에 못 넣는 그 검증을 대신할 체크값(0x89A1897F)을 테스트에 고정.
+
+### 남은 것
+
+- libvorbis 인코딩 실 파일 디코드는 여전히 미검증 — 이 디코더가 VQ codebook /
+  채널 커플링 미구현이라 디코더 확장이 선행 조건. audio_demo 통합도 미실시.
+
+---
+
 ## [v1.0.110] — 2026-07-07 — 도그푸딩 마찰 일괄 해소 (friction 9/9)
 
 Voltex Depths 도그푸딩이 남긴 마찰 6건(P1 4 + P2 2)을 한 세션에서 해소 +
