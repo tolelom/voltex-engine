@@ -354,6 +354,33 @@ fn tone_ogg_decodes_to_the_expected_waveform() {
 }
 
 #[test]
+fn ogg_whose_audio_packets_all_fail_is_an_error() {
+    // A leading 1 bit marks the packet as a header, which no audio frame may
+    // be. Before, a stream like this decoded to `Ok` with zero samples, so a
+    // corrupt file was indistinguishable from a deliberately silent one.
+    let broken = vec![vec![0xFF_u8; 8], vec![0xFF_u8; 8]];
+    let file = ogg_vorbis_file(&broken);
+
+    let err = decode_ogg_vorbis_bytes(&file).expect_err("expected a decode error");
+    let msg = err.to_string();
+    assert!(
+        msg.contains("all 2 audio packet(s)"),
+        "error should name the all-failed case, got: {msg}"
+    );
+}
+
+#[test]
+fn ogg_with_one_broken_audio_packet_keeps_the_frames_that_decoded() {
+    // Partial damage must stay survivable: a truncated tail costs its own
+    // frame, not the whole clip.
+    let packet = audio_packet(&tone_spectrum());
+    let file = ogg_vorbis_file(&[packet.clone(), packet, vec![0xFF_u8; 8]]);
+
+    let clip = decode_ogg_vorbis_bytes(&file).expect("partial damage must still decode");
+    assert_eq!(clip.samples.len(), N_HALF, "one good overlap-added frame");
+}
+
+#[test]
 fn zero_residue_ogg_decodes_to_exact_silence() {
     // Control for the test above: same stream, same floor, empty spectrum.
     // If that test's signal came from anywhere other than the residue we

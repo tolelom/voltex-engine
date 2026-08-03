@@ -37,7 +37,10 @@ use headers::{parse_id_header, parse_setup_header};
 /// 2. Comment header (skipped)
 /// 3. Setup header
 ///
-/// All subsequent packets are audio packets.
+/// All subsequent packets are audio packets. A packet that fails to decode is
+/// skipped so a single damaged frame costs one frame of audio rather than the
+/// whole clip — but if *every* audio packet fails the first error is returned,
+/// since an empty clip is indistinguishable from silence at the call site.
 pub fn decode_vorbis(packets: &[Vec<u8>]) -> crate::Result<AudioClip> {
     if packets.len() < 3 {
         return Err("Need at least 3 Vorbis packets (id, comment, setup)".into());
@@ -59,15 +62,32 @@ pub fn decode_vorbis(packets: &[Vec<u8>]) -> crate::Result<AudioClip> {
     let mut prev_window: Vec<Vec<f32>> = Vec::new();
     let mut prev_block_flag: Option<bool> = None;
 
-    for packet in &packets[3..] {
+    let audio_packets = &packets[3..];
+    let mut decoded = 0usize;
+    let mut first_error: Option<crate::AudioError> = None;
+
+    for packet in audio_packets {
         match decode_audio_packet(packet, &id, &setup, &mut prev_window, &mut prev_block_flag) {
             Ok(samples) => {
+                decoded += 1;
                 all_samples.extend_from_slice(&samples);
             }
-            Err(_e) => {
-                // Skip problematic audio packets silently
-                // In production we might log the error
+            Err(e) => {
+                // Tolerate isolated bad frames — a truncated tail is common —
+                // but keep the first cause for the all-failed case below.
+                first_error.get_or_insert(e);
             }
+        }
+    }
+
+    if decoded == 0 {
+        if let Some(e) = first_error {
+            return Err(format!(
+                "Vorbis: all {} audio packet(s) failed to decode: {}",
+                audio_packets.len(),
+                e
+            )
+            .into());
         }
     }
 
