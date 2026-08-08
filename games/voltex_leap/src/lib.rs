@@ -4,3 +4,5 @@
 pub mod level;
 
 pub mod physics2d;
+
+pub mod components;
