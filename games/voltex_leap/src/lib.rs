@@ -8,3 +8,5 @@ pub mod physics2d;
 pub mod components;
 
 pub mod enemy;
+
+pub mod game_state;

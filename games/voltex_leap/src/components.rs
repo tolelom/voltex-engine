@@ -44,6 +44,10 @@ pub struct DoorMarker;
 #[derive(Debug, Clone, Copy)]
 pub struct Spike;
 
+/// 수집한 코인 수 (플레이어 엔티티에 부착).
+#[derive(Debug, Clone, Copy, Default)]
+pub struct CoinCount(pub u32);
+
 /// [`player_control`]이 보고하는 프레임 이벤트 (SFX/파티클 트리거용).
 #[derive(Debug, Default, Clone, Copy)]
 pub struct PlayerEvents {
