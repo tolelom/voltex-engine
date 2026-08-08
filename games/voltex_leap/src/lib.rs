@@ -2,3 +2,5 @@
 //! 설계: docs/superpowers/specs/2026-08-09-voltex-leap-game-design.md
 
 pub mod level;
+
+pub mod physics2d;
