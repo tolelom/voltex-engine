@@ -1,0 +1,15 @@
+[package]
+name = "voltex_leap"
+version = "0.1.0"
+edition = "2021"
+license.workspace = true
+# gen_assets 바이너리와 공존 — `cargo run -p voltex_leap`가 게임을 실행하도록 고정
+default-run = "voltex_leap"
+
+[dependencies]
+voltex.workspace = true
+voltex_runtime.workspace = true
+env_logger = { workspace = true }
+
+[dev-dependencies]
+voltex_capture.workspace = true
