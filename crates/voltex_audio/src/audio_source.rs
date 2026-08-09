@@ -60,9 +60,17 @@ impl AudioSource {
     pub fn looping(mut self) -> Self { self.looping = true; self }
 
     /// Starts playback (resets the `played_once` latch).
+    ///
+    /// Also clears `active` so the next `audio_sync_system` tick sees a fresh
+    /// play edge — without this, a source whose clip already finished (which
+    /// leaves `active == true`, since the mixer has no completion feedback
+    /// into the ECS) could never be re-triggered. Re-playing while the voice
+    /// is still audible restarts the clip (the sync system stops the
+    /// overwritten voice).
     pub fn play(&mut self) {
         self.playing = true;
         self.played_once = false;
+        self.active = false;
     }
 
     /// Stops playback (does not reset `played_once`).

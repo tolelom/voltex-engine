@@ -603,6 +603,11 @@ impl RuntimeApp {
     /// then JSON; via the configured `Vfs` if any, else disk). Existing
     /// entities are cleared first.
     pub fn load_scene(&mut self, path: &str) -> RuntimeResult<()> {
+        // clear()는 entity allocator를 리셋해 핸들이 (0,0)부터 재발급된다 —
+        // 재사용 핸들은 orphan sweep이 못 잡으므로 남은 voice를 먼저 전부 stop.
+        if let Some(audio) = self.audio.as_ref() {
+            self.audio_voices.stop_all(audio);
+        }
         self.world.clear();
         // Give previously-failed TexturePath/MeshPath/AudioPath resolves
         // another chance on every scene load (the file may exist by now). The
