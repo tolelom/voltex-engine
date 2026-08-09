@@ -10,10 +10,31 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
-## [Unreleased] — OGG/Vorbis 디코드 경로 실검증 + 그 과정에서 드러난 갭 2건
+## v1.0.111 — 2026-08-09 — 도그푸딩 게임 2편: Voltex Leap (2D 스택) + OGG 실검증
 
-DEFERRED 의 "실제 `.ogg` 파일 디코드 검증" 항목 처리. 버전 미부여 (릴리스
-태그는 별도 결정).
+### Additive — `games/voltex_leap` (2D 사이드뷰 플랫포머)
+
+엔진 2D 스택(v1.0.60: orthographic, `Sprite`, `SpriteAnimation`, `Particle`,
+`Lifetime`, `add_texture_png`)의 첫 실게임 도그푸딩. 게임 로직 100% Rust.
+ASCII 맵 → 타일 레벨, 중력 + AABB 축 분리 타일 충돌(자체 `physics2d`), 순찰
+워커 2, 가시/코인/문, 점프·착지 먼지 + 코인 스파클 파티클, 상태별(idle/run/
+jump) 스프라이트 시트 전환 + uv 스왑 좌우 반전, 절차 생성 SFX 5종 + BGM +
+스프라이트시트 PNG(`bin/gen_assets`), 직교 카메라 플레이어 추적, HUD.
+
+- **검증**: 단위 16 + 헤드리스 풀 플레이스루(`tests/playthrough.rs` — 봇이
+  본편 MAP을 실클리어 + 사망/재시작 리셋) + GPU 시각 회귀(`tests/visual.rs`,
+  RTX 4080 — 가시/문/코인 색 비율 + `docs/visual/leap_level.png`) + 8초
+  스모크 런 (panic/validation 0, 시트 4장 로드 확인).
+- **마찰 로그 신설**: `docs/dogfood-friction-2.md` — 6건 (P1 3: SpriteAnimation
+  프레임 오프셋 부재 / Sprite flip 1급 지원 부재 / render_world 직교 미지원,
+  P2 3: 2D 타일 충돌 헬퍼 / 타일맵 배치 렌더 / 빌보드 z-rot). 지난 사이클
+  개선(gpu_init·asset_root·audio 시드·orphan voice)은 전부 우회 없이 동작.
+- 스펙: `docs/superpowers/specs/2026-08-09-voltex-leap-game-design.md`,
+  플랜: `docs/superpowers/plans/2026-08-09-voltex-leap.md`.
+
+### (이월) OGG/Vorbis 디코드 경로 실검증 + 그 과정에서 드러난 갭 2건
+
+DEFERRED 의 "실제 `.ogg` 파일 디코드 검증" 항목 처리.
 
 ### Additive
 

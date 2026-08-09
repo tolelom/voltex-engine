@@ -173,6 +173,26 @@
 
 v1.0.9 부터는 **서비스 배포 완성도** 로드맵 (`docs/superpowers/specs/2026-05-21-service-readiness-roadmap.md`) 기준으로 진행.
 
+### 2026-08-09 — 도그푸딩 게임 2편: Voltex Leap (v1.0.111)
+
+`games/voltex_leap` — 2D 사이드뷰 플랫포머. 2D 스택(v1.0.60)의 첫 실게임
+검증: orthographic 카메라 + 플레이어 X 추적, ASCII 타일 레벨, 자체 2D
+물리(중력 + AABB 축 분리 타일 충돌 + 접지 프로브), 순찰 워커, 가시/코인/문,
+상태별 스프라이트 시트(idle/run/jump) 전환 + uv 스왑 좌우 반전, 파티클
+(점프 먼지/코인 스파클), 절차 생성 에셋(`bin/gen_assets` — SFX 5 + BGM +
+시트 PNG 4), HUD. 게임 로직 100% Rust (depths 미러 구조).
+
+- **검증**: 단위 16 + 헤드리스 풀 플레이스루(봇이 본편 MAP 실클리어 —
+  "이 레벨은 클리어 가능"이 테스트로 보증) + GPU 시각 회귀
+  (`docs/visual/leap_level.png`) + 스모크 런 그린.
+- **새 마찰 로그**: `docs/dogfood-friction-2.md` — 6건 (P1 3 + P2 3).
+  진행을 막은 마찰은 0건, 지난 사이클 개선 항목들은 전부 우회 없이 동작.
+  P1 요지: SpriteAnimation 프레임 오프셋 부재(상태별 시트 분리 강제),
+  Sprite flip 1급 지원 부재(tick 순서 의존 uv 재적용), render_world 직교
+  미지원. 다음 엔진 사이클 입력.
+- 스펙/플랜: `docs/superpowers/specs/2026-08-09-voltex-leap-game-design.md`,
+  `docs/superpowers/plans/2026-08-09-voltex-leap.md`.
+
 ### 2026-07-07 — 도그푸딩 마찰 일괄 해소 9/9 (v1.0.110)
 
 Depths friction 로그의 잔여 6건(P1 4 + P2 2)을 TDD로 일괄 해소 + 미배선 모듈
