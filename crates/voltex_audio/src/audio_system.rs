@@ -490,13 +490,15 @@ mod tests {
         let mut clips = vec![silence_clip()];
         let mut listener = Listener::default();
         let mut mixer = MixerState::new();
-        let mut apply = |cmd| apply_command(cmd, &mut playing, &mut clips, &mut listener, &mut mixer);
-
         let v1 = VoiceId(1);
         let v2 = VoiceId(2);
-        assert!(!apply(AudioCommand::Play { clip_index: 0, volume: 1.0, looping: true, voice: v1 }));
-        assert!(!apply(AudioCommand::Play { clip_index: 0, volume: 1.0, looping: true, voice: v2 }));
-        drop(apply);
+        // 블록 스코프로 클로저의 가변 차용을 해제 (clippy drop_non_drop 회피).
+        {
+            let mut apply =
+                |cmd| apply_command(cmd, &mut playing, &mut clips, &mut listener, &mut mixer);
+            assert!(!apply(AudioCommand::Play { clip_index: 0, volume: 1.0, looping: true, voice: v1 }));
+            assert!(!apply(AudioCommand::Play { clip_index: 0, volume: 1.0, looping: true, voice: v2 }));
+        }
         assert_eq!(playing.len(), 2);
 
         // Stopping one voice leaves the other instance of the SAME clip alive —
