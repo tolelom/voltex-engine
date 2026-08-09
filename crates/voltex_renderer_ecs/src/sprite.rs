@@ -21,6 +21,11 @@ pub struct Sprite {
     /// Texture sub-rect `[u_min, v_min, u_max, v_max]` for sprite sheets.
     /// `[0, 0, 1, 1]` (default) samples the whole texture.
     pub uv_rect: [f32; 4],
+    /// Mirror horizontally at render time (e.g. a right-facing character
+    /// walking left). Display-only: `uv_rect` stays forward-oriented, so
+    /// sheet-frame updates ([`set_sheet_frame`](Self::set_sheet_frame),
+    /// [`update_sprite_animations`]) never fight the flip.
+    pub flip_x: bool,
 }
 
 impl Default for Sprite {
@@ -30,6 +35,7 @@ impl Default for Sprite {
             size: [1.0, 1.0],
             color: [1.0, 1.0, 1.0, 1.0],
             uv_rect: [0.0, 0.0, 1.0, 1.0],
+            flip_x: false,
         }
     }
 }
@@ -53,6 +59,17 @@ impl Sprite {
     pub fn with_uv_rect(mut self, uv_rect: [f32; 4]) -> Self {
         self.uv_rect = uv_rect;
         self
+    }
+
+    /// The uv rect the renderer should sample — [`Self::flip_x`] swaps the
+    /// u endpoints (the sprite shader lerps between them, so reversed
+    /// endpoints mirror cleanly).
+    pub fn effective_uv_rect(&self) -> [f32; 4] {
+        if self.flip_x {
+            [self.uv_rect[2], self.uv_rect[1], self.uv_rect[0], self.uv_rect[3]]
+        } else {
+            self.uv_rect
+        }
     }
 
     /// Point this sprite at frame `index` of a `cols × rows` sprite sheet
@@ -79,6 +96,9 @@ pub struct SpriteAnimation {
     pub cols: u32,
     /// Sheet grid rows.
     pub rows: u32,
+    /// First sheet cell of this clip (row-major index) — lets one sheet hold
+    /// several clips (idle/run/jump) selected by offset. `0` = sheet start.
+    pub first_frame: u32,
     /// Number of frames to play (≤ `cols * rows`).
     pub frame_count: u32,
     /// Playback speed in frames per second.
@@ -87,7 +107,8 @@ pub struct SpriteAnimation {
     pub time: f32,
     /// Whether playback is advancing.
     pub playing: bool,
-    /// Loop back to frame 0 at the end (else clamp to the last frame + stop).
+    /// Loop back to the clip's first frame at the end (else clamp to the
+    /// clip's last frame + stop).
     pub looping: bool,
 }
 
@@ -95,9 +116,16 @@ impl SpriteAnimation {
     /// A looping animation over the first `frame_count` cells of a
     /// `cols × rows` sheet at `fps` frames/sec.
     pub fn new(cols: u32, rows: u32, frame_count: u32, fps: f32) -> Self {
+        Self::clip(cols, rows, 0, frame_count, fps)
+    }
+
+    /// A looping animation over `frame_count` cells starting at sheet cell
+    /// `first_frame` (row-major) — one sheet, many clips.
+    pub fn clip(cols: u32, rows: u32, first_frame: u32, frame_count: u32, fps: f32) -> Self {
         Self {
             cols,
             rows,
+            first_frame,
             frame_count: frame_count.max(1),
             fps,
             time: 0.0,
@@ -135,7 +163,7 @@ pub fn update_sprite_animations(world: &mut World, dt: f32) {
             raw
         };
         if let Some(s) = world.get_mut::<Sprite>(e) {
-            s.set_sheet_frame(anim.cols, anim.rows, frame);
+            s.set_sheet_frame(anim.cols, anim.rows, anim.first_frame + frame);
         }
         if let Some(slot) = world.get_mut::<SpriteAnimation>(e) {
             *slot = anim;
@@ -193,6 +221,52 @@ mod tests {
         update_sprite_animations(&mut world, 0.5);
         assert_eq!(world.get::<Sprite>(e).unwrap().uv_rect, [0.5, 0.0, 1.0, 0.5]);
         assert!(world.get::<SpriteAnimation>(e).unwrap().playing);
+    }
+
+    #[test]
+    fn flip_x_swaps_u_endpoints_at_render_time_only() {
+        let mut s = Sprite::default();
+        s.set_sheet_frame(2, 2, 1); // TR quadrant [0.5, 0, 1, 0.5]
+        assert_eq!(s.effective_uv_rect(), [0.5, 0.0, 1.0, 0.5]);
+        s.flip_x = true;
+        // 표시용 uv만 반전 — 저장된 uv_rect는 정방향 유지 (애니 시스템 소유).
+        assert_eq!(s.effective_uv_rect(), [1.0, 0.0, 0.5, 0.5]);
+        assert_eq!(s.uv_rect, [0.5, 0.0, 1.0, 0.5]);
+        // set_sheet_frame이 flip을 파괴하지 않는다.
+        s.set_sheet_frame(2, 2, 0);
+        assert!(s.flip_x);
+        assert_eq!(s.effective_uv_rect(), [0.5, 0.0, 0.0, 0.5]);
+    }
+
+    #[test]
+    fn clip_plays_from_first_frame_offset() {
+        let (mut world, e) = anim_world();
+        // 4x2 시트에서 클립 = 프레임 4..6 (2프레임, 10fps).
+        if let Some(a) = world.get_mut::<SpriteAnimation>(e) {
+            *a = SpriteAnimation::clip(4, 2, 4, 2, 10.0);
+        }
+        // 0.05s → raw 0 → 표시 프레임 4 (2행 좌단).
+        update_sprite_animations(&mut world, 0.05);
+        assert_eq!(world.get::<Sprite>(e).unwrap().uv_rect, [0.0, 0.5, 0.25, 1.0]);
+        // +0.1s → raw 1 → 표시 프레임 5.
+        update_sprite_animations(&mut world, 0.1);
+        assert_eq!(world.get::<Sprite>(e).unwrap().uv_rect, [0.25, 0.5, 0.5, 1.0]);
+        // 루프 wrap은 클립 내부: +0.1s → raw 2 → 2 % 2 = 0 → 프레임 4.
+        update_sprite_animations(&mut world, 0.1);
+        assert_eq!(world.get::<Sprite>(e).unwrap().uv_rect, [0.0, 0.5, 0.25, 1.0]);
+    }
+
+    #[test]
+    fn non_looping_clip_clamps_to_clip_end() {
+        let (mut world, e) = anim_world();
+        if let Some(a) = world.get_mut::<SpriteAnimation>(e) {
+            *a = SpriteAnimation::clip(4, 2, 4, 2, 10.0);
+            a.looping = false;
+        }
+        update_sprite_animations(&mut world, 1.0); // 클립 끝을 지나침
+        // 클립 마지막 프레임(5)에 고정 + 정지.
+        assert_eq!(world.get::<Sprite>(e).unwrap().uv_rect, [0.25, 0.5, 0.5, 1.0]);
+        assert!(!world.get::<SpriteAnimation>(e).unwrap().playing);
     }
 
     #[test]
