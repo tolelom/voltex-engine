@@ -517,3 +517,29 @@ fn redo_spawn_then_undo_cleans_up_the_new_entity() {
     cleanup(&scene);
 }
 
+
+#[test]
+fn redo_chain_survives_spawn_remap() {
+    let scene = temp_path("voltex_redo_chain.vscn");
+    cleanup(&scene);
+    let mut session = EditorSession::new(scene.clone());
+
+    // Spawn → SetTag → 두 번 undo → 두 번 redo.
+    let e = session.dispatch(EditorCommand::Spawn).unwrap();
+    session
+        .dispatch(EditorCommand::SetTag { entity: e, tag: "Hero".into() })
+        .unwrap();
+    assert!(session.undo(), "undo SetTag");
+    assert!(session.undo(), "undo Spawn");
+
+    // redo Spawn은 새 generation의 엔티티를 배정한다 — 남은 redo 항목
+    // (SetTag)의 옛 핸들이 리매핑되지 않으면 EntityNotAlive로 조용히 유실.
+    assert!(session.redo(), "redo Spawn");
+    assert!(session.redo(), "redo SetTag must survive the entity remap");
+    let tagged = session
+        .world
+        .find_by_tag("Hero")
+        .expect("redone tag lands on the respawned entity");
+    assert!(session.world.is_alive(tagged));
+    cleanup(&scene);
+}

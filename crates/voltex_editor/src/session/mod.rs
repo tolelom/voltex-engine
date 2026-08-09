@@ -29,6 +29,50 @@ pub enum EditorMode {
 /// The inverse of a dispatched command. The undo stack stores one of these per
 /// undoable command. Only SaveScene/LoadScene clear the history (no tractable
 /// inverse). Despawn became undoable in E3 via the `RestoreEntity` variant.
+/// Spawn redo가 배정받은 새 엔티티로, redo 스택에 남은 항목들의 옛 핸들
+/// 참조를 치환한다 (forward + inverse 양쪽). 없으면 남은 체인이
+/// `EntityNotAlive`로 조용히 끊긴다.
+fn remap_entity_refs(
+    stack: &mut [(EditorCommand, Inverse)],
+    old: Entity,
+    new: Entity,
+) {
+    fn fix(e: &mut Entity, old: Entity, new: Entity) {
+        if *e == old {
+            *e = new;
+        }
+    }
+    for (forward, inverse) in stack.iter_mut() {
+        match forward {
+            EditorCommand::Despawn { entity }
+            | EditorCommand::SetTransform { entity, .. }
+            | EditorCommand::SetTag { entity, .. }
+            | EditorCommand::AddComponent { entity, .. }
+            | EditorCommand::RemoveComponent { entity, .. } => fix(entity, old, new),
+            EditorCommand::AddChild { parent, child }
+            | EditorCommand::RemoveChild { parent, child } => {
+                fix(parent, old, new);
+                fix(child, old, new);
+            }
+            EditorCommand::Spawn
+            | EditorCommand::SaveScene { .. }
+            | EditorCommand::LoadScene { .. } => {}
+        }
+        match inverse {
+            Inverse::DespawnSpawned(entity)
+            | Inverse::SetTransform { entity, .. }
+            | Inverse::SetTag { entity, .. }
+            | Inverse::RemoveComponentByName { entity, .. }
+            | Inverse::AddComponentByBytes { entity, .. }
+            | Inverse::RestoreEntity { entity, .. } => fix(entity, old, new),
+            Inverse::RemoveChild { parent, child } | Inverse::AddChild { parent, child } => {
+                fix(parent, old, new);
+                fix(child, old, new);
+            }
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 enum Inverse {
     /// Undo Spawn: despawn the entity that was just created.
@@ -267,8 +311,17 @@ impl EditorSession {
             // `DespawnSpawned(old_entity)` inverse refers to the *previous*
             // entity (now dead) — applying it later would silent-no-op and
             // leak the newly-redo'd entity. Patch the inverse so the next
-            // undo targets the right slot.
+            // undo targets the right slot, and remap the old handle in every
+            // remaining redo entry — their forward commands still hold the
+            // stale (id, gen) and would fail `EntityNotAlive`, silently
+            // dropping the rest of the redo chain.
             let patched_inverse = match (&forward, inverse) {
+                (EditorCommand::Spawn, Inverse::DespawnSpawned(old)) => {
+                    if old != applied_entity {
+                        remap_entity_refs(&mut self.redo_stack, old, applied_entity);
+                    }
+                    Inverse::DespawnSpawned(applied_entity)
+                }
                 (EditorCommand::Spawn, _) => Inverse::DespawnSpawned(applied_entity),
                 (_, inv) => inv,
             };
