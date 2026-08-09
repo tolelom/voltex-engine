@@ -1,8 +1,7 @@
 //! GPU 시각 회귀: 2D 레벨이 실제 픽셀로 렌더되는지 (GPU 머신에서 -- --ignored).
 //!
-//! `render_world`는 perspective 고정 계약(FOV 45°)이라 게임의 직교 카메라를
-//! 재현할 수 없다 — dogfood-friction-2 로그 대상. 여기선 perspective 원거리
-//! 샷으로 색 비율만 단언한다.
+//! `render_world_ortho`(friction-2 #3 해소분)로 게임과 동일한 직교 구도
+//! (ORTHO_HEIGHT 12, 플레이어 스폰 부근)를 재현해 단언한다.
 use voltex::prelude::*;
 use voltex_capture::{HeadlessGpu, ImageStats};
 use voltex_leap::game_state::spawn_level;
@@ -22,15 +21,17 @@ fn level_scene_renders_tiles_spikes_door_coins() {
     let map = LevelMap::parse(MAP).unwrap();
     let mut world = World::new();
     spawn_level(&mut world, &map);
-    // 레벨 전폭(48유닛)이 잡히게 뒤로 뺀 perspective 샷 (yaw 0 → -Z 방향).
-    let rgba = voltex_capture::render_world(
+    // 게임 화면과 동일한 직교 구도(뷰 높이 12 → 폭 ~21.3): 가시(34-35) +
+    // 코인(40) + 문(45)이 모두 드는 x=40 중심 구간 (yaw 0 → -Z 방향).
+    let rgba = voltex_capture::render_world_ortho(
         &gpu,
         640,
         360,
         &mut world,
-        Vec3::new(24.0, 4.0, 34.0),
+        Vec3::new(40.0, 4.0, 10.0),
         0.0,
         0.0,
+        12.0,
     );
     let stats = ImageStats::analyze(&rgba);
     eprintln!("leap frame stats: {stats:?}");

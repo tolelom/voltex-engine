@@ -1,9 +1,8 @@
 //! 절차 생성 에셋: SFX/BGM wav + 스프라이트시트 PNG.
 //! `cargo run -p voltex_leap --bin gen_assets` 로 assets/ 재생성.
 //!
-//! 애니메이션 상태(idle/run/jump)별로 시트를 분리하는 이유:
-//! `SpriteAnimation`은 시트의 `0..frame_count` 프리픽스만 재생 가능
-//! (시작 프레임 오프셋/행 선택 없음) — dogfood-friction-2 #1.
+//! 플레이어는 단일 8×1 시트 — idle 0-1 / run 2-5 / jump 6 / 여분 7.
+//! 클립 선택은 `SpriteAnimation::clip`의 first_frame (friction-2 #1 해소 검증).
 use std::f32::consts::TAU;
 use std::io::Write;
 
@@ -163,22 +162,17 @@ fn main() -> std::io::Result<()> {
     }
     write_wav(&format!("{dir}/bgm.wav"), &bgm)?;
 
-    // ---- 스프라이트시트
-    let mut idle = Sheet::new(2); // 숨쉬기 bob
-    draw_player(&mut idle, 0, (0, 0), 0, false);
-    draw_player(&mut idle, 1, (0, 0), 1, false);
-    idle.save(&format!("{dir}/player_idle.png"))?;
-
-    let mut run = Sheet::new(4); // 다리 위상 4프레임
-    draw_player(&mut run, 0, (-2, 2), 0, false);
-    draw_player(&mut run, 1, (0, 0), 1, false);
-    draw_player(&mut run, 2, (2, -2), 0, false);
-    draw_player(&mut run, 3, (0, 0), 1, false);
-    run.save(&format!("{dir}/player_run.png"))?;
-
-    let mut jump = Sheet::new(1);
-    draw_player(&mut jump, 0, (0, 0), 0, true);
-    jump.save(&format!("{dir}/player_jump.png"))?;
+    // ---- 스프라이트시트 (플레이어 단일 시트: idle 0-1 / run 2-5 / jump 6)
+    let mut player = Sheet::new(8);
+    draw_player(&mut player, 0, (0, 0), 0, false); // idle a
+    draw_player(&mut player, 1, (0, 0), 1, false); // idle b (숨쉬기 bob)
+    draw_player(&mut player, 2, (-2, 2), 0, false); // run 1
+    draw_player(&mut player, 3, (0, 0), 1, false); // run 2
+    draw_player(&mut player, 4, (2, -2), 0, false); // run 3
+    draw_player(&mut player, 5, (0, 0), 1, false); // run 4
+    draw_player(&mut player, 6, (0, 0), 0, true); // jump (다리 접음)
+    // 프레임 7: 여분 (투명)
+    player.save(&format!("{dir}/player.png"))?;
 
     let mut coin_sheet = Sheet::new(4);
     for (i, sq) in [1.0f32, 0.6, 0.25, 0.6].iter().enumerate() {
@@ -186,6 +180,6 @@ fn main() -> std::io::Result<()> {
     }
     coin_sheet.save(&format!("{dir}/coin.png"))?;
 
-    println!("wrote 5 wav + 4 png to {dir}");
+    println!("wrote 5 wav + 2 png to {dir}");
     Ok(())
 }

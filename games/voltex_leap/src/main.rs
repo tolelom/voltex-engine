@@ -37,8 +37,8 @@ fn asset_root() -> PathBuf {
     }
 }
 
-/// 플레이어 애니메이션 상태. 상태별 시트가 분리된 이유는 gen_assets.rs 참고
-/// (SpriteAnimation 프리픽스 재생 한계 — friction-2 #1).
+/// 플레이어 애니메이션 상태. 단일 8×1 시트에서 `SpriteAnimation::clip`으로
+/// 구간 선택 (idle 0-1 / run 2-5 / jump 6 — gen_assets.rs 레이아웃).
 #[derive(Clone, Copy, PartialEq)]
 enum AnimState {
     Idle,
@@ -46,11 +46,20 @@ enum AnimState {
     Jump,
 }
 
+impl AnimState {
+    /// 이 상태의 시트 클립 (first_frame, frame_count, fps).
+    fn clip(self) -> SpriteAnimation {
+        match self {
+            AnimState::Idle => SpriteAnimation::clip(8, 1, 0, 2, 4.0),
+            AnimState::Run => SpriteAnimation::clip(8, 1, 2, 4, 10.0),
+            AnimState::Jump => SpriteAnimation::clip(8, 1, 6, 1, 1.0),
+        }
+    }
+}
+
 /// gpu_init에서 로드한 텍스처 핸들 묶음.
 struct GameTex {
-    idle: TextureHandle,
-    run: TextureHandle,
-    jump: TextureHandle,
+    player: TextureHandle,
     coin: TextureHandle,
 }
 
@@ -98,14 +107,12 @@ fn main() -> RuntimeResult<()> {
                 };
                 let loaded = (|| {
                     Some(GameTex {
-                        idle: load("player_idle.png")?,
-                        run: load("player_run.png")?,
-                        jump: load("player_jump.png")?,
+                        player: load("player.png")?,
                         coin: load("coin.png")?,
                     })
                 })();
                 if loaded.is_some() {
-                    eprintln!("leap: loaded 4 spritesheets");
+                    eprintln!("leap: loaded 2 spritesheets");
                 }
                 *tex_boot.borrow_mut() = loaded;
             }),
@@ -223,9 +230,9 @@ fn apply_visuals(world: &mut World, tex: &Option<GameTex>) {
     let Some(tex) = tex.as_ref() else { return };
     if let Some(p) = world.find_by_tag("player") {
         if let Some(s) = world.get_mut::<Sprite>(p) {
-            *s = Sprite::textured(tex.idle, [0.9, 0.9]);
+            *s = Sprite::textured(tex.player, [0.9, 0.9]);
         }
-        world.add(p, SpriteAnimation::new(2, 1, 2, 4.0));
+        world.add(p, AnimState::Idle.clip());
     }
     let coins: Vec<Entity> = world.query::<Coin>().map(|(e, _)| e).collect();
     for c in coins {
@@ -236,9 +243,12 @@ fn apply_visuals(world: &mut World, tex: &Option<GameTex>) {
     }
 }
 
-/// 이동 상태에 맞는 시트로 갈아끼우고, 왼쪽을 볼 땐 uv를 좌우 반전한다.
+/// 이동 상태에 맞는 클립으로 전환하고, 바라보는 방향을 `flip_x`에 반영한다.
+/// (시트는 한 장 — 텍스처 교체 없음. flip은 표시 속성이라 한 번 세팅으로 유지)
 fn update_player_visual(world: &mut World, tex: &Option<GameTex>, anim: &mut AnimState) {
-    let Some(tex) = tex.as_ref() else { return };
+    if tex.is_none() {
+        return;
+    }
     let Some(p) = world.find_by_tag("player") else { return };
     let Some(player) = world.get::<Player>(p).copied() else { return };
 
@@ -251,25 +261,12 @@ fn update_player_visual(world: &mut World, tex: &Option<GameTex>, anim: &mut Ani
     };
     if desired != *anim {
         *anim = desired;
-        let (handle, cols, fps) = match desired {
-            AnimState::Idle => (tex.idle, 2, 4.0),
-            AnimState::Run => (tex.run, 4, 10.0),
-            AnimState::Jump => (tex.jump, 1, 1.0),
-        };
-        if let Some(s) = world.get_mut::<Sprite>(p) {
-            s.texture = Some(handle);
-            s.uv_rect = [0.0, 0.0, 1.0, 1.0];
-        }
         if let Some(a) = world.get_mut::<SpriteAnimation>(p) {
-            *a = SpriteAnimation::new(cols, 1, cols, fps);
+            *a = desired.clip();
         }
     }
-    // 시트는 오른쪽을 보게 그려져 있다 — 왼쪽 이동 시 u 성분 스왑.
-    // (update_sprite_animations가 매 프레임 정방향 uv를 다시 쓰므로 매번 재적용)
-    if player.facing < 0.0 {
-        if let Some(s) = world.get_mut::<Sprite>(p) {
-            s.uv_rect = [s.uv_rect[2], s.uv_rect[1], s.uv_rect[0], s.uv_rect[3]];
-        }
+    if let Some(s) = world.get_mut::<Sprite>(p) {
+        s.flip_x = player.facing < 0.0;
     }
 }
 

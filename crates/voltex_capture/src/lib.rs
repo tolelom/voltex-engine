@@ -27,7 +27,7 @@ pub mod scene_ui;
 mod target;
 
 pub use headless::HeadlessGpu;
-pub use scene::render_world;
+pub use scene::{render_world, render_world_ortho};
 pub use target::{OffscreenTarget, CAPTURE_FORMAT, DEPTH_FORMAT};
 pub use voltex_image::encode_rgba8;
 

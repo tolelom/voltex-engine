@@ -26,12 +26,7 @@ mod asset_tests {
     /// (시트 재생성 시 프레임 수 변경이 조용히 깨지는 것 방지)
     #[test]
     fn generated_spritesheets_decode_with_expected_dims() {
-        for (file, w) in [
-            ("player_idle.png", 64u32),
-            ("player_run.png", 128),
-            ("player_jump.png", 32),
-            ("coin.png", 128),
-        ] {
+        for (file, w) in [("player.png", 256u32), ("coin.png", 128)] {
             let path = format!("{}/assets/{file}", env!("CARGO_MANIFEST_DIR"));
             let bytes = std::fs::read(&path).unwrap_or_else(|e| {
                 panic!("{path}: {e} — `cargo run -p voltex_leap --bin gen_assets` 먼저")

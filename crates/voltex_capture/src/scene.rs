@@ -368,6 +368,48 @@ pub fn render_world(
     cam_yaw: f32,
     cam_pitch: f32,
 ) -> Vec<u8> {
+    render_world_impl(gpu, width, height, world, cam_pos, cam_yaw, cam_pitch, None)
+}
+
+/// [`render_world`] with an **orthographic** camera (view height `ortho_height`
+/// world units, width = height × aspect) — matches the runtime's
+/// `RuntimeConfig::with_orthographic`, so 2D games can pixel-verify the same
+/// framing the player sees. Same fixed light/capacity contract as
+/// [`render_world`].
+#[allow(clippy::too_many_arguments)]
+pub fn render_world_ortho(
+    gpu: &HeadlessGpu,
+    width: u32,
+    height: u32,
+    world: &mut World,
+    cam_pos: Vec3,
+    cam_yaw: f32,
+    cam_pitch: f32,
+    ortho_height: f32,
+) -> Vec<u8> {
+    render_world_impl(
+        gpu,
+        width,
+        height,
+        world,
+        cam_pos,
+        cam_yaw,
+        cam_pitch,
+        Some(ortho_height),
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn render_world_impl(
+    gpu: &HeadlessGpu,
+    width: u32,
+    height: u32,
+    world: &mut World,
+    cam_pos: Vec3,
+    cam_yaw: f32,
+    cam_pitch: f32,
+    ortho_height: Option<f32>,
+) -> Vec<u8> {
     use voltex_renderer_ecs::materialize_renderables;
 
     let target = OffscreenTarget::new(&gpu.device, width, height);
@@ -378,6 +420,7 @@ pub fn render_world(
     let mut camera = Camera::new(cam_pos, width as f32 / height as f32);
     camera.yaw = cam_yaw;
     camera.pitch = cam_pitch;
+    camera.ortho_height = ortho_height;
     let view_proj = camera.view_projection();
     let mut light = LightUniform::new();
     light.direction = [-0.4, -1.0, -0.6];
