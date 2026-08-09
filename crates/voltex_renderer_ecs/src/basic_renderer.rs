@@ -886,18 +886,8 @@ impl BasicRenderer {
         if items.is_empty() {
             return;
         }
-        // Back-to-front sort (farthest from the camera first) so alpha-blended
-        // sprites composite correctly independent of spawn/iteration order.
-        items.sort_by(|a, b| {
-            let da = (a.0 - cam_pos).length_squared();
-            let db = (b.0 - cam_pos).length_squared();
-            db.partial_cmp(&da).unwrap_or(std::cmp::Ordering::Equal)
-        });
-        warn_overflow_once(&self.sprite_overflow_warned, "sprites", items.len(), MAX_SPRITES);
-        let n = items.len().min(MAX_SPRITES);
-
-        // World-space camera right/up from the inverse VP (clip-x/clip-y axes
-        // map back to camera right/up for a shear-free perspective/ortho proj).
+        // World-space camera right/up/forward from the inverse VP (clip axes
+        // map back to camera axes for a shear-free perspective/ortho proj).
         let inv = view_proj.inverse().unwrap_or(Mat4::IDENTITY);
         let dir = |v: Vec4| {
             let r = inv * v;
@@ -905,6 +895,10 @@ impl BasicRenderer {
         };
         let right = dir(Vec4::new(1.0, 0.0, 0.0, 0.0));
         let up = dir(Vec4::new(0.0, 1.0, 0.0, 0.0));
+        let forward = dir(Vec4::new(0.0, 0.0, 1.0, 0.0));
+
+        warn_overflow_once(&self.sprite_overflow_warned, "sprites", items.len(), MAX_SPRITES);
+        let n = cull_and_sort_sprites(&mut items, cam_pos, forward, MAX_SPRITES);
 
         let aligned = self.sprite_uniform_aligned as usize;
         let mut staging = vec![0u8; n * aligned];
@@ -1560,6 +1554,35 @@ fn warn_overflow_once(flag: &Cell<bool>, kind: &str, count: usize, cap: usize) {
     }
 }
 
+/// Cull to the `max` sprites **nearest** the camera, then sort those
+/// back-to-front, both by view depth `(pos - cam_pos)·forward` (not euclidean
+/// distance — radial distance flips layering for coplanar sprites under an
+/// orthographic camera). Returns the draw count; `items[..n]` is the ordered
+/// draw list.
+fn cull_and_sort_sprites(
+    items: &mut [(Vec3, Sprite)],
+    cam_pos: Vec3,
+    forward: Vec3,
+    max: usize,
+) -> usize {
+    let depth = |p: Vec3| (p - cam_pos).dot(forward);
+    let n = items.len().min(max);
+    if items.len() > max {
+        // 가까운(depth 작은) n개를 앞으로 — 초과분은 먼 것부터 버린다.
+        items.select_nth_unstable_by(n - 1, |a, b| {
+            depth(a.0)
+                .partial_cmp(&depth(b.0))
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+    }
+    items[..n].sort_by(|a, b| {
+        depth(b.0)
+            .partial_cmp(&depth(a.0))
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+    n
+}
+
 /// Skinned-PBR group-0 layout: camera (binding 0, dynamic, vertex+fragment) +
 /// lights (binding 1, fragment) + bone palette (binding 2, dynamic, vertex).
 fn pbr_skinned_g0_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
@@ -1650,6 +1673,38 @@ fn camera_light_bind_group_layout(device: &wgpu::Device) -> wgpu::BindGroupLayou
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn sprite_cull_keeps_nearest_and_sorts_back_to_front() {
+        // 카메라 원점, forward -Z: z가 더 음수일수록 멀다? 아니 — depth =
+        // (pos-cam)·forward 이므로 forward=(0,0,-1)일 때 z=-5가 depth 5(멀고),
+        // z=-1이 depth 1(가깝다).
+        let cam = Vec3::ZERO;
+        let fwd = Vec3::new(0.0, 0.0, -1.0);
+        let at = |z: f32| (Vec3::new(0.0, 0.0, z), Sprite::default());
+        // 5개 중 3개만 그릴 수 있음 — 가까운 1,2,3이 살아남고 4,5는 컬링.
+        let mut items = vec![at(-4.0), at(-1.0), at(-5.0), at(-3.0), at(-2.0)];
+        let n = super::cull_and_sort_sprites(&mut items, cam, fwd, 3);
+        assert_eq!(n, 3);
+        let depths: Vec<f32> = items[..n].iter().map(|(p, _)| -p.z).collect();
+        assert_eq!(depths, vec![3.0, 2.0, 1.0], "back-to-front, 가까운 3개만");
+        // cap 미만이면 전량 back-to-front.
+        let mut items = vec![at(-1.0), at(-3.0), at(-2.0)];
+        let n = super::cull_and_sort_sprites(&mut items, cam, fwd, 256);
+        assert_eq!(n, 3);
+        let depths: Vec<f32> = items.iter().map(|(p, _)| -p.z).collect();
+        assert_eq!(depths, vec![3.0, 2.0, 1.0]);
+        // 직교 동일평면 시나리오: z=0 평면, 카메라 (0,4,10) forward -Z.
+        // 유클리드 정렬이면 y에 따라 순서가 갈라졌겠지만 depth는 전부 동일 —
+        // 순서가 안정적으로 유지되고 패닉 없음.
+        let cam = Vec3::new(0.0, 4.0, 10.0);
+        let mut items = vec![
+            (Vec3::new(0.0, 6.0, 0.0), Sprite::default()),
+            (Vec3::new(0.0, 1.0, 0.0), Sprite::default()),
+        ];
+        let n = super::cull_and_sort_sprites(&mut items, cam, fwd, 256);
+        assert_eq!(n, 2);
+    }
 
     #[test]
     fn warn_overflow_once_fires_only_on_overflow_and_only_once() {

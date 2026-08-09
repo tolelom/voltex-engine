@@ -120,13 +120,18 @@ impl SpriteAnimation {
     }
 
     /// A looping animation over `frame_count` cells starting at sheet cell
-    /// `first_frame` (row-major) — one sheet, many clips.
+    /// `first_frame` (row-major) — one sheet, many clips. The clip is clamped
+    /// to the sheet: frames past `cols * rows` would otherwise wrap to cell 0
+    /// (`set_sheet_frame` wraps modulo the sheet) and silently splice another
+    /// clip's frames into playback.
     pub fn clip(cols: u32, rows: u32, first_frame: u32, frame_count: u32, fps: f32) -> Self {
+        let total = cols.max(1) * rows.max(1);
+        let first_frame = first_frame.min(total - 1);
         Self {
             cols,
             rows,
             first_frame,
-            frame_count: frame_count.max(1),
+            frame_count: frame_count.clamp(1, total - first_frame),
             fps,
             time: 0.0,
             playing: true,
@@ -254,6 +259,17 @@ mod tests {
         // 루프 wrap은 클립 내부: +0.1s → raw 2 → 2 % 2 = 0 → 프레임 4.
         update_sprite_animations(&mut world, 0.1);
         assert_eq!(world.get::<Sprite>(e).unwrap().uv_rect, [0.0, 0.5, 0.25, 1.0]);
+    }
+
+    #[test]
+    fn clip_is_clamped_to_the_sheet() {
+        // 8칸 시트에서 6번부터 4프레임을 요구 → 시트 밖 2프레임은 잘려
+        // 6..8만 재생 (안 자르면 set_sheet_frame wrap으로 0,1이 섞인다).
+        let a = SpriteAnimation::clip(4, 2, 6, 4, 10.0);
+        assert_eq!((a.first_frame, a.frame_count), (6, 2));
+        // first_frame 자체가 밖이면 마지막 셀 1프레임으로 강등.
+        let a = SpriteAnimation::clip(4, 2, 99, 4, 10.0);
+        assert_eq!((a.first_frame, a.frame_count), (7, 1));
     }
 
     #[test]
