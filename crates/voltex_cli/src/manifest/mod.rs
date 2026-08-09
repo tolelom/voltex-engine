@@ -292,10 +292,12 @@ fn extract_build(section: Option<&TomlSection>, project_name: &str) -> Result<Bu
     };
     // Rust-logic games have no Lua wrapper scripts — defaulting to the Lua
     // glob would make validate_paths demand a scripts/ dir that never exists.
-    let default_scripts = if kind == BuildKind::Rust {
-        Vec::new()
+    // Same for assets: content may live entirely in code (procedural), so a
+    // missing assets/ must not fail the build unless explicitly declared.
+    let (default_scripts, default_assets) = if kind == BuildKind::Rust {
+        (Vec::new(), Vec::new())
     } else {
-        default_scripts
+        (default_scripts, default_assets)
     };
 
     let scene = s

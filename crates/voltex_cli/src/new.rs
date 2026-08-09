@@ -55,7 +55,9 @@ window_size = [1280, 720]
 }
 
 fn write_empty_scene(target: &Path) -> Result<()> {
-    std::fs::write(target.join("scene.vscn"), "{\"entities\":[]}\n")?;
+    // "version" 필수 — 없으면 런타임 deserialize_scene_json이 거부해
+    // 갓 스캐폴드한 프로젝트가 매 부팅 씬 로드 에러를 낸다.
+    std::fs::write(target.join("scene.vscn"), "{\"version\":1,\"entities\":[]}\n")?;
     Ok(())
 }
 
@@ -106,6 +108,18 @@ mod tests {
         assert!(manifest.contains("[project]"));
         assert!(manifest.contains("name = "));
 
+        let _ = std::fs::remove_dir_all(&target);
+    }
+
+    #[test]
+    fn scaffolded_scene_carries_the_required_version_field() {
+        // "version" 없으면 런타임 JSON 씬 로더가 거부 — 새 프로젝트가
+        // 매 부팅 씬 로드 에러를 내는 첫인상 결함이었다.
+        let target = unique_target("scene_version");
+        let _ = std::fs::remove_dir_all(&target);
+        create_at(&target).unwrap();
+        let scene = std::fs::read_to_string(target.join("scene.vscn")).unwrap();
+        assert!(scene.contains("\"version\""), "scene: {scene}");
         let _ = std::fs::remove_dir_all(&target);
     }
 

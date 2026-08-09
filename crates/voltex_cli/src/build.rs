@@ -353,6 +353,11 @@ path = "src/main.rs"
 
 [dependencies]
 voltex_runtime = {{ path = "{}" }}
+
+# 조상 디렉토리의 카고 워크스페이스에 흡수되지 않도록 격리 — 없으면
+# 워크스페이스 안에서 스캐폴드한 프로젝트의 빌드가 "believes it's in a
+# workspace" 에러로 통째 실패한다.
+[workspace]
 "#,
         runtime_path_str
     );
@@ -427,14 +432,17 @@ pub fn pack_archive(manifest_dir: &Path, manifest: &Manifest, out_path: &Path) -
     // 4. scene-referenced assets not covered by the declared dirs.
     if let Some(bytes) = scene_bytes {
         for path in scan_scene_asset_paths(&bytes) {
-            if entries.iter().any(|(key, _)| *key == path) {
+            // 아카이브 키는 forward-slash 규약 (collect_into_entries / 런타임
+            // read_asset과 동일) — 백슬래시 표기 씬 경로도 같은 키로 정규화.
+            let key = path.replace('\\', "/");
+            if entries.iter().any(|(k, _)| *k == key) {
                 continue; // already bundled via an assets dir
             }
             let on_disk = manifest_dir.join(&path);
             match std::fs::read(&on_disk) {
                 Ok(data) => {
-                    eprintln!("voltex build: auto-bundled scene asset `{}`", path);
-                    entries.push((path, data));
+                    eprintln!("voltex build: auto-bundled scene asset `{}`", key);
+                    entries.push((key, data));
                 }
                 Err(_) => eprintln!(
                     "voltex build: warning: scene references missing asset `{}` \
@@ -847,6 +855,19 @@ mod tests {
             copied,
         );
         let _ = std::fs::remove_dir_all(&dist);
+    }
+
+    #[test]
+    fn wrapper_manifest_isolates_from_ancestor_workspaces() {
+        let dir = std::env::temp_dir().join(format!("voltex_wrapper_ws_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        write_wrapper_manifest(&dir, Path::new("/engine")).unwrap();
+        let manifest = std::fs::read_to_string(dir.join("Cargo.toml")).unwrap();
+        // 없으면 워크스페이스 안(예: 이 레포의 examples/*)에서 스캐폴드한
+        // 프로젝트의 wrapper 빌드가 카고 워크스페이스 검사로 통째 실패한다.
+        assert!(manifest.contains("[workspace]"), "manifest:\n{manifest}");
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]

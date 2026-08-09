@@ -285,6 +285,9 @@ kind = "rust"
     // A Rust-logic game has no Lua wrapper scripts — the scripts default must
     // be empty so validate_paths doesn't demand a scripts/ dir.
     assert!(m.build.scripts.is_empty(), "rust kind defaults scripts to []");
+    // Assets likewise: procedural games may have no assets/ dir at all —
+    // the default glob must not force one into existence.
+    assert!(m.build.assets.is_empty(), "rust kind defaults assets to []");
 
     // Explicit "scene" also accepted.
     let m = Manifest::parse(
