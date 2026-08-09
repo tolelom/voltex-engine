@@ -13,6 +13,19 @@ use std::path::{Path, PathBuf};
 use voltex_ecs::{MeshHandle, World};
 use voltex_renderer_ecs::{MeshPath, RenderAssets, TextureHandle, TexturePath};
 
+/// Canonical cache-key form of an asset path: forward slashes, no leading
+/// `./`. `with_audio_files` seeds, editor-persisted paths, and Vfs keys all
+/// meet in the caches — without one spelling, the same file can occupy two
+/// slots (double decode, hot-reload split). Loaders still receive the
+/// original path (filesystem resolution handles either spelling).
+pub(crate) fn normalize_path_key(path: &Path) -> PathBuf {
+    let mut s = path.to_string_lossy().replace('\\', "/");
+    while let Some(rest) = s.strip_prefix("./") {
+        s = rest.to_string();
+    }
+    PathBuf::from(s)
+}
+
 /// Shared-handle + failure cache for [`resolve_asset_paths_with`].
 ///
 /// Success entries make entities pointing at the same file share one handle
@@ -60,7 +73,7 @@ pub fn resolve_asset_paths_with(
     for (entity, path) in tex_targets {
         let slot = cache
             .textures
-            .entry(path.clone())
+            .entry(normalize_path_key(&path))
             .or_insert_with(|| load_texture(&path));
         if let Some(h) = *slot {
             world.add(entity, h);
@@ -78,7 +91,7 @@ pub fn resolve_asset_paths_with(
     for (entity, path) in mesh_targets {
         let slot = cache
             .meshes
-            .entry(path.clone())
+            .entry(normalize_path_key(&path))
             .or_insert_with(|| load_mesh(&path));
         if let Some(h) = *slot {
             world.add(entity, h);

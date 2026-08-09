@@ -59,12 +59,18 @@ impl AudioClipCache {
     /// unifying the two audio loading routes (they also share hot-reload,
     /// since the `with_audio_files` watch replaces the same clip index).
     pub fn seed(&mut self, path: impl Into<PathBuf>, clip_id: u32) {
-        self.clips.insert(path.into(), Some(clip_id));
+        self.clips
+            .insert(crate::asset_paths::normalize_path_key(&path.into()), Some(clip_id));
     }
 
-    /// The clip id `path` is bound to, if resolved or seeded.
+    /// The clip id `path` is bound to, if resolved or seeded. Spelling
+    /// variants (`./`, `\` vs `/`) hit the same slot — see
+    /// `asset_paths::normalize_path_key`.
     pub fn get(&self, path: &Path) -> Option<u32> {
-        self.clips.get(path).copied().flatten()
+        self.clips
+            .get(&crate::asset_paths::normalize_path_key(path))
+            .copied()
+            .flatten()
     }
 }
 
@@ -93,7 +99,7 @@ pub fn resolve_audio_paths_with(
     for (entity, path) in targets {
         let slot = cache
             .clips
-            .entry(path.clone())
+            .entry(crate::asset_paths::normalize_path_key(&path))
             .or_insert_with(|| load_clip(&path));
         let Some(id) = *slot else { continue };
         match world.get_mut::<AudioSource>(entity) {
@@ -160,6 +166,23 @@ mod tests {
         world.add(e, Transform::default());
         world.add(e, AudioPath(path.to_string()));
         (world, e)
+    }
+
+    #[test]
+    fn spelling_variants_of_the_same_path_share_one_cache_slot() {
+        // with_audio_files 시드("assets/bgm.wav")와 에디터가 저장한
+        // AudioPath("./assets\bgm.wav")는 같은 파일 — 키 정규화가 없으면
+        // 같은 데이터를 두 번째 슬롯에 중복 디코드하고 핫리로드가 갈라진다.
+        let (mut world, a) = world_with_audio_path("./assets\\bgm.wav");
+        let mut cache = AudioClipCache::new();
+        cache.seed("assets/bgm.wav", 7);
+        let n = resolve_audio_paths_with(&mut world, &mut cache, |_| {
+            panic!("seed hit expected — loader must not run")
+        });
+        assert_eq!(n, 1);
+        assert_eq!(world.get::<AudioSource>(a).unwrap().clip_id.0, 7);
+        assert_eq!(cache.get(Path::new("assets/bgm.wav")), Some(7));
+        assert_eq!(cache.get(Path::new(".\\assets\\bgm.wav")), Some(7));
     }
 
     #[test]
