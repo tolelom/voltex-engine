@@ -173,6 +173,22 @@
 
 v1.0.9 부터는 **서비스 배포 완성도** 로드맵 (`docs/superpowers/specs/2026-05-21-service-readiness-roadmap.md`) 기준으로 진행.
 
+### 2026-08-09 — 2D 스프라이트 저작 1급 지원 (v1.0.112)
+
+leap 도그푸딩 직후 같은 날 후속 사이클. friction-2 **P1 3건 전부 해소** +
+leap을 새 API로 마이그레이션해 실검증 (P2 3건 잔여 — 로그 참고).
+
+- **`SpriteAnimation::clip(cols, rows, first_frame, frames, fps)`** — 한
+  시트에 다중 클립. leap 플레이어가 단일 8×1 시트(idle 0-1/run 2-5/jump 6)로
+  전환, 상태 변경 = 클립 교체만.
+- **`Sprite::flip_x`** — 표시 전용 반전 (렌더러가 `effective_uv_rect()`
+  샘플). uv 스왑 워크어라운드의 tick 순서 의존 소멸.
+- **`voltex_capture::render_world_ortho`** — 직교 캡처. leap visual 회귀가
+  게임 실제 구도(뷰 높이 12)로 픽셀 단언 + 스크린샷 교체.
+- 검증: renderer_ecs 단위 +3, leap 전 스위트 + GPU visual + 스모크 런,
+  workspace build/clippy(-D warnings)/test 그린. CODEMAP 2건 갱신.
+- 부수: voltex_audio 테스트 clippy 1.94 `drop_non_drop` 정리.
+
 ### 2026-08-09 — 도그푸딩 게임 2편: Voltex Leap (v1.0.111)
 
 `games/voltex_leap` — 2D 사이드뷰 플랫포머. 2D 스택(v1.0.60)의 첫 실게임

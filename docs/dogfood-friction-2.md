@@ -7,8 +7,17 @@
 
 ## 현재 상태 요약
 
-**2026-08-09: 게임 완성 시점 6건 (P1 3 + P2 3), 전건 미해소.** 이번엔 진행을
-막는 마찰은 없었다 — 전부 우회 가능했고, 우회 비용이 곧 P 등급이다.
+**2026-08-09: 게임 완성 시점 6건 (P1 3 + P2 3) → 같은 날 후속 사이클에서 P1
+3건 해소, P2 3건 잔여.** 진행을 막는 마찰은 없었다 — 전부 우회 가능했고,
+우회 비용이 곧 P 등급이다. 해소 설계:
+`docs/superpowers/specs/2026-08-09-sprite-authoring-friction-design.md`.
+
+- ~~#1 SpriteAnimation 프레임 오프셋 부재~~ — **해소** (`SpriteAnimation::clip(cols, rows, first_frame, frames, fps)` + `first_frame` 필드. leap이 플레이어 단일 8×1 시트로 마이그레이션해 실검증)
+- ~~#2 Sprite 좌우 반전 1급 지원 부재~~ — **해소** (`Sprite::flip_x` 표시 전용 플래그 — 렌더러가 `effective_uv_rect()`로 u-스왑 적용, `uv_rect`는 애니 시스템이 정방향 소유. 매 프레임 재적용/tick 순서 의존 소멸)
+- ~~#3 render_world 직교 미지원~~ — **해소** (`voltex_capture::render_world_ortho(..., ortho_height)` — leap visual 회귀가 게임과 동일한 직교 구도로 전환)
+- #4 2D 타일 충돌 헬퍼 부재 — P2 잔여
+- #5 타일맵 배치 렌더 부재 — P2 잔여
+- #6 빌보드 z-rot 불가 — P2 잔여 (관찰)
 
 참고 — 마찰이 *아니었던* 것 (지난 사이클 개선의 실사용 검증):
 `with_gpu_init`(텍스처 업로드 훅), `with_asset_root`, `with_audio_files`

@@ -10,6 +10,37 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## v1.0.112 — 2026-08-09 — 2D 스프라이트 저작 1급 지원 (friction-2 P1 3건 해소)
+
+leap 도그푸딩 직후 후속 사이클 — `docs/dogfood-friction-2.md` P1 전건 해소 +
+leap 마이그레이션으로 실검증. 설계:
+`docs/superpowers/specs/2026-08-09-sprite-authoring-friction-design.md`.
+
+### Additive
+
+- **voltex_renderer_ecs `SpriteAnimation::clip`** — `first_frame` 필드 신설
+  (기본 0, `new()` 호환 유지). 한 시트에 여러 클립(idle/run/jump)을 담고
+  오프셋으로 선택. wrap/clamp은 클립 내부 기준. 단위 +2.
+- **voltex_renderer_ecs `Sprite::flip_x`** — 표시 전용 좌우 반전 플래그.
+  렌더러가 `effective_uv_rect()`(u-스왑)를 샘플하고 `uv_rect`는 애니
+  시스템이 정방향 소유 — 종전 uv 스왑 워크어라운드의 "매 프레임 재적용 +
+  tick 순서 지식" 요구가 사라짐. 단위 +1.
+- **voltex_capture `render_world_ortho`** — `render_world`의 직교 변형
+  (`ortho_height` = 런타임 `with_orthographic`과 동일 의미). 기존
+  `render_world`는 무변경 (공통부는 내부 헬퍼로 추출).
+
+### Changed
+
+- **games/voltex_leap** — 새 API 도그푸딩: 플레이어 시트 3장 → 단일 8×1
+  (`AnimState::clip()` 전환, 텍스처 교체 제거), facing 반전은
+  `sprite.flip_x` 한 줄, visual 회귀는 게임과 동일한 직교 구도
+  (`render_world_ortho`, 스크린샷 교체). 스모크 런 그린.
+
+### Fix
+
+- **voltex_audio** — 테스트의 `drop(closure)`가 clippy 1.94
+  `drop_non_drop`에 걸리던 것을 블록 스코프로 교체 (동작 불변).
+
 ## v1.0.111 — 2026-08-09 — 도그푸딩 게임 2편: Voltex Leap (2D 스택) + OGG 실검증
 
 ### Additive — `games/voltex_leap` (2D 사이드뷰 플랫포머)
