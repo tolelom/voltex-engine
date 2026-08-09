@@ -15,6 +15,7 @@
 - raycast — `raycast`, `raycast_all`, ray_vs_triangle, ray_vs_plane, ray_vs_mesh (src/raycast.rs, src/ray.rs)
 - `detect_collisions` — ECS 통합 (src/collision.rs)
 - CCD — `swept_sphere_vs_aabb` (src/ccd.rs)
+- 2D 타일 충돌 — `move_and_collide_2d`, `MoveResult2D` (src/grid2d.rs): XY 평면 AABB vs `is_solid(gx,gy)` 클로저 그리드, 축 분리(X→Y) 스냅 해소 + 접지 프로브. 경계 정책은 호출자 소유, 프레임 이동량 < tile 전제. voltex_leap physics2d 승격분 (friction-2 #4)
 
 ## 모듈 구조
 - `collider`, `mesh_collider` — 콜라이더 타입 (src/collider.rs, src/mesh_collider.rs)
@@ -24,6 +25,7 @@
 - `ray`, `raycast` — 레이 인터섹션 (src/ray.rs, src/raycast.rs)
 - `collision` — ECS 통합 (src/collision.rs)
 - `ccd` — Continuous Collision Detection (src/ccd.rs)
+- `grid2d` — 2D 타일 그리드 충돌 (src/grid2d.rs)
 
 ## 의존성
 - voltex crate: voltex_math, voltex_ecs
@@ -37,4 +39,4 @@
 ## 테스트
 - 단위 테스트: src/**/*.rs `#[cfg(test)]`
 - 실행: `cargo test -p voltex_physics --lib`
-- 현재 테스트 개수: 106개
+- 현재 테스트 개수: 119개

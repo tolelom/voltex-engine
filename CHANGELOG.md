@@ -10,6 +10,23 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## v1.0.113 — 2026-08-09 — voltex_physics::grid2d (friction-2 #4 해소)
+
+### Additive
+
+- **voltex_physics `grid2d`** — `move_and_collide_2d(is_solid, tile, pos,
+  vel, half, dt) -> MoveResult2D`: XY 평면 AABB vs 타일 그리드 축 분리(X→Y)
+  이동·해소 + 발밑 접지 프로브. 그리드는 `is_solid(gx, gy)` 클로저로 주입
+  (맵 타입 비의존, 경계 정책 호출자 소유). 전제(프레임 이동량 < tile) doc
+  명시. 단위 6 (leap 시나리오 4 이식 + 경계 정책/타일 스케일 2).
+  판정 기록: 충돌 코어는 엔진 승격, 중력/점프 튜닝은 게임 잔류.
+- 비범위(다음 사용자 등장 시): 스윕 CCD, 슬로프, 원웨이 플랫폼.
+
+### Changed
+
+- **games/voltex_leap `physics2d`** — grid2d 어댑터 + `GRAVITY` 상수로 축소
+  (호출부 시그니처 불변). 기존 테스트 4개가 동작 동일성 회귀 가드.
+
 ## v1.0.112 — 2026-08-09 — 2D 스프라이트 저작 1급 지원 (friction-2 P1 3건 해소)
 
 leap 도그푸딩 직후 후속 사이클 — `docs/dogfood-friction-2.md` P1 전건 해소 +

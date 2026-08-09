@@ -173,6 +173,16 @@
 
 v1.0.9 부터는 **서비스 배포 완성도** 로드맵 (`docs/superpowers/specs/2026-05-21-service-readiness-roadmap.md`) 기준으로 진행.
 
+### 2026-08-09 — voltex_physics::grid2d 승격 (v1.0.113)
+
+friction-2 #4 해소. leap `physics2d`의 타일 충돌 코어를
+`voltex_physics::grid2d::move_and_collide_2d`로 승격 — `is_solid(gx,gy)`
+클로저 주입(맵 타입 비의존, 경계 정책 호출자 소유), 축 분리 X→Y 스냅 해소 +
+접지 프로브. **판정**: 충돌 코어 = 엔진, 중력/점프 튜닝 = 게임. leap은
+어댑터로 축소(호출부 불변, 기존 테스트 4개가 동작 동일성 가드). physics
+단위 119(+6). friction-2 잔여: #5(타일맵 배치)/#6(z-rot) — n=1 YAGNI 보류,
+다음 2D 게임 등장 시 재평가.
+
 ### 2026-08-09 — 2D 스프라이트 저작 1급 지원 (v1.0.112)
 
 leap 도그푸딩 직후 같은 날 후속 사이클. friction-2 **P1 3건 전부 해소** +

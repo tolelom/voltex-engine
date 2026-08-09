@@ -15,7 +15,7 @@
 - ~~#1 SpriteAnimation 프레임 오프셋 부재~~ — **해소** (`SpriteAnimation::clip(cols, rows, first_frame, frames, fps)` + `first_frame` 필드. leap이 플레이어 단일 8×1 시트로 마이그레이션해 실검증)
 - ~~#2 Sprite 좌우 반전 1급 지원 부재~~ — **해소** (`Sprite::flip_x` 표시 전용 플래그 — 렌더러가 `effective_uv_rect()`로 u-스왑 적용, `uv_rect`는 애니 시스템이 정방향 소유. 매 프레임 재적용/tick 순서 의존 소멸)
 - ~~#3 render_world 직교 미지원~~ — **해소** (`voltex_capture::render_world_ortho(..., ortho_height)` — leap visual 회귀가 게임과 동일한 직교 구도로 전환)
-- #4 2D 타일 충돌 헬퍼 부재 — P2 잔여
+- ~~#4 2D 타일 충돌 헬퍼 부재~~ — **해소** (v1.0.113 `voltex_physics::grid2d::move_and_collide_2d` — `is_solid(gx,gy)` 클로저 그리드, 경계 정책 호출자 소유. 캐릭터 튜닝 상수는 게임 잔류 판정. leap physics2d는 어댑터로 축소, 기존 테스트 4개가 동작 동일성 가드)
 - #5 타일맵 배치 렌더 부재 — P2 잔여
 - #6 빌보드 z-rot 불가 — P2 잔여 (관찰)
 
