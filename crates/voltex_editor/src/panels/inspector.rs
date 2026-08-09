@@ -44,6 +44,11 @@ pub struct InspectorState {
     /// changes (e.g. gizmo, undo, physics in Play mode) that should refresh
     /// the proxy without nuking an in-progress slider drag.
     pub last_quat: Quat,
+    /// The world-side tag value `tag` was last synced against (or last
+    /// dispatched). Detects external changes (undo, "- tag" removal, script)
+    /// that should refresh the input buffer — without it, one more keystroke
+    /// after an undo re-dispatches the undone value (`last_quat` twin).
+    pub last_tag: String,
     /// Entity whose state populated the buffers (used to reset on selection change).
     pub last_entity: Option<Entity>,
 }
@@ -54,6 +59,7 @@ impl Default for InspectorState {
             tag: String::new(),
             euler: Vec3::ZERO,
             last_quat: Quat::IDENTITY,
+            last_tag: String::new(),
             last_entity: None,
         }
     }
@@ -67,17 +73,25 @@ impl InspectorState {
         let Some(entity) = session.selected else {
             self.last_entity = None;
             self.tag.clear();
+            self.last_tag.clear();
             return;
         };
 
         let entity_changed = self.last_entity != Some(entity);
+        // Refresh the tag buffer when the selection changed OR the world-side
+        // value moved away from what the buffer was synced against (undo,
+        // "- tag" removal, external write) — the `last_quat` pattern.
+        let world_tag = session
+            .world
+            .get::<Tag>(entity)
+            .map(|t| t.0.clone())
+            .unwrap_or_default();
+        if entity_changed || world_tag != self.last_tag {
+            self.tag = world_tag.clone();
+            self.last_tag = world_tag;
+        }
         if entity_changed {
             self.last_entity = Some(entity);
-            self.tag = session
-                .world
-                .get::<Tag>(entity)
-                .map(|t| t.0.clone())
-                .unwrap_or_default();
         }
 
         // Refresh Euler from quat when (a) selection just changed, or
@@ -263,6 +277,9 @@ pub fn inspector_panel(
     let tag_input_x = x + ui.layout.padding;
     let tag_input_w = (w - ui.layout.padding * 2.0).max(50.0);
     if ui.text_input(0x1_5A_00_01, &mut state.tag, tag_input_x, tag_input_y, tag_input_w) {
+        // 버퍼가 곧 world 값이 된다 — last_tag를 함께 갱신해 다음 프레임
+        // sync가 방금 친 입력을 외부 변경으로 오인해 되돌리지 않게 한다.
+        state.last_tag = state.tag.clone();
         let _ = session.dispatch(EditorCommand::SetTag {
             entity,
             tag: state.tag.clone(),
@@ -448,6 +465,36 @@ mod tests {
         // Dedicated-UI and unknown names → None even when attached.
         assert_eq!(component_value_summary(&session, e, "transform"), None);
         assert_eq!(component_value_summary(&session, e, "audio_source"), None);
+        cleanup(&scene);
+    }
+
+    #[test]
+    fn tag_buffer_resyncs_after_undo() {
+        let scene = temp_path("voltex_insp_tag_resync.vscn");
+        cleanup(&scene);
+        let mut session = EditorSession::new(scene.clone());
+        let e = session.dispatch(EditorCommand::Spawn).unwrap();
+        session.selected = Some(e);
+
+        let mut state = InspectorState::default();
+        state.sync_from(&session);
+        assert_eq!(state.tag, "");
+
+        // 사용자가 tag를 입력·커밋한 상황 (UI 경로와 동일하게 last_tag 갱신).
+        state.tag = "Hero".into();
+        state.last_tag = "Hero".into();
+        session
+            .dispatch(EditorCommand::SetTag { entity: e, tag: "Hero".into() })
+            .unwrap();
+        state.sync_from(&session);
+        assert_eq!(state.tag, "Hero", "자기 입력은 되돌리지 않는다");
+
+        // Ctrl+Z — world의 tag가 사라짐. 버퍼도 따라와야 한다 (안 따라오면
+        // 다음 키 입력이 undo된 값을 그대로 재-dispatch).
+        assert!(session.undo());
+        assert!(session.world.get::<Tag>(e).is_none());
+        state.sync_from(&session);
+        assert_eq!(state.tag, "", "undo 후 버퍼 재동기화");
         cleanup(&scene);
     }
 
