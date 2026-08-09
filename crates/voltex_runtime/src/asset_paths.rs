@@ -178,8 +178,16 @@ pub(crate) fn read_asset(
     }
     if path.is_relative() {
         if let Some(root) = asset_root {
-            if let Ok(bytes) = std::fs::read(root.join(path)) {
-                return Ok(bytes);
+            let rooted = root.join(path);
+            match std::fs::read(&rooted) {
+                Ok(bytes) => return Ok(bytes),
+                // 파일이 root에 존재하는데 다른 이유(권한/공유 위반)로 못
+                // 읽었다면 그 에러를 그대로 — cwd 폴백은 진단을 어긋나게
+                // 하고, cwd의 동명 파일을 잘못 로드할 수 있다.
+                Err(e) if e.kind() != std::io::ErrorKind::NotFound => {
+                    return Err(format!("{}: {e}", rooted.display()));
+                }
+                Err(_) => {}
             }
         }
     }

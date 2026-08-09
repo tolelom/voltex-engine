@@ -210,6 +210,9 @@ impl RuntimeApp {
         crate::audio_sync::register_audio_source(&mut registry);
         // AudioPath (scene-persisted clip file path) is runtime-owned.
         registry.register::<crate::audio_paths::AudioPath>();
+        // Lifetime — 미등록이면 저장 씬에서 소멸 조건만 떨어져 나가
+        // 로드 시 one-shot 엔티티가 불멸이 된다 (감사 발견).
+        registry.register::<crate::lifetime::Lifetime>();
         // Declarative renderables (PrimitiveMesh / MaterialDesc) live in
         // voltex_renderer_ecs (L3), so they register here rather than in the
         // L1 register_defaults. Materialized to GPU resources in gpu_init.
