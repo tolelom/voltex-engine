@@ -10,6 +10,50 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## v1.0.114 — 2026-08-09 — 3-도메인 병렬 감사: 발견 23건 중 19건 당일 해소
+
+v1.0.56 이후 처음의 심층 감사. 병렬 탐색 에이전트 3개가 미감사 표면
+(v1.0.57~113 추가분)을 정적 감사: ① 런타임 에셋/오디오 resolve 체인 ② CLI
+빌드 파이프라인 ③ 2D 스택 + 에디터. 발견 23건 (high 5) — high/medium 19건
+당일 TDD 해소, low 4건 + World::clear 설계 항목은 DEFERRED 이월.
+
+### Fix — high 5건
+
+- **voice 영구 누수** (runtime/audio): `world.clear()`가 allocator까지
+  리셋해 재사용 핸들이 orphan sweep을 통과 — Play 덮어쓰기가 이전 voice를
+  stop, `AudioVoiceTracker::stop_all` 신설 + load_scene 배선, 계약 doc 정정.
+  두 게임의 수동 `src.stop()`이 가리고 있던 실누수.
+- **스프라이트 오버플로 컬링 역방향** (renderer_ecs): back-to-front 정렬 후
+  truncate라 256 초과 시 **가까운 것부터** 사라짐 — select_nth로 가까운
+  n개 생존 후 정렬. 정렬 키도 유클리드 거리 → 카메라 전방 투영 깊이로
+  (직교 동일평면에서 화면 위치 따라 레이어 뒤집히던 것).
+- **grid2d 터널링** (physics): "프레임 이동량 < tile" 전제가 미강제 —
+  히칭 프레임(dt 250ms 클램프)이면 벽 관통. 내부 서브스텝(축당 반 타일)으로
+  호출부 계약 유지한 채 해소.
+- **.vpkg Lua 스크립트 로드 불가** (script/cli): 스크립트만 Vfs를 우회해
+  dist exe가 루즈 .lua 없이는 무동작 + 무진단. 풀에 소스 시드 경로 신설
+  (RuntimeApp이 Vfs의 .lua 전부 시드), 실패 1회 로깅 + 캐시.
+- **wrapper Cargo.toml `[workspace]` 누락** (cli): 카고 워크스페이스 안
+  프로젝트의 wrapper 빌드가 통째 실패하던 것.
+
+### Fix — medium 14건 (요약)
+
+- runtime: one-shot 재트리거 불가(play()가 active 미리셋), 캐시 키 철자
+  변형 이중 슬롯(정규화 헬퍼 공유), Lifetime 미등록(저장 씬에서 소멸 조건
+  소실), read_asset 폴백이 비-NotFound 에러 은폐.
+- renderer_ecs: SpriteAnimation::clip 시트 밖 프레임 wrap 클램프.
+- physics: grid2d tile ≤ 0 가드.
+- editor: 인스펙터 tag 버퍼 undo 후 stale 재-dispatch(last_tag 동기화),
+  Spawn redo 후 redo 체인 EntityNotAlive 유실(엔티티 리매핑), 카메라 포함
+  AABB가 모든 픽킹 독점(내부 히트 최저 우선순위 강등).
+- cli: 씬 자동 동봉 키 구분자 정규화, kind=rust의 assets/ 강제 기본값 제거,
+  스캐폴드/튜토리얼 scene.vscn "version" 누락(새 프로젝트 첫 부팅 에러),
+  중첩 에셋 선언 평탄화(manifest 상대 레이아웃 보존), kind=rust 엔진 경로
+  없이 진행(라이선스만 스킵).
+
+검증: 각 수정 TDD (+16 테스트), leap/depths 회귀 그린, workspace
+clippy(-D warnings)/test 그린.
+
 ## v1.0.113 — 2026-08-09 — voltex_physics::grid2d (friction-2 #4 해소)
 
 ### Additive

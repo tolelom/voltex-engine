@@ -173,6 +173,21 @@
 
 v1.0.9 부터는 **서비스 배포 완성도** 로드맵 (`docs/superpowers/specs/2026-05-21-service-readiness-roadmap.md`) 기준으로 진행.
 
+### 2026-08-09 — 3-도메인 병렬 감사 (v1.0.114)
+
+v1.0.56 이후 첫 심층 감사 — 미감사 표면(v1.0.57~113)을 병렬 에이전트 3개로
+정적 감사. **발견 23건(high 5), 당일 19건 TDD 해소**, LOW 4건 +
+World::clear generation 설계 항목은 DEFERRED 이월. 하이라이트:
+
+- world.clear() 핸들 재사용 → 오디오 voice 영구 누수 (봉쇄 수정 + stop_all)
+- 스프라이트 256 초과 시 가까운 것부터 사라지는 컬링 역방향 + 직교 정렬 키
+- grid2d 히칭 프레임 벽 관통 (내부 서브스텝)
+- .vpkg에 담긴 Lua를 런타임이 못 읽던 출하 격차 (Vfs 시드 + 1회 로깅)
+- wrapper [workspace] 누락, 스캐폴드 씬 "version" 누락 등 신규 사용자
+  첫 경험을 깨는 CLI 결함 일괄
+- 상세는 CHANGELOG v1.0.114. 검증: 각 수정 TDD(+16), 게임 2종 회귀 그린,
+  workspace clippy(-D warnings)/test 그린.
+
 ### 2026-08-09 — voltex_physics::grid2d 승격 (v1.0.113)
 
 friction-2 #4 해소. leap `physics2d`의 타일 충돌 코어를

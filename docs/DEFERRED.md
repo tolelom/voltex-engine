@@ -229,3 +229,29 @@
 - **GameTimer hz=0 panic + alpha div-by-zero** ✅ v1.0.52 — `clamp(1, 100_000)` + alpha 가드. +3 회귀 테스트.
 - **Camera::right NaN at pitch ±90°** ✅ v1.0.53 — `normalize_or_zero` + Vec3::X fallback. +2 회귀 테스트.
 - **Sphere generator degenerate-input** ✅ v1.0.54 — sectors/stacks/radius clamp. +2 회귀 테스트.
+
+## 2026-08-09 감사 사이클 LOW 이월 (v1.0.114)
+
+3-도메인 병렬 감사(런타임 에셋/오디오, CLI 파이프라인, 2D/에디터)의 발견 23건 중
+high/medium 19건은 당일 해소 (CHANGELOG v1.0.114). LOW 4건은 실피해 조건이
+좁아 이월:
+
+- **에디터 asset_browser `navigate_to` root 가드가 `..` 미정규화** — 현재 UI
+  경로(read_dir 결과만 전달)로는 탈출 불가, Windows verbatim 경로 부작용이
+  이중 방어. join 결과 canonicalize 후 재검사로 강화 — v1.1.
+- **CLI 멀티바이너리 crate에서 exe 이름 매칭 실패 시 `exes.last()` 폴백** —
+  project.name과 [[bin]] 불일치 시 에셋 생성기가 배포될 수 있음 (note 1줄만).
+  이름 매칭 실패 + 후보 2개 이상이면 에러 승격 — v1.1.
+- **CLI 씬 스캔이 BOM 붙은 JSON을 legacy text로 오분류** — 자동 동봉만 조용히
+  스킵 (런타임 JSON 파서도 BOM 거부라 씬 자체가 먼저 터짐 — 실질 피해는 경고
+  부재). 판정 전 BOM 스트립 — v1.1.
+- **CLI `assets = ["./**/*"]` 류 선언이 dist/를 자기 안으로 재귀 복사** — 소스
+  디렉토리가 dist를 포함하면 거부/스킵 — v1.1.
+
+또한 audit-runtime의 근본 원인 지적 1건을 설계 항목으로 이월:
+- **`World::clear()`가 entity allocator까지 리셋해 핸들 (0,0)부터 재발급** —
+  용어집의 "generation 기반 재사용 안전" 보증이 clear() 경로에서만 깨진다
+  (v1.0.114에서 audio voice 누수로 실증, 봉쇄 수정 적용됨). 근본 수정은
+  clear 시 generation bump인데 **씬 파일의 Entity 참조(parent 등)가 (id,gen)을
+  담고 있어 로드 규약과 얽힘** — 씬 로드가 gen 무관 재매핑을 하는지 확인 후
+  진행할 것. v1.1 설계 검토.

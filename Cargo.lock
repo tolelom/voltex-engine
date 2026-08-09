@@ -2124,7 +2124,7 @@ checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
 
 [[package]]
 name = "voltex"
-version = "1.0.113"
+version = "1.0.114"
 dependencies = [
  "voltex_ai",
  "voltex_asset",
@@ -2144,7 +2144,7 @@ dependencies = [
 
 [[package]]
 name = "voltex_ai"
-version = "1.0.113"
+version = "1.0.114"
 dependencies = [
  "thiserror 2.0.18",
  "voltex_ecs",
@@ -2153,14 +2153,14 @@ dependencies = [
 
 [[package]]
 name = "voltex_asset"
-version = "1.0.113"
+version = "1.0.114"
 dependencies = [
  "thiserror 2.0.18",
 ]
 
 [[package]]
 name = "voltex_audio"
-version = "1.0.113"
+version = "1.0.114"
 dependencies = [
  "thiserror 2.0.18",
  "voltex_math",
@@ -2168,7 +2168,7 @@ dependencies = [
 
 [[package]]
 name = "voltex_capture"
-version = "1.0.113"
+version = "1.0.114"
 dependencies = [
  "bytemuck",
  "pollster",
@@ -2184,7 +2184,7 @@ dependencies = [
 
 [[package]]
 name = "voltex_cli"
-version = "1.0.113"
+version = "1.0.114"
 dependencies = [
  "voltex_asset",
  "voltex_audio",
@@ -2204,7 +2204,7 @@ dependencies = [
 
 [[package]]
 name = "voltex_ecs"
-version = "1.0.113"
+version = "1.0.114"
 dependencies = [
  "thiserror 2.0.18",
  "voltex_asset",
@@ -2213,7 +2213,7 @@ dependencies = [
 
 [[package]]
 name = "voltex_editor"
-version = "1.0.113"
+version = "1.0.114"
 dependencies = [
  "bytemuck",
  "thiserror 2.0.18",
@@ -2226,7 +2226,7 @@ dependencies = [
 
 [[package]]
 name = "voltex_image"
-version = "1.0.113"
+version = "1.0.114"
 dependencies = [
  "bytemuck",
  "thiserror 2.0.18",
@@ -2244,11 +2244,11 @@ dependencies = [
 
 [[package]]
 name = "voltex_math"
-version = "1.0.113"
+version = "1.0.114"
 
 [[package]]
 name = "voltex_net"
-version = "1.0.113"
+version = "1.0.114"
 dependencies = [
  "thiserror 2.0.18",
  "voltex_math",
@@ -2256,7 +2256,7 @@ dependencies = [
 
 [[package]]
 name = "voltex_physics"
-version = "1.0.113"
+version = "1.0.114"
 dependencies = [
  "voltex_ecs",
  "voltex_math",
@@ -2264,7 +2264,7 @@ dependencies = [
 
 [[package]]
 name = "voltex_platform"
-version = "1.0.113"
+version = "1.0.114"
 dependencies = [
  "log",
  "voltex_math",
@@ -2273,7 +2273,7 @@ dependencies = [
 
 [[package]]
 name = "voltex_renderer"
-version = "1.0.113"
+version = "1.0.114"
 dependencies = [
  "bytemuck",
  "log",
@@ -2288,7 +2288,7 @@ dependencies = [
 
 [[package]]
 name = "voltex_renderer_ecs"
-version = "1.0.113"
+version = "1.0.114"
 dependencies = [
  "bytemuck",
  "thiserror 2.0.18",
@@ -2301,7 +2301,7 @@ dependencies = [
 
 [[package]]
 name = "voltex_runtime"
-version = "1.0.113"
+version = "1.0.114"
 dependencies = [
  "bytemuck",
  "thiserror 2.0.18",
@@ -2321,7 +2321,7 @@ dependencies = [
 
 [[package]]
 name = "voltex_script"
-version = "1.0.113"
+version = "1.0.114"
 dependencies = [
  "cc",
  "thiserror 2.0.18",
