@@ -175,6 +175,10 @@ pub fn pick_entity(
     voltex_ecs::propagate_transforms(world);
 
     let mut best: Option<(Entity, f32)> = None;
+    // 카메라(레이 원점)를 포함하는 AABB는 t=0으로 모든 클릭을 이기므로
+    // 최저 우선순위로 강등 — 다른 히트가 하나도 없을 때만 선택된다.
+    // (방/레벨 경계 메시나 크게 스케일된 엔티티 안에서도 내부 오브젝트 선택 가능)
+    let mut best_enclosing: Option<(Entity, f32)> = None;
     let entities: Vec<Entity> = world.query::<Transform>().map(|(e, _)| e).collect();
     for entity in entities {
         let hit_t: Option<f32> = if let (Some(bounds), Some(wt)) = (
@@ -183,6 +187,15 @@ pub fn pick_entity(
         ) {
             // AABB path: transform local Bounds.0 by WorldTransform → world AABB.
             let world_aabb = world_aabb_from_local(&bounds.0, &wt.0);
+            if world_aabb.contains_point(cam_pos) {
+                if let Some(t) = ray_vs_aabb(&ray, &world_aabb) {
+                    best_enclosing = match best_enclosing {
+                        Some((_, bt)) if bt <= t => best_enclosing,
+                        _ => Some((entity, t)),
+                    };
+                }
+                continue;
+            }
             ray_vs_aabb(&ray, &world_aabb)
         } else {
             // Sphere fallback for entities without Bounds.
@@ -201,7 +214,7 @@ pub fn pick_entity(
             };
         }
     }
-    best.map(|(e, _)| e)
+    best.or(best_enclosing).map(|(e, _)| e)
 }
 
 #[cfg(test)]
@@ -341,6 +354,47 @@ mod tests {
             1.0,
         );
         assert_eq!(result, Some(e));
+    }
+
+    #[test]
+    fn camera_enclosing_aabb_does_not_steal_every_click() {
+        // 카메라를 통째로 감싸는 거대 Bounds 엔티티(방 경계 메시 류)는
+        // ray 원점이 내부라 t=0으로 항상 이긴다 — 내부의 일반 엔티티가
+        // 있으면 그쪽이 선택돼야 하고, 없을 때만 fallback으로 선택된다.
+        let mut world = World::new();
+        let cam = OrbitCamera::new();
+
+        let room = world.spawn();
+        world.add(room, Transform::new());
+        world.add(
+            room,
+            voltex_ecs::Bounds(voltex_math::AABB::new(
+                Vec3::new(-100.0, -100.0, -100.0),
+                Vec3::new(100.0, 100.0, 100.0),
+            )),
+        );
+
+        let inner = world.spawn();
+        world.add(inner, Transform::from_position(Vec3::ZERO));
+
+        let vp = cam.view_projection(1.0);
+        let result = pick_entity(
+            &mut world, &vp, cam.position(),
+            0.0, 0.0, 800.0, 800.0,
+            400.0, 400.0,
+            1.0,
+        );
+        assert_eq!(result, Some(inner), "내부 엔티티가 우선");
+
+        // 내부 엔티티가 없으면 감싸는 엔티티라도 선택된다 (no-hit 아님).
+        world.despawn(inner);
+        let result = pick_entity(
+            &mut world, &vp, cam.position(),
+            0.0, 0.0, 800.0, 800.0,
+            400.0, 400.0,
+            1.0,
+        );
+        assert_eq!(result, Some(room), "fallback으로는 선택 가능");
     }
 
     #[test]
