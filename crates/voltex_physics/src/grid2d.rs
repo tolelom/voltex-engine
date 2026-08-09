@@ -28,8 +28,39 @@ pub struct MoveResult2D {
 }
 
 /// AABB(`half` = 반폭/반높이)를 `is_solid` 그리드에 대해 이동·해소한다.
+///
+/// 한 호출의 이동량이 tile을 넘으면(히칭 프레임, 고속 투사체) 내부적으로
+/// 서브스텝으로 쪼개 해소한다 — 호출자는 dt/속도 크기를 신경 쓸 필요 없음.
 pub fn move_and_collide_2d(
     is_solid: impl Fn(i32, i32) -> bool,
+    tile: f32,
+    pos: Vec3,
+    vel: Vec3,
+    half: [f32; 2],
+    dt: f32,
+) -> MoveResult2D {
+    debug_assert!(tile > 0.0, "grid2d: tile must be positive");
+    let tile = tile.max(f32::MIN_POSITIVE);
+    // 서브스텝당 축 이동량을 tile의 절반 이하로 — 셀 하나를 건너뛰는 일이
+    // 없도록 (충돌 시 축 속도가 0이 되므로 이후 서브스텝은 자연히 저렴).
+    let max_axis_move = vel.x.abs().max(vel.y.abs()) * dt;
+    let steps = ((max_axis_move / (tile * 0.5)).ceil() as u32).max(1);
+    let sub_dt = dt / steps as f32;
+    let mut r = MoveResult2D { pos, vel, grounded: false, hit_wall: false };
+    for _ in 0..steps {
+        let hit_wall_so_far = r.hit_wall;
+        r = step(&is_solid, tile, r.pos, r.vel, half, sub_dt);
+        r.hit_wall |= hit_wall_so_far;
+        if r.vel.x == 0.0 && r.vel.y == 0.0 {
+            break; // 양축 정지 — 남은 서브스텝은 이동 없음
+        }
+    }
+    r
+}
+
+/// 단일 스텝 해소 (이동량 < tile 전제는 호출자 [`move_and_collide_2d`]가 보장).
+fn step(
+    is_solid: &impl Fn(i32, i32) -> bool,
     tile: f32,
     pos: Vec3,
     vel: Vec3,
@@ -170,6 +201,36 @@ mod tests {
         let r = move_and_collide_2d(room, 1.0, standing, Vec3::new(1.0, 0.0, 0.0), HALF, 0.016);
         assert!(r.grounded);
         assert!(!r.hit_wall);
+    }
+
+    #[test]
+    fn fast_motion_does_not_tunnel_through_walls() {
+        // 한 스텝 이동량이 벽 두께(1 tile)를 훌쩍 넘는 속도 — 히칭 프레임
+        // (dt 0.25 클램프)이나 고속 투사체 시나리오. 내부 서브스텝이 없으면
+        // AABB가 벽 반대편에 착지해 overlap 자체가 없고 그냥 통과한다.
+        let r = move_and_collide_2d(
+            room,
+            1.0,
+            Vec3::new(2.5, 1.5, 0.0),
+            Vec3::new(200.0, 0.0, 0.0),
+            HALF,
+            0.1, // 이동량 20 tile
+        );
+        assert!((r.pos.x - (5.0 - HALF[0])).abs() < 1e-3, "pos.x={}", r.pos.x);
+        assert_eq!(r.vel.x, 0.0);
+        assert!(r.hit_wall);
+
+        // 고속 낙하도 바닥에서 멈춘다.
+        let r = move_and_collide_2d(
+            room,
+            1.0,
+            Vec3::new(2.5, 2.4, 0.0),
+            Vec3::new(0.0, -200.0, 0.0),
+            HALF,
+            0.1,
+        );
+        assert!((r.pos.y - (1.0 + HALF[1])).abs() < 1e-3, "pos.y={}", r.pos.y);
+        assert!(r.grounded);
     }
 
     #[test]
