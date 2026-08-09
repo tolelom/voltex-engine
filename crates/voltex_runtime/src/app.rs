@@ -350,6 +350,26 @@ impl RuntimeApp {
         for (path, index) in audio_seed_pairs {
             app.audio_clip_cache.seed(path, index as u32);
         }
+        // Vfs(.vpkg)의 Lua 스크립트를 풀에 시드 — 씬/텍스처/오디오와 달리
+        // 스크립트만 Vfs를 우회해 dist exe가 루즈 .lua 없이는 무동작이던
+        // 출하 격차 해소 (감사 발견).
+        if app.config.enable_scripts {
+            if let Some(vfs) = app.config.vfs.as_ref() {
+                let mut seeded = 0usize;
+                for key in vfs.list() {
+                    if key.ends_with(".lua") {
+                        if let Ok(bytes) = vfs.read(&key) {
+                            app.script_pool
+                                .seed_source(&key, String::from_utf8_lossy(&bytes).into_owned());
+                            seeded += 1;
+                        }
+                    }
+                }
+                if seeded > 0 {
+                    crate::log_info!("voltex_runtime: seeded {seeded} Lua script(s) from Vfs");
+                }
+            }
+        }
         let system_setup = app.config.setup_systems.take();
         if let Some(setup) = system_setup {
             setup(&mut app);

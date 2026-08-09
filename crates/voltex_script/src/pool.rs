@@ -21,7 +21,18 @@ use crate::state::LuaState;
 pub struct ScriptInstancePool {
     instances: HashMap<u32, ScriptInstance>,
     path_to_id: HashMap<String, u32>,
+    /// Vfs 등에서 시드된 스크립트 소스 (키: forward-slash 정규화 경로).
+    /// [`Self::get_or_create`]가 파일시스템보다 먼저 조회 — `.vpkg`에 담긴
+    /// 스크립트가 디스크에 루즈 파일 없이 동작하는 경로.
+    sources: HashMap<String, String>,
+    /// 로드에 실패한 경로 — 프레임마다 재시도/재로그하지 않기 위한 캐시.
+    failed: std::collections::HashSet<String>,
     next_id: u32,
+}
+
+/// 소스/경로 맵 키 정규화 (vpkg 키 규약과 동일: forward slash).
+fn norm_key(path: &str) -> String {
+    path.replace('\\', "/")
 }
 
 impl ScriptInstancePool {
@@ -30,8 +41,19 @@ impl ScriptInstancePool {
         Self {
             instances: HashMap::new(),
             path_to_id: HashMap::new(),
+            sources: HashMap::new(),
+            failed: std::collections::HashSet::new(),
             next_id: 0,
         }
+    }
+
+    /// Pre-bind `path` to an in-memory script source. `get_or_create` will
+    /// execute this instead of reading the filesystem — the runtime seeds
+    /// every `.lua` entry of its Vfs archive through here so `.vpkg`-shipped
+    /// games run without loose script files (audit fix: scripts were the only
+    /// asset class that bypassed the Vfs).
+    pub fn seed_source(&mut self, path: impl Into<String>, source: impl Into<String>) {
+        self.sources.insert(norm_key(&path.into()), source.into());
     }
 
     /// Return the instance id for `path`. On first encounter, create a new
@@ -45,8 +67,12 @@ impl ScriptInstancePool {
     /// by the same outer struct (EditorSession, RuntimeApp) and dropped in
     /// pool-before-world order.
     pub fn get_or_create(&mut self, path: &str, world: *mut World) -> crate::Result<u32> {
-        if let Some(&id) = self.path_to_id.get(path) {
+        let key = norm_key(path);
+        if let Some(&id) = self.path_to_id.get(&key) {
             return Ok(id);
+        }
+        if self.failed.contains(&key) {
+            return Err(format!("script previously failed to load: {path}").into());
         }
         let lua = LuaState::new();
         register_default_bindings(&lua);
@@ -54,7 +80,18 @@ impl ScriptInstancePool {
         // The global `input` table reads a thread-local snapshot published by
         // the runtime each frame (`set_current_input`); harmless if unset.
         register_engine_input(&lua);
-        lua.exec_file(path)?;
+        // 시드된 소스(Vfs) 우선, 없으면 파일시스템.
+        let loaded = match self.sources.get(&key) {
+            Some(src) => lua.exec(src),
+            None => lua.exec_file(path),
+        };
+        if let Err(e) = loaded {
+            // 1회 로깅 + 실패 캐시 — 이전엔 호출부(system.rs)가 조용히
+            // continue 해서 스크립트 부재가 무진단 무동작이었다.
+            eprintln!("voltex_script: failed to load `{path}`: {e}");
+            self.failed.insert(key);
+            return Err(e);
+        }
         let id = self.next_id;
         self.next_id += 1;
         self.instances.insert(
@@ -65,7 +102,7 @@ impl ScriptInstancePool {
                 started: false,
             },
         );
-        self.path_to_id.insert(path.to_string(), id);
+        self.path_to_id.insert(key, id);
         Ok(id)
     }
 
@@ -81,7 +118,7 @@ impl ScriptInstancePool {
 
     /// Looks up the id assigned to `path`, if any.
     pub fn find_by_path(&self, path: &str) -> Option<u32> {
-        self.path_to_id.get(path).copied()
+        self.path_to_id.get(&norm_key(path)).copied()
     }
 
     /// Number of loaded script instances.
@@ -98,7 +135,7 @@ impl ScriptInstancePool {
     /// the next `script_start_all` re-runs `on_start`. Returns `Ok(true)` if
     /// the instance existed, `Ok(false)` if the path was unknown to the pool.
     pub fn reload(&mut self, path: &str) -> crate::Result<bool> {
-        let Some(&id) = self.path_to_id.get(path) else {
+        let Some(&id) = self.path_to_id.get(&norm_key(path)) else {
             return Ok(false);
         };
         let Some(inst) = self.instances.get_mut(&id) else {
@@ -155,6 +192,31 @@ mod tests {
         let path = dir.join(name);
         std::fs::write(&path, body).unwrap();
         path
+    }
+
+    #[test]
+    fn seeded_source_loads_without_a_file_on_disk() {
+        let mut world = World::new();
+        let world_ptr = &mut world as *mut World;
+        let mut pool = ScriptInstancePool::new();
+        // 디스크에 존재하지 않는 경로 — .vpkg 시나리오.
+        pool.seed_source("scripts/ghost.lua", "x = 42");
+        let id = pool.get_or_create("scripts/ghost.lua", world_ptr).unwrap();
+        assert!(pool.get(id).is_some());
+        // 백슬래시 표기도 같은 시드에 히트 (키 정규화).
+        let id2 = pool.get_or_create("scripts\\ghost.lua", world_ptr).unwrap();
+        assert_eq!(id, id2);
+    }
+
+    #[test]
+    fn failed_load_is_cached_and_does_not_retry() {
+        let mut world = World::new();
+        let world_ptr = &mut world as *mut World;
+        let mut pool = ScriptInstancePool::new();
+        assert!(pool.get_or_create("scripts/nope.lua", world_ptr).is_err());
+        // 두 번째는 실패 캐시에서 즉시 반환 (프레임당 fs 재시도/재로그 없음).
+        assert!(pool.get_or_create("scripts/nope.lua", world_ptr).is_err());
+        assert_eq!(pool.len(), 0);
     }
 
     #[test]

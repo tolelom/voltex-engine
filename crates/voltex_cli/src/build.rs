@@ -14,16 +14,28 @@ const VOLTEX_REPO_ENV: &str = "VOLTEX_REPO";
 pub fn cmd(args: &[String]) -> Result<()> {
     let manifest_dir = parse_manifest_path(args)?;
     let target_arg = parse_target_arg(args);
-    let engine_path = resolve_engine_path(args)?;
     let skip_path_validation = args.iter().any(|a| a == "--no-validate-paths");
 
     let manifest = Manifest::load_from_dir(&manifest_dir)?;
+    // kind="rust"는 엔진 경로를 라이선스 동봉에만 쓴다 — 게임 crate가 이미
+    // voltex를 의존으로 갖고 있으므로, 미설정이면 라이선스만 건너뛰고 진행.
+    let engine_path = match resolve_engine_path(args) {
+        Ok(p) => Some(p),
+        Err(_) if manifest.build.kind == BuildKind::Rust => {
+            eprintln!(
+                "voltex build: note: engine path not set — skipping license \
+                 bundling (set VOLTEX_REPO or --engine-path to include it)"
+            );
+            None
+        }
+        Err(e) => return Err(e),
+    };
     if !skip_path_validation {
         manifest.validate_paths(&manifest_dir)?;
     }
     let target = validate_target(&manifest, target_arg.as_deref(), host_triple())?;
 
-    build_target(&manifest_dir, &engine_path, &manifest, &target)
+    build_target(&manifest_dir, engine_path.as_deref(), &manifest, &target)
 }
 
 /// Pick the build target and reject impossible requests up front (B3).
@@ -105,12 +117,15 @@ fn resolve_engine_path(args: &[String]) -> Result<PathBuf> {
 
 pub fn build_target(
     manifest_dir: &Path,
-    engine_path: &Path,
+    engine_path: Option<&Path>,
     manifest: &Manifest,
     target: &str,
 ) -> Result<()> {
     let manifest_dir = canonicalize_friendly(manifest_dir)?;
-    let engine_path = canonicalize_friendly(engine_path)?;
+    let engine_path = match engine_path {
+        Some(p) => Some(canonicalize_friendly(p)?),
+        None => None,
+    };
     eprintln!(
         "voltex build: project={} target={}",
         manifest_dir.display(),
@@ -118,8 +133,12 @@ pub fn build_target(
     );
 
     if manifest.build.kind == BuildKind::Rust {
-        return build_rust_target(&manifest_dir, &engine_path, manifest);
+        return build_rust_target(&manifest_dir, engine_path.as_deref(), manifest);
     }
+    // scene kind의 wrapper 코드젠은 엔진 경로가 필수.
+    let engine_path = engine_path.ok_or_else(|| {
+        CliError::Io("engine path required for scene builds — set VOLTEX_REPO or --engine-path".into())
+    })?;
 
     let dist_dir = manifest_dir.join("dist");
     let wrapper_dir = dist_dir.join("wrapper");
@@ -177,7 +196,11 @@ pub fn build_target(
 /// to it — the shipped layout `RuntimeConfig::with_asset_root("assets")`
 /// expects. No `.vpkg` is packed: a Rust game owns its runtime config and can
 /// opt into a Vfs itself.
-fn build_rust_target(manifest_dir: &Path, engine_path: &Path, manifest: &Manifest) -> Result<()> {
+fn build_rust_target(
+    manifest_dir: &Path,
+    engine_path: Option<&Path>,
+    manifest: &Manifest,
+) -> Result<()> {
     if !manifest_dir.join("Cargo.toml").is_file() {
         return Err(CliError::Io(format!(
             "kind = \"rust\" expects a Cargo.toml next to voltex.toml (looked in {})",
@@ -230,9 +253,11 @@ fn build_rust_target(manifest_dir: &Path, engine_path: &Path, manifest: &Manifes
 
     copy_assets(manifest_dir, &dist_dir, manifest)?;
 
-    let licenses = copy_license_files(engine_path, &dist_dir)?;
-    if !licenses.is_empty() {
-        eprintln!("voltex build: bundled {} license file(s)", licenses.len());
+    if let Some(engine_path) = engine_path {
+        let licenses = copy_license_files(engine_path, &dist_dir)?;
+        if !licenses.is_empty() {
+            eprintln!("voltex build: bundled {} license file(s)", licenses.len());
+        }
     }
 
     Ok(())
@@ -297,14 +322,17 @@ fn copy_assets(manifest_dir: &Path, dist_dir: &Path, manifest: &Manifest) -> Res
     let scene_dst = dist_dir.join(&manifest.build.scene);
     copy_optional_file(&scene, &scene_dst)?;
 
-    // scripts (each glob → its directory prefix)
-    for dir in manifest.resolved_script_dirs(manifest_dir) {
-        let dst = dist_dir.join(dir.file_name().unwrap_or_default());
-        copy_optional_dir(&dir, &dst)?;
-    }
-    // assets (same pattern)
-    for dir in manifest.resolved_assets_dirs(manifest_dir) {
-        let dst = dist_dir.join(dir.file_name().unwrap_or_default());
+    // scripts / assets: dist 레이아웃은 manifest 기준 상대 경로를 보존한다
+    // (`assets/levels` → `dist/assets/levels`). file_name 평탄화는
+    // 중첩 선언을 잘못된 위치로 옮기고 (`dist/levels`), 마지막 컴포넌트가
+    // 같은 두 선언을 합쳐버린다 — .vpkg 키(strip_prefix 보존)와도 어긋남.
+    for dir in manifest
+        .resolved_script_dirs(manifest_dir)
+        .into_iter()
+        .chain(manifest.resolved_assets_dirs(manifest_dir))
+    {
+        let rel = dir.strip_prefix(manifest_dir).unwrap_or(&dir);
+        let dst = dist_dir.join(rel);
         copy_optional_dir(&dir, &dst)?;
     }
     Ok(())
@@ -967,7 +995,7 @@ mod tests {
             .unwrap()
             .to_path_buf();
 
-        build_target(&root, &engine, &m, host_triple()).expect("rust-kind build succeeds");
+        build_target(&root, Some(&engine), &m, host_triple()).expect("rust-kind build succeeds");
 
         let exe = root.join("dist").join(if cfg!(windows) {
             "mini_game.exe"
