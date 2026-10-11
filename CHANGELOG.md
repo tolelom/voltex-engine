@@ -10,6 +10,28 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## v1.0.166 — 2026-10-12 — glTF 인덱스 범위 미검증으로 로더 패닉
+
+### Fix
+
+- **voltex_image glTF — 정점 수를 넘는 인덱스**: 인덱스 accessor의 값을 정점 수와 대조하지
+  않았다. 손상되거나 조작된 파일은 탄젠트 생성 단계(`compute_tangents`)에서 범위 밖
+  인덱싱 패닉을 냈다(재현: 정점 3개에 인덱스 64). 탄젠트를 이미 가진 파일이라면 패닉
+  없이 렌더러로 넘어가 GPU 범위 밖 읽기가 됐을 경로다. 이제 primitive 조립 직후 검사해
+  `Err`를 돌려준다.
+
+### Tests
+
+- **voltex_image `tests/mesh_fuzz.rs`**: 인덱스·법선·UV·노드 계층·스킨·애니메이션을 갖춘
+  glTF를 테스트 안에서 만들어 base64 내장 JSON과 GLB 두 형태로 쓴다. 이를 숫자 치환
+  (문법은 유지한 채 인덱스·개수·오프셋만 바꿈), 임의 바이트, 잘라내기로 6000회 변조한다.
+  `assets/cube.obj`도 6000회 변조한다. 패닉이 없어야 하고, 성공한 메시의 인덱스는 모두
+  정점 범위 안이어야 한다. OBJ는 처음부터 깨끗했다.
+- **voltex_ecs `tests/scene_fuzz.rs`**: 계층·태그(비ASCII 포함)가 있는 월드를 바이너리·
+  JSON·텍스트로 직렬화한 뒤 9000회 변조한다. 로드와 transform 전파가 패닉하지 않아야
+  한다(통과, 버그 없음).
+- 개발 중 release 8만~15만 회, 다른 시드로도 깨끗함을 확인했다.
+
 ## v1.0.165 — 2026-10-12 — 손상된 Vorbis setup으로 디코더 패닉, float WAV NaN 통과
 
 ### Fix

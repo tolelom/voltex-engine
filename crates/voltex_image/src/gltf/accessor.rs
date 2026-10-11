@@ -144,6 +144,17 @@ pub(super) fn extract_meshes(json: &JsonValue, buffers: &[Vec<u8>]) -> crate::Re
                 });
             }
 
+            // Indices come from the file; one past the vertex list would index
+            // out of bounds in tangent generation and on the GPU.
+            if let Some(&bad) = indices.iter().find(|&&ix| ix as usize >= vertices.len()) {
+                return Err(format!(
+                    "glTF index {} out of range for {} vertices",
+                    bad,
+                    vertices.len()
+                )
+                .into());
+            }
+
             // Read JOINTS_0 (optional)
             let joints = if let Some(idx) = attrs
                 .iter()
