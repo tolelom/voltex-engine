@@ -97,10 +97,12 @@ fn read_f32_le(data: &[u8], offset: usize) -> crate::Result<f32> {
 
 /// Parse a WAV file from raw bytes into an [`AudioClip`].
 ///
-/// Supported formats:
-/// - PCM 16-bit (format_tag=1, bits_per_sample=16)
-/// - PCM 24-bit (format_tag=1, bits_per_sample=24)
-/// - IEEE float 32-bit (format_tag=3, bits_per_sample=32)
+/// Supported formats (mono or stereo):
+/// - PCM 8-bit unsigned, 16-bit, 24-bit, 32-bit (format_tag=1)
+/// - IEEE float 32-bit (format_tag=3)
+/// - WAVE_FORMAT_EXTENSIBLE (0xFFFE) wrapping either of the above
+///
+/// Unknown chunks (LIST, fact, ...) are skipped with RIFF word padding.
 pub fn parse_wav(data: &[u8]) -> crate::Result<AudioClip> {
     // Minimum viable WAV: RIFF(4) + size(4) + WAVE(4) = 12 bytes
     if data.len() < 12 {
@@ -123,7 +125,7 @@ pub fn parse_wav(data: &[u8]) -> crate::Result<AudioClip> {
         return Err(format!("fmt chunk too small: {}", fmt_size).into());
     }
 
-    let format_tag = read_u16_le(data, fmt_offset)?;
+    let mut format_tag = read_u16_le(data, fmt_offset)?;
     let channels = read_u16_le(data, fmt_offset + 2)?;
     if channels != 1 && channels != 2 {
         return Err(format!("Unsupported channel count: {}", channels).into());
@@ -134,10 +136,22 @@ pub fn parse_wav(data: &[u8]) -> crate::Result<AudioClip> {
     // block_align = fmt_offset + 12 (skip)
     let bits_per_sample = read_u16_le(data, fmt_offset + 14)?;
 
+    // WAVE_FORMAT_EXTENSIBLE: the real format is the first two bytes of the
+    // SubFormat GUID (after cbSize, wValidBitsPerSample, dwChannelMask).
+    // Audacity and most DAWs write 24-bit / multichannel audio this way.
+    if format_tag == 0xFFFE {
+        if fmt_size < 40 {
+            return Err(format!("EXTENSIBLE fmt chunk too small: {}", fmt_size).into());
+        }
+        format_tag = read_u16_le(data, fmt_offset + 24)?;
+    }
+
     // Validate format_tag + bits_per_sample combination
     let bytes_per_sample = match (format_tag, bits_per_sample) {
+        (1, 8) => 1,    // PCM 8-bit (unsigned)
         (1, 16) => 2,   // PCM 16-bit
         (1, 24) => 3,   // PCM 24-bit
+        (1, 32) => 4,   // PCM 32-bit
         (3, 32) => 4,   // IEEE float 32-bit
         (1, bps) => return Err(format!("Unsupported PCM bits per sample: {}", bps).into()),
         (3, bps) => return Err(format!("Unsupported float bits per sample: {} (only 32-bit supported)", bps).into()),
@@ -157,6 +171,15 @@ pub fn parse_wav(data: &[u8]) -> crate::Result<AudioClip> {
     let mut samples = Vec::with_capacity(sample_count);
 
     match (format_tag, bits_per_sample) {
+        (1, 8) => {
+            // 8-bit PCM is unsigned, centred on 128.
+            for i in 0..sample_count {
+                let raw = *data
+                    .get(data_offset + i)
+                    .ok_or_else(|| crate::AudioError::from("Unexpected end of 8-bit data"))?;
+                samples.push((raw as f32 - 128.0) / 128.0);
+            }
+        }
         (1, 16) => {
             for i in 0..sample_count {
                 let raw = read_i16_le(data, data_offset + i * 2)?;
@@ -168,6 +191,12 @@ pub fn parse_wav(data: &[u8]) -> crate::Result<AudioClip> {
                 let raw = read_i24_le(data, data_offset + i * 3)?;
                 // 24-bit range: [-8388608, 8388607]
                 samples.push(raw as f32 / 8388608.0);
+            }
+        }
+        (1, 32) => {
+            for i in 0..sample_count {
+                let raw = read_u32_le(data, data_offset + i * 4)? as i32;
+                samples.push(raw as f32 / 2_147_483_648.0);
             }
         }
         (3, 32) => {

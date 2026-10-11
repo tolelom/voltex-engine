@@ -9,7 +9,7 @@
 - `AudioClip` — PCM 데이터 (src/audio_clip.rs)
 - `AudioSource` / `ClipId` — per-entity 재생 디스크립터 + 타입화된 clip 식별자. ECS 컴포넌트로 등록 가능하나 audio crate 자체는 ECS 무의존 (src/audio_source.rs)
 - `AsyncAudioLoader` — 비동기 로딩 (src/async_loader.rs)
-- WAV/OGG 디코더 — `parse_wav`, `parse_ogg`(컨테이너) + `decode_vorbis`(코덱), 합본 진입점 `decode_ogg_vorbis_bytes` (src/wav.rs, src/ogg.rs, src/vorbis/)
+- WAV/OGG 디코더 — `parse_wav`(PCM 8/16/24/32·float32·EXTENSIBLE, v1.0.144), `parse_ogg`(컨테이너) + `decode_vorbis`(코덱), 합본 진입점 `decode_ogg_vorbis_bytes` (src/wav.rs, src/ogg.rs, src/vorbis/)
 - `load_clip_file(path) -> Result<AudioClip>` — 파일 read + `decode_clip_bytes` 원콜 디코드 (src/lib.rs; 에디터/핫리로드 공용)
 - `decode_clip_bytes(path, bytes) -> Result<AudioClip>` — in-memory bytes 를 path 확장자(wav/ogg) 분기로 디코드. 경로는 확장자/에러 메시지에만 사용 — Vfs(.vpkg) 소스 지원 (v1.0.103) (src/lib.rs)
 - `MixGroup`, `MixGroupManager`, `AudioBus` — 믹싱 (src/mix_group.rs, src/dynamic_groups.rs, src/audio_bus.rs)

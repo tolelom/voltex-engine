@@ -10,6 +10,20 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## v1.0.144 — 2026-10-12 — WAV: EXTENSIBLE · 8비트 · 32비트 정수 PCM
+
+### Additive
+
+- **voltex_audio `parse_wav`**: `WAVE_FORMAT_EXTENSIBLE`(0xFFFE)을 받는다.
+  SubFormat GUID 앞 2바이트로 실제 형식(PCM/float)을 고른다. Audacity와
+  대부분의 DAW가 24비트·멀티채널을 이 형식으로 써서, 지금까지는 "Unsupported
+  WAV format tag: 65534"로 거부됐다. 8비트(부호 없음, 128 중심)와 32비트 정수
+  PCM도 추가했다.
+- 검증 `tests/wav_real.rs`: CPython `wave`로 만든 8/32비트, 수제 EXTENSIBLE
+  24비트 PCM·float, 그리고 `data` 앞에 홀수 크기 LIST 청크가 있는 파일(패딩 —
+  기존에도 통과)을 알려진 정수 램프로 정확히 비교. 테스트 +5.
+- `.gitattributes`에 `*.wav` binary.
+
 ## v1.0.143 — 2026-10-12 — PNG 전 색 유형·비트 깊이 + tRNS 지원
 
 ### Additive
