@@ -131,8 +131,15 @@ impl World {
     }
 
     /// Attach (or overwrite) a component of type `T` on `entity`. The
-    /// underlying storage is created lazily on first call per type.
+    /// underlying storage is created lazily on first call per type. No-op if
+    /// `entity` is not alive (despawned or stale handle).
     pub fn add<T: 'static>(&mut self, entity: Entity, component: T) {
+        // Storage is keyed by slot id: writing through a stale handle would
+        // overwrite (and hide) the component of the live entity that now
+        // owns the slot. Adding to a dead entity is a no-op instead.
+        if !self.is_alive(entity) {
+            return;
+        }
         let type_id = TypeId::of::<T>();
         let storage = self
             .storages

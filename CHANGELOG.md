@@ -10,6 +10,27 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## v1.0.171 — 2026-10-12 — 옛 핸들로 add하면 살아 있는 엔티티의 컴포넌트를 덮어씀
+
+### Fix
+
+- **voltex_ecs `World::add` — 죽은 핸들 미검사**: 컴포넌트 저장소(SparseSet)는 슬롯 id로
+  키를 잡는다. 그래서 despawn된 옛 핸들로 `add`하면, 지금 그 슬롯을 쓰는 살아 있는
+  엔티티의 컴포넌트를 덮어썼다. 슬롯의 세대 표시까지 옛 값으로 바뀌어 살아 있는 쪽에서는
+  컴포넌트가 사라진 것처럼 보였다. 계층 속성 테스트에서 `add_child(parent, 옛 자식)`가 같은
+  슬롯의 살아 있는 엔티티에서 `Parent`를 지운 것으로 발견했다. 들고 있던 핸들이 오래된
+  경우는 게임 코드·스크립트·에디터 undo에서 모두 생긴다. 이제 살아 있지 않은 엔티티에 대한
+  `add`는 아무것도 하지 않는다. `get`·`get_mut`·`remove`는 원래 세대를 검사했다.
+- **동작 변화**: 죽은 엔티티에 컴포넌트를 붙이던 코드는 이제 조용히 무시된다. 워크스페이스
+  전체 테스트·GPU 캡처에서 이 경로에 의존하는 곳은 없었다.
+
+### Tests
+
+- **voltex_ecs `tests/hierarchy_property.rs`**: 시드 3 × 3000 단계에서 `add_child`·
+  `remove_child`·`despawn_recursive`·plain `despawn`을 죽은·무관한 엔티티까지 섞어 호출한다.
+  매 단계 살아 있는 엔티티 사이의 Parent↔Children 양방향 일치, Children 중복 없음, 순환
+  없음을 본다. 위 결함을 결정적 회귀 테스트로 따로 고정했다.
+
 ## v1.0.170 — 2026-10-12 — Lua 엔진 API 쓰레기 인자 퍼징
 
 ### Tests
