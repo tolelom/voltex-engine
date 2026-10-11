@@ -255,7 +255,16 @@ impl Mat4 {
         // det(M) = Laplace expansion along row 0.
         let det =
             e(0, 0) * cof(0, 0) + e(0, 1) * cof(0, 1) + e(0, 2) * cof(0, 2) + e(0, 3) * cof(0, 3);
-        if det.abs() < 1e-12 {
+        // Singularity relative to the matrix's own size: |det| is bounded by
+        // the product of its column lengths (Hadamard), so compare against
+        // that instead of an absolute cut-off, which rejected well-conditioned
+        // small-scale matrices (e.g. a 100k-unit orthographic projection).
+        let column_len = |c: usize| (m[c][0] * m[c][0] + m[c][1] * m[c][1] + m[c][2] * m[c][2] + m[c][3] * m[c][3]).sqrt();
+        let hadamard = column_len(0) * column_len(1) * column_len(2) * column_len(3);
+        // 1e-10, not ~f32::EPSILON: a large translation column inflates the
+        // bound (a view matrix 1e5 units from the origin sits near 1e-6) and
+        // such matrices are still fine for transforming points.
+        if !det.is_finite() || det.abs() <= 1e-10 * hadamard {
             return None;
         }
         let inv_det = 1.0 / det;
