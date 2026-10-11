@@ -1,4 +1,5 @@
-use super::accessor::{read_accessor_floats, read_accessor_mat4};
+use super::accessor::read_accessor_mat4;
+use super::component::read_accessor_floats;
 use super::types::{
     parse_animation_path, parse_interpolation, GltfAnimation, GltfChannel, GltfNode, GltfSkin,
     Interpolation,

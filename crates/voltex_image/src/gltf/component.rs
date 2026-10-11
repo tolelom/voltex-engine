@@ -6,7 +6,7 @@ use super::accessor::{get_buffer_data, validate_count};
 use crate::json_parser::JsonValue;
 
 /// Size in bytes of one glTF component, or `None` for an unknown type.
-fn component_size(comp_type: u32) -> Option<usize> {
+pub(super) fn component_size(comp_type: u32) -> Option<usize> {
     match comp_type {
         5120 | 5121 => Some(1), // BYTE / UNSIGNED_BYTE
         5122 | 5123 => Some(2), // SHORT / UNSIGNED_SHORT
@@ -17,7 +17,7 @@ fn component_size(comp_type: u32) -> Option<usize> {
 
 /// One component as f32. Normalized integers map to [0, 1] / [-1, 1]
 /// (signed: `max(c / MAX, -1)`, glTF 2.0 §3.11); others are cast.
-fn read_component(b: &[u8], comp_type: u32, normalized: bool) -> f32 {
+pub(super) fn read_component(b: &[u8], comp_type: u32, normalized: bool) -> f32 {
     match comp_type {
         5126 => f32::from_le_bytes([b[0], b[1], b[2], b[3]]),
         5121 => {
@@ -80,6 +80,55 @@ pub(super) fn read_accessor_vecn<const N: usize>(
             *slot = read_component(&buffer[at..at + comp_size], comp_type, normalized);
         }
         result.push(v);
+    }
+    Ok(result)
+}
+
+/// Flattened scalars of a SCALAR/VEC2/VEC3/VEC4 accessor — animation sampler
+/// inputs and outputs. Honours `componentType`/`normalized` like
+/// [`read_accessor_vecn`] (rotation outputs may be normalized SHORT/BYTE).
+pub(super) fn read_accessor_floats(
+    accessors: &[JsonValue],
+    buffer_views: &[JsonValue],
+    buffers: &[Vec<u8>],
+    idx: usize,
+) -> crate::Result<Vec<f32>> {
+    let acc = accessors.get(idx).ok_or("Accessor index out of range")?;
+    let count = validate_count(
+        acc.get("count")
+            .and_then(|v| v.as_u32())
+            .ok_or("Missing count")?,
+    )?;
+    let acc_type = acc.get("type").and_then(|v| v.as_str()).unwrap_or("SCALAR");
+    let components = match acc_type {
+        "SCALAR" => 1,
+        "VEC2" => 2,
+        "VEC3" => 3,
+        "VEC4" => 4,
+        _ => 1,
+    };
+    let total = count
+        .checked_mul(components)
+        .ok_or("glTF accessor count*components overflow")?;
+    // Animation outputs may be normalized integers (e.g. SHORT rotations).
+    let comp_type = acc
+        .get("componentType")
+        .and_then(|v| v.as_u32())
+        .unwrap_or(5126);
+    let comp_size = component_size(comp_type)
+        .ok_or_else(|| format!("Unsupported componentType {} for animation data", comp_type))?;
+    let normalized = acc
+        .get("normalized")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
+    let (buffer, offset, _) = get_buffer_data(acc, buffer_views, buffers)?;
+    let mut result = Vec::with_capacity(total);
+    for i in 0..total {
+        let o = offset + i * comp_size;
+        if o + comp_size > buffer.len() {
+            return Err("Buffer overflow reading floats".into());
+        }
+        result.push(read_component(&buffer[o..o + comp_size], comp_type, normalized));
     }
     Ok(result)
 }

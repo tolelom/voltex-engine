@@ -413,46 +413,6 @@ pub(super) fn read_accessor_mat4(
     Ok(result)
 }
 
-pub(super) fn read_accessor_floats(
-    accessors: &[JsonValue],
-    buffer_views: &[JsonValue],
-    buffers: &[Vec<u8>],
-    idx: usize,
-) -> crate::Result<Vec<f32>> {
-    let acc = accessors.get(idx).ok_or("Accessor index out of range")?;
-    let count = validate_count(
-        acc.get("count")
-            .and_then(|v| v.as_u32())
-            .ok_or("Missing count")?,
-    )?;
-    let acc_type = acc.get("type").and_then(|v| v.as_str()).unwrap_or("SCALAR");
-    let components = match acc_type {
-        "SCALAR" => 1,
-        "VEC2" => 2,
-        "VEC3" => 3,
-        "VEC4" => 4,
-        _ => 1,
-    };
-    let total = count
-        .checked_mul(components)
-        .ok_or("glTF accessor count*components overflow")?;
-    let (buffer, offset, _) = get_buffer_data(acc, buffer_views, buffers)?;
-    let mut result = Vec::with_capacity(total);
-    for i in 0..total {
-        let o = offset + i * 4;
-        if o + 4 > buffer.len() {
-            return Err("Buffer overflow reading floats".into());
-        }
-        result.push(f32::from_le_bytes([
-            buffer[o],
-            buffer[o + 1],
-            buffer[o + 2],
-            buffer[o + 3],
-        ]));
-    }
-    Ok(result)
-}
-
 // Helper functions for tests
 #[allow(dead_code)]
 pub(super) fn read_floats(buffer: &[u8], offset: usize, count: usize) -> Vec<f32> {
@@ -477,6 +437,7 @@ pub(super) fn read_indices_u16(buffer: &[u8], offset: usize, count: usize) -> Ve
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::gltf::component::read_accessor_floats;
     use crate::json_parser::parse_json;
 
     /// Two interleaved vertices: position (12 B) + uv (8 B) per vertex, so
@@ -565,6 +526,18 @@ mod tests {
         );
         let v = read_accessor_vec2(&acc, &views, &bufs, 0).unwrap();
         assert_eq!(v, vec![[-1.0, -1.0], [1.0, 0.0]]);
+    }
+
+    #[test]
+    fn animation_output_reads_normalized_short_rotations() {
+        // glTF 2.0 allows rotation sampler outputs as normalized SHORT.
+        let buf: Vec<u8> = [0i16, 0, 0, 32767].iter().flat_map(|v| v.to_le_bytes()).collect();
+        let (acc, views, bufs) = single_view(
+            buf,
+            r#"[{"bufferView":0,"count":1,"type":"VEC4","componentType":5122,"normalized":true}]"#,
+        );
+        let q = read_accessor_floats(&acc, &views, &bufs, 0).unwrap();
+        assert_eq!(q, vec![0.0, 0.0, 0.0, 1.0]);
     }
 
     #[test]

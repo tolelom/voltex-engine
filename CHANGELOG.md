@@ -10,6 +10,17 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## v1.0.134 — 2026-10-12 — glTF 애니메이션 데이터도 normalized 정수 지원
+
+### Fix
+
+- **voltex_image glTF 애니메이션**: 샘플러 input/output을 항상 f32로 읽었다.
+  glTF 2.0은 rotation·weights 출력을 normalized BYTE/SHORT 등으로 저장하는
+  것을 허용하므로, 그런 파일의 회전 키프레임은 쓰레기 값이 됐다(예: `(0,0,0,32767)`
+  SHORT → 기대 단위 쿼터니언 `(0,0,0,1)`). v1.0.133의 컴포넌트 헬퍼를 재사용하도록
+  고쳤다. `read_accessor_floats`는 `gltf/component.rs`로 옮겼다(600줄 규칙).
+  테스트 +1.
+
 ## v1.0.133 — 2026-10-12 — glTF 정점 속성 componentType·normalized 지원
 
 ### Fix
