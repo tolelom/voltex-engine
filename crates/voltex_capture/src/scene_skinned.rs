@@ -533,8 +533,7 @@ mod tests {
         // and shade differently from the colored skinned path.
         let pbr_rest = render_skinned_runtime_mode(&gpu, w, h, 0.0, true);
         let pbr_posed = render_skinned_runtime_mode(&gpu, w, h, 1.0, true);
-        let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../../docs/visual/");
-        crate::save_png(&format!("{dir}skinned_pbr.png"), w, h, &pbr_posed).unwrap();
+        crate::write_visual_record("skinned_pbr.png", w, h, &pbr_posed);
 
         assert!(
             !ImageStats::analyze(&pbr_rest).looks_blank(),
@@ -587,8 +586,7 @@ mod tests {
         let off_ctrl = render_skinned_shadow_scene(&gpu, w, h, false, true);
         let baseline = darkened_pixels(&on_ctrl, &off_ctrl, 40);
 
-        let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../../docs/visual/");
-        crate::save_png(&format!("{dir}skinned_shadow.png"), w, h, &on).unwrap();
+        crate::write_visual_record("skinned_shadow.png", w, h, &on);
 
         assert!(
             cast > 500,

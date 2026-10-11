@@ -27,6 +27,14 @@ in CI):
 cargo test -p voltex_capture -- --ignored
 ```
 
+These tests leave the PNGs in this directory untouched unless
+`VOLTEX_WRITE_SCREENSHOTS=1` is set (GPU output is not bit-identical across
+runs, so rewriting them every run would dirty the working tree):
+
+```bash
+VOLTEX_WRITE_SCREENSHOTS=1 cargo test -p voltex_capture -- --ignored
+```
+
 ## What was verified (2026-05-28)
 
 GPU: NVIDIA GeForce RTX 4080 SUPER (Vulkan).

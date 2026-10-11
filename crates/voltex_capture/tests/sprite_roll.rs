@@ -47,11 +47,5 @@ fn roll_from_transform_rotates_the_billboard_in_screen_plane() {
     assert!(!is_red(&rolled, right_of_centre.0, right_of_centre.1), "rolled sprite is no longer wide");
     assert!(is_red(&rolled, above_centre.0, above_centre.1), "rolled sprite stands tall");
 
-    let png = voltex_capture::encode_rgba8(W, H, &rolled);
-    if let Err(e) = std::fs::write(
-        concat!(env!("CARGO_MANIFEST_DIR"), "/../../docs/visual/sprite_roll.png"),
-        png,
-    ) {
-        eprintln!("screenshot write failed: {e}");
-    }
+    voltex_capture::write_visual_record("sprite_roll.png", W, H, &rolled);
 }

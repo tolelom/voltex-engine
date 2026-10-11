@@ -1721,8 +1721,7 @@ mod tests {
         assert!(green_px > 50, "expected green checker texels, got {green_px}");
 
         // Persist a visual artifact for manual inspection.
-        let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../../docs/visual/");
-        let _ = std::fs::write(format!("{dir}textured_entity.png"), crate::encode_rgba8(256, 256, &rgba));
+        crate::write_visual_record("textured_entity.png", 256, 256, &rgba);
     }
 
     /// Asset hot-reload regression: replacing a texture in place behind an
@@ -1854,9 +1853,8 @@ mod tests {
         };
         let off = render_shadow_demo(&gpu, 512, 512, false);
         let on = render_shadow_demo(&gpu, 512, 512, true);
-        let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../../docs/visual/");
-        crate::save_png(&format!("{dir}shadow_off.png"), 512, 512, &off).unwrap();
-        crate::save_png(&format!("{dir}shadow_on.png"), 512, 512, &on).unwrap();
+        crate::write_visual_record("shadow_off.png", 512, 512, &off);
+        crate::write_visual_record("shadow_on.png", 512, 512, &on);
         // Shadows on → overall darker (occluded ground region) than shadows off.
         let lum = |r: &[u8]| -> u64 {
             r.chunks_exact(4).map(|p| p[0] as u64 + p[1] as u64 + p[2] as u64).sum()
@@ -2011,8 +2009,7 @@ mod tests {
             22.0,
         );
         let on = render_spot_lit(&gpu, 256, 256, &[down]);
-        let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../../docs/visual/");
-        crate::save_png(&format!("{dir}spot_cone.png"), 256, 256, &on).unwrap();
+        crate::write_visual_record("spot_cone.png", 256, 256, &on);
         let center = lum(&on, 128, 128);
         let corner = lum(&on, 20, 20);
         assert!(
@@ -2074,8 +2071,7 @@ mod tests {
 
         let early = render_particle_burst(&gpu, 256, 256, 2, 0.1); // t≈0.2s
         let late = render_particle_burst(&gpu, 256, 256, 8, 0.1); // t≈0.8s
-        let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../../docs/visual/");
-        crate::save_png(&format!("{dir}particle_burst.png"), 256, 256, &late).unwrap();
+        crate::write_visual_record("particle_burst.png", 256, 256, &late);
 
         let (re, rl) = (mean_radius(&early), mean_radius(&late));
         assert!(re > 1.0, "early burst should have visible particles, r={re:.1}");
@@ -2119,8 +2115,7 @@ mod tests {
         };
         let colored = render_pbr_basic_renderer(&gpu, 256, 256, false);
         let pbr = render_pbr_basic_renderer(&gpu, 256, 256, true);
-        let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../../docs/visual/");
-        crate::save_png(&format!("{dir}pbr_runtime.png"), 256, 256, &pbr).unwrap();
+        crate::write_visual_record("pbr_runtime.png", 256, 256, &pbr);
 
         assert!(!crate::ImageStats::analyze(&pbr).looks_blank(), "PBR frame blank");
         // Enabling PBR must visibly change shading vs the Blinn-Phong path.
@@ -2334,8 +2329,7 @@ mod tests {
         // distance (4) → a true billboard keeps the same on-screen footprint.
         let front = render_billboard_sprite(&gpu, 256, 256, Vec3::new(0.0, 0.0, 4.0), 0.0);
         let side = render_billboard_sprite(&gpu, 256, 256, Vec3::new(4.0, 0.0, 0.0), -FRAC_PI_2);
-        let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../../docs/visual/");
-        crate::save_png(&format!("{dir}sprite_billboard.png"), 256, 256, &front).unwrap();
+        crate::write_visual_record("sprite_billboard.png", 256, 256, &front);
 
         let (cf, cs) = (magenta(&front), magenta(&side));
         assert!(cf > 1500, "front view should show the sprite, got {cf} px");
@@ -2383,8 +2377,7 @@ mod tests {
             LineVertex::new([0.0, 1.5, 0.0], green),
         ];
         let lit = render_debug_lines(&gpu, 256, 256, &verts);
-        let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../../docs/visual/");
-        crate::save_png(&format!("{dir}debug_lines.png"), 256, 256, &lit).unwrap();
+        crate::write_visual_record("debug_lines.png", 256, 256, &lit);
 
         // The horizontal line sits at world y=0 → near the center row; a 1px
         // line straddles the row boundary, so scan a small band for it.

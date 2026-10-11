@@ -181,9 +181,8 @@ mod tests {
         // Two scripted frames: start, then player moved + chaser closed in.
         let a = render_demo_frame(&gpu, 640, 360, 0.2, 0.0, Vec3::new(10.0, 0.5, 10.0));
         let b = render_demo_frame(&gpu, 640, 360, 1.0, 5.0, Vec3::new(3.0, 0.5, 3.0));
-        let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../../docs/visual/");
-        crate::save_png(&format!("{dir}demo_frame_a.png"), 640, 360, &a).unwrap();
-        crate::save_png(&format!("{dir}demo_frame_b.png"), 640, 360, &b).unwrap();
+        crate::write_visual_record("demo_frame_a.png", 640, 360, &a);
+        crate::write_visual_record("demo_frame_b.png", 640, 360, &b);
         assert!(!ImageStats::analyze(&a).looks_blank(), "frame A blank");
         assert!(!ImageStats::analyze(&b).looks_blank(), "frame B blank");
         // The two frames must differ (player moved, totem waved, chaser closer).
@@ -210,8 +209,7 @@ mod tests {
         // runtime path — what a user gets from RuntimeConfig::with_pbr(true).
         let colored = render_demo_frame_mode(&gpu, 640, 360, 1.0, 5.0, Vec3::new(3.0, 0.5, 3.0), false);
         let pbr = render_demo_frame_mode(&gpu, 640, 360, 1.0, 5.0, Vec3::new(3.0, 0.5, 3.0), true);
-        let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../../docs/visual/");
-        crate::save_png(&format!("{dir}demo_frame_pbr.png"), 640, 360, &pbr).unwrap();
+        crate::write_visual_record("demo_frame_pbr.png", 640, 360, &pbr);
 
         assert!(!ImageStats::analyze(&pbr).looks_blank(), "PBR demo frame blank");
         // PBR shading should differ from the colored path on the same scene.

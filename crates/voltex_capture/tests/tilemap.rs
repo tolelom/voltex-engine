@@ -56,11 +56,5 @@ fn tilemap_fills_set_cells_and_leaves_empty_ones() {
     assert!(red(c2), "filled cell 2 should be red: {c2:?}");
     assert!(!red(above), "above the row (y > 2) should be background: {above:?}");
 
-    let png = voltex_capture::encode_rgba8(W, H, &rgba);
-    if let Err(e) = std::fs::write(
-        concat!(env!("CARGO_MANIFEST_DIR"), "/../../docs/visual/tilemap_basic.png"),
-        png,
-    ) {
-        eprintln!("screenshot write failed: {e}");
-    }
+    voltex_capture::write_visual_record("tilemap_basic.png", W, H, &rgba);
 }

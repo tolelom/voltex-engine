@@ -10,6 +10,18 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## v1.0.172 — 2026-10-12 — GPU 테스트 스크린샷 기록은 opt-in
+
+### Changed (test-only)
+
+- **voltex_capture GPU 테스트가 `docs/visual/` PNG를 매번 다시 쓰던 것**: GPU 출력은
+  실행마다 비트 단위로 같지 않아 `demo_frame_{a,b,pbr}.png`가 매 실행 바뀌었고, 작업
+  트리가 더러워졌다. 15개 기록 지점을 `voltex_capture::write_visual_record`로 모았다.
+  `VOLTEX_WRITE_SCREENSHOTS`가 비어 있지 않고 `0`이 아닐 때만 쓴다. 쓰기 실패는
+  stderr에만 남기고 테스트를 실패시키지 않는다(기록은 검증 대상이 아님. 일부 지점은 전에도
+  실패를 무시했다). 재생성 방법은 `docs/visual/README.md`.
+- 확인: 미설정으로 `--include-ignored` 실행 뒤 `docs/visual` 변경 0, 설정하면 15개 PNG 갱신.
+
 ## v1.0.171 — 2026-10-12 — 옛 핸들로 add하면 살아 있는 엔티티의 컴포넌트를 덮어씀
 
 ### Fix

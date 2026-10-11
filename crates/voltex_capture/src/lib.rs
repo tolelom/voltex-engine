@@ -37,6 +37,31 @@ pub fn save_png(path: &str, width: u32, height: u32, rgba: &[u8]) -> std::io::Re
     std::fs::write(path, png)
 }
 
+/// Environment variable that lets GPU tests rewrite the tracked reference
+/// PNGs under `docs/visual/`. Unset, empty or `0` leaves them untouched.
+pub const WRITE_SCREENSHOTS_ENV: &str = "VOLTEX_WRITE_SCREENSHOTS";
+
+fn visual_record_enabled(value: Option<&str>) -> bool {
+    matches!(value, Some(v) if !v.is_empty() && v != "0")
+}
+
+/// Write `rgba` to `docs/visual/<name>` when [`WRITE_SCREENSHOTS_ENV`] is set.
+/// Rendering is not bit-identical across runs, so writing by default would
+/// dirty the tracked PNGs on every GPU test run. A failed write is reported
+/// on stderr and does not fail the caller.
+pub fn write_visual_record(name: &str, width: u32, height: u32, rgba: &[u8]) {
+    let value = std::env::var(WRITE_SCREENSHOTS_ENV).ok();
+    if !visual_record_enabled(value.as_deref()) {
+        return;
+    }
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../docs/visual")
+        .join(name);
+    if let Err(e) = std::fs::write(&path, encode_rgba8(width, height, rgba)) {
+        eprintln!("visual record write failed ({}): {e}", path.display());
+    }
+}
+
 /// Summary statistics of an RGBA8 image, used to flag obviously-broken frames
 /// (all black, single flat color, presence of fully-transparent or NaN-derived
 /// pixels) without a human in the loop.
@@ -116,5 +141,14 @@ mod tests {
         assert!(!s.looks_blank());
         assert!(s.distinct_colors > 1);
         assert!(s.mean_luminance > 0.0);
+    }
+
+    #[test]
+    fn visual_record_writes_are_opt_in() {
+        assert!(!visual_record_enabled(None));
+        assert!(!visual_record_enabled(Some("")));
+        assert!(!visual_record_enabled(Some("0")));
+        assert!(visual_record_enabled(Some("1")));
+        assert!(visual_record_enabled(Some("true")));
     }
 }

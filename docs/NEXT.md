@@ -17,7 +17,6 @@
 
 | 항목 | 현상 | 선택지 |
 |---|---|---|
-| GPU 테스트 스크린샷 | voltex_capture GPU 테스트가 실행마다 추적 파일 `docs/visual/demo_frame_{a,b,pbr}.png`를 다시 써서 작업 트리가 더러워짐 (`crates/voltex_capture/src/scene_playthrough.rs`) | 환경 변수(예: `VOLTEX_WRITE_SCREENSHOTS=1`)일 때만 쓰기 / 출력 경로를 `target/` 아래로 이동 |
 | 커버리지 게이트 | `cargo llvm-cov --workspace --lib` 라인 68.29%(GPU 제외), `-- --include-ignored` 82.90%(RTX 4080), CI 게이트 78%. AUDIT-BACKLOG F5의 "lib-only 79.69%" 전제와 맞지 않음. 원인 미조사 | 측정 범위 차이인지 하락인지 먼저 확인한 뒤 GPU 없는 runner용 기준을 따로 둘지 결정 |
 | glTF 머티리얼 텍스처 | 텍스처를 무시하고 색 계수만 로드 ([DEFERRED](DEFERRED.md) "2026-10-12 밤샘 점검") | baseColor·normal부터 임포트 / 실제 glTF 에셋을 쓸 때까지 보류 |
 | `Packet::to_bytes` 길이 | 64 KiB 넘는 페이로드에서 u16 길이가 wrap (`crates/voltex_net/src/packet.rs`). UDP에선 OS가 먼저 막아 도달하지 않음 | `try_to_bytes() -> Result` 추가 / 다른 전송 계층을 붙일 때까지 보류 |
