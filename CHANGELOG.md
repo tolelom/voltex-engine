@@ -10,6 +10,28 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## v1.0.122 — 2026-10-12 — 배치 타일맵 렌더 (friction-2 #5, 엔진 측)
+
+설계: `docs/superpowers/specs/2026-10-12-tilemap-batch-render-design.md`.
+
+### Additive
+
+- **voltex_renderer_ecs `Tilemap`** 컴포넌트 + `tilemap_vertices`: 로컬 XY
+  평면 격자(gy +y 위, 0=빈 칸, n=아틀라스 프레임 n-1). `WorldTransform`이
+  평면을 놓는다(빌보드 아님).
+- **`BasicRenderer` 타일맵 패스** (`tilemap_pass.rs`): 보이는 맵을 하나의
+  꼭짓점 스트림에 펼쳐 맵마다 텍스처 바인드 1회 + draw 1회. 스킨드 다음,
+  스프라이트 앞(플레이어·코인이 타일 위에 합성). 프레임당 최대 16384쿼드,
+  초과 시 경고 1회. 셀마다 Sprite 엔티티를 쓰던 방식의 `MAX_SPRITES = 256`
+  예산·엔티티당 dynamic UBO 슬롯과 무관.
+- **voltex_renderer** `TilemapVertex`/`TilemapUniform`/`create_tilemap_pipeline`
+  + `tilemap.wgsl`.
+- 검증: 단위 13(꼭짓점 전개 7 — 축 뒤바꿈·UV 반전·변환 무시 변이 3종이 모두
+  테스트 실패로 잡힘, 배치 패킹 3, GPU 타입 3), GPU 캡처
+  `voltex_capture/tests/tilemap.rs`(RTX 4080: 채운 셀 정확히 틴트색, 빈 셀·맵
+  밖은 배경; 패스 호출을 끄면 실패) + `docs/visual/tilemap_basic.png`.
+- leap 마이그레이션은 v1.0.123(B3b).
+
 ## v1.0.121 — 2026-10-12 — survivor 씬 version 누락 + 저장소 씬 전수 로드 가드
 
 ### Fix

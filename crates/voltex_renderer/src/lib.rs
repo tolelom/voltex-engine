@@ -50,6 +50,7 @@ pub mod shadow_pipeline;
 pub mod sphere;
 pub mod spot_shadow;
 pub mod sprite;
+pub mod tilemap;
 pub mod ssgi;
 pub mod ssr;
 pub mod taa;
@@ -125,6 +126,10 @@ pub use spot_shadow::{spot_shadow_matrix, SpotShadowMap};
 pub use sprite::{
     create_sprite_pipeline, sprite_uniform_bind_group_layout, SpriteUniform, SpriteVertex,
     SPRITE_INDICES, SPRITE_QUAD, SPRITE_VERTEX_LAYOUT,
+};
+pub use tilemap::{
+    create_tilemap_pipeline, tilemap_quad_indices, tilemap_uniform_bind_group_layout,
+    TilemapUniform, TilemapVertex, TILEMAP_VERTEX_LAYOUT,
 };
 pub use ssgi::{SsgiResources, SsgiUniform, SSGI_OUTPUT_FORMAT};
 pub use ssr::Ssr;

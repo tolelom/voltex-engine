@@ -22,6 +22,7 @@ ECS World ↔ voltex_renderer 브릿지. C0a 의 `MeshHandle` / `MaterialHandle`
 | `BasicRenderer::set_point_lights(&queue, &[PointLight])` / `set_shadows(bool)` / `set_debug_lines(&queue, &[LineVertex])` | `basic_renderer.rs` | 매 프레임 호출(`&self`). 디버그 라인은 `LineList` depth-tested 마지막 패스 (MAX 8192 verts, 초과 drop) |
 | `Sprite { texture, size, color, uv_rect, flip_x }` + `Sprite::solid` / `textured` / `with_uv_rect(rect)` / `set_sheet_frame(cols,rows,index)` / `effective_uv_rect()` | `sprite.rs` | 카메라-facing 빌보드 컴포넌트. `WorldTransform`+`Sprite` 엔티티를 mesh 패스 후 alpha-blended·depth-tested(no write) 빌보드로 렌더. `uv_rect`로 스프라이트시트/아틀라스 프레임 선택, `flip_x`는 렌더 시점 u-스왑(표시 전용 — 애니 시스템과 충돌 없음, 렌더러는 `effective_uv_rect()` 사용). 카메라 right/up은 inverse VP에서 복원. 카메라 거리 기준 back-to-front 정렬(투명도 합성 순서 무관). MAX 256/frame |
 | `Particle { velocity, acceleration, age, lifetime, start/end_size, start/end_alpha }` + `Particle::new(vel,lifetime,size)` / `spawn_particle(world,pos,color,particle)` / `update_particles(&mut World, dt)` | `particle.rs` | CPU 파티클(=Transform+Sprite+Particle 엔티티). update가 이동·크기/알파 보간·수명 만료 despawn. RuntimeApp tick이 `update_particles` 자동 호출 |
+| `Tilemap { cols, rows, tile_size, tiles, texture, atlas, color }` + `Tilemap::solid(cols,rows,ts,color)` / `set(gx,gy,tile)` / `filled_count()` / `tilemap_vertices(&map,&world_mat)` | `tilemap.rs` | 배치 타일맵. 로컬 XY 평면 격자(gy +y 위), `tiles[gy*cols+gx]` 0=빈 칸·n=아틀라스 프레임 n-1(`set_sheet_frame`과 같은 규약). 빌보드 아님 — `WorldTransform`이 평면을 놓는다. `BasicRenderer`가 스킨드 다음·스프라이트 앞에 맵당 텍스처 바인드 1 + draw 1로 렌더(`tilemap_pass.rs`, 전체 MAX 16384 쿼드/frame, 초과 시 경고 1회). `Hidden` 존중. 씬 직렬화 미등록(Sprite와 동일) |
 | `SpriteAnimation { cols, rows, first_frame, frame_count, fps, time, playing, looping }` + `SpriteAnimation::new(cols,rows,frames,fps)` / `SpriteAnimation::clip(cols,rows,first,frames,fps)` / `update_sprite_animations(&mut World, dt)` | `sprite.rs` | 스프라이트시트 애니메이션. Sprite+SpriteAnimation 엔티티의 `uv_rect`를 시간에 따라 프레임 진행(loop=wrap, else clamp+stop; `first_frame` 오프셋으로 한 시트에 다중 클립). RuntimeApp tick 자동 호출 |
 | `PrimitiveMesh` (`Cube`/`Plane`/`Quad`/`Sphere`) + `cube`/`plane`/`quad`/`sphere`/`sphere_default` / `aabb()` / `geometry()` | `renderable.rs` | 값-타입 모양 선언(GPU 무관). `Component` → 씬 직렬화. 빌트인 generator 위임 |
 | `MaterialDesc(MaterialUniform)` + `color(rgba)` / `pbr(rgba,metallic,roughness)` | `renderable.rs` | 값-타입 머티리얼 선언. `Component` → 씬 직렬화 |
@@ -55,6 +56,8 @@ src/
 ├── renderable.rs       # PrimitiveMesh / MaterialDesc / materialize_renderables (선언적 렌더러블)
 ├── particle.rs         # Particle / spawn_particle / update_particles
 ├── sprite.rs           # Sprite / SpriteAnimation / update_sprite_animations
+├── tilemap.rs          # Tilemap 컴포넌트 + tilemap_vertices (CPU 쿼드 전개)
+├── tilemap_pass.rs     # BasicRenderer 타일맵 패스 + pack_tilemap_batches
 └── skinned.rs          # SkinnedMeshHandle / SkinnedPose / update_skinned_poses
 ```
 

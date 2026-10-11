@@ -126,6 +126,8 @@ pub struct BasicRenderer {
     mesh_overflow_warned: Cell<bool>,
     sprite_overflow_warned: Cell<bool>,
     skinned_overflow_warned: Cell<bool>,
+    /// Batched `Tilemap` pass (drawn before sprites).
+    tilemap_pass: crate::tilemap_pass::TilemapPass,
     // ── Skinned PBR (used when both pbr_enabled and skinned entities exist) ──
     pbr_skinned_pipeline: wgpu::RenderPipeline,
     pbr_skinned_cam_buffer: wgpu::Buffer,
@@ -397,6 +399,9 @@ impl BasicRenderer {
             mapped_at_creation: false,
         });
 
+        let tilemap_pass =
+            crate::tilemap_pass::TilemapPass::new(device, queue, target_format, &tex_layout);
+
         // ── Billboard sprite resources ──────────────────────────────────────
         let sprite_uniform_layout = sprite_uniform_bind_group_layout(device);
         let sprite_pipeline =
@@ -667,6 +672,7 @@ impl BasicRenderer {
             mesh_overflow_warned: Cell::new(false),
             sprite_overflow_warned: Cell::new(false),
             skinned_overflow_warned: Cell::new(false),
+            tilemap_pass,
             pbr_skinned_pipeline,
             pbr_skinned_cam_buffer,
             pbr_skinned_cam_aligned,
@@ -851,6 +857,9 @@ impl BasicRenderer {
         }
 
         self.render_skinned(queue, encoder, target_view, depth_view, world, assets, view_proj, cam_pos);
+        self.tilemap_pass.render(
+            queue, encoder, target_view, depth_view, world, assets, &self.default_texture, view_proj,
+        );
         self.render_sprites(queue, encoder, target_view, depth_view, world, assets, view_proj, cam_pos);
         self.render_debug_lines(queue, encoder, target_view, depth_view, view_proj);
     }
@@ -1544,7 +1553,7 @@ fn pbr_camera_light_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
 /// Emit a one-time `eprintln!` the first time a per-frame draw cap is exceeded,
 /// so silently-dropped objects don't read as "everything rendered". `flag` is
 /// flipped after the first warning.
-fn warn_overflow_once(flag: &Cell<bool>, kind: &str, count: usize, cap: usize) {
+pub(crate) fn warn_overflow_once(flag: &Cell<bool>, kind: &str, count: usize, cap: usize) {
     if count > cap && !flag.get() {
         flag.set(true);
         eprintln!(

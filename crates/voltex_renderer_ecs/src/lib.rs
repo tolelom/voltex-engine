@@ -17,6 +17,8 @@ pub mod particle;
 pub mod renderable;
 pub mod skinned;
 pub mod sprite;
+pub mod tilemap;
+mod tilemap_pass;
 
 pub use error::{RendererEcsError, Result};
 pub use assets::{MeshPath, PbrTextures, RenderAssets, TextureHandle, TexturePath};
@@ -31,3 +33,4 @@ pub use renderable::{
     register_renderable_components, MaterialDesc, PrimitiveMesh,
 };
 pub use sprite::{update_sprite_animations, Sprite, SpriteAnimation};
+pub use tilemap::{tilemap_vertices, Tilemap};

@@ -11,6 +11,7 @@ wgpu 기반 렌더링 — 메시/PBR/그림자/IBL/디퍼드/RT/post-process. �
 - `SkinnedMeshVertex`, `BonePalette`, `MAX_BONES` — 스킨드 메시 정점 (src/skinned_vertex.rs)
 - `Skeleton`, `JointPose` — 조인트 계층 + 포즈 → BonePalette (from_skin/apply_animation/compute_palette) (src/skeleton.rs)
 - `create_skinned_mesh_pipeline`, `skinned_camera_bind_group_layout`, `bone_palette_bind_group_layout` — GPU 스키닝 파이프라인 (src/pipeline.rs, src/mesh_skinned.wgsl)
+- `TilemapVertex`, `TilemapUniform`, `TILEMAP_VERTEX_LAYOUT`, `tilemap_quad_indices`, `tilemap_uniform_bind_group_layout`, `create_tilemap_pipeline` — 배치 타일맵(월드 좌표 쿼드 + 꼭짓점 색, 스프라이트와 같은 블렌드/깊이 상태; src/tilemap.rs, src/tilemap.wgsl)
 - `ColoredCameraUniform`, `create_colored_mesh_pipeline` — per-entity base_color 틴트 Blinn-Phong (BasicRenderer 전용, src/light.rs, src/mesh_colored.wgsl)
 - `Mesh` — 메시 데이터 + `Mesh::from_obj(device, source)` / `Mesh::from_gltf(device, bytes)` 모델 로더 (src/mesh.rs)
 - `Camera`, `FpsController` — 카메라 (src/camera.rs)
@@ -97,7 +98,7 @@ wgpu 기반 렌더링 — 메시/PBR/그림자/IBL/디퍼드/RT/post-process. �
 - RT: rt_accel, rt_shadow, rt_reflections, rt_ao, rt_point_shadow, soft_rt_shadow, blas_update, rt_fallback
 - SSGI/Probes/Volumes: ssgi, half_res_ssgi, stencil_opt, light_volumes, light_probes
 - 포스트: hdr, bloom, bilateral_bloom, tonemap, forward_pass, auto_exposure, instancing, bilateral_blur, temporal_accum, taa, ssr, motion_blur, dof
-- 셰이더: 각종 .wgsl 파일 (mesh, pbr, shadow, deferred, ssgi, rt, bloom, taa, ssr, motion_blur, dof, bilateral_blur, auto_exposure, brdf_lut_compute, instanced, forward, skinned)
+- 셰이더: 각종 .wgsl 파일 (mesh, pbr, shadow, deferred, ssgi, rt, bloom, taa, ssr, motion_blur, dof, bilateral_blur, auto_exposure, brdf_lut_compute, instanced, forward, skinned, sprite, tilemap)
 
 ## 의존성
 - voltex crate: voltex_math, voltex_platform, voltex_image
