@@ -90,6 +90,12 @@ impl<'a> VpkgReader<'a> {
             )));
         }
         let count = u32::from_le_bytes([bytes[8], bytes[9], bytes[10], bytes[11]]) as usize;
+        // Each index entry takes at least 12 bytes, so a header claiming more
+        // than the file can hold is corrupt — reject it before pre-allocating
+        // (u32::MAX entries tried to reserve ~137 GB and aborted the process).
+        if count > (bytes.len() - 12) / 12 {
+            return Err(AssetError::Generic(format!("vpkg entry count {count} exceeds archive size")));
+        }
         let mut entries = Vec::with_capacity(count);
         let mut cursor = 12usize;
         for _ in 0..count {

@@ -264,3 +264,4 @@ high/medium 19건은 당일 해소 (CHANGELOG v1.0.114). LOW 4건은 실피해 �
 - **JPEG**: baseline·그레이/YCbCr만(progressive·CMYK는 에러, v1.0.145). 서브샘플 크로마는 샘플 복제(libjpeg의 보간 업샘플보다 강한 색 경계가 거칠다).
 - **Vorbis**: 엔진 디코더는 스펙대로 만든 스트림(통합 테스트)만 검증됐다. libvorbis 인코딩 파일(VQ 코드북·채널 커플링) 호환은 미검증.
 - **레이캐스트, 레이가 콜라이더 안에서 시작할 때 규약 불일치**: `Box`는 `t=0`과 가장 가까운 면 법선을 돌려주고, `Sphere`·`Capsule`은 출구 지점의 t를 돌려준다. 어느 쪽으로 통일할지는 미정이다(호출 측에서 `t=0`을 "안에 있음"으로 쓰는지 확인 필요). `ConvexHull` 레이캐스트는 AABB로 근사한다(박스 모양 다면체에선 정확하다, 법선은 v1.0.156부터 AABB 면 법선). 무작위 속성 테스트(`tests/raycast_property.rs`, v1.0.151)는 바깥에서 출발하는 레이만 검증한다.
+- **`.vpkg` 4 GiB 한계**: 인덱스의 offset·size가 u32라 아카이브 전체가 4 GiB를 넘으면 `write_vpkg`가 release 빌드에서 offset을 조용히 wrap시켜 깨진 아카이브를 만든다(debug에선 overflow 패닉). 현재 게임 에셋 규모에선 도달하지 않는다. 포맷 버전을 올려 u64로 바꾸거나 쓰기 단계에서 에러를 내야 한다.

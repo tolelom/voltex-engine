@@ -10,6 +10,26 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## v1.0.163 — 2026-10-12 — 손상된 .vpkg 헤더 하나로 프로세스 중단
+
+### Fix
+
+- **voltex_asset `VpkgReader::parse`**: 헤더의 엔트리 수를 검증하지 않고
+  `Vec::with_capacity(count)`로 미리 할당했다. 엔트리 수가 `u32::MAX`인 12바이트 파일
+  하나로 약 137 GB 할당을 시도하다 프로세스가 중단됐다(패닉이 아니라 abort라 잡을 수도
+  없다). 인덱스 엔트리는 최소 12바이트이므로, 파일 크기로 담을 수 없는 엔트리 수는
+  손상으로 보고 할당 전에 `Err`를 돌려준다.
+
+### Tests
+
+- **voltex_asset `tests/vpkg_property.rs`**: 무작위 아카이브 500개 쓰기→파싱 왕복, 엔트리
+  수가 비정상적으로 큰 헤더 거부, 무작위 바이트 변조·잘림 2만 건에서 파싱·읽기가
+  패닉하지 않는지 본다.
+
+### Docs
+
+- DEFERRED: `.vpkg` 4 GiB 한계(u32 offset이 release에서 조용히 wrap).
+
 ## v1.0.162 — 2026-10-12 — AssetStorage 슬롯 재사용 세대가 항상 1 (ABA)
 
 ### Fix
