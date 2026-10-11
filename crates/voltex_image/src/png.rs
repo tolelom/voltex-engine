@@ -1,5 +1,7 @@
 //! PNG decoder that uses the self-contained deflate decompressor.
-//! Supports 8-bit RGB (color_type=2) and RGBA (color_type=6) images.
+//! Supports every non-interlaced colour type / bit depth (gray, RGB,
+//! palette, gray+alpha, RGBA at their legal depths, with `tRNS`); pixel
+//! conversion lives in `png_pixels`. Adam7 interlacing is rejected.
 
 use crate::deflate;
 
@@ -12,8 +14,8 @@ const PNG_MAX_DIMENSION: u32 = 16_384;
 /// Decode a PNG file from raw bytes.
 ///
 /// Returns `(rgba_pixels, width, height)` where `rgba_pixels` is a packed
-/// RGBA8 byte buffer. Only 8-bit RGB and RGBA images are supported; indexed,
-/// grayscale, and bit depths other than 8 return an error.
+/// RGBA8 byte buffer. 16-bit samples keep their high byte; Adam7-interlaced
+/// images return an error.
 pub fn parse_png(data: &[u8]) -> crate::Result<(Vec<u8>, u32, u32)> {
     // 1. Verify PNG signature
     let signature: [u8; 8] = [137, 80, 78, 71, 13, 10, 26, 10];
@@ -24,7 +26,9 @@ pub fn parse_png(data: &[u8]) -> crate::Result<(Vec<u8>, u32, u32)> {
     let mut pos = 8;
     let mut width: u32 = 0;
     let mut height: u32 = 0;
-    let mut bit_depth: u8;
+    let mut bit_depth: u8 = 8;
+    let mut palette: Option<Vec<u8>> = None;
+    let mut trns: Option<Vec<u8>> = None;
     let mut color_type: u8 = 0;
     let mut idat_data = Vec::new();
     let mut got_ihdr = false;
@@ -71,18 +75,7 @@ pub fn parse_png(data: &[u8]) -> crate::Result<(Vec<u8>, u32, u32)> {
                 let _filter = chunk_data[11];
                 let interlace = chunk_data[12];
 
-                if bit_depth != 8 {
-                    return Err(
-                        format!("Unsupported bit depth: {} (only 8 supported)", bit_depth).into(),
-                    );
-                }
-                if color_type != 2 && color_type != 6 {
-                    return Err(format!(
-                        "Unsupported color type: {} (only RGB=2 and RGBA=6 supported)",
-                        color_type
-                    )
-                    .into());
-                }
+                crate::png_pixels::bits_per_pixel(color_type, bit_depth)?;
                 if compression != 0 {
                     return Err("Unsupported compression method".into());
                 }
@@ -90,6 +83,12 @@ pub fn parse_png(data: &[u8]) -> crate::Result<(Vec<u8>, u32, u32)> {
                     return Err("Interlaced PNGs not supported".into());
                 }
                 got_ihdr = true;
+            }
+            b"PLTE" => {
+                palette = Some(chunk_data.to_vec());
+            }
+            b"tRNS" => {
+                trns = Some(chunk_data.to_vec());
             }
             b"IDAT" => {
                 idat_data.extend_from_slice(chunk_data);
@@ -124,15 +123,13 @@ pub fn parse_png(data: &[u8]) -> crate::Result<(Vec<u8>, u32, u32)> {
     let decompressed = deflate::inflate(&idat_data)?;
 
     // 4. Apply PNG filters
-    let channels: usize = match color_type {
-        2 => 3, // RGB
-        6 => 4, // RGBA
-        _ => unreachable!(),
-    };
-    let bpp = channels; // bytes per pixel (bit_depth=8)
+    let bits = crate::png_pixels::bits_per_pixel(color_type, bit_depth)?;
+    // Filters operate on whole bytes: sub-byte pixels use a 1-byte step.
+    let bpp = bits.div_ceil(8);
     let stride = (width as usize)
-        .checked_mul(channels)
-        .ok_or("PNG stride overflow")?;
+        .checked_mul(bits)
+        .ok_or("PNG stride overflow")?
+        .div_ceil(8);
     let expected_size = (height as usize)
         .checked_mul(1usize.checked_add(stride).ok_or("PNG row width overflow")?)
         .ok_or("PNG expected size overflow")?;
@@ -176,25 +173,17 @@ pub fn parse_png(data: &[u8]) -> crate::Result<(Vec<u8>, u32, u32)> {
         }
     }
 
-    // 5. Convert to RGBA if needed
-    let rgba = if color_type == 2 {
-        // RGB -> RGBA
-        let rgba_size = (width as usize)
-            .checked_mul(height as usize)
-            .and_then(|v| v.checked_mul(4))
-            .ok_or("PNG RGBA output size overflow")?;
-        let mut rgba = Vec::with_capacity(rgba_size);
-        for pixel in image_data.chunks_exact(3) {
-            rgba.push(pixel[0]);
-            rgba.push(pixel[1]);
-            rgba.push(pixel[2]);
-            rgba.push(255);
-        }
-        rgba
-    } else {
-        // Already RGBA
-        image_data
-    };
+    // 5. Convert to RGBA8
+    let rgba = crate::png_pixels::to_rgba8(
+        &image_data,
+        width as usize,
+        height as usize,
+        stride,
+        color_type,
+        bit_depth,
+        palette.as_deref(),
+        trns.as_deref(),
+    )?;
 
     Ok((rgba, width, height))
 }

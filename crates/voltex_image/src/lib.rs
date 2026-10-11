@@ -18,6 +18,7 @@ pub mod jpg;
 pub mod json_parser;
 pub mod obj;
 pub mod png;
+mod png_pixels;
 pub mod png_encode;
 pub mod progressive_jpeg;
 pub mod vertex;

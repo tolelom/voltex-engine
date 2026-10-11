@@ -5,7 +5,7 @@ GPU 무의존(L0) asset codecs — PNG/JPG/glTF/OBJ/JSON 디코더 + PNG 인코�
 
 ## 공개 API 진입점
 
-- `parse_png(data: &[u8]) -> Result<(u32, u32, Vec<u8>)>` — PNG → RGBA8 픽셀 (src/png.rs)
+- `parse_png(data: &[u8]) -> Result<(Vec<u8>, u32, u32)>` — PNG → RGBA8 `(pixels, width, height)`. 그레이/RGB/팔레트/그레이+알파/RGBA 전 비트 깊이 + tRNS, Adam7은 에러 (src/png.rs, src/png_pixels.rs)
 - `parse_jpg(data: &[u8]) -> Result<(u32, u32, Vec<u8>)>` — JPEG Baseline + Progressive → RGBA8 (src/jpg/, src/progressive_jpeg.rs)
 - `parse_gltf(data: &[u8]) -> Result<GltfData>` — glTF 2.0 / GLB 파서 (src/gltf/). 정점 속성은 `bufferView.byteStride`(인터리브, v1.0.132)와 정규화 정수 componentType(v1.0.133, `gltf/component.rs`) 지원. 노드 `matrix`는 TRS로 분해(v1.0.137)
 - `encode_rgba8(w: u32, h: u32, rgba: &[u8]) -> Vec<u8>` — RGBA8 → PNG (zlib stored block, 무압축) (src/png_encode.rs)
@@ -22,6 +22,7 @@ GPU 무의존(L0) asset codecs — PNG/JPG/glTF/OBJ/JSON 디코더 + PNG 인코�
 - `checksum` — CRC32/Adler32 구현 (**crate-private** — `mod checksum;`로만 선언, 외부 노출 금지) (src/checksum.rs)
 - `deflate` — zlib/DEFLATE inflate (src/deflate.rs)
 - `png` — PNG 디코더: IHDR 검증, 필터 재구성, `parse_png` (src/png.rs)
+- `png_pixels` (crate-private) — 언필터된 스캔라인 → RGBA8 (색 유형·비트 깊이·tRNS) (src/png_pixels.rs)
 - `png_encode` — PNG 인코더: `encode_rgba8` (stored deflate, CRC32/Adler32 사용) (src/png_encode.rs)
 - `jpg` — JPEG Baseline 8-bit RGB→RGBA 디코더 (src/jpg/)
 - `progressive_jpeg` — JPEG Progressive 디코더 (src/progressive_jpeg.rs)
