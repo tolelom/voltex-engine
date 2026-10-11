@@ -173,6 +173,27 @@
 
 v1.0.9 부터는 **서비스 배포 완성도** 로드맵 (`docs/superpowers/specs/2026-05-21-service-readiness-roadmap.md`) 기준으로 진행.
 
+### 2026-10-12 — 에셋·입력 경계 점검 (v1.0.129 ~ v1.0.144)
+
+밤샘 점검에서 실제 인코더 출력과 스펙 대조로 **에러 없이 데이터가 깨지던
+결함**을 찾아 고쳤다(각각 재현 테스트가 수정 전 실패). 상세는 CHANGELOG 각 버전.
+
+- glTF: `byteStride` 무시(인터리브 정점 오염), 정점·애니메이션 `componentType`
+  무시(normalized 정수 UV·가중치·회전 쓰레기), 노드 `matrix` 무시(항등 변환)
+- OBJ: 음수(상대) 인덱스가 0 처리돼 정점 전부 원점으로
+- JSON(이미지·씬): UTF-8 바이트를 char로 넣어 비ASCII 깨짐, 서로게이트 쌍 소실,
+  비ASCII 컴포넌트 이름이 로드 때 소실
+- 오디오 믹서: NaN 볼륨 하나가 공유 버퍼 전체를 NaN으로(`clamp`가 NaN 통과)
+- Lua 샌드박스: `package` 미차단으로 `package.loaded.os`·`loadlib` 우회
+- 검증만 하고 버그 없던 것: deflate dynamic Huffman, baseline JPEG(4:4:4/4:2:2/
+  4:2:0/그레이/DRI), PNG 필터 5종 — 실제 인코더 픽스처를 테스트로 고정
+- 기능 확장: PNG 전 색 유형·비트 깊이 + tRNS(v1.0.143), WAV EXTENSIBLE·8/32비트
+  (v1.0.144)
+- 테스트 품질: `assert!` 없는 `matches!` 6건(항상 통과) 복구, 테스트 중 crash 파일
+  누출 수정, 빈 secret 0 나눗셈 패닉 정리
+- 미지원으로 문서화(DEFERRED): glTF 머티리얼 텍스처, Adam7 PNG, progressive JPEG,
+  libvorbis 인코딩 호환 미검증
+
 ### 2026-10-12 — 배치 타일맵 (v1.0.122 ~ v1.0.123)
 
 friction-2 #5(P2) 해소. `Tilemap` 컴포넌트 하나가 맵 전체를 텍스처 바인드 1회 +
