@@ -6,6 +6,7 @@
 
 use crate::assets::TextureHandle;
 use voltex_ecs::World;
+use voltex_math::{Mat4, Vec3};
 
 /// A billboarded quad. `size` is the world-space width/height; `color` tints
 /// the texture (or acts as a solid color when `texture` is `None`, since the
@@ -26,6 +27,11 @@ pub struct Sprite {
     /// sheet-frame updates ([`set_sheet_frame`](Self::set_sheet_frame),
     /// [`update_sprite_animations`]) never fight the flip.
     pub flip_x: bool,
+    /// Roll the quad in the screen plane to follow the entity's transform
+    /// (its local X axis as seen by the camera) — e.g. a coin spinning
+    /// about Z in a 2D side view. `false` (default) keeps the upright
+    /// billboard, ignoring rotation.
+    pub roll_from_transform: bool,
 }
 
 impl Default for Sprite {
@@ -36,6 +42,7 @@ impl Default for Sprite {
             color: [1.0, 1.0, 1.0, 1.0],
             uv_rect: [0.0, 0.0, 1.0, 1.0],
             flip_x: false,
+            roll_from_transform: false,
         }
     }
 }
@@ -53,6 +60,12 @@ impl Sprite {
             size,
             ..Default::default()
         }
+    }
+
+    /// Opt into [`Self::roll_from_transform`] (builder style).
+    pub fn with_roll_from_transform(mut self) -> Self {
+        self.roll_from_transform = true;
+        self
     }
 
     /// Set the texture sub-rect (builder style) — e.g. for an atlas region.
@@ -84,6 +97,20 @@ impl Sprite {
         let v0 = cy as f32 * fh;
         self.uv_rect = [u0, v0, u0 + fw, v0 + fh];
     }
+}
+
+/// Screen-plane roll (radians, counter-clockwise) of a sprite whose world
+/// matrix is `world`: the angle of its local X axis projected onto the
+/// camera's `right`/`up` plane. `0` when that axis points along the view
+/// direction (no screen-plane component).
+pub(crate) fn sprite_roll(world: &Mat4, right: Vec3, up: Vec3) -> f32 {
+    let c = world.cols[0];
+    let x_axis = Vec3::new(c[0], c[1], c[2]);
+    let (x, y) = (x_axis.dot(right), x_axis.dot(up));
+    if x * x + y * y < 1e-12 {
+        return 0.0;
+    }
+    y.atan2(x)
 }
 
 /// Plays a sprite-sheet animation by advancing a [`Sprite`]'s `uv_rect` over
@@ -181,6 +208,38 @@ mod tests {
     use super::*;
     use voltex_ecs::Transform;
     use voltex_math::Vec3;
+
+    fn z_rotated(angle: f32) -> voltex_math::Mat4 {
+        let mut t = Transform::from_position(Vec3::new(5.0, 2.0, 0.0));
+        t.rotation = voltex_math::Quat::from_axis_angle(Vec3::Z, angle);
+        t.matrix()
+    }
+
+    #[test]
+    fn roll_from_transform_is_opt_in() {
+        assert!(!Sprite::default().roll_from_transform);
+        assert!(Sprite::solid([1.0, 1.0], [1.0; 4]).with_roll_from_transform().roll_from_transform);
+    }
+
+    #[test]
+    fn sprite_roll_follows_z_rotation_in_a_front_view() {
+        // Ortho side view looking down -Z: screen right = +X, up = +Y.
+        let (right, up) = (Vec3::X, Vec3::Y);
+        assert!(sprite_roll(&z_rotated(0.0), right, up).abs() < 1e-5);
+        let quarter = std::f32::consts::FRAC_PI_2;
+        assert!((sprite_roll(&z_rotated(quarter), right, up) - quarter).abs() < 1e-5);
+        assert!((sprite_roll(&z_rotated(-0.5), right, up) + 0.5).abs() < 1e-5);
+    }
+
+    #[test]
+    fn sprite_roll_is_zero_when_x_axis_points_into_the_screen() {
+        // Yawed 90° about Y: local X now parallel to the view direction, so it
+        // has no screen-plane direction — no roll instead of NaN.
+        let mut t = Transform::new();
+        t.rotation = voltex_math::Quat::from_axis_angle(Vec3::Y, std::f32::consts::FRAC_PI_2);
+        let r = sprite_roll(&t.matrix(), Vec3::X, Vec3::Y);
+        assert!(r.is_finite() && r.abs() < 1e-5, "got {r}");
+    }
 
     #[test]
     fn default_uv_rect_is_full_texture() {

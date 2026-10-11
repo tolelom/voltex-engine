@@ -883,13 +883,13 @@ impl BasicRenderer {
         view_proj: Mat4,
         cam_pos: Vec3,
     ) {
-        // (world position, sprite) for each visible sprite entity.
-        let mut items: Vec<(Vec3, Sprite)> = world
+        // (world position, (sprite, world matrix)) for each visible sprite.
+        let mut items: Vec<(Vec3, (Sprite, Mat4))> = world
             .query2::<WorldTransform, Sprite>()
             .filter(|(e, _, _)| world.get::<crate::items::Hidden>(*e).is_none())
             .map(|(_, wt, s)| {
                 let c = wt.0.cols[3];
-                (Vec3::new(c[0], c[1], c[2]), *s)
+                (Vec3::new(c[0], c[1], c[2]), (*s, wt.0))
             })
             .collect();
         if items.is_empty() {
@@ -911,14 +911,19 @@ impl BasicRenderer {
 
         let aligned = self.sprite_uniform_aligned as usize;
         let mut staging = vec![0u8; n * aligned];
-        for (i, (pos, sprite)) in items.iter().take(n).enumerate() {
+        for (i, (pos, (sprite, world_m))) in items.iter().take(n).enumerate() {
+            let roll = if sprite.roll_from_transform {
+                crate::sprite::sprite_roll(world_m, right, up)
+            } else {
+                0.0
+            };
             let u = SpriteUniform {
                 view_proj: view_proj.cols,
                 camera_right: [right.x, right.y, right.z, 0.0],
                 camera_up: [up.x, up.y, up.z, 0.0],
                 center: [pos.x, pos.y, pos.z, 0.0],
                 color: sprite.color,
-                size: [sprite.size[0], sprite.size[1], 0.0, 0.0],
+                size: [sprite.size[0], sprite.size[1], roll, 0.0],
                 uv_rect: sprite.effective_uv_rect(),
             };
             let b = bytemuck::bytes_of(&u);
@@ -952,7 +957,7 @@ impl BasicRenderer {
         pass.set_pipeline(&self.sprite_pipeline);
         pass.set_vertex_buffer(0, self.sprite_quad_vbuf.slice(..));
         pass.set_index_buffer(self.sprite_quad_ibuf.slice(..), wgpu::IndexFormat::Uint16);
-        for (i, (_, sprite)) in items.iter().take(n).enumerate() {
+        for (i, (_, (sprite, _))) in items.iter().take(n).enumerate() {
             let tex_bg = sprite
                 .texture
                 .and_then(|h| assets.texture(h))
@@ -1568,8 +1573,8 @@ pub(crate) fn warn_overflow_once(flag: &Cell<bool>, kind: &str, count: usize, ca
 /// distance — radial distance flips layering for coplanar sprites under an
 /// orthographic camera). Returns the draw count; `items[..n]` is the ordered
 /// draw list.
-fn cull_and_sort_sprites(
-    items: &mut [(Vec3, Sprite)],
+fn cull_and_sort_sprites<T>(
+    items: &mut [(Vec3, T)],
     cam_pos: Vec3,
     forward: Vec3,
     max: usize,

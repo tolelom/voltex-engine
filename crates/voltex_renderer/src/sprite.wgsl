@@ -8,7 +8,7 @@ struct Sprite {
     camera_up: vec4<f32>,
     center: vec4<f32>,
     color: vec4<f32>,
-    size: vec4<f32>,    // xy = width/height
+    size: vec4<f32>,    // xy = width/height, z = screen-plane roll (radians)
     uv_rect: vec4<f32>, // [u_min, v_min, u_max, v_max]
 };
 @group(0) @binding(0) var<uniform> sprite: Sprite;
@@ -29,9 +29,15 @@ struct VsOut {
 @vertex
 fn vs_main(in: VsIn) -> VsOut {
     var out: VsOut;
+    // Scale the unit corner to the sprite size, then roll it in the screen
+    // plane (size.z = 0 for upright billboards).
+    let local = vec2<f32>(in.corner.x * sprite.size.x, in.corner.y * sprite.size.y);
+    let c = cos(sprite.size.z);
+    let s = sin(sprite.size.z);
+    let rolled = vec2<f32>(local.x * c - local.y * s, local.x * s + local.y * c);
     let world = sprite.center.xyz
-        + sprite.camera_right.xyz * (in.corner.x * sprite.size.x)
-        + sprite.camera_up.xyz * (in.corner.y * sprite.size.y);
+        + sprite.camera_right.xyz * rolled.x
+        + sprite.camera_up.xyz * rolled.y;
     out.clip = sprite.view_proj * vec4<f32>(world, 1.0);
     // Remap the unit-quad UV into the sprite's texture sub-rect (atlas frame).
     out.uv = mix(sprite.uv_rect.xy, sprite.uv_rect.zw, in.uv);

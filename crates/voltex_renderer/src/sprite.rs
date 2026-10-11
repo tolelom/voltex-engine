@@ -57,7 +57,8 @@ pub struct SpriteUniform {
     pub camera_up: [f32; 4],
     pub center: [f32; 4],
     pub color: [f32; 4],
-    /// `xy` = world-space width/height; `zw` padding.
+    /// `xy` = world-space width/height; `z` = screen-plane roll in radians
+    /// (0 = upright billboard); `w` padding.
     pub size: [f32; 4],
     /// Texture sub-rect `[u_min, v_min, u_max, v_max]` for sprite sheets /
     /// atlases. `[0, 0, 1, 1]` samples the whole texture.

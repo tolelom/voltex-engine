@@ -10,6 +10,24 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## v1.0.124 — 2026-10-12 — 스프라이트 화면 평면 회전 옵트인 (friction-2 #6)
+
+### Additive
+
+- **voltex_renderer_ecs `Sprite::roll_from_transform`** (+ `with_roll_from_transform()`):
+  켜면 엔티티 로컬 X축의 화면 투영 각도만큼 빌보드를 화면 평면에서 돌린다.
+  2D 사이드뷰에서 `Transform` z 회전(빙글 도는 코인 등)이 그대로 보인다.
+  기본값 false라 기존 동작은 그대로다. 각도는 `SpriteUniform.size.z`(이전에는
+  패딩)로 전달해 유니폼 레이아웃은 바뀌지 않았다. 로컬 X축이 시선 방향과
+  평행하면 0(NaN 없음).
+- 주의: `Sprite`에 pub 필드가 하나 늘었다. 구조체 리터럴로 만드는 외부
+  코드는 `..Default::default()`가 필요하다(저장소 안에는 없음).
+- 검증: 단위 4(옵트인 기본값, 0/±각도 추적, 축 퇴화), GPU
+  `voltex_capture/tests/sprite_roll.rs`(3×1 스프라이트 90°: 끄면 가로 유지,
+  켜면 세로 — 셰이더가 각도를 무시하게 바꾸면 실패) + `docs/visual/sprite_roll.png`.
+  스프라이트 셰이더가 모든 스프라이트에 적용되므로 GPU 테스트 98개를 전부
+  재실행했고, 스프라이트가 담긴 기존 스크린샷(leap 등)은 바이트 동일.
+
 ## v1.0.123 — 2026-10-12 — voltex_leap 타일맵 마이그레이션 (friction-2 #5 해소)
 
 ### Changed
