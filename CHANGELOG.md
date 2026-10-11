@@ -10,6 +10,18 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## v1.0.167 — 2026-10-12 — 네트워크 패킷·암호화·내비메시 로더 퍼징
+
+### Tests
+
+- **voltex_net `tests/wire_fuzz.rs`**: 모든 `Packet` 변형을 인코딩한 뒤 변조·잘라내기·임의
+  바이트로 3만 건 넣는다. `Packet::from_bytes`가 패닉하지 않아야 하고, 받아들인 패킷은
+  다시 인코딩해도 안정적이어야 한다. 비트 반전·잘라내기·임의 바이트로 만든 암호문 2만
+  건에서 `PacketCipher::decrypt`도 패닉하지 않아야 한다. 둘 다 통과(버그 없음).
+- **voltex_ai `tests/navmesh_fuzz.rs`**: 인접 정보가 있는 3×3 격자 내비메시를 `.vnav`와
+  헤더 없는 옛 포맷으로 직렬화한 뒤 2만 건 변조한다. 로드에 성공한 메시에 무작위
+  `find_path`까지 돌린다. 통과(버그 없음). 로더가 정점·이웃 인덱스를 이미 검증하고 있다.
+
 ## v1.0.166 — 2026-10-12 — glTF 인덱스 범위 미검증으로 로더 패닉
 
 ### Fix
