@@ -182,14 +182,14 @@ mod tests {
         let mut bytes = write_vpkg(&[]);
         bytes[0] = b'X';
         let err = VpkgReader::parse(&bytes).unwrap_err();
-        matches!(err, AssetError::Generic(_));
+        assert!(matches!(err, AssetError::Generic(_)), "{err:?}");
     }
 
     #[test]
     fn parse_rejects_truncated_index() {
         let bytes = vec![b'V', b'P', b'K', b'G', 1, 0, 0, 0, 5, 0, 0, 0]; // 5 entries but no data
         let err = VpkgReader::parse(&bytes).unwrap_err();
-        matches!(err, AssetError::Generic(_));
+        assert!(matches!(err, AssetError::Generic(_)), "{err:?}");
     }
 
     #[test]

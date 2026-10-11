@@ -57,12 +57,15 @@ fn missing_name_returns_missing_field() {
 version = "0.1.0"
 "#;
     let err = Manifest::parse(toml).unwrap_err();
-    matches!(
-        err,
-        CliError::MissingField {
-            section: "project",
-            field: "name"
-        }
+    assert!(
+        matches!(
+            err,
+            CliError::MissingField {
+                section: "project",
+                field: "name"
+            }
+        ),
+        "{err:?}"
     );
 }
 
@@ -73,12 +76,15 @@ fn missing_version_returns_missing_field() {
 name = "x"
 "#;
     let err = Manifest::parse(toml).unwrap_err();
-    matches!(
-        err,
-        CliError::MissingField {
-            section: "project",
-            field: "version"
-        }
+    assert!(
+        matches!(
+            err,
+            CliError::MissingField {
+                section: "project",
+                field: "version"
+            }
+        ),
+        "{err:?}"
     );
 }
 

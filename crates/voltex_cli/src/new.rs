@@ -128,7 +128,7 @@ mod tests {
         let target = unique_target("exists");
         std::fs::create_dir_all(&target).unwrap();
         let err = create_at(&target).unwrap_err();
-        matches!(err, CliError::NewTargetExists(_));
+        assert!(matches!(err, CliError::NewTargetExists(_)), "{err:?}");
         let _ = std::fs::remove_dir_all(&target);
     }
 

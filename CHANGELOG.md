@@ -10,6 +10,18 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## v1.0.129 — 2026-10-12 — 항상 통과하던 테스트 단언 5건 복구
+
+### Tests
+
+- `assert!` 없이 `matches!(…);`만 쓴 테스트 문장은 결과를 버려서 무엇이 와도
+  통과한다. v1.0.128에서 1건을 찾은 뒤 저장소 전체를 검색해 5건을 더 고쳤다:
+  `voltex_asset` vpkg `parse_rejects_bad_magic` / `parse_rejects_truncated_index`,
+  `voltex_cli` manifest `missing_name_returns_missing_field` /
+  `missing_version_returns_missing_field`, `new_refuses_existing_directory`.
+  다섯 다 실제 동작이 기대와 같아 통과했다(숨어 있던 버그는 없음). 기대값을
+  틀리게 바꾸면 실패하는 것도 확인했다. 남은 `matches!`는 모두 `assert!` 안에 있다.
+
 ## v1.0.128 — 2026-10-12 — voltex.toml 파싱 에러에 열 번호
 
 ### Changed
