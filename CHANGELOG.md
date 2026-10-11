@@ -10,6 +10,19 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## v1.0.136 — 2026-10-12 — PNG 디코더를 실제 인코더 출력으로 검증
+
+### Tests
+
+- **voltex_image `tests/png_real.rs`**: Pillow `optimize=True`의 RGB/RGBA PNG가
+  바이트 단위로 정확히 복원된다. Pillow의 적응 필터는 Sub·Paeth만 골라서,
+  필터 5종(None/Sub/Up/Average/Paeth)을 행마다 돌리고 IDAT를 3조각으로 나눈
+  PNG를 직접 만들어(zlib + CRC) 추가했다. Average 필터를 망가뜨리면 이 픽스처만
+  실패한다(Pillow 픽스처로는 못 잡음). 미지원 형식(팔레트, 8/16비트 그레이,
+  Adam7 인터레이스)은 쓰레기가 아니라 에러로 거부되는 것도 확인. 디코더 버그는
+  없었다.
+- `.gitattributes`에 `*.png`, `*.rgba` binary 추가.
+
 ## v1.0.135 — 2026-10-12 — 실제 JPEG 인코더 출력으로 디코더 검증
 
 ### Tests

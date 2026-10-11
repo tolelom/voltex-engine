@@ -2,3 +2,5 @@
 *.zz binary
 *.jpg binary
 *.rgb binary
+*.png binary
+*.rgba binary
