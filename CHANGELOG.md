@@ -10,6 +10,22 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## v1.0.133 — 2026-10-12 — glTF 정점 속성 componentType·normalized 지원
+
+### Fix
+
+- **voltex_image glTF**: VEC2/VEC3/VEC4 정점 속성을 `componentType`과
+  상관없이 항상 f32로 읽고 있었다. glTF 2.0 core가 허용하는 정규화 정수
+  인코딩 — `TEXCOORD`의 normalized `UNSIGNED_BYTE`/`UNSIGNED_SHORT`,
+  `WEIGHTS_0`의 normalized `UNSIGNED_BYTE`/`SHORT` 등(압축 익스포트에서 흔함) —
+  은 **에러 없이 쓰레기 값**으로 로드됐다. `read_accessor_vecn::<N>` 하나로
+  통합해 FLOAT / (UNSIGNED_)BYTE / (UNSIGNED_)SHORT와 `normalized`(signed는
+  `max(c/MAX, -1)`), byteStride를 모두 처리한다. 지원하지 않는 componentType은
+  쓰레기 대신 에러를 낸다.
+- 600줄 규칙 때문에 컴포넌트 읽기를 `gltf/component.rs`로 분리했다.
+- 테스트 +4 (normalized u16 UV, normalized u8 가중치, signed -1 클램프, 미지원
+  타입 에러). GPU 캡처 48 그린.
+
 ## v1.0.132 — 2026-10-12 — glTF 인터리브 정점(byteStride) 지원
 
 ### Fix

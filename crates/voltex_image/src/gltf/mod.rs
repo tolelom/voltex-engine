@@ -1,6 +1,7 @@
 //! glTF 2.0 / GLB parser — vertex/material/animation extraction.
 
 mod accessor;
+mod component;
 mod material;
 mod node;
 mod parser;

@@ -1,6 +1,7 @@
 use super::material::extract_material;
 use super::node::{parse_animations, parse_nodes, parse_skins};
 use super::types::{GltfData, GltfMesh};
+use super::component::read_accessor_vecn;
 use crate::json_parser::JsonValue;
 use crate::obj::compute_tangents;
 use crate::vertex::MeshVertex;
@@ -13,7 +14,7 @@ const MAX_ACCESSOR_COUNT: usize = 4_000_000;
 
 /// Validates an accessor `count` field. Returns the cast `usize` value or
 /// an error if it exceeds the cap.
-fn validate_count(count: u32) -> crate::Result<usize> {
+pub(super) fn validate_count(count: u32) -> crate::Result<usize> {
     let count = count as usize;
     if count > MAX_ACCESSOR_COUNT {
         return Err(format!(
@@ -210,7 +211,7 @@ pub(super) fn extract_meshes(json: &JsonValue, buffers: &[Vec<u8>]) -> crate::Re
     })
 }
 
-fn get_buffer_data<'a>(
+pub(super) fn get_buffer_data<'a>(
     accessor: &JsonValue,
     buffer_views: &[JsonValue],
     buffers: &'a [Vec<u8>],
@@ -246,25 +247,7 @@ fn read_accessor_vec3(
     buffers: &[Vec<u8>],
     idx: usize,
 ) -> crate::Result<Vec<[f32; 3]>> {
-    let acc = accessors.get(idx).ok_or("Accessor index out of range")?;
-    let count = validate_count(
-        acc.get("count")
-            .and_then(|v| v.as_u32())
-            .ok_or("Missing count")?,
-    )?;
-    let (buffer, offset, stride) = get_buffer_data(acc, buffer_views, buffers)?;
-    let mut result = Vec::with_capacity(count);
-    for i in 0..count {
-        let o = offset + i * stride.unwrap_or(12);
-        if o + 12 > buffer.len() {
-            return Err("Buffer overflow reading vec3".into());
-        }
-        let x = f32::from_le_bytes([buffer[o], buffer[o + 1], buffer[o + 2], buffer[o + 3]]);
-        let y = f32::from_le_bytes([buffer[o + 4], buffer[o + 5], buffer[o + 6], buffer[o + 7]]);
-        let z = f32::from_le_bytes([buffer[o + 8], buffer[o + 9], buffer[o + 10], buffer[o + 11]]);
-        result.push([x, y, z]);
-    }
-    Ok(result)
+    read_accessor_vecn::<3>(accessors, buffer_views, buffers, idx)
 }
 
 fn read_accessor_vec2(
@@ -273,24 +256,7 @@ fn read_accessor_vec2(
     buffers: &[Vec<u8>],
     idx: usize,
 ) -> crate::Result<Vec<[f32; 2]>> {
-    let acc = accessors.get(idx).ok_or("Accessor index out of range")?;
-    let count = validate_count(
-        acc.get("count")
-            .and_then(|v| v.as_u32())
-            .ok_or("Missing count")?,
-    )?;
-    let (buffer, offset, stride) = get_buffer_data(acc, buffer_views, buffers)?;
-    let mut result = Vec::with_capacity(count);
-    for i in 0..count {
-        let o = offset + i * stride.unwrap_or(8);
-        if o + 8 > buffer.len() {
-            return Err("Buffer overflow reading vec2".into());
-        }
-        let x = f32::from_le_bytes([buffer[o], buffer[o + 1], buffer[o + 2], buffer[o + 3]]);
-        let y = f32::from_le_bytes([buffer[o + 4], buffer[o + 5], buffer[o + 6], buffer[o + 7]]);
-        result.push([x, y]);
-    }
-    Ok(result)
+    read_accessor_vecn::<2>(accessors, buffer_views, buffers, idx)
 }
 
 fn read_accessor_vec4(
@@ -299,31 +265,7 @@ fn read_accessor_vec4(
     buffers: &[Vec<u8>],
     idx: usize,
 ) -> crate::Result<Vec<[f32; 4]>> {
-    let acc = accessors.get(idx).ok_or("Accessor index out of range")?;
-    let count = validate_count(
-        acc.get("count")
-            .and_then(|v| v.as_u32())
-            .ok_or("Missing count")?,
-    )?;
-    let (buffer, offset, stride) = get_buffer_data(acc, buffer_views, buffers)?;
-    let mut result = Vec::with_capacity(count);
-    for i in 0..count {
-        let o = offset + i * stride.unwrap_or(16);
-        if o + 16 > buffer.len() {
-            return Err("Buffer overflow reading vec4".into());
-        }
-        let x = f32::from_le_bytes([buffer[o], buffer[o + 1], buffer[o + 2], buffer[o + 3]]);
-        let y = f32::from_le_bytes([buffer[o + 4], buffer[o + 5], buffer[o + 6], buffer[o + 7]]);
-        let z = f32::from_le_bytes([buffer[o + 8], buffer[o + 9], buffer[o + 10], buffer[o + 11]]);
-        let w = f32::from_le_bytes([
-            buffer[o + 12],
-            buffer[o + 13],
-            buffer[o + 14],
-            buffer[o + 15],
-        ]);
-        result.push([x, y, z, w]);
-    }
-    Ok(result)
+    read_accessor_vecn::<4>(accessors, buffer_views, buffers, idx)
 }
 
 fn read_accessor_indices(
@@ -578,6 +520,60 @@ mod tests {
         let views = parse_json(r#"[{"buffer":0,"byteLength":24,"byteStride":0}]"#).unwrap();
         let pos = read_accessor_vec3(acc.as_array().unwrap(), views.as_array().unwrap(), &[buf], 0).unwrap();
         assert_eq!(pos, vec![[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]]);
+    }
+
+    fn single_view(buf: Vec<u8>, accessor_json: &str) -> (Vec<JsonValue>, Vec<JsonValue>, Vec<Vec<u8>>) {
+        let views = format!(r#"[{{"buffer":0,"byteLength":{}}}]"#, buf.len());
+        (
+            parse_json(accessor_json).unwrap().as_array().unwrap().to_vec(),
+            parse_json(&views).unwrap().as_array().unwrap().to_vec(),
+            vec![buf],
+        )
+    }
+
+    #[test]
+    fn vec2_reads_normalized_unsigned_short_texcoords() {
+        // glTF 2.0 allows TEXCOORD as normalized UNSIGNED_SHORT (65535 = 1.0).
+        let buf: Vec<u8> = [0u16, 65535, 32768, 16384].iter().flat_map(|v| v.to_le_bytes()).collect();
+        let (acc, views, bufs) = single_view(
+            buf,
+            r#"[{"bufferView":0,"count":2,"type":"VEC2","componentType":5123,"normalized":true}]"#,
+        );
+        let uv = read_accessor_vec2(&acc, &views, &bufs, 0).unwrap();
+        assert_eq!(uv[0], [0.0, 1.0]);
+        assert!((uv[1][0] - 32768.0 / 65535.0).abs() < 1e-6 && (uv[1][1] - 16384.0 / 65535.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn vec4_reads_normalized_unsigned_byte_weights() {
+        let (acc, views, bufs) = single_view(
+            vec![255, 0, 0, 0, 128, 127, 0, 0],
+            r#"[{"bufferView":0,"count":2,"type":"VEC4","componentType":5121,"normalized":true}]"#,
+        );
+        let w = read_accessor_vec4(&acc, &views, &bufs, 0).unwrap();
+        assert_eq!(w[0], [1.0, 0.0, 0.0, 0.0]);
+        assert!((w[1][0] - 128.0 / 255.0).abs() < 1e-6 && (w[1][1] - 127.0 / 255.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn signed_normalized_components_clamp_to_minus_one() {
+        // SHORT normalized: -32768 and -32767 both map to -1.0 (spec: max(c / 32767, -1)).
+        let buf: Vec<u8> = [-32768i16, -32767, 32767, 0].iter().flat_map(|v| v.to_le_bytes()).collect();
+        let (acc, views, bufs) = single_view(
+            buf,
+            r#"[{"bufferView":0,"count":2,"type":"VEC2","componentType":5122,"normalized":true}]"#,
+        );
+        let v = read_accessor_vec2(&acc, &views, &bufs, 0).unwrap();
+        assert_eq!(v, vec![[-1.0, -1.0], [1.0, 0.0]]);
+    }
+
+    #[test]
+    fn unsupported_component_type_is_an_error_not_garbage() {
+        let (acc, views, bufs) = single_view(
+            vec![0; 16],
+            r#"[{"bufferView":0,"count":2,"type":"VEC2","componentType":5125}]"#,
+        );
+        assert!(read_accessor_vec2(&acc, &views, &bufs, 0).is_err());
     }
 
     #[test]
