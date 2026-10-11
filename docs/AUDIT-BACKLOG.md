@@ -15,7 +15,7 @@
 
 ## B. 데드코드 정리 (YAGNI)
 
-- [~] **B1** `DependencyScheduler`/`SystemAccess`/`build_schedule` — 소비자 0, 실행 불가. **보류**: CLAUDE.md 용어집에 "의존성 기반 병렬 = future work" 로 이미 명시 + missing_docs 통과(문서 있음) → churn 회피, 실 병렬 실행 구현 시 재방문.
+- [~] **B1** `DependencyScheduler`/`SystemAccess`/`build_schedule` — 소비자 0, 실행 불가. **보류**: CLAUDE.md 용어집에 "의존성 기반 병렬 = future work" 로 이미 명시 + missing_docs 통과(문서 있음) → churn 회피, 실 병렬 실행 구현 시 재방문. **2026-10-12 판정: 구현 안 함** (`docs/superpowers/specs/2026-10-12-dependency-scheduler-parallel-verdict.md`) — `World`가 Send/Sync가 아니고(컴파일 확인), 시스템이 `&mut World` 전체를 받아 access 선언이 타입으로 강제되지 않으며, 저장소 지연 생성이 구조 경쟁을 만든다. 병렬화는 ECS 파라미터 시스템 재설계가 필요하고 소비자·측정 근거가 없다. 재검토 조건은 문서에.
 - [x] **B2** `net::OrderedChannel` — **CODEMAP 문서화** (제거 X — in-order delivery 는 정당한 공개 네트워킹 primitive, 라이브러리 공개 API 는 내부 소비자 0 정상). (커밋 후속)
 - [x] **B3** `CliError::SceneNotFound` 데드 variant 제거 + Display arm 제거. (커밋 후속)
 
