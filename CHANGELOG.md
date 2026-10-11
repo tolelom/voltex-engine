@@ -10,6 +10,17 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## v1.0.149 — 2026-10-12 — ECS 코어 모델 기반 속성 테스트
+
+### Tests
+
+- **voltex_ecs `tests/world_model_property.rs`**: spawn/despawn(죽은 핸들
+  포함)/add/remove/clear를 무작위로 시드 4개 × 1500단계 실행하고, HashMap 모델과
+  `is_alive`·`get`·`query`·`query2`·`entity_count`·`remove` 반환값을 매 단계
+  비교한다. 한 번이라도 발급된 핸들은 다시 발급되지 않는다는 것도 확인한다(v1.0.120
+  clear 계약). 통과(버그 없음). sparse set swap-remove의 인덱스 갱신을 빼면 실패하는
+  것 확인.
+
 ## v1.0.148 — 2026-10-12 — 씬 직렬화 무작위 왕복 속성 테스트
 
 ### Tests
