@@ -249,7 +249,8 @@ high/medium 19건은 당일 해소 (CHANGELOG v1.0.114). LOW 4건은 실피해 �
   디렉토리가 dist를 포함하면 거부/스킵 — v1.1.
 
 또한 audit-runtime의 근본 원인 지적 1건을 설계 항목으로 이월:
-- **`World::clear()`가 entity allocator까지 리셋해 핸들 (0,0)부터 재발급** —
+- 🟡 설계 확정 (`docs/superpowers/specs/2026-10-12-world-clear-generation-design.md`) — 씬 포맷 3종 모두 부모를 로컬 인덱스로 저장해 파일 호환과 무관함을 확인, allocator 슬롯 해제 방식으로 결정. 구현 대기.
+  **`World::clear()`가 entity allocator까지 리셋해 핸들 (0,0)부터 재발급** —
   용어집의 "generation 기반 재사용 안전" 보증이 clear() 경로에서만 깨진다
   (v1.0.114에서 audio voice 누수로 실증, 봉쇄 수정 적용됨). 근본 수정은
   clear 시 generation bump인데 **씬 파일의 Entity 참조(parent 등)가 (id,gen)을
