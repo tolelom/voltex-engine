@@ -196,84 +196,13 @@ fn wake_colliding_bodies(world: &mut World, contacts: &[ContactPoint]) {
 
 /// Runs one full physics step: CCD → integrate → detect → resolve.
 pub fn physics_step(world: &mut World, config: &PhysicsConfig) {
-    // CCD: for fast-moving bodies, check for tunneling
-    apply_ccd(world, config);
-
+    // CCD sweeps each fast body from where it was to where integration put
+    // it, so it has to bracket the integrate call.
+    let before = ccd::snapshot_positions(world);
     integrate(world, config);
+    ccd::clamp_tunnelling(world, &before);
     let contacts = detect_collisions(world);
     resolve_collisions(world, &contacts, config.solver_iterations);
-}
-
-fn apply_ccd(world: &mut World, config: &PhysicsConfig) {
-    // Gather fast-moving bodies and all collider AABBs
-    let bodies: Vec<(Entity, Vec3, Vec3, Collider)> = world
-        .query3::<Transform, RigidBody, Collider>()
-        .filter(|(_, _, rb, _)| !rb.is_static() && !rb.is_sleeping)
-        .map(|(e, t, rb, c)| (e, t.position, rb.velocity, c.clone()))
-        .collect();
-
-    let all_colliders: Vec<(Entity, voltex_math::AABB)> = world
-        .query2::<Transform, Collider>()
-        .map(|(e, t, c)| (e, c.aabb(t.position)))
-        .collect();
-
-    let mut ccd_corrections: Vec<(Entity, Vec3)> = Vec::new();
-
-    for (entity, pos, vel, collider) in &bodies {
-        let speed = vel.length();
-        let collider_radius = match collider {
-            Collider::Sphere { radius } => *radius,
-            Collider::Box { half_extents } => half_extents.x.min(half_extents.y).min(half_extents.z),
-            Collider::Capsule { radius, .. } => *radius,
-            Collider::ConvexHull(hull) => {
-                // Use minimum distance from origin to any vertex as approximate radius
-                hull.vertices.iter().map(|v| v.length()).fold(f32::MAX, f32::min)
-            }
-        };
-
-        // Only apply CCD if displacement > collider radius
-        if speed * config.fixed_dt <= collider_radius {
-            continue;
-        }
-
-        let sweep_radius = match collider {
-            Collider::Sphere { radius } => *radius,
-            _ => collider_radius,
-        };
-
-        let end = *pos + *vel * config.fixed_dt;
-
-        let mut earliest_t = 1.0f32;
-
-        for (other_entity, other_aabb) in &all_colliders {
-            if *other_entity == *entity {
-                continue;
-            }
-
-            if let Some(t) = ccd::swept_sphere_vs_aabb(*pos, end, sweep_radius, other_aabb) {
-                if t < earliest_t {
-                    earliest_t = t;
-                }
-            }
-        }
-
-        if earliest_t < 1.0 {
-            // Place body just before collision point
-            let safe_t = (earliest_t - 0.01).max(0.0);
-            let safe_pos = *pos + *vel * config.fixed_dt * safe_t;
-            ccd_corrections.push((*entity, safe_pos));
-        }
-    }
-
-    for (entity, safe_pos) in ccd_corrections {
-        if let Some(t) = world.get_mut::<Transform>(entity) {
-            t.position = safe_pos;
-        }
-        if let Some(rb) = world.get_mut::<RigidBody>(entity) {
-            // Reduce velocity to prevent re-tunneling
-            rb.velocity = rb.velocity * 0.5;
-        }
-    }
 }
 
 #[cfg(test)]

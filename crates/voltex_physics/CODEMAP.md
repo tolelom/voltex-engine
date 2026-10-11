@@ -24,7 +24,7 @@
 - `rigid_body`, `integrator`, `solver` — 강체 동역학 (src/rigid_body.rs 등)
 - `ray`, `raycast` — 레이 인터섹션 (src/ray.rs, src/raycast.rs)
 - `collision` — ECS 통합 (src/collision.rs)
-- `ccd` — Continuous Collision Detection (src/ccd.rs)
+- `ccd` — Continuous Collision Detection (src/ccd.rs): `swept_sphere_vs_aabb` + `physics_step`이 integrate 앞뒤로 부르는 `snapshot_positions`/`clamp_tunnelling`(crate 내부)
 - `grid2d` — 2D 타일 그리드 충돌 (src/grid2d.rs)
 
 ## 의존성
@@ -34,7 +34,7 @@
 ## 변경 시 주의점
 - solver.rs(574줄), gjk.rs(524줄)는 spec 만족 (600줄 이하), 분리 대상 아님
 - detect_collisions(world)는 ECS와 강하게 결합 — World 구조 변경 시 영향
-- CCD는 sphere vs AABB만 구현 (다른 형상은 DEFERRED)
+- CCD는 sphere vs AABB만 구현 (다른 형상은 DEFERRED). 시작 시점에 이미 겹친 콜라이더(t=0)는 CCD가 무시하고 이산 솔버에 맡긴다. 확장 AABB 근사라 모서리 근처에선 실제보다 일찍 접촉으로 본다.
 
 ## 테스트
 - 단위 테스트: src/**/*.rs `#[cfg(test)]`
