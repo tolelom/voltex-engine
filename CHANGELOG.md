@@ -10,6 +10,21 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## v1.0.131 — 2026-10-12 — inflate를 실제 zlib 출력으로 검증 (dynamic Huffman)
+
+### Tests
+
+- **voltex_image `tests/deflate_dynamic.rs`**: 기존 단위 테스트는 stored·fixed
+  Huffman 블록만 손으로 만들어 썼고, 저장소의 PNG는 전부 엔진 자체 인코더
+  (stored 블록)로 만든 것이다. 그래서 이미지 편집기가 만드는 PNG의 압축
+  방식인 **dynamic Huffman(BTYPE=2) 경로는 한 번도 실행된 적이 없었다**.
+  CPython `zlib.compress(…, 9)`로 만든 픽스처 2개(378B·1168B, 첫 블록 BTYPE=2)를
+  추가했다. 반복 텍스트 29,690B, 그리고 ~31,000B 뒤로 가는 back-reference(32KiB
+  창 한계 근처)다. 디코더는 두 픽스처 모두 정확히 복원했다(버그 없음). 가장 큰
+  distance base 값을 바꾸면 새 테스트가 실패한다. 잘린 스트림이 패닉하지
+  않는 것도 확인했다.
+- deflate.rs 라인 커버리지 56.2% → 82.5%.
+
 ## v1.0.130 — 2026-10-12 — 테스트 중 크래시 파일이 crate 폴더에 생기던 것
 
 ### Fix (tests only)

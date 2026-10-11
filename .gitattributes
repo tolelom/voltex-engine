@@ -1,0 +1,2 @@
+# Compressed test fixtures: never line-ending convert (autocrlf would corrupt LF bytes).
+*.zz binary
