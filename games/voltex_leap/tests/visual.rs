@@ -54,7 +54,18 @@ fn level_scene_renders_tiles_spikes_door_coins() {
             gold += 1;
         }
     }
-    eprintln!("leap color pixels: red={red} green={green} gold={gold}");
+    // 타일 회색 [0.45,0.45,0.5] → sRGB ≈ (179,179,186): r≈g, b 약간 우세.
+    // 배경(63,63,80)·플레이어 흰색(255)과 밝기로 구분된다.
+    let tile_gray = rgba
+        .chunks_exact(4)
+        .filter(|p| {
+            let (r, g, b) = (p[0] as i32, p[1] as i32, p[2] as i32);
+            (150..220).contains(&r) && (r - g).abs() <= 6 && (0..=20).contains(&(b - r))
+        })
+        .count();
+    eprintln!("leap color pixels: red={red} green={green} gold={gold} tile_gray={tile_gray}");
+    // 화면의 지면·벽 타일 (뷰 21×12 중 수십 셀).
+    assert!(tile_gray >= 20_000, "tile gray pixels: {tile_gray}");
     assert!(red >= 30, "spike red pixels: {red}");
     assert!(green >= 30, "door green pixels: {green}");
     assert!(gold >= 20, "coin gold pixels: {gold}");

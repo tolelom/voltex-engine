@@ -2,7 +2,7 @@
 
 use crate::components::{Coin, CoinCount, DoorMarker, Player, Spike, Walker};
 use crate::enemy::{lethal_contact, walker_system};
-use crate::level::{cell_center, LevelMap};
+use crate::level::{cell_center, LevelMap, TILE};
 use voltex::ecs::Tag;
 use voltex::editor::UiContext;
 use voltex::prelude::*;
@@ -44,16 +44,17 @@ pub struct StepOutcome {
 /// 스프라이트는 솔리드 색 — 텍스처/애니메이션은 main이 스폰 후 입힌다.
 pub fn spawn_level(world: &mut World, map: &LevelMap) {
     world.clear();
+    // 솔리드 셀 전체를 Tilemap 하나로 — 셀 (gx,gy)가 [gx,gx+1]×[gy,gy+1]을
+    // 덮는 규약이 cell_center와 같아 원점에 두면 그대로 겹친다.
+    let mut tiles = Tilemap::solid(map.cols as u32, map.rows as u32, TILE, COLOR_TILE);
     for gy in 0..map.rows {
         for gx in 0..map.cols {
             if map.is_solid(gx as i32, gy as i32) {
-                world.spawn_bundle((
-                    Transform::from_position(cell_center(gx, gy)),
-                    Sprite::solid([1.0, 1.0], COLOR_TILE),
-                ));
+                tiles.set(gx as u32, gy as u32, 1);
             }
         }
     }
+    world.spawn_bundle((Transform::from_position(Vec3::ZERO), tiles));
     for &(gx, gy) in &map.spikes {
         let mut pos = cell_center(gx, gy);
         pos.y -= 0.2; // 셀 하단에 깔린 형태 (enemy::SPIKE_HALF와 정합)
@@ -193,8 +194,16 @@ mod tests {
         w.despawn(c);
         spawn_level(&mut w, &m);
         assert_eq!(w.query::<Coin>().count(), 1);
-        // 타일 엔티티도 스폰됨 (솔리드 6 + 스파이크 0)
-        assert!(w.query::<Sprite>().count() > 6);
+        // 솔리드 셀은 Tilemap 엔티티 하나로 (셀당 Sprite 아님 — friction-2 #5).
+        let maps: Vec<_> = w.query::<Tilemap>().map(|(_, t)| t.clone()).collect();
+        assert_eq!(maps.len(), 1, "exactly one tilemap after respawn");
+        let solids = (0..m.rows)
+            .flat_map(|gy| (0..m.cols).map(move |gx| (gx, gy)))
+            .filter(|&(gx, gy)| m.is_solid(gx as i32, gy as i32))
+            .count();
+        assert_eq!(maps[0].filled_count(), solids);
+        // 남은 Sprite = 코인 1 + 문 1 + 플레이어 1 (이 맵엔 가시·워커 없음)
+        assert_eq!(w.query::<Sprite>().count(), 3);
     }
 
     #[test]

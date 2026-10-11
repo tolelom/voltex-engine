@@ -173,6 +173,13 @@
 
 v1.0.9 부터는 **서비스 배포 완성도** 로드맵 (`docs/superpowers/specs/2026-05-21-service-readiness-roadmap.md`) 기준으로 진행.
 
+### 2026-10-12 — 배치 타일맵 (v1.0.122 ~ v1.0.123)
+
+friction-2 #5(P2) 해소. `Tilemap` 컴포넌트 하나가 맵 전체를 텍스처 바인드 1회 +
+draw 1회로 그린다(스프라이트 앞, 프레임당 16384쿼드). leap의 셀당 Sprite
+~100개를 Tilemap 1개로 옮겼고, 렌더 결과가 바이트 단위로 같음을 GPU 회귀로
+확인. 설계: `docs/superpowers/specs/2026-10-12-tilemap-batch-render-design.md`.
+
 ### 2026-10-12 — World::clear() generation 보증 (v1.0.120)
 
 v1.0.114 감사가 근본 원인으로 지목한 설계 항목. clear가 allocator를 리셋해

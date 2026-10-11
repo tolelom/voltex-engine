@@ -76,7 +76,7 @@ pub mod prelude {
     // PrimitiveMesh/MaterialDesc 는 "모양+색을 한 줄로 선언" 하는 진입점이라
     // 거의 모든 게임이 가장 먼저 쓴다 (런타임이 GPU 메시/머티리얼로 materialize).
     pub use voltex_renderer_ecs::{
-        MaterialDesc, Particle, PrimitiveMesh, Sprite, SpriteAnimation, TextureHandle,
+        MaterialDesc, Particle, PrimitiveMesh, Sprite, SpriteAnimation, TextureHandle, Tilemap,
     };
     pub use voltex_runtime::{DebugLines, Lifetime};
 
@@ -106,6 +106,7 @@ mod tests {
         let _part: Option<Particle> = None;
         let _anim: Option<SpriteAnimation> = None;
         let _tex: Option<TextureHandle> = None;
+        let _tilemap: Option<Tilemap> = None;
         let _life: Option<Lifetime> = None;
         let _dbg: Option<DebugLines> = None;
         // Declarative renderables reachable via prelude:

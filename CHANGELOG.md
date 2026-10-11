@@ -10,6 +10,24 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## v1.0.123 — 2026-10-12 — voltex_leap 타일맵 마이그레이션 (friction-2 #5 해소)
+
+### Changed
+
+- **games/voltex_leap `spawn_level`**: 솔리드 셀마다 Sprite 엔티티를 스폰하던
+  것을 원점의 `Tilemap` 엔티티 하나로 바꿨다(셀 규약이 `cell_center`와 같아
+  위치 보정 불필요). 레벨 엔티티 수가 솔리드 셀 수만큼 줄고, 타일이 스프라이트
+  예산(256)을 쓰지 않는다.
+- 검증: GPU visual 회귀에 타일 회색 픽셀 단언을 먼저 추가해 **마이그레이션
+  전** 통과를 확인(tile_gray=31800)한 뒤 전환 — 전환 후 픽셀 집계가 완전히
+  같고(red 864 / green 810 / gold 225 / tile_gray 31800) `docs/visual/
+  leap_level.png`가 바이트 단위로 동일. 헤드리스 플레이스루·단위 16 그린,
+  spawn 테스트는 "Tilemap 1개 + filled = 솔리드 수 + 남은 Sprite 3"으로 갱신.
+
+### Additive
+
+- **voltex prelude**에 `Tilemap` 추가.
+
 ## v1.0.122 — 2026-10-12 — 배치 타일맵 렌더 (friction-2 #5, 엔진 측)
 
 설계: `docs/superpowers/specs/2026-10-12-tilemap-batch-render-design.md`.
