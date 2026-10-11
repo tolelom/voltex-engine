@@ -165,11 +165,12 @@ fn despawn_no_longer_clears_undo_history() {
 }
 
 #[test]
-fn despawn_undo_silently_fails_when_slot_reused() {
-    // Despawn, then spawn (steals the slot), then undo despawn — restore
-    // can't recover the original handle. Expect silent skip (undo returns
-    // true because the stack popped, but world is unchanged for the
-    // original entity).
+fn despawn_undo_recreates_entity_when_slot_was_reused() {
+    // Despawn, then spawn (steals the slot), then undo both. The original
+    // handle cannot be revived in place (the slot's generation moved past
+    // it), so undo re-creates the entity under a new handle instead of
+    // silently dropping it (it used to vanish: delete A -> create B ->
+    // undo -> undo lost A).
     let scene = temp_path("voltex_e3_despawn_reused.vscn");
     cleanup(&scene);
     let mut session = EditorSession::new(scene.clone());
@@ -185,12 +186,9 @@ fn despawn_undo_silently_fails_when_slot_reused() {
     assert!(session.undo());
     assert!(!session.world.is_alive(reused));
 
-    // Now top of undo stack is Despawn(e). Undoing it should silently fail
-    // because entry.generation has advanced beyond e.generation + 1.
-    let depth_before = session.undo_depth();
-    assert!(session.undo()); // pop succeeds
-    assert_eq!(session.undo_depth(), depth_before - 1);
-    // e never gets restored — generation moved past it.
-    assert!(!session.world.is_alive(e));
+    // Undoing the Despawn brings the entity back under a fresh handle.
+    assert!(session.undo());
+    assert!(!session.world.is_alive(e), "old handle stays stale");
+    assert_eq!(session.world.entity_count(), 1, "entity re-created");
     cleanup(&scene);
 }

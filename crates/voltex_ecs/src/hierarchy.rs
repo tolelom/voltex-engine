@@ -89,8 +89,12 @@ pub fn remove_child(world: &mut World, parent: Entity, child: Entity) {
         children.0.retain(|&e| e != child);
     }
 
-    // Remove the Parent component from the child
-    world.remove::<Parent>(child);
+    // Only clear the child's Parent if it actually points at `parent` — a
+    // mismatched call must not detach the child from its real parent (whose
+    // Children would still list it).
+    if world.get::<Parent>(child).is_some_and(|p| p.0 == parent) {
+        world.remove::<Parent>(child);
+    }
 }
 
 /// Despawn `entity` and all of its descendants recursively.
@@ -215,6 +219,23 @@ pub fn validate_hierarchy(world: &mut World) -> Vec<Entity> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn remove_child_with_the_wrong_parent_leaves_the_real_link_alone() {
+        // Found by the editor undo property test: the child's Parent was
+        // removed unconditionally, detaching it from its *real* parent while
+        // that parent's Children still listed it.
+        let mut world = World::new();
+        let real = world.spawn();
+        let other = world.spawn();
+        let child = world.spawn();
+        add_child(&mut world, real, child);
+
+        remove_child(&mut world, other, child);
+
+        assert_eq!(world.get::<Parent>(child).map(|p| p.0), Some(real));
+        assert_eq!(world.get::<Children>(real).map(|c| c.0.clone()), Some(vec![child]));
+    }
 
     #[test]
     fn test_add_child() {

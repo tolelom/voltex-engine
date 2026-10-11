@@ -12,9 +12,12 @@ use crate::command::{apply_command, EditorCommand};
 use crate::error::EditorError;
 use std::fs::OpenOptions;
 use std::io::Write;
+use voltex_ecs::hierarchy::{Children, Parent};
 use voltex_ecs::scene::Tag;
 use voltex_ecs::{ComponentRegistry, Entity, Transform, World};
-use voltex_math::{Quat, Vec3};
+
+mod inverse;
+use inverse::{remap_entity_refs, Inverse};
 
 /// Editor mode: Edit allows mutation, Play freezes the user-facing dispatch
 /// and lets systems (physics, scripts) drive the World instead.
@@ -24,83 +27,6 @@ pub enum EditorMode {
     Edit,
     /// Play mode — commands rejected (read-only surface); systems run.
     Play,
-}
-
-/// The inverse of a dispatched command. The undo stack stores one of these per
-/// undoable command. Only SaveScene/LoadScene clear the history (no tractable
-/// inverse). Despawn became undoable in E3 via the `RestoreEntity` variant.
-/// Spawn redo가 배정받은 새 엔티티로, redo 스택에 남은 항목들의 옛 핸들
-/// 참조를 치환한다 (forward + inverse 양쪽). 없으면 남은 체인이
-/// `EntityNotAlive`로 조용히 끊긴다.
-fn remap_entity_refs(
-    stack: &mut [(EditorCommand, Inverse)],
-    old: Entity,
-    new: Entity,
-) {
-    fn fix(e: &mut Entity, old: Entity, new: Entity) {
-        if *e == old {
-            *e = new;
-        }
-    }
-    for (forward, inverse) in stack.iter_mut() {
-        match forward {
-            EditorCommand::Despawn { entity }
-            | EditorCommand::SetTransform { entity, .. }
-            | EditorCommand::SetTag { entity, .. }
-            | EditorCommand::AddComponent { entity, .. }
-            | EditorCommand::RemoveComponent { entity, .. } => fix(entity, old, new),
-            EditorCommand::AddChild { parent, child }
-            | EditorCommand::RemoveChild { parent, child } => {
-                fix(parent, old, new);
-                fix(child, old, new);
-            }
-            EditorCommand::Spawn
-            | EditorCommand::SaveScene { .. }
-            | EditorCommand::LoadScene { .. } => {}
-        }
-        match inverse {
-            Inverse::DespawnSpawned(entity)
-            | Inverse::SetTransform { entity, .. }
-            | Inverse::SetTag { entity, .. }
-            | Inverse::RemoveComponentByName { entity, .. }
-            | Inverse::AddComponentByBytes { entity, .. }
-            | Inverse::RestoreEntity { entity, .. } => fix(entity, old, new),
-            Inverse::RemoveChild { parent, child } | Inverse::AddChild { parent, child } => {
-                fix(parent, old, new);
-                fix(child, old, new);
-            }
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
-enum Inverse {
-    /// Undo Spawn: despawn the entity that was just created.
-    DespawnSpawned(Entity),
-    /// Undo SetTransform: write back the previous Transform values.
-    SetTransform {
-        entity: Entity,
-        position: Vec3,
-        rotation: Quat,
-        scale: Vec3,
-    },
-    /// Undo SetTag: restore the previous Tag (or remove if there was none).
-    SetTag {
-        entity: Entity,
-        prev: Option<String>,
-    },
-    /// Undo AddChild: detach the child from the parent.
-    RemoveChild { parent: Entity, child: Entity },
-    /// Undo RemoveChild: re-attach the child to the parent.
-    AddChild { parent: Entity, child: Entity },
-    /// Undo AddComponent: remove the just-added component by name (E3).
-    RemoveComponentByName { entity: Entity, name: String },
-    /// Undo RemoveComponent: re-add with prior bytes (E3). `data = None`
-    /// when the component was absent before — undo leaves it absent.
-    AddComponentByBytes { entity: Entity, name: String, data: Option<Vec<u8>> },
-    /// Undo Despawn: restore the entity slot at its original generation and
-    /// re-attach every registered component captured pre-despawn (E3).
-    RestoreEntity { entity: Entity, components: Vec<(String, Vec<u8>)> },
 }
 
 /// Owns the editor's mutable state — World, ComponentRegistry, selection,
@@ -309,8 +235,17 @@ impl EditorSession {
         let Some((forward, inverse)) = self.undo_stack.pop() else {
             return false;
         };
-        self.apply_inverse(&inverse);
+        let recreated = self.apply_inverse(&inverse);
         self.redo_stack.push((forward, inverse));
+        if let Some((old, new)) = recreated {
+            // The despawned entity came back under a new handle: every
+            // stored command still naming the old one must follow it.
+            remap_entity_refs(&mut self.undo_stack, old, new);
+            remap_entity_refs(&mut self.redo_stack, old, new);
+            if self.selected == Some(old) {
+                self.selected = Some(new);
+            }
+        }
         self.persist_scene_silent();
         true
     }
@@ -372,6 +307,10 @@ impl EditorSession {
             EditorCommand::AddChild { parent, child } => Some(Inverse::RemoveChild {
                 parent: *parent,
                 child: *child,
+                prev_parent: self
+                    .world
+                    .get::<voltex_ecs::hierarchy::Parent>(*child)
+                    .map(|p| p.0),
             }),
             EditorCommand::RemoveChild { parent, child } => {
                 // Only undoable if the child is currently attached to this parent
@@ -440,13 +379,21 @@ impl EditorSession {
                 Some(Inverse::RestoreEntity {
                     entity: *entity,
                     components,
+                    parent: self.world.get::<Parent>(*entity).map(|p| p.0),
+                    children: self
+                        .world
+                        .get::<Children>(*entity)
+                        .map(|c| c.0.clone())
+                        .unwrap_or_default(),
                 })
             }
             EditorCommand::SaveScene { .. } | EditorCommand::LoadScene { .. } => None,
         }
     }
 
-    fn apply_inverse(&mut self, inverse: &Inverse) {
+    /// Apply `inverse`. Returns `Some((old, new))` when a despawned entity
+    /// could not be revived at its old handle and was re-created as `new`.
+    fn apply_inverse(&mut self, inverse: &Inverse) -> Option<(Entity, Entity)> {
         match inverse {
             Inverse::DespawnSpawned(entity) => {
                 if self.world.is_alive(*entity) {
@@ -479,9 +426,18 @@ impl EditorSession {
                     voltex_ecs::hierarchy::add_child(&mut self.world, *parent, *child);
                 }
             }
-            Inverse::RemoveChild { parent, child } => {
-                if self.world.is_alive(*parent) && self.world.is_alive(*child) {
+            Inverse::RemoveChild { parent, child, prev_parent } => {
+                // Re-attaching to the same parent was a no-op: nothing to undo.
+                if *prev_parent != Some(*parent)
+                    && self.world.is_alive(*parent)
+                    && self.world.is_alive(*child)
+                {
                     voltex_ecs::hierarchy::remove_child(&mut self.world, *parent, *child);
+                    if let Some(p) = prev_parent {
+                        if self.world.is_alive(*p) {
+                            voltex_ecs::hierarchy::add_child(&mut self.world, *p, *child);
+                        }
+                    }
                 }
             }
             Inverse::RemoveComponentByName { entity, name } => {
@@ -498,24 +454,40 @@ impl EditorSession {
                 // data == None means the component was absent before; undo
                 // leaves it absent.
             }
-            Inverse::RestoreEntity { entity, components } => {
-                let restored = self
+            Inverse::RestoreEntity { entity, components, parent, children } => {
+                // Revive at the original handle when the slot allows it;
+                // otherwise (the slot was reused, e.g. delete A -> create B
+                // -> undo -> undo) re-create the entity and report the new
+                // handle so undo() can remap the stacks.
+                let target = if self
                     .world
-                    .restore_at_generation(entity.id, entity.generation);
-                if restored {
-                    for (name, bytes) in components {
-                        if let Some(entry) = self.registry.find(name) {
-                            let _ = (entry.deserialize)(&mut self.world, *entity, bytes);
-                        }
+                    .restore_at_generation(entity.id, entity.generation)
+                {
+                    *entity
+                } else {
+                    self.world.spawn()
+                };
+                for (name, bytes) in components {
+                    if let Some(entry) = self.registry.find(name) {
+                        let _ = (entry.deserialize)(&mut self.world, target, bytes);
                     }
                 }
-                // If restore failed (slot was reused by another spawn that
-                // hasn't yet been despawned, etc.) we silently no-op. The
-                // undo() caller still pops the stack, so the UI's redo
-                // affordance becomes available — visible "nothing happened"
-                // is the intended behaviour for this edge case.
+                // Re-link the hierarchy where the other side still exists
+                // and has not been re-parented meanwhile.
+                if let Some(p) = parent {
+                    if self.world.is_alive(*p) {
+                        voltex_ecs::hierarchy::add_child(&mut self.world, *p, target);
+                    }
+                }
+                for c in children {
+                    if self.world.is_alive(*c) && self.world.get::<Parent>(*c).is_none() {
+                        voltex_ecs::hierarchy::add_child(&mut self.world, target, *c);
+                    }
+                }
+                return (target != *entity).then_some((*entity, target));
             }
         }
+        None
     }
 
     fn persist_scene_silent(&self) {
@@ -540,3 +512,5 @@ mod tests;
 
 #[cfg(test)]
 mod e3_tests;
+#[cfg(test)]
+mod undo_property_tests;

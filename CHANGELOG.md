@@ -10,6 +10,40 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## v1.0.146 — 2026-10-12 — 에디터 undo/redo 결함 4건 (무작위 속성 테스트로 발견)
+
+새 속성 테스트 `voltex_editor/src/session/undo_property_tests.rs`: 결정적
+xorshift로 Spawn/Despawn/SetTransform/SetTag/AddChild/RemoveChild를 시드 3개 × 400단계
+돌린다. 성공한 명령마다 상태를 기록하고, 끝까지 undo하면서 **매 단계** 기록과
+일치하는지(엔티티 id 무관 구조 비교), 다시 끝까지 redo해 최종 상태와 일치하는지
+본다. 실패한 명령이나 undo 항목을 안 남긴 성공은 상태를 바꾸면 안 된다. 이
+테스트가 차례로 찾은 결함:
+
+### Fix
+
+- **voltex_ecs `hierarchy::remove_child`**: 자식의 `Parent`를 무조건 지웠다.
+  실제 부모가 아닌 엔티티를 넘기면 자식이 **진짜 부모에게서 떨어지고**, 그
+  부모의 `Children`에는 남는 불일치가 생겼다. 이제 `Parent`가 그 부모일 때만
+  지운다(Lua `remove_child`에도 적용).
+- **voltex_editor Despawn undo**: A 삭제 → B 생성(슬롯 재사용) → undo → undo에서
+  **A가 돌아오지 않았다**. B 생성의 undo가 슬롯을 다시 해제해 generation이 지나가서
+  제자리 부활이 불가능했고, 코드가 이를 "의도된 무동작"으로 삼키고 있었다. 이제
+  새 핸들로 재생성하고, undo/redo 스택과 선택의 옛 핸들을 새 핸들로 리매핑한다
+  (redo의 Spawn과 같은 방식). 옛 계약을 고정하던 테스트
+  `despawn_undo_silently_fails_when_slot_reused`는
+  `despawn_undo_recreates_entity_when_slot_was_reused`로 바꿨다.
+- **voltex_editor Despawn과 계층**: 삭제가 `Parent`/`Children` 링크를 매달린
+  핸들로 남겼고(부모의 Children에 죽은 자식, 자식의 Parent가 죽은 부모), undo는
+  등록 컴포넌트만 복원해 **계층이 사라졌다**. 이제 삭제 전에 링크를 떼고 undo
+  데이터에 부모·자식 목록을 담아 복원 시 다시 잇는다.
+- **voltex_editor AddChild undo**: 역연산이 `RemoveChild`뿐이라 재부모 지정의
+  undo가 자식을 **원래 부모로 돌려놓지 못하고 고아로** 만들었다. 같은 부모로
+  다시 붙인(무동작) AddChild를 undo하면 **있던 링크를 끊었다**. 이제 이전 부모를
+  기록해 되돌린다.
+- 600줄 규칙: `Inverse`·`remap_entity_refs`를 `session/inverse.rs`로 분리했고,
+  뒤섞여 있던 두 문서 주석도 바로잡았다.
+- 테스트 +5 (속성 1, 결정적 재현 3, ecs 1).
+
 ## v1.0.145 — 2026-10-12 — CMYK JPEG를 쓰레기 색 대신 에러로
 
 ### Fix

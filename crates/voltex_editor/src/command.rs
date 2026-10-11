@@ -112,6 +112,16 @@ pub(crate) fn apply_command(
             if !world.is_alive(*entity) {
                 return Err(EditorError::EntityNotAlive(*entity));
             }
+            // Detach first so no Parent/Children link is left pointing at a
+            // dead handle (the session's undo re-links them).
+            use voltex_ecs::hierarchy::{remove_child, Children, Parent};
+            if let Some(p) = world.get::<Parent>(*entity).map(|p| p.0) {
+                remove_child(world, p, *entity);
+            }
+            let kids = world.get::<Children>(*entity).map(|c| c.0.clone()).unwrap_or_default();
+            for kid in kids {
+                remove_child(world, *entity, kid);
+            }
             world.despawn(*entity);
             Ok(*entity)
         }
