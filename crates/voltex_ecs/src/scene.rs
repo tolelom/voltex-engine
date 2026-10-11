@@ -358,6 +358,9 @@ pub(crate) fn deserialize_scene_json_with_cap(
     registry: &ComponentRegistry,
     cap: usize,
 ) -> crate::Result<Vec<Entity>> {
+    // A UTF-8 BOM (Notepad / "UTF-8 with signature") survives from_utf8 as
+    // U+FEFF and is not JSON whitespace.
+    let json_str = json_str.strip_prefix('\u{FEFF}').unwrap_or(json_str);
     let root = json::json_parse(json_str)?;
 
     let version = root
@@ -659,6 +662,24 @@ entity 2
         assert!((t.position.z - 3.0).abs() < 1e-4);
         let tag = world2.get::<Tag>(entities[0]).unwrap();
         assert_eq!(tag.0, "player");
+    }
+
+    #[test]
+    fn deserialize_scene_json_accepts_leading_utf8_bom() {
+        // Windows editors (Notepad, VS "UTF-8 with signature") save a BOM;
+        // `read_to_string`/`from_utf8` keep it as U+FEFF.
+        let mut registry = ComponentRegistry::new();
+        registry.register_defaults();
+        let mut world = World::new();
+        let e = world.spawn();
+        world.add(e, Transform::from_position(Vec3::new(1.0, 0.0, 0.0)));
+        world.add(e, Tag("bom".into()));
+        let json = format!("\u{FEFF}{}", serialize_scene_json(&world, &registry));
+
+        let mut loaded = World::new();
+        let entities = deserialize_scene_json(&mut loaded, &json, &registry)
+            .expect("BOM-prefixed scene loads");
+        assert_eq!(loaded.get::<Tag>(entities[0]).unwrap().0, "bom");
     }
 
     #[test]

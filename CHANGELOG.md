@@ -10,6 +10,15 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## v1.0.117 — 2026-10-12 — JSON 씬 로더가 UTF-8 BOM 허용 (감사 LOW 이월 3/4, 1부)
+
+### Fix
+
+- **voltex_ecs `deserialize_scene_json`**: 선두 U+FEFF(BOM)를 떼고 파싱.
+  메모장·VS "UTF-8 with signature"로 저장한 씬이 `Expected number at
+  position 0`으로 실패하던 것. runtime `load_scene`, 에디터 LoadScene,
+  CLI 씬 스캔이 모두 이 함수를 거쳐 한 곳 수정으로 해소. 테스트 +1.
+
 ## v1.0.116 — 2026-10-12 — CLI 멀티바이너리 exe 추측 배포 차단 (감사 LOW 이월 2/4)
 
 ### Fix (behaviour change)
