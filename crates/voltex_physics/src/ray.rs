@@ -199,8 +199,11 @@ pub fn ray_vs_triangle(ray: &Ray, v0: Vec3, v1: Vec3, v2: Vec3) -> Option<(f32, 
     let h = ray.direction.cross(edge2);
     let a = edge1.dot(h);
 
-    if a.abs() < 1e-8 {
-        return None; // Ray is parallel to triangle
+    // Parallel test relative to the triangle's size: |a| = |n|·|cos θ| scales
+    // with edge length², so a fixed 1e-8 rejected grazing hits on mm-sized
+    // triangles while being meaningless for km-sized ones.
+    if a.abs() <= 1e-7 * edge1.length() * edge2.length() {
+        return None; // Ray is parallel to triangle (or the triangle is degenerate)
     }
 
     let f = 1.0 / a;
