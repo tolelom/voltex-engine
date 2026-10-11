@@ -10,6 +10,19 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## v1.0.128 — 2026-10-12 — voltex.toml 파싱 에러에 열 번호
+
+### Changed
+
+- **voltex_cli `CliError::ManifestParse`**에 `column` 필드(1부터, **문자** 단위)
+  추가. 메시지는 `parse error on line N, column M: …`. 파서가 보는 모든 조각이
+  원본 줄의 슬라이스라서, 문제 조각의 위치를 그대로 열로 쓴다(`Loc::err`).
+  한글 등 멀티바이트 키가 앞에 있어도 바이트가 아니라 문자로 센다.
+- 같은 파일에서 발견: `unterminated_array_is_parse_error` 테스트가
+  `matches!(…)`를 `assert!` 없이 써서 **항상 통과하는 테스트**였다. 줄·열까지
+  단언하도록 고쳤다.
+- 테스트 +3 (열 위치 5종, 문자 단위, 표시 문자열).
+
 ## v1.0.127 — 2026-10-12 — 크래시 리포트에 GPU·씬·FPS 컨텍스트
 
 ### Additive

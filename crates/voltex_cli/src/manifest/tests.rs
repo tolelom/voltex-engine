@@ -151,7 +151,48 @@ version = "0.1.0"
 scripts = ["a.lua"
 "#;
     let err = Manifest::parse(toml).unwrap_err();
-    matches!(err, CliError::ManifestParse { .. });
+    // Line 5 (the empty first line of the raw string is line 1); `[` is the 11th character.
+    assert!(
+        matches!(err, CliError::ManifestParse { line: 5, column: 11, .. }),
+        "{err:?}"
+    );
+}
+
+/// (line, column) of the parse error for a one-line document.
+fn parse_error_at(text: &str) -> (usize, usize) {
+    match parse_toml(text) {
+        Err(CliError::ManifestParse { line, column, .. }) => (line, column),
+        other => panic!("expected ManifestParse, got {other:?}"),
+    }
+}
+
+#[test]
+fn parse_errors_point_at_the_offending_column() {
+    // Unrecognised bare value, after indentation: `foo` starts at column 10.
+    assert_eq!(parse_error_at("  name = foo"), (1, 10));
+    // Bad array element: `abc` starts at column 22.
+    assert_eq!(parse_error_at("window_size = [1280, abc]"), (1, 22));
+    // Missing `]` on a header points one past the end of the line.
+    assert_eq!(parse_error_at("[build"), (1, 7));
+    // No `=`: the line start.
+    assert_eq!(parse_error_at("just words"), (1, 1));
+    // Empty key: the `=`.
+    assert_eq!(parse_error_at("  = 3"), (1, 3));
+}
+
+#[test]
+fn parse_error_column_counts_characters_not_bytes() {
+    // 제목 is 2 characters but 6 bytes; `foo` is character 6.
+    assert_eq!(parse_error_at("제목 = foo"), (1, 6));
+}
+
+#[test]
+fn parse_error_display_includes_line_and_column() {
+    let err = parse_toml("x = foo").unwrap_err();
+    assert_eq!(
+        err.to_string(),
+        "voltex.toml parse error on line 1, column 5: unrecognised value `foo`"
+    );
 }
 
 #[test]

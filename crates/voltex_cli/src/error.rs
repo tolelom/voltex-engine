@@ -9,6 +9,8 @@ pub enum CliError {
     ManifestNotFound(PathBuf),
     ManifestParse {
         line: usize,
+        /// 1-based character column of the offending token.
+        column: usize,
         msg: String,
     },
     MissingField {
@@ -77,8 +79,12 @@ impl fmt::Display for CliError {
                     path.display()
                 )
             }
-            CliError::ManifestParse { line, msg } => {
-                write!(f, "voltex.toml parse error on line {}: {}", line, msg)
+            CliError::ManifestParse { line, column, msg } => {
+                write!(
+                    f,
+                    "voltex.toml parse error on line {}, column {}: {}",
+                    line, column, msg
+                )
             }
             CliError::MissingField { section, field } => {
                 write!(

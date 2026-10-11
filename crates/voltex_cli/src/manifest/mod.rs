@@ -410,6 +410,29 @@ impl TomlDoc {
     }
 }
 
+/// Where a parse error happened: the 1-based line and the raw line text.
+/// Every substring the parser inspects is a slice of `raw`, so an error can
+/// point at the slice and the column falls out of its offset.
+struct Loc<'a> {
+    line_no: usize,
+    raw: &'a str,
+}
+
+impl Loc<'_> {
+    /// `ManifestParse` at the start of `at` (a slice of `raw`, possibly the
+    /// empty slice at its end). Column is 1-based, in characters.
+    fn err(&self, at: &str, msg: impl Into<String>) -> CliError {
+        let offset = (at.as_ptr() as usize).saturating_sub(self.raw.as_ptr() as usize);
+        let offset = offset.min(self.raw.len());
+        let column = self.raw[..offset].chars().count() + 1;
+        CliError::ManifestParse {
+            line: self.line_no,
+            column,
+            msg: msg.into(),
+        }
+    }
+}
+
 fn parse_toml(text: &str) -> Result<TomlDoc> {
     let mut doc = TomlDoc::default();
     let mut current = String::new();
@@ -428,17 +451,17 @@ fn parse_toml(text: &str) -> Result<TomlDoc> {
     };
 
     for (i, raw_line) in text.lines().enumerate() {
-        let line_no = i + 1;
+        let loc = Loc { line_no: i + 1, raw: raw_line };
         let line = strip_comment(raw_line).trim();
         if line.is_empty() {
             continue;
         }
-        if let Some(header) = parse_header(line, line_no)? {
+        if let Some(header) = parse_header(line, &loc)? {
             flush(&mut doc, &mut current, &mut current_entries);
             current = header;
             continue;
         }
-        let (key, value) = parse_kv(line, line_no)?;
+        let (key, value) = parse_kv(line, &loc)?;
         current_entries.push((key, value));
     }
     flush(&mut doc, &mut current, &mut current_entries);
@@ -460,49 +483,37 @@ fn strip_comment(line: &str) -> &str {
     line
 }
 
-fn parse_header(line: &str, line_no: usize) -> Result<Option<String>> {
+fn parse_header(line: &str, loc: &Loc) -> Result<Option<String>> {
     let bytes = line.as_bytes();
     if bytes.first() != Some(&b'[') {
         return Ok(None);
     }
     if bytes.last() != Some(&b']') {
-        return Err(CliError::ManifestParse {
-            line: line_no,
-            msg: "section header missing closing `]`".to_string(),
-        });
+        return Err(loc.err(&line[line.len()..], "section header missing closing `]`"));
     }
     let inner = line[1..line.len() - 1].trim();
     if inner.is_empty() {
-        return Err(CliError::ManifestParse {
-            line: line_no,
-            msg: "empty section header".to_string(),
-        });
+        return Err(loc.err(line, "empty section header"));
     }
     Ok(Some(inner.to_string()))
 }
 
-fn parse_kv(line: &str, line_no: usize) -> Result<(String, TomlValue)> {
+fn parse_kv(line: &str, loc: &Loc) -> Result<(String, TomlValue)> {
     let Some(eq) = line.find('=') else {
-        return Err(CliError::ManifestParse {
-            line: line_no,
-            msg: "expected `key = value`".to_string(),
-        });
+        return Err(loc.err(line, "expected `key = value`"));
     };
     let key = line[..eq].trim().to_string();
     if key.is_empty() {
-        return Err(CliError::ManifestParse {
-            line: line_no,
-            msg: "empty key".to_string(),
-        });
+        return Err(loc.err(&line[eq..], "empty key"));
     }
     let value_part = line[eq + 1..].trim();
-    let value = parse_value(value_part, line_no)?;
+    let value = parse_value(value_part, loc)?;
     Ok((key, value))
 }
 
-fn parse_value(raw: &str, line_no: usize) -> Result<TomlValue> {
+fn parse_value(raw: &str, loc: &Loc) -> Result<TomlValue> {
     if raw.starts_with('"') {
-        return parse_string(raw, line_no).map(TomlValue::String);
+        return parse_string(raw, loc).map(TomlValue::String);
     }
     if raw == "true" {
         return Ok(TomlValue::Bool(true));
@@ -511,24 +522,18 @@ fn parse_value(raw: &str, line_no: usize) -> Result<TomlValue> {
         return Ok(TomlValue::Bool(false));
     }
     if raw.starts_with('[') {
-        return parse_array(raw, line_no);
+        return parse_array(raw, loc);
     }
     // Plain integer?
     if let Ok(n) = raw.parse::<i64>() {
         return Ok(TomlValue::Int(n));
     }
-    Err(CliError::ManifestParse {
-        line: line_no,
-        msg: format!("unrecognised value `{}`", raw),
-    })
+    Err(loc.err(raw, format!("unrecognised value `{}`", raw)))
 }
 
-fn parse_string(raw: &str, line_no: usize) -> Result<String> {
+fn parse_string(raw: &str, loc: &Loc) -> Result<String> {
     if !raw.ends_with('"') || raw.len() < 2 {
-        return Err(CliError::ManifestParse {
-            line: line_no,
-            msg: "unterminated string".to_string(),
-        });
+        return Err(loc.err(raw, "unterminated string"));
     }
     let inner = &raw[1..raw.len() - 1];
     let mut out = String::with_capacity(inner.len());
@@ -542,10 +547,7 @@ fn parse_string(raw: &str, line_no: usize) -> Result<String> {
                 Some('t') => out.push('\t'),
                 Some(other) => out.push(other),
                 None => {
-                    return Err(CliError::ManifestParse {
-                        line: line_no,
-                        msg: "trailing backslash in string".to_string(),
-                    })
+                    return Err(loc.err(raw, "trailing backslash in string"))
                 }
             }
         } else {
@@ -555,12 +557,9 @@ fn parse_string(raw: &str, line_no: usize) -> Result<String> {
     Ok(out)
 }
 
-fn parse_array(raw: &str, line_no: usize) -> Result<TomlValue> {
+fn parse_array(raw: &str, loc: &Loc) -> Result<TomlValue> {
     if !raw.ends_with(']') || raw.len() < 2 {
-        return Err(CliError::ManifestParse {
-            line: line_no,
-            msg: "unterminated array".to_string(),
-        });
+        return Err(loc.err(raw, "unterminated array"));
     }
     let inner = raw[1..raw.len() - 1].trim();
     if inner.is_empty() {
@@ -573,16 +572,16 @@ fn parse_array(raw: &str, line_no: usize) -> Result<TomlValue> {
     if first.starts_with('"') {
         let mut out = Vec::with_capacity(items.len());
         for item in items {
-            out.push(parse_string(item.trim(), line_no)?);
+            out.push(parse_string(item.trim(), loc)?);
         }
         Ok(TomlValue::StringArray(out))
     } else {
         let mut out = Vec::with_capacity(items.len());
         for item in items {
-            let n: i64 = item.trim().parse().map_err(|_| CliError::ManifestParse {
-                line: line_no,
-                msg: format!("expected integer in array, got `{}`", item.trim()),
-            })?;
+            let item = item.trim();
+            let n: i64 = item
+                .parse()
+                .map_err(|_| loc.err(item, format!("expected integer in array, got `{}`", item)))?;
             out.push(n);
         }
         Ok(TomlValue::IntArray(out))
