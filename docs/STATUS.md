@@ -2323,7 +2323,9 @@ crates/
 └── voltex_cli         — bin "voltex" (new/build/run), voltex.toml 매니페스트, .vpkg packing (B1+B2)
 ```
 
-## 테스트: ~1044개 통과 (Windows host, `cargo test --workspace`). `--lib` 기준은 989 (voltex_cli 는 bin-only 라 lib count 에서 빠지나 `cargo test -p voltex_cli` 로 55 개 실행됨). macOS host 에서는 +2 (CoreAudio 모듈) = 1038 예상. v1.0.1 +5 (input_system 순서/참조 ×2, Bounds default ×2, ScriptComponent default ×1). v1.0.3 +4 (canonicalize_friendly Windows verbatim strip ×3 + cross-OS integration ×1). v1.0.8 +21 (parser panic-resistance fuzz: PNG ×4 + JPG ×4 + GLTF ×5 + OBJ ×4 + WAV ×4). v1.0.9 +30 (OGG +11 + Vorbis +17 + decode_ogg_vorbis_bytes +2 — 모두 wire 직전까지 dead, 이제 실 컴파일). v1.0.10 +14 (voltex_runtime crash module ×11 + config crash log ×3). v1.0.11 +13 (voltex_cli schema/path validation + Levenshtein helper + error Display). v1.0.12 +4 (voltex_cli copy_license_files).
+## 테스트: 1669개 통과 (2026-10-12, Windows host, `cargo test --workspace`, GPU `#[ignore]` 제외 — `voltex_capture` GPU 테스트는 `--include-ignored`로 별도). crate별(라이브러리 + 통합 테스트 합): ecs 206+4, editor 206, renderer 200, audio 138+5, physics 121, runtime 118, image 99+12, math 99, ai 75, script 77, net 63, renderer_ecs 60, asset 38, depths 28, platform 21, leap 17, depths·leap 플레이스루 통합 3, capture 3, voltex 퍼사드+voltex_cli(실행 파일명이 둘 다 voltex라 로그에서 합산) 75+1. 아래 crate별 목록은 v1.0.12 시점 기록이다.
+
+### (v1.0.12 시점 기록) ~1044개. `--lib` 기준은 989 (voltex_cli 는 bin-only 라 lib count 에서 빠지나 `cargo test -p voltex_cli` 로 55 개 실행됨). macOS host 에서는 +2 (CoreAudio 모듈) = 1038 예상. v1.0.1 +5 (input_system 순서/참조 ×2, Bounds default ×2, ScriptComponent default ×1). v1.0.3 +4 (canonicalize_friendly Windows verbatim strip ×3 + cross-OS integration ×1). v1.0.8 +21 (parser panic-resistance fuzz: PNG ×4 + JPG ×4 + GLTF ×5 + OBJ ×4 + WAV ×4). v1.0.9 +30 (OGG +11 + Vorbis +17 + decode_ogg_vorbis_bytes +2 — 모두 wire 직전까지 dead, 이제 실 컴파일). v1.0.10 +14 (voltex_runtime crash module ×11 + config crash log ×3). v1.0.11 +13 (voltex_cli schema/path validation + Levenshtein helper + error Display). v1.0.12 +4 (voltex_cli copy_license_files).
 
 - voltex: 2 (M6: prelude/module 경로 컴파일 검증)
 - voltex_math: 39 (8-7 +2: inverse roundtrip × VP+translation; v1.0.19: missing_docs 59→0, doc 강화만, 테스트 카운트 변경 없음)
@@ -2341,7 +2343,9 @@ crates/
 - voltex_runtime: 36 (v1.0.18 +2 panic hook relocation guards; v1.0.17 +7; v1.0.10 +14; was 13)
 - voltex_cli: 55 (v1.0.16 +1 manifest reference doc gating; v1.0.13 +7; v1.0.12 +4; v1.0.11 +13; was 30)
 
-## Examples (14개) + Games (1개) + 기존 survivor_game (archived)
+## Examples (17개, `examples/` — survivor_game archive 포함) + Games (3개: voltex_survivor, voltex_depths, voltex_leap)
+
+아래 목록은 v1.0 시점 구성이다. 이후 추가: boids_demo, game_ready_demo(예제), voltex_depths·voltex_leap(게임, 도그푸딩 1·2편).
 
 - triangle, model_viewer, many_cubes, hierarchy_demo, asset_demo
 - pbr_demo, multi_light_demo, shadow_demo, ibl_demo
