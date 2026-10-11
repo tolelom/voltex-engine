@@ -10,6 +10,17 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## v1.0.139 — 2026-10-12 — glTF JSON 문자열 UTF-8 복원 + 서로게이트 쌍
+
+### Fix
+
+- **voltex_image `json_parser`**: 문자열을 바이트마다 `b as char`로 넣어서
+  비ASCII UTF-8이 깨졌다(재현: `"모델.bin"` → `"ëª¨ë\u{8d}¸.bin"`). glTF 노드
+  이름이 깨졌고, 비ASCII 외부 버퍼·이미지 URI는 파일을 찾지 못했다. 이제 바이트를
+  모아 끝에서 한 번 UTF-8로 해석한다(잘못된 UTF-8은 에러). `\uD83D\uDE00` 같은
+  서로게이트 쌍은 각각 `char::from_u32` 실패로 **조용히 사라졌는데**, 이제 한
+  문자로 합친다. 짝 없는 서로게이트는 에러. 테스트 +3.
+
 ## v1.0.138 — 2026-10-12 — OBJ 음수(상대) 인덱스 지원
 
 ### Fix

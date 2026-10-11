@@ -137,39 +137,66 @@ impl<'a> JsonParser<'a> {
 
     fn parse_string(&mut self) -> crate::Result<String> {
         self.expect(b'"')?;
-        let mut s = String::new();
+        // Collect raw bytes and decode once: the input is UTF-8, and pushing
+        // each byte as a `char` would turn multi-byte text into mojibake.
+        let mut bytes: Vec<u8> = Vec::new();
+        let push_char = |bytes: &mut Vec<u8>, c: char| {
+            let mut buf = [0u8; 4];
+            bytes.extend_from_slice(c.encode_utf8(&mut buf).as_bytes());
+        };
         loop {
             let b = self.advance()?;
             match b {
-                b'"' => return Ok(s),
+                b'"' => {
+                    return String::from_utf8(bytes)
+                        .map_err(|_| "Invalid UTF-8 in string".into());
+                }
                 b'\\' => {
                     let esc = self.advance()?;
                     match esc {
-                        b'"' => s.push('"'),
-                        b'\\' => s.push('\\'),
-                        b'/' => s.push('/'),
-                        b'b' => s.push('\u{08}'),
-                        b'f' => s.push('\u{0C}'),
-                        b'n' => s.push('\n'),
-                        b'r' => s.push('\r'),
-                        b't' => s.push('\t'),
+                        b'"' => bytes.push(b'"'),
+                        b'\\' => bytes.push(b'\\'),
+                        b'/' => bytes.push(b'/'),
+                        b'b' => bytes.push(0x08),
+                        b'f' => bytes.push(0x0C),
+                        b'n' => bytes.push(b'\n'),
+                        b'r' => bytes.push(b'\r'),
+                        b't' => bytes.push(b'\t'),
                         b'u' => {
-                            let mut hex = String::new();
-                            for _ in 0..4 {
-                                hex.push(self.advance()? as char);
-                            }
-                            let code = u32::from_str_radix(&hex, 16)
-                                .map_err(|_| format!("Invalid unicode escape: {}", hex))?;
-                            if let Some(ch) = char::from_u32(code) {
-                                s.push(ch);
-                            }
+                            let unit = self.parse_hex4()?;
+                            let code = match unit {
+                                // High surrogate: must be followed by \uDC00..DFFF.
+                                0xD800..=0xDBFF => {
+                                    if self.advance()? != b'\\' || self.advance()? != b'u' {
+                                        return Err("Unpaired high surrogate".into());
+                                    }
+                                    let low = self.parse_hex4()?;
+                                    if !(0xDC00..=0xDFFF).contains(&low) {
+                                        return Err("Unpaired high surrogate".into());
+                                    }
+                                    0x10000 + ((unit - 0xD800) << 10) + (low - 0xDC00)
+                                }
+                                0xDC00..=0xDFFF => return Err("Unpaired low surrogate".into()),
+                                other => other,
+                            };
+                            let ch = char::from_u32(code)
+                                .ok_or_else(|| format!("Invalid unicode escape: {:04X}", code))?;
+                            push_char(&mut bytes, ch);
                         }
                         _ => return Err(format!("Invalid escape: \\{}", esc as char).into()),
                     }
                 }
-                _ => s.push(b as char),
+                _ => bytes.push(b),
             }
         }
+    }
+
+    fn parse_hex4(&mut self) -> crate::Result<u32> {
+        let mut hex = String::with_capacity(4);
+        for _ in 0..4 {
+            hex.push(self.advance()? as char);
+        }
+        u32::from_str_radix(&hex, 16).map_err(|_| format!("Invalid unicode escape: {}", hex).into())
     }
 
     fn parse_number(&mut self) -> crate::Result<JsonValue> {
@@ -275,6 +302,29 @@ impl<'a> JsonParser<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn string_of(json: &str) -> String {
+        parse_json(json).unwrap().as_str().unwrap().to_string()
+    }
+
+    #[test]
+    fn non_ascii_utf8_strings_survive_intact() {
+        // glTF node names / buffer URIs can be any UTF-8.
+        assert_eq!(string_of(r#""모델.bin""#), "모델.bin");
+        assert_eq!(string_of(r#""日本語 é""#), "日本語 é");
+    }
+
+    #[test]
+    fn surrogate_pair_escape_decodes_to_one_char() {
+        assert_eq!(string_of(r#""a😀b""#), "a\u{1F600}b");
+        assert_eq!(string_of(r#""é""#), "é");
+    }
+
+    #[test]
+    fn lone_surrogate_escape_is_an_error() {
+        assert!(parse_json(r#""\uD83D""#).is_err());
+        assert!(parse_json(r#""\uDE00x""#).is_err());
+    }
 
     #[test]
     fn test_parse_null() {
