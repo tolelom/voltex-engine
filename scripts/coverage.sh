@@ -12,12 +12,13 @@
 #   cargo install cargo-llvm-cov
 #   rustup component add llvm-tools-preview
 #
-# Coverage today (measured on Windows + RTX 4080 SUPER, 2026-05-28):
-#   --lib only           : 79.69% lines
-#   --lib + GPU ignored  : 84.24% lines
+# Coverage (measured on Windows + RTX 4080 SUPER, 2026-10-12):
+#   --lib only           : 68.83% lines (below the 78% gate)
+#   --lib + GPU ignored  : 82.90% lines
 #
-# CI gates at 78% so a missing GPU on the runner (lavapipe absent) still
-# passes — graceful skip in voltex_capture's HeadlessGpu::new().
+# The GPU-gated #[ignore] tests must run to pass the gate: without a GPU
+# (lavapipe absent) their bodies and the renderer code they exercise count
+# as uncovered. See docs/NEXT.md "커버리지 게이트".
 
 set -euo pipefail
 
