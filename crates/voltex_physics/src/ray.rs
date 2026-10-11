@@ -64,7 +64,14 @@ pub(crate) fn ray_vs_sphere(ray: &Ray, center: Vec3, radius: f32) -> Option<(f32
     }
 
     let point = ray.at(t);
-    let normal = (point - center).normalize();
+    // radius 0 hit exactly at the centre has no surface direction — face
+    // the ray instead of returning NaN.
+    let outward = point - center;
+    let normal = if outward.length_squared() > 1e-12 {
+        outward.normalize()
+    } else {
+        (-ray.direction).normalize_or_zero()
+    };
     Some((t, normal))
 }
 
@@ -238,6 +245,16 @@ mod tests {
 
     fn approx(a: f32, b: f32) -> bool {
         (a - b).abs() < 1e-4
+    }
+
+    #[test]
+    fn zero_radius_sphere_hit_through_centre_has_finite_normal() {
+        let ray = Ray::new(Vec3::new(0.0, 0.0, -5.0), Vec3::new(0.0, 0.0, 1.0));
+        let (t, n) = ray_vs_sphere(&ray, Vec3::ZERO, 0.0).expect("ray passes the point");
+        assert!(approx(t, 5.0));
+        assert!(n.x.is_finite() && n.y.is_finite() && n.z.is_finite(), "{n:?}");
+        // Falls back to facing the ray.
+        assert!(approx(n.z, -1.0), "{n:?}");
     }
 
     fn approx_vec(a: Vec3, b: Vec3) -> bool {

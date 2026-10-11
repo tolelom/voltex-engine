@@ -62,6 +62,14 @@ impl OrbitCamera {
         )
     }
 
+    /// Unit view direction (eye → target) from yaw/pitch alone. Independent
+    /// of `distance`, so it stays finite when eye == target (`distance` is
+    /// pub and can bypass [`Self::zoom`]'s clamp).
+    pub fn forward(&self) -> Vec3 {
+        let cp = self.pitch.cos();
+        Vec3::new(-cp * self.yaw.sin(), -self.pitch.sin(), -cp * self.yaw.cos())
+    }
+
     /// Applies a mouse-drag orbit (`dx`/`dy` in pixels), clamping pitch.
     pub fn orbit(&mut self, dx: f32, dy: f32) {
         self.yaw += dx * ORBIT_SENSITIVITY;
@@ -78,7 +86,7 @@ impl OrbitCamera {
     /// Middle-drag pan — translates the target along the camera's
     /// right/up axes by `(dx, dy)` scaled by distance.
     pub fn pan(&mut self, dx: f32, dy: f32) {
-        let forward = (self.target - self.position()).normalize();
+        let forward = self.forward();
         let right = forward.cross(Vec3::Y);
         let right = if right.length() < 1e-4 { Vec3::X } else { right.normalize() };
         let up = right.cross(forward).normalize();
@@ -89,7 +97,10 @@ impl OrbitCamera {
 
     /// View matrix from the current eye position looking at `target`.
     pub fn view_matrix(&self) -> Mat4 {
-        Mat4::look_at(self.position(), self.target, Vec3::Y)
+        // Look along forward() rather than at target: same matrix for any
+        // positive distance, and still defined when eye == target.
+        let eye = self.position();
+        Mat4::look_at(eye, eye + self.forward(), Vec3::Y)
     }
 
     /// Perspective projection matrix for the given viewport aspect.
@@ -106,6 +117,39 @@ impl OrbitCamera {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn finite(v: Vec3) -> bool {
+        v.x.is_finite() && v.y.is_finite() && v.z.is_finite()
+    }
+
+    #[test]
+    fn pan_at_zero_distance_keeps_target_finite() {
+        // `distance` is pub, so it can bypass zoom()'s clamp. Eye == target
+        // used to make forward NaN, and NaN * 0 poisoned target for good.
+        let mut cam = OrbitCamera::new();
+        cam.distance = 0.0;
+        cam.pan(10.0, 5.0);
+        assert!(finite(cam.target), "target became {:?}", cam.target);
+    }
+
+    #[test]
+    fn view_matrix_at_zero_distance_is_finite() {
+        let mut cam = OrbitCamera::new();
+        cam.distance = 0.0;
+        let m = cam.view_matrix();
+        assert!(m.cols.iter().flatten().all(|c| c.is_finite()), "{m:?}");
+    }
+
+    #[test]
+    fn view_matrix_unchanged_for_normal_distance() {
+        // Regression guard for the eye+forward formulation.
+        let cam = OrbitCamera::new();
+        let expected = Mat4::look_at(cam.position(), cam.target, Vec3::Y);
+        let got = cam.view_matrix();
+        for (a, b) in got.cols.iter().flatten().zip(expected.cols.iter().flatten()) {
+            assert!((a - b).abs() < 1e-5, "{got:?} vs {expected:?}");
+        }
+    }
 
     #[test]
     fn test_default_position() {

@@ -10,6 +10,25 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## v1.0.126 — 2026-10-12 — 남은 normalize 미가드 호출자 정리 (v1.0.61 audit 잔여)
+
+### Fix
+
+- **voltex_editor `OrbitCamera`**: `distance`가 pub이라 `zoom()`의 clamp를 거치지
+  않고 0이 될 수 있다. 그러면 eye == target이 되어 `pan()`의 forward가 NaN이
+  됐고 `NaN × 0`이 **target을 영구히 NaN으로 오염**시켰다. `view_matrix()`도
+  NaN이었다. 시선 방향을 yaw/pitch로 바로 계산하는 `forward()`(신설, pub)로
+  바꿨고, `view_matrix`는 `look_at(eye, eye + forward)`다. 거리가 양수면 행렬이
+  예전과 같다(회귀 테스트로 비교).
+- **voltex_physics `ray_vs_sphere`**: 반지름 0 구의 중심을 정확히 지나는 레이의
+  법선이 NaN이던 것 → 레이를 마주 보는 방향으로 폴백.
+- 확인만 하고 고치지 않은 곳: `ray_vs_triangle`(퇴화 삼각형은 판별식 0으로
+  먼저 걸러짐 — `a = -dir·(e1×e2)`), 기즈모 `pick_drag_plane_normal`(카메라가
+  기즈모 원점에 있으면 NaN 비교가 모두 false라 두 번째 후보 축 반환 → 우연히
+  안전, 테스트로 고정), 기즈모 `axis.cross(helper)`(helper가 축과 평행하지 않게
+  골라짐).
+- 테스트 +5.
+
 ## v1.0.125 — 2026-10-12 — AuthToken 상수 시간 비교 + 빈 secret 패닉 정리 (P3)
 
 ### Fix

@@ -103,6 +103,14 @@ mod tests {
     fn approx(a: f32, b: f32, tol: f32) -> bool { (a - b).abs() <= tol }
 
     #[test]
+    fn drag_plane_with_camera_on_gizmo_origin_is_a_unit_axis() {
+        // cam_dir is NaN here; every NaN comparison is false so the second
+        // candidate wins. Pinned so a refactor can't start returning NaN.
+        let n = pick_drag_plane_normal(GizmoAxis::X, Vec3::ZERO, Vec3::ZERO);
+        assert!(approx(n.length(), 1.0, 1e-6), "{n:?}");
+    }
+
+    #[test]
     fn hit_x_axis_straight_on() {
         // Gizmo at origin. Ray fired down +X axis from -X side hits the X arrow.
         let ray = Ray::new(Vec3::new(-5.0, 0.0, 0.0), Vec3::new(1.0, 0.0, 0.0));

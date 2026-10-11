@@ -21,7 +21,7 @@ Immediate-mode UI 에디터 — 도킹/플로팅/뷰포트/인스펙터/에셋 �
 - `FloatingPanel`, `FloatingPanelManager` (src/floating_panel.rs)
 
 ### 3D 뷰포트
-- `OrbitCamera` (src/orbit_camera.rs)
+- `OrbitCamera` (src/orbit_camera.rs) — `forward()`는 yaw/pitch만으로 계산해 `distance` 0에서도 유한 (v1.0.126)
 - `ViewportTexture`, `VIEWPORT_COLOR_FORMAT`, `VIEWPORT_DEPTH_FORMAT` (src/viewport_texture.rs)
 - `ViewportRenderer` (src/viewport_renderer.rs)
 - `picking::pick_entity` + helpers (ndc_from_viewport / ray_from_ndc / ray_vs_sphere_t) — 좌클릭 → ray → sphere intersection → 가장 가까운 entity. 반경은 default × max(scale). 메시 바운드 미구현 (DEFERRED). (src/picking.rs)
