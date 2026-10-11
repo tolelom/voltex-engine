@@ -1,12 +1,12 @@
 //! Randomized raycast property: every hit/miss reported by `raycast` against
-//! a single Sphere / Box / Capsule collider must agree with a brute-force
+//! a single Sphere / Box / Capsule / box-shaped ConvexHull collider must agree with a brute-force
 //! march of the shape's signed distance field along the same ray.
 //! Rays start outside the shape (the "starts inside" conventions differ per
 //! shape and are covered by unit tests).
 
 use voltex_ecs::{Transform, World};
 use voltex_math::{Ray, Vec3};
-use voltex_physics::{raycast, raycast_all, Collider};
+use voltex_physics::{raycast, raycast_all, Collider, ConvexHull};
 
 struct XorShift(u32);
 impl XorShift {
@@ -38,15 +38,32 @@ fn sdf(collider: &Collider, center: Vec3, p: Vec3) -> f32 {
             let y = q.y.clamp(-half_height, *half_height);
             (q - Vec3::new(0.0, y, 0.0)).length() - radius
         }
-        Collider::ConvexHull(_) => unreachable!("not generated"),
+        Collider::ConvexHull(hull) => {
+            // Only box-shaped hulls are generated; their SDF is the box's.
+            let h = hull.vertices.iter().fold(Vec3::ZERO, |m, v| {
+                Vec3::new(m.x.max(v.x.abs()), m.y.max(v.y.abs()), m.z.max(v.z.abs()))
+            });
+            sdf(&Collider::Box { half_extents: h }, center, p)
+        }
     }
 }
 
 fn random_collider(rng: &mut XorShift) -> Collider {
-    match rng.next() % 3 {
+    match rng.next() % 4 {
         0 => Collider::Sphere { radius: rng.range(0.2, 2.0) },
         1 => Collider::Box { half_extents: rng.vec(0.2, 2.0) },
-        _ => Collider::Capsule { radius: rng.range(0.2, 1.5), half_height: rng.range(0.0, 2.0) },
+        2 => Collider::Capsule { radius: rng.range(0.2, 1.5), half_height: rng.range(0.0, 2.0) },
+        _ => {
+            let h = rng.vec(0.2, 2.0);
+            let corners = (0..8)
+                .map(|i| Vec3::new(
+                    if i & 1 == 0 { -h.x } else { h.x },
+                    if i & 2 == 0 { -h.y } else { h.y },
+                    if i & 4 == 0 { -h.z } else { h.z },
+                ))
+                .collect();
+            Collider::ConvexHull(ConvexHull::new(corners))
+        }
     }
 }
 

@@ -10,6 +10,22 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## v1.0.156 — 2026-10-12 — ConvexHull 레이캐스트 법선, 다면체 속성 테스트
+
+### Fix
+
+- **voltex_physics `raycast`/`raycast_all` — ConvexHull 법선이 항상 +Y**: 다면체 히트는
+  AABB로 근사하면서 법선을 고정값 +Y로 돌려줬다. 옆면이나 아랫면을 맞혀도 위를
+  가리켰다. 이제 같은 AABB의 면 법선을 쓴다(`ray_vs_box`). 박스 모양 다면체에서는
+  t와 법선이 모두 정확하다. 일반 다면체의 AABB 근사 자체는 그대로다(DEFERRED).
+
+### Tests
+
+- 충돌·레이캐스트 속성 테스트(`collision_property.rs`, `raycast_property.rs`)의
+  생성기에 박스 모양 `ConvexHull`을 추가했다. 기준값은 같은 크기의 박스로 계산한다.
+  충돌 쪽은 GJK/EPA 경로의 접촉 유무·밀어내기·깊이(1e-3 이내)가 박스 기준값과 맞았다
+  (버그 없음). 레이캐스트 쪽은 위 +Y 법선을 잡아냈다.
+
 ## v1.0.155 — 2026-10-12 — 2D 타일 이동 무작위 속성 테스트
 
 ### Tests

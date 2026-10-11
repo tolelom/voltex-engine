@@ -1,4 +1,5 @@
-//! Randomized narrowphase property: for random Sphere / Box / Capsule pairs,
+//! Randomized narrowphase property: for random Sphere / Box / Capsule /
+//! box-shaped ConvexHull pairs,
 //! `detect_collisions` must report a contact exactly when the shapes overlap
 //! (by an independent distance oracle), its normal must point from A to B
 //! (pushing B along it by `depth` separates the pair), and the answer must
@@ -6,7 +7,7 @@
 
 use voltex_ecs::{Entity, Transform, World};
 use voltex_math::Vec3;
-use voltex_physics::{detect_collisions, Collider, ContactPoint};
+use voltex_physics::{detect_collisions, Collider, ContactPoint, ConvexHull};
 
 struct XorShift(u32);
 impl XorShift {
@@ -25,10 +26,35 @@ impl XorShift {
 }
 
 fn random_collider(rng: &mut XorShift) -> Collider {
-    match rng.next() % 3 {
+    match rng.next() % 4 {
         0 => Collider::Sphere { radius: rng.range(0.2, 1.5) },
         1 => Collider::Box { half_extents: rng.vec(0.2, 1.5) },
-        _ => Collider::Capsule { radius: rng.range(0.2, 1.0), half_height: rng.range(0.0, 1.5) },
+        2 => Collider::Capsule { radius: rng.range(0.2, 1.0), half_height: rng.range(0.0, 1.5) },
+        // A box written as a hull: goes through GJK/EPA but has an exact oracle.
+        _ => {
+            let h = rng.vec(0.2, 1.5);
+            let corners = (0..8)
+                .map(|i| Vec3::new(
+                    if i & 1 == 0 { -h.x } else { h.x },
+                    if i & 2 == 0 { -h.y } else { h.y },
+                    if i & 4 == 0 { -h.z } else { h.z },
+                ))
+                .collect();
+            Collider::ConvexHull(ConvexHull::new(corners))
+        }
+    }
+}
+
+/// The oracle's view of a collider: box-shaped hulls are boxes.
+fn oracle_shape(c: &Collider) -> Collider {
+    match c {
+        Collider::ConvexHull(hull) => {
+            let h = hull.vertices.iter().fold(Vec3::ZERO, |m, v| {
+                Vec3::new(m.x.max(v.x.abs()), m.y.max(v.y.abs()), m.z.max(v.z.abs()))
+            });
+            Collider::Box { half_extents: h }
+        }
+        other => other.clone(),
     }
 }
 
@@ -63,6 +89,7 @@ fn core_segment(c: &Collider) -> Option<(f32, f32)> {
 /// Exact for box-box; otherwise samples the segment core of one shape
 /// against the exact SDF of the other (error <= half_height / 400).
 fn separation(a: &Collider, pa: Vec3, b: &Collider, pb: Vec3) -> f32 {
+    let (a, b) = (&oracle_shape(a), &oracle_shape(b));
     let (seg, other, po, ps) = match (core_segment(a), core_segment(b)) {
         (Some(s), _) => (s, b, pb, pa),
         (None, Some(s)) => (s, a, pa, pb),

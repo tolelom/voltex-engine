@@ -63,9 +63,9 @@ pub fn raycast(world: &World, ray: &Ray, max_dist: f32) -> Option<RayHit> {
                 ray_tests::ray_vs_capsule(ray, *pos, *radius, *half_height)
             }
             Collider::ConvexHull(_) => {
-                // Use AABB test as approximation for convex hull raycasting
-                let aabb = collider.aabb(*pos);
-                ray_tests::ray_vs_aabb(ray, &aabb).map(|t| (t, Vec3::Y))
+                // Approximated by the hull's AABB (exact for box-shaped hulls);
+                // the normal is that box's face normal, not a fixed +Y.
+                ray_tests::ray_vs_box(ray, aabb.center(), aabb.half_extents())
             }
         };
 
@@ -119,9 +119,9 @@ pub fn raycast_all(world: &World, ray: &Ray, max_dist: f32) -> Vec<RayHit> {
                 ray_tests::ray_vs_capsule(ray, *pos, *radius, *half_height)
             }
             Collider::ConvexHull(_) => {
-                // Use AABB test as approximation for convex hull raycasting
-                let aabb = collider.aabb(*pos);
-                ray_tests::ray_vs_aabb(ray, &aabb).map(|t| (t, Vec3::Y))
+                // Approximated by the hull's AABB (exact for box-shaped hulls);
+                // the normal is that box's face normal, not a fixed +Y.
+                ray_tests::ray_vs_box(ray, aabb.center(), aabb.half_extents())
             }
         };
 
