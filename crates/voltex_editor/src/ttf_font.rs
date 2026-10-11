@@ -22,7 +22,8 @@ impl TtfFont {
         let scale = font_size / parser.units_per_em as f32;
         let ascender = parser.ascender as f32 * scale;
         let descender = parser.descender as f32 * scale;
-        let line_height = (parser.ascender - parser.descender + parser.line_gap) as f32 * scale;
+        // i16 metrics straight from the file: sum in i32 so corrupt values can't overflow.
+        let line_height = (parser.ascender as i32 - parser.descender as i32 + parser.line_gap as i32) as f32 * scale;
         let cache = GlyphCache::new(ATLAS_SIZE, ATLAS_SIZE);
 
         Ok(TtfFont {

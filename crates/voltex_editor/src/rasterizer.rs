@@ -23,6 +23,22 @@ pub(crate) fn flatten_quad(
     x1: f32, y1: f32,
     edges: &mut Vec<(f32, f32, f32, f32)>,
 ) {
+    flatten_quad_depth(x0, y0, cx, cy, x1, y1, edges, 0);
+}
+
+/// Subdivision depth cap: 2^16 segments is far beyond any real glyph, and it
+/// bounds the recursion when corrupt fonts feed NaN / enormous coordinates
+/// (the flatness test never passes for NaN).
+const MAX_FLATTEN_DEPTH: u32 = 16;
+
+#[allow(clippy::too_many_arguments)]
+fn flatten_quad_depth(
+    x0: f32, y0: f32,
+    cx: f32, cy: f32,
+    x1: f32, y1: f32,
+    edges: &mut Vec<(f32, f32, f32, f32)>,
+    depth: u32,
+) {
     // Check if curve is flat enough (midpoint distance < 0.5px)
     let mx = (x0 + 2.0 * cx + x1) / 4.0;
     let my = (y0 + 2.0 * cy + y1) / 4.0;
@@ -30,7 +46,7 @@ pub(crate) fn flatten_quad(
     let ly = (y0 + y1) / 2.0;
     let dx = mx - lx;
     let dy = my - ly;
-    if dx * dx + dy * dy < 0.25 {
+    if dx * dx + dy * dy < 0.25 || depth >= MAX_FLATTEN_DEPTH {
         edges.push((x0, y0, x1, y1));
     } else {
         // Subdivide at t=0.5
@@ -40,8 +56,8 @@ pub(crate) fn flatten_quad(
         let m12y = (cy + y1) / 2.0;
         let midx = (m01x + m12x) / 2.0;
         let midy = (m01y + m12y) / 2.0;
-        flatten_quad(x0, y0, m01x, m01y, midx, midy, edges);
-        flatten_quad(midx, midy, m12x, m12y, x1, y1, edges);
+        flatten_quad_depth(x0, y0, m01x, m01y, midx, midy, edges, depth + 1);
+        flatten_quad_depth(midx, midy, m12x, m12y, x1, y1, edges, depth + 1);
     }
 }
 
@@ -63,8 +79,16 @@ pub(crate) fn rasterize(outline: &GlyphOutline, scale: f32) -> RasterResult {
     let x_max = outline.x_max as f32;
     let y_max = outline.y_max as f32;
 
-    let w = ((x_max - x_min) * scale).ceil() as u32 + 2;
-    let h = ((y_max - y_min) * scale).ceil() as u32 + 2;
+    // The bbox comes from the font file; cap the bitmap so a corrupt header
+    // can't overflow `w * h` or demand a gigantic allocation.
+    const MAX_GLYPH_PIXELS: u64 = 1024;
+    let span = |a: f32, b: f32| ((b - a) * scale).ceil();
+    let (sw, sh) = (span(x_min, x_max), span(y_min, y_max));
+    if !(sw.is_finite() && sh.is_finite()) || sw > MAX_GLYPH_PIXELS as f32 || sh > MAX_GLYPH_PIXELS as f32 || sh < 0.0 {
+        return RasterResult { width: 0, height: 0, bitmap: vec![], offset_x: 0.0, offset_y: 0.0 };
+    }
+    let w = sw as u32 + 2;
+    let h = sh as u32 + 2;
 
     // Transform a font-space coordinate to bitmap pixel space.
     let transform = |px: f32, py: f32| -> (f32, f32) {

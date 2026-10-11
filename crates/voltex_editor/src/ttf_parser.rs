@@ -14,21 +14,31 @@
 use std::collections::HashMap;
 
 // --- Byte helpers (big-endian) ---
+//
+// Fonts are user-supplied files and every offset below comes from them, so
+// reads are total: bytes past the end read as 0 (a corrupt font renders
+// garbage or blank glyphs instead of panicking the editor).
+
+fn bytes<const N: usize>(data: &[u8], off: usize) -> [u8; N] {
+    off.checked_add(N)
+        .and_then(|end| data.get(off..end))
+        .map_or([0; N], |s| s.try_into().unwrap_or([0; N]))
+}
 
 fn read_u8(data: &[u8], off: usize) -> u8 {
-    data[off]
+    data.get(off).copied().unwrap_or(0)
 }
 
 fn read_u16(data: &[u8], off: usize) -> u16 {
-    u16::from_be_bytes([data[off], data[off + 1]])
+    u16::from_be_bytes(bytes(data, off))
 }
 
 fn read_i16(data: &[u8], off: usize) -> i16 {
-    i16::from_be_bytes([data[off], data[off + 1]])
+    i16::from_be_bytes(bytes(data, off))
 }
 
 fn read_u32(data: &[u8], off: usize) -> u32 {
-    u32::from_be_bytes([data[off], data[off + 1], data[off + 2], data[off + 3]])
+    u32::from_be_bytes(bytes(data, off))
 }
 
 // --- Data types ---
@@ -94,8 +104,7 @@ impl TtfParser {
         let mut tables = HashMap::new();
         for i in 0..num_tables {
             let rec_off = 12 + i * 16;
-            let mut tag = [0u8; 4];
-            tag.copy_from_slice(&data[rec_off..rec_off + 4]);
+            let tag: [u8; 4] = bytes(&data, rec_off);
             let offset = read_u32(&data, rec_off + 8);
             let length = read_u32(&data, rec_off + 12);
             tables.insert(tag, (offset, length));
@@ -107,6 +116,11 @@ impl TtfParser {
             .ok_or("Missing head table")?;
         let head_off = head_off as usize;
         let units_per_em = read_u16(&data, head_off + 18);
+        // OpenType 'head': unitsPerEm is 16..=16384. Zero made the glyph
+        // scale infinite (NaN outlines, unbounded curve subdivision).
+        if !(16..=16384).contains(&units_per_em) {
+            return Err(format!("Invalid unitsPerEm {units_per_em}").into());
+        }
         let loca_format = read_i16(&data, head_off + 50);
 
         // Parse hhea table
@@ -239,8 +253,8 @@ impl TtfParser {
             (o, n)
         };
 
-        if offset == next_offset {
-            // Empty glyph (e.g., space)
+        // Empty glyph (e.g., space) — or a corrupt loca with a backwards range.
+        if next_offset <= offset {
             return None;
         }
 
@@ -281,6 +295,11 @@ impl TtfParser {
             off += 2;
         }
 
+        // Contour end points must strictly increase (the last one sizes every
+        // per-point array below); a corrupt glyph is treated as missing.
+        if end_pts.windows(2).any(|w| w[1] <= w[0]) {
+            return None;
+        }
         let num_points = end_pts[num_contours - 1] + 1;
 
         // Skip instructions
@@ -414,7 +433,7 @@ impl TtfParser {
             }
         } else {
             // Use last advance_width, lsb from separate array
-            let last_aw_off = hmtx_off + (self.num_h_metrics as usize - 1) * 4;
+            let last_aw_off = hmtx_off + (self.num_h_metrics as usize).saturating_sub(1) * 4;
             let advance_width = read_u16(&self.data, last_aw_off);
             let lsb_array_off = hmtx_off + self.num_h_metrics as usize * 4;
             let idx = glyph_id as usize - self.num_h_metrics as usize;
