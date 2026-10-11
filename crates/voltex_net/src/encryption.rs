@@ -77,8 +77,10 @@ pub struct AuthToken {
 }
 
 impl AuthToken {
-    /// Generate a simple auth token from player_id + secret.
+    /// Generate a simple auth token from player_id + secret. Panics if
+    /// `secret` is empty (same contract as [`PacketCipher::new`]).
     pub fn generate(player_id: u32, secret: &[u8], expires_at: f64) -> Self {
+        assert!(!secret.is_empty(), "auth secret must not be empty");
         let mut token = Vec::new();
         token.extend_from_slice(&player_id.to_le_bytes());
         token.extend_from_slice(&expires_at.to_le_bytes());
@@ -94,15 +96,29 @@ impl AuthToken {
     /// Returns `false` if the token has expired, if `current_time` or
     /// `expires_at` is NaN (NaN comparisons always return `false`, so a
     /// NaN `current_time` used to slip past the expiry check), or if the
-    /// HMAC bytes don't match.
+    /// HMAC bytes don't match. An empty `secret` is rejected rather than
+    /// panicking. Token bytes are compared in constant time.
     pub fn validate(&self, secret: &[u8], current_time: f64) -> bool {
+        if secret.is_empty() {
+            return false;
+        }
         if !current_time.is_finite() || !self.expires_at.is_finite() {
             return false;
         }
         if current_time > self.expires_at { return false; }
         let expected = AuthToken::generate(self.player_id, secret, self.expires_at);
-        self.token == expected.token
+        constant_time_eq(&self.token, &expected.token)
     }
+}
+
+/// Slice equality whose running time does not depend on where the first
+/// differing byte is (lengths are not secret and compared directly).
+fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
+    if a.len() != b.len() {
+        return false;
+    }
+    let diff = a.iter().zip(b).fold(0u8, |acc, (x, y)| acc | (x ^ y));
+    std::hint::black_box(diff) == 0
 }
 
 #[cfg(test)]
@@ -185,5 +201,35 @@ mod tests {
         // Token with NaN expiry should also fail.
         let bad_token = AuthToken { player_id: 1, token: vec![1, 2], expires_at: f64::NAN };
         assert!(!bad_token.validate(secret, 0.0));
+    }
+
+    #[test]
+    fn constant_time_eq_matches_slice_equality() {
+        assert!(constant_time_eq(b"abcd", b"abcd"));
+        assert!(constant_time_eq(b"", b""));
+        assert!(!constant_time_eq(b"abcd", b"abce"), "last byte differs");
+        assert!(!constant_time_eq(b"abcd", b"xbcd"), "first byte differs");
+        assert!(!constant_time_eq(b"abc", b"abcd"), "length differs");
+    }
+
+    #[test]
+    fn validate_rejects_tampered_token_bytes() {
+        let secret = b"s3cret";
+        let mut token = AuthToken::generate(9, secret, 100.0);
+        let last = token.token.len() - 1;
+        token.token[last] ^= 0x01;
+        assert!(!token.validate(secret, 0.0));
+    }
+
+    #[test]
+    fn validate_with_empty_secret_is_false_not_a_panic() {
+        let token = AuthToken::generate(1, b"k", 100.0);
+        assert!(!token.validate(b"", 0.0));
+    }
+
+    #[test]
+    #[should_panic(expected = "auth secret must not be empty")]
+    fn generate_with_empty_secret_panics_with_a_clear_message() {
+        let _ = AuthToken::generate(1, b"", 100.0);
     }
 }

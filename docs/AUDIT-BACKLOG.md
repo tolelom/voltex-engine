@@ -56,6 +56,6 @@
 
 ## P3 — 보류 (저가치)
 
-- `AuthToken::validate` 비상수시간 비교 (dev-only 디스클레이머 있음)
+- ~~`AuthToken::validate` 비상수시간 비교 (dev-only 디스클레이머 있음)~~ — **v1.0.125 해소** (`constant_time_eq`, 빈 secret 패닉도 정리)
 - ~~`query_with`/`query2_with` 이중 패스 (E2 와 함께)~~ — **E2로 이미 해소 확인 (2026-10-12)**: `query2`가 iterator가 된 뒤 `query2_with`/`query2_without`은 `filter().collect()` 한 번이고, `query_with`/`query_without`은 원래 단일 루프. 남은 것은 `Vec` 반환(API 변경)과 루프 안 W 저장소 조회(측정 없음)뿐이고 소비자는 테스트 4개라 변경 안 함.
 - `voltex_cli` 수기 `Display` vs thiserror (외부 dep 0 정책상 의도적)

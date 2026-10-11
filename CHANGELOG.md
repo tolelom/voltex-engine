@@ -10,6 +10,21 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## v1.0.125 — 2026-10-12 — AuthToken 상수 시간 비교 + 빈 secret 패닉 정리 (P3)
+
+### Fix
+
+- **voltex_net `AuthToken::validate`**: 토큰 바이트를 상수 시간으로 비교한다
+  (`constant_time_eq` — XOR 누적, 첫 불일치 위치에 따라 시간이 달라지지 않음).
+  이 모듈은 doc에 적힌 대로 개발용 비암호 체계라 위협 모델이 바뀌지는 않는다.
+  다만 비교 시간이 키 정보를 흘리는 경로는 닫았다.
+- 같은 파일에서 발견: `generate`/`validate`에 빈 `secret`을 주면
+  `i % secret.len()`에서 0으로 나누기 패닉이 났다. 이제 `validate`는 false를
+  돌려주고(검증은 외부 입력 경계라 패닉하지 않음), `generate`는
+  `PacketCipher::new`와 같은 계약으로 명시적인 메시지와 함께 패닉한다(doc 명시).
+  저장소 안 호출처는 없다.
+- 테스트 +4.
+
 ## v1.0.124 — 2026-10-12 — 스프라이트 화면 평면 회전 옵트인 (friction-2 #6)
 
 ### Additive
