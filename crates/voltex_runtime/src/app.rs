@@ -189,7 +189,11 @@ impl RuntimeApp {
     /// a crash report. Both are `OnceLock`-guarded, so a later
     /// `RuntimeApp::run` call is a no-op.
     pub fn new(mut config: RuntimeConfig) -> RuntimeResult<Self> {
-        if config.enable_crash_log {
+        // Not in this crate's unit tests: the hook is process-wide and
+        // first-install-wins, so a test RuntimeApp would point it at the cwd
+        // (the crate directory) and any other failing test would drop a crash
+        // file there. The hook itself is covered by crash.rs tests.
+        if config.enable_crash_log && !cfg!(test) {
             crate::crash::install_panic_hook(
                 config.window.title.clone(),
                 config.crash_log_dir.clone(),

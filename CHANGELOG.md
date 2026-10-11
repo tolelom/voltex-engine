@@ -10,6 +10,19 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## v1.0.130 — 2026-10-12 — 테스트 중 크래시 파일이 crate 폴더에 생기던 것
+
+### Fix (tests only)
+
+- **voltex_runtime**: 이 crate의 단위 테스트(`cfg!(test)`)에서는
+  `RuntimeApp::new`가 패닉 훅을 설치하지 않는다. 훅은 프로세스 전역이고 먼저
+  설치한 쪽이 이긴다. 그래서 `disable_crash_log()` 없이 `RuntimeApp`을 만드는
+  테스트가 먼저 돌면 저장 위치가 cwd(= crate 폴더)가 되고, 같은 바이너리의
+  **다른** 테스트가 실패할 때마다 `Voltex_Engine-crash-*.txt`가 생겼다. 테스트
+  순서에 따라 생기기도 하고 안 생기기도 했다. 임시 패닉 테스트로 수정 전 1개 →
+  수정 후 0개를 확인했다. 훅 자체는 crash.rs 테스트가 temp 디렉터리로 계속
+  검증한다. 출하 바이너리와 다른 crate에는 영향 없음.
+
 ## v1.0.129 — 2026-10-12 — 항상 통과하던 테스트 단언 5건 복구
 
 ### Tests
