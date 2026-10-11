@@ -6,7 +6,7 @@ wgpu 기반 렌더링 — 메시/PBR/그림자/IBL/디퍼드/RT/post-process. �
 ## 공개 API 진입점
 
 ### Core GPU
-- `GpuContext`, `DEPTH_FORMAT` — wgpu 디바이스/큐/surface (src/gpu.rs)
+- `GpuContext`, `DEPTH_FORMAT` — wgpu 디바이스/큐/surface + `adapter_info`(로그·크래시 리포트용) (src/gpu.rs)
 - `Vertex`, `MeshVertex` — 정점 포맷 (src/vertex.rs)
 - `SkinnedMeshVertex`, `BonePalette`, `MAX_BONES` — 스킨드 메시 정점 (src/skinned_vertex.rs)
 - `Skeleton`, `JointPose` — 조인트 계층 + 포즈 → BonePalette (from_skin/apply_animation/compute_palette) (src/skeleton.rs)

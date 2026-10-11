@@ -223,6 +223,7 @@ impl RuntimeApp {
 
         let mut world = World::new();
         if let Some(scene_path) = config.initial_scene.as_ref() {
+            crate::crash::set_crash_scene(scene_path.as_str());
             // A broken initial scene degrades to an empty world (the scene
             // builder below may still populate it), but never silently — the
             // dist-exe E2E reads these lines as its load evidence.
@@ -626,6 +627,8 @@ impl RuntimeApp {
     /// then JSON; via the configured `Vfs` if any, else disk). Existing
     /// entities are cleared first.
     pub fn load_scene(&mut self, path: &str) -> RuntimeResult<()> {
+        // Before loading, so a panic inside the load names the scene.
+        crate::crash::set_crash_scene(path);
         // clear() 뒤 이전 씬 핸들은 전부 stale이 된다(v1.0.120 generation bump).
         // 이전 씬의 소리는 핸들과 별개로 씬 교체 시점에 끄는 게 맞으므로 전부 stop.
         if let Some(audio) = self.audio.as_ref() {

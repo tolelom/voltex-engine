@@ -10,6 +10,24 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## v1.0.127 — 2026-10-12 — 크래시 리포트에 GPU·씬·FPS 컨텍스트
+
+### Additive
+
+- **voltex_runtime crash**: `CrashContext { gpu_adapter, scene, fps }` 전역 +
+  `set_crash_gpu_adapter` / `set_crash_scene` / `set_crash_fps` /
+  `crash_context_snapshot`, `format_crash_report_with_context`. 패닉 훅이 아는
+  필드만 헤더에 `gpu adapter:` / `scene:` / `fps (avg):` 줄로 넣는다. 훅은
+  `try_lock`으로 읽어서, 컨텍스트를 갱신하는 도중 패닉이 나도 교착 없이
+  컨텍스트 없이 쓴다. 기존 `format_crash_report`는 시그니처 그대로(빈
+  컨텍스트로 위임).
+- 채우는 곳: GPU 생성 직후 어댑터 이름과 백엔드(`handler.rs`), `load_scene`과
+  초기 씬 로드(로드 **전** — 로드 중 패닉에도 씬이 찍힘), 매 프레임 HUD 평균
+  FPS.
+- **voltex_renderer `GpuContext::adapter_info`** (pub 필드 추가).
+- 검증: 포매터·setter·스냅샷 단위 +3. winit 창 경로의 배선(어댑터·FPS
+  채우기)은 창을 띄우는 테스트가 없어 컴파일로만 확인했다.
+
 ## v1.0.126 — 2026-10-12 — 남은 normalize 미가드 호출자 정리 (v1.0.61 audit 잔여)
 
 ### Fix

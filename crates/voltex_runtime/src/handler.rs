@@ -42,6 +42,10 @@ impl ApplicationHandler for RuntimeHandler {
                 return;
             }
         };
+        crate::crash::set_crash_gpu_adapter(format!(
+            "{} ({:?})",
+            gpu.adapter_info.name, gpu.adapter_info.backend
+        ));
         let mut renderer = BasicRenderer::new(&gpu.device, &gpu.queue, gpu.surface_format, 1024);
         renderer.set_shadows(app.config.enable_shadows);
         renderer.set_pbr_enabled(app.config.enable_pbr);
@@ -312,6 +316,7 @@ fn redraw(app: &mut RuntimeApp, event_loop: &ActiveEventLoop) {
             state.window.handle.set_title(&new_title);
         }
     }
+    crate::crash::set_crash_fps(app.hud.average_fps());
 
     // End-of-frame: clear just_pressed / just_released / mouse_delta AFTER
     // user systems have observed them. Previously this ran before

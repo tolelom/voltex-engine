@@ -38,6 +38,7 @@
 | `with_vfs(Vfs)` | new 직후 | 가상 파일시스템 (`.vpkg` 아카이브 지원) |
 | `with_crash_log_dir(path)` | new 직후 | crash log 저장 경로 |
 | `disable_crash_log()` | new 직후 | panic hook 비활성화 (headless/테스트 용) |
+| `voltex_runtime::set_crash_{gpu_adapter,scene,fps}` | 어디서나 | 크래시 리포트 헤더 컨텍스트 (RuntimeApp이 어댑터·씬·FPS를 자동으로 채움, v1.0.127) |
 | `with_hud(bool)` | new 직후 | 인-윈도우 HUD 오버레이 활성화 (`set_hud_fn` 과 함께) |
 | `with_camera(pos, yaw, pitch)` / `with_camera_fov(f)` / `with_orthographic(h)` | new 직후 | 초기 카메라 프레이밍 (`set_camera_fn` 로 매 프레임 추적). `with_orthographic`은 2D/탑다운용 직교 투영(view height h) |
 | `with_pbr(bool)` | new 직후 | 메시 패스를 colored Blinn-Phong → 풀 PBR로 전환 |

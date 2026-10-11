@@ -39,6 +39,9 @@ pub struct GpuContext {
     pub config: wgpu::SurfaceConfiguration,
     /// Surface texture format (sRGB-preferred when supported).
     pub surface_format: wgpu::TextureFormat,
+    /// Adapter the device was created on (name, backend, driver) — for
+    /// logs and crash reports.
+    pub adapter_info: wgpu::AdapterInfo,
     /// Depth attachment view, sized to the surface.
     pub depth_view: wgpu::TextureView,
 }
@@ -137,6 +140,7 @@ impl GpuContext {
             queue,
             config,
             surface_format,
+            adapter_info: adapter.get_info(),
             depth_view,
         })
     }

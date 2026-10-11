@@ -11,8 +11,58 @@
 use std::backtrace::Backtrace;
 use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::sync::Once;
+use std::sync::{Mutex, Once, TryLockError};
 use std::time::{SystemTime, UNIX_EPOCH};
+
+/// Runtime facts worth having in a crash report. Filled by `RuntimeApp`
+/// as they become known; every field is optional.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct CrashContext {
+    /// GPU adapter name + backend.
+    pub gpu_adapter: Option<String>,
+    /// Path of the last scene loaded with `RuntimeApp::load_scene`.
+    pub scene: Option<String>,
+    /// Most recent averaged frames per second.
+    pub fps: Option<f32>,
+}
+
+static CONTEXT: Mutex<CrashContext> = Mutex::new(CrashContext {
+    gpu_adapter: None,
+    scene: None,
+    fps: None,
+});
+
+fn with_context(f: impl FnOnce(&mut CrashContext)) {
+    let mut guard = CONTEXT.lock().unwrap_or_else(|p| p.into_inner());
+    f(&mut guard);
+}
+
+/// Record the GPU adapter for future crash reports.
+pub fn set_crash_gpu_adapter(name: impl Into<String>) {
+    let name = name.into();
+    with_context(|c| c.gpu_adapter = Some(name));
+}
+
+/// Record the current scene path for future crash reports.
+pub fn set_crash_scene(path: impl Into<String>) {
+    let path = path.into();
+    with_context(|c| c.scene = Some(path));
+}
+
+/// Record the latest averaged FPS for future crash reports.
+pub fn set_crash_fps(fps: f32) {
+    with_context(|c| c.fps = Some(fps));
+}
+
+/// Copy of the current crash context. Never blocks: if the lock is held
+/// (a panic while updating it) the report goes out without context.
+pub fn crash_context_snapshot() -> CrashContext {
+    match CONTEXT.try_lock() {
+        Ok(guard) => guard.clone(),
+        Err(TryLockError::Poisoned(p)) => p.into_inner().clone(),
+        Err(TryLockError::WouldBlock) => CrashContext::default(),
+    }
+}
 
 /// One-shot guard so duplicate calls to [`install_panic_hook`] are no-ops.
 static INSTALLED: Once = Once::new();
@@ -38,12 +88,13 @@ pub fn install_panic_hook(app_name: impl Into<String>, dir: Option<PathBuf>) {
             let backtrace = Backtrace::force_capture().to_string();
             let now = unix_seconds_now();
 
-            let report = format_crash_report(
+            let report = format_crash_report_with_context(
                 &app_name,
                 &payload,
                 location.as_ref().map(|(f, l, c)| (f.as_str(), *l, *c)),
                 &backtrace,
                 now,
+                &crash_context_snapshot(),
             );
 
             // Best-effort write. If we cannot write the file, we have already
@@ -58,7 +109,8 @@ pub fn install_panic_hook(app_name: impl Into<String>, dir: Option<PathBuf>) {
     });
 }
 
-/// Pure formatter used by [`install_panic_hook`] and by the tests.
+/// Pure formatter without runtime context (see
+/// [`format_crash_report_with_context`]).
 /// `unix_seconds` is seconds since the Unix epoch (UTC).
 pub fn format_crash_report(
     app_name: &str,
@@ -66,6 +118,26 @@ pub fn format_crash_report(
     location: Option<(&str, u32, u32)>,
     backtrace: &str,
     unix_seconds: i64,
+) -> String {
+    format_crash_report_with_context(
+        app_name,
+        panic_message,
+        location,
+        backtrace,
+        unix_seconds,
+        &CrashContext::default(),
+    )
+}
+
+/// Pure formatter used by [`install_panic_hook`]; `context` lines appear
+/// in the header only for the fields that are known.
+pub fn format_crash_report_with_context(
+    app_name: &str,
+    panic_message: &str,
+    location: Option<(&str, u32, u32)>,
+    backtrace: &str,
+    unix_seconds: i64,
+    context: &CrashContext,
 ) -> String {
     let (y, mo, d, h, mi, s) = unix_to_ymd_hms(unix_seconds);
     let mut out = String::new();
@@ -78,6 +150,15 @@ pub fn format_crash_report(
     out.push_str(&format!("os:            {}\n", std::env::consts::OS));
     out.push_str(&format!("arch:          {}\n", std::env::consts::ARCH));
     out.push_str(&format!("voltex_runtime: {}\n", env!("CARGO_PKG_VERSION")));
+    if let Some(gpu) = &context.gpu_adapter {
+        out.push_str(&format!("gpu adapter:   {}\n", gpu));
+    }
+    if let Some(scene) = &context.scene {
+        out.push_str(&format!("scene:         {}\n", scene));
+    }
+    if let Some(fps) = context.fps {
+        out.push_str(&format!("fps (avg):     {:.1}\n", fps));
+    }
     out.push_str(&format!("\npanic message:\n  {}\n", panic_message));
     match location {
         Some((file, line, col)) => {
@@ -248,6 +329,43 @@ mod tests {
         assert!(report.contains("something went wrong"));
         assert!(report.contains("src/main.rs:42:7"));
         assert!(report.contains("my_game::do_thing"));
+    }
+
+    #[test]
+    fn report_includes_runtime_context_when_known() {
+        let ctx = CrashContext {
+            gpu_adapter: Some("NVIDIA GeForce RTX 4080 SUPER (Vulkan)".into()),
+            scene: Some("levels/one.vscn".into()),
+            fps: Some(59.84),
+        };
+        let report = format_crash_report_with_context("g", "boom", None, "bt", 0, &ctx);
+        assert!(report.contains("gpu adapter:   NVIDIA GeForce RTX 4080 SUPER (Vulkan)\n"));
+        assert!(report.contains("scene:         levels/one.vscn\n"));
+        assert!(report.contains("fps (avg):     59.8\n"));
+        // Context sits in the header, before the panic message.
+        assert!(report.find("gpu adapter").unwrap() < report.find("panic message").unwrap());
+    }
+
+    #[test]
+    fn report_omits_unknown_context_lines() {
+        let report = format_crash_report_with_context("g", "boom", None, "bt", 0, &CrashContext::default());
+        assert!(!report.contains("gpu adapter:"));
+        assert!(!report.contains("scene:"));
+        assert!(!report.contains("fps (avg):"));
+        // The context-free entry point is the same report.
+        assert_eq!(report, format_crash_report("g", "boom", None, "bt", 0));
+    }
+
+    #[test]
+    fn crash_context_setters_feed_the_snapshot() {
+        // Only test that writes the process-global context.
+        set_crash_gpu_adapter("test adapter");
+        set_crash_scene("test.vscn");
+        set_crash_fps(30.0);
+        let snap = crash_context_snapshot();
+        assert_eq!(snap.gpu_adapter.as_deref(), Some("test adapter"));
+        assert_eq!(snap.scene.as_deref(), Some("test.vscn"));
+        assert_eq!(snap.fps, Some(30.0));
     }
 
     #[test]

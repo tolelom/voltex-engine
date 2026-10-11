@@ -37,7 +37,11 @@ pub use audio_paths::{resolve_audio_paths, resolve_audio_paths_with, AudioClipCa
 pub use time::{Time, Timer, TimerMode, Tween};
 pub use audio_sync::{audio_sync_system, AudioVoiceTracker};
 pub use config::RuntimeConfig;
-pub use crash::{crash_filename, format_crash_report, install_panic_hook};
+pub use crash::{
+    crash_context_snapshot, crash_filename, format_crash_report,
+    format_crash_report_with_context, install_panic_hook, set_crash_fps, set_crash_gpu_adapter,
+    set_crash_scene, CrashContext,
+};
 pub use debug_draw::DebugLines;
 pub use lifetime::{update_lifetimes, Lifetime};
 pub use error::{RuntimeError, RuntimeResult};
