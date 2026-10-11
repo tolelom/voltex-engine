@@ -665,6 +665,34 @@ entity 2
     }
 
     #[test]
+    fn json_roundtrip_keeps_components_with_non_ascii_names() {
+        // Component NAMEs are JSON keys; the reader used to push each UTF-8
+        // byte as a char, so a non-ASCII name never matched on load and the
+        // component was silently dropped.
+        #[derive(Debug, PartialEq)]
+        struct Hp(u8);
+        let mut registry = ComponentRegistry::new();
+        registry.register_defaults();
+        registry.register_raw(
+            "체력",
+            |w, e| w.get::<Hp>(e).map(|h| vec![h.0]),
+            |w, e, d| {
+                w.add(e, Hp(d[0]));
+                Ok(())
+            },
+        );
+        let mut world = World::new();
+        let e = world.spawn();
+        world.add(e, Transform::from_position(Vec3::new(0.0, 0.0, 0.0)));
+        world.add(e, Hp(42));
+        let json = serialize_scene_json(&world, &registry);
+
+        let mut loaded = World::new();
+        let entities = deserialize_scene_json(&mut loaded, &json, &registry).unwrap();
+        assert_eq!(loaded.get::<Hp>(entities[0]), Some(&Hp(42)));
+    }
+
+    #[test]
     fn deserialize_scene_json_accepts_leading_utf8_bom() {
         // Windows editors (Notepad, VS "UTF-8 with signature") save a BOM;
         // `read_to_string`/`from_utf8` keep it as U+FEFF.

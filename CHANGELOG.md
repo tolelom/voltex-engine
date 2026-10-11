@@ -10,6 +10,18 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## v1.0.140 — 2026-10-12 — 씬 JSON의 비ASCII 컴포넌트 이름
+
+### Fix
+
+- **voltex_ecs JSON 리더**: v1.0.139(이미지 JSON)와 같은 결함이었다. 문자열을
+  바이트마다 `char`로 넣어 비ASCII가 깨졌다. 씬 JSON에서 문자열로 직접 읽는
+  것은 컴포넌트 이름(키)이고(Tag 등 값은 hex 페이로드라 영향 없음),
+  `const NAME = "체력"`처럼 비ASCII 이름으로 등록한 컴포넌트는 저장 → 로드에서
+  이름이 안 맞아 **조용히 사라졌다**(재현: 로드 후 `None`). 바이트를 모아
+  UTF-8로 한 번 해석하도록 고쳤다. 저장소 전체에서 같은 `as char` 누적 패턴은
+  이제 에러 메시지에만 남았다. 테스트 +1.
+
 ## v1.0.139 — 2026-10-12 — glTF JSON 문자열 UTF-8 복원 + 서로게이트 쌍
 
 ### Fix

@@ -178,31 +178,36 @@ fn read_string(b: &[u8], pos: usize) -> crate::Result<(String, usize)> {
         return Err(format!("Expected '\"' at position {}", pos).into());
     }
     let mut i = pos + 1;
-    let mut s = String::new();
+    // Raw bytes, decoded once at the end: pushing each byte as a `char`
+    // turned non-ASCII UTF-8 (e.g. a component NAME key) into mojibake.
+    let mut s: Vec<u8> = Vec::new();
     while i < b.len() {
         match b[i] {
-            b'"' => return Ok((s, i + 1)),
+            b'"' => {
+                let text = String::from_utf8(s).map_err(|_| "Invalid UTF-8 in string")?;
+                return Ok((text, i + 1));
+            }
             b'\\' => {
                 i += 1;
                 if i >= b.len() {
                     return Err("Unexpected end in string escape".into());
                 }
                 match b[i] {
-                    b'"' => s.push('"'),
-                    b'\\' => s.push('\\'),
-                    b'/' => s.push('/'),
-                    b'n' => s.push('\n'),
-                    b'r' => s.push('\r'),
-                    b't' => s.push('\t'),
-                    _ => {
-                        s.push('\\');
-                        s.push(b[i] as char);
+                    b'"' => s.push(b'"'),
+                    b'\\' => s.push(b'\\'),
+                    b'/' => s.push(b'/'),
+                    b'n' => s.push(b'\n'),
+                    b'r' => s.push(b'\r'),
+                    b't' => s.push(b'\t'),
+                    other => {
+                        s.push(b'\\');
+                        s.push(other);
                     }
                 }
                 i += 1;
             }
             ch => {
-                s.push(ch as char);
+                s.push(ch);
                 i += 1;
             }
         }
