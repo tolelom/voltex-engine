@@ -10,6 +10,17 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## v1.0.148 — 2026-10-12 — 씬 직렬화 무작위 왕복 속성 테스트
+
+### Tests
+
+- **voltex_ecs `tests/scene_roundtrip_property.rs`**: 시드 5개의 무작위
+  월드(트랜스폼, 비ASCII 태그, 계층, 중간 despawn으로 생긴 구멍·재사용
+  슬롯·매달린 부모)를 JSON·binary VSCN·레거시 텍스트로 왕복시켜 엔티티 id와
+  무관한 구조가 같은지 본다. 세 형식 모두 통과(버그 없음). 생성기가 계층·태그·
+  despawn을 실제로 만드는지도 단언해 공허한 속성을 막았다. binary가 부모를
+  버리게 바꾸면 실패하는 것 확인.
+
 ## v1.0.147 — 2026-10-12 — 부모가 despawn된 자식의 WorldTransform 동결
 
 ### Fix
