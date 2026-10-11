@@ -1,0 +1,40 @@
+# 이어 할 작업
+
+> 2026-10-12 밤샘 작업(v1.0.115 ~ v1.0.171) 뒤에 남은 항목입니다. 세부 사실은 링크한 문서에 있고, 여기에는 무엇을 하고 무엇에 막혔는지만 둡니다. 처리하면 항목을 지우고 결과는 CHANGELOG에 적습니다.
+
+## 1. 창을 띄워 확인
+
+헤드리스 테스트로는 볼 수 없는 체감 확인입니다.
+
+| 항목 | 확인할 것 | 관련 버전 |
+|---|---|---|
+| 물리 체감 | `survivor_game`·`editor_demo`에서 물체 간 통과, 빠른 물체의 벽 충돌, 미끄러짐·정지 | v1.0.152 브로드페이즈 쌍 누락, v1.0.153 CCD, v1.0.154 마찰 |
+| 크래시 리포트 GPU 정보 | 실제 패닉 시 리포트에 어댑터 정보가 들어가는지 | v1.0.127 (컴파일만 확인) |
+
+물리 세 수정은 버그 수정이지만 손맛이 달라질 수 있습니다. 회귀로 보이면 해당 버전의 CHANGELOG 항목과 속성 테스트(`crates/voltex_physics/tests/*_property.rs`)부터 봅니다.
+
+## 2. 결정이 필요한 것
+
+| 항목 | 현상 | 선택지 |
+|---|---|---|
+| GPU 테스트 스크린샷 | voltex_capture GPU 테스트가 실행마다 추적 파일 `docs/visual/demo_frame_{a,b,pbr}.png`를 다시 써서 작업 트리가 더러워짐 (`crates/voltex_capture/src/scene_playthrough.rs`) | 환경 변수(예: `VOLTEX_WRITE_SCREENSHOTS=1`)일 때만 쓰기 / 출력 경로를 `target/` 아래로 이동 |
+| 커버리지 게이트 | `cargo llvm-cov --workspace --lib` 라인 68.29%(GPU 제외), `-- --include-ignored` 82.90%(RTX 4080), CI 게이트 78%. AUDIT-BACKLOG F5의 "lib-only 79.69%" 전제와 맞지 않음. 원인 미조사 | 측정 범위 차이인지 하락인지 먼저 확인한 뒤 GPU 없는 runner용 기준을 따로 둘지 결정 |
+| glTF 머티리얼 텍스처 | 텍스처를 무시하고 색 계수만 로드 ([DEFERRED](DEFERRED.md) "2026-10-12 밤샘 점검") | baseColor·normal부터 임포트 / 실제 glTF 에셋을 쓸 때까지 보류 |
+| `Packet::to_bytes` 길이 | 64 KiB 넘는 페이로드에서 u16 길이가 wrap (`crates/voltex_net/src/packet.rs`). UDP에선 OS가 먼저 막아 도달하지 않음 | `try_to_bytes() -> Result` 추가 / 다른 전송 계층을 붙일 때까지 보류 |
+| README | 미커밋 변경(`cargo run -p`)이 있고 버전 배지가 v1.0.114에 머묾 | 그 변경과 함께 버전 배지 갱신. coverage 배지는 커버리지 게이트 결론에 맞춤 |
+
+## 3. 설계가 필요한 것
+
+| 항목 | 막힌 이유 | 기록 위치 |
+|---|---|---|
+| 600줄 초과 파일 17개 | 기계적 분할이 안 되는 큰 파일(`voltex_capture/src/scene.rs` 2787줄 등). 한 파일로 분할 패턴을 정한 뒤 나머지에 적용 | [DEFERRED](DEFERRED.md) "600줄 한도 재위반" |
+| 안에서 시작하는 레이 규약 | Box는 t=0, Sphere·Capsule은 출구 t. 통일하면 동작이 바뀌므로 호출 측이 t=0을 어떻게 쓰는지 확인 필요 | [DEFERRED](DEFERRED.md) "레이캐스트" |
+| `.vpkg` 4 GiB 한계 | 인덱스 offset·size가 u32. 포맷 버전을 올릴지, 쓰기 단계에서 에러를 낼지 호환성 결정 필요 | [DEFERRED](DEFERRED.md) "`.vpkg` 4 GiB 한계" |
+| 지연 보상 타임스탬프 정밀도 | `HistoryEntry.timestamp`가 f32라 서버 가동 수 시간 뒤 ms 정밀도 손실 가능. 공개 필드라 타입 변경은 API 변경 (`crates/voltex_net/src/lag_compensation.rs`) | CHANGELOG v1.0.161 |
+| CI 첫 green run | GitHub 미러 push가 사용자 작업. 그 전엔 CI 게이트가 실제로 돌지 않음 | [AUDIT-BACKLOG](AUDIT-BACKLOG.md) F7, [release.md](release.md) |
+
+## 4. 동작이 바뀐 것 (게임 코드 점검용)
+
+- 죽은 엔티티나 옛 핸들에 대한 `World::add`는 아무것도 하지 않음 (v1.0.171)
+- 법선 하중이 없는 접촉에는 마찰 없음 (v1.0.154)
+- 보간 버퍼는 같은 시각의 스냅샷을 교체하고, 순서가 뒤바뀌어 도착해도 시간순으로 넣음 (v1.0.160)
