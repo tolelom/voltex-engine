@@ -10,6 +10,24 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## v1.0.160 — 2026-10-12 — 보간 버퍼가 순서 뒤바뀐 스냅샷에서 틀린 구간을 보간
+
+### Fix
+
+- **voltex_net `InterpolationBuffer::push`**: 도착 순서대로 뒤에 붙이기만 했다. UDP에서
+  흔한 순서 뒤바뀜이 생기면 `interpolate`가 시간이 정렬돼 있다고 보고 구간을 찾다가
+  엉뚱한 두 스냅샷 사이를 보간했다. 가장 먼저 도착한 스냅샷이 렌더 시각보다 늦으면
+  `None`(보간 불가)을 돌려주기도 했다. 축출도 "가장 먼저 도착한 것"을 버렸다. 이제
+  `server_time` 순으로 정렬 삽입하고(같은 시각이면 교체), 축출은 가장 오래된 시각부터 한다.
+
+### Tests
+
+- **voltex_net `tests/snapshot_property.rs`**: 추가·삭제·부분 필드 변경(0.0→-0.0 포함)이
+  섞인 무작위 스냅샷 체인 50×40에서 `apply_diff(old, diff_snapshots(old, new))`가 비트
+  단위로 `new`와 같은지 본다. 전체 직렬화 왕복도 확인한다(통과). 임의 바이트와 비트를
+  뒤집거나 잘라낸 diff 2만 건에서 디코더가 패닉하지 않는지 본다(통과). 무작위 도착
+  순서와 정렬 순서의 보간 결과가 같은지도 본다(위 결함 검출).
+
 ## v1.0.159 — 2026-10-12 — OrderedChannel: 아주 늦은 중복이 다음 wrap에서 진짜 메시지를 밀어냄
 
 ### Fix

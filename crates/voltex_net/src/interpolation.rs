@@ -26,9 +26,17 @@ impl InterpolationBuffer {
     }
 
     /// Push a new snapshot with its server timestamp.
+    ///
+    /// Snapshots may arrive out of order (UDP); they are kept sorted by
+    /// `server_time` so bracketing in [`interpolate`](Self::interpolate)
+    /// stays correct. A second snapshot with the same time replaces the first.
     pub fn push(&mut self, server_time: f64, snapshot: Snapshot) {
-        self.snapshots.push_back((server_time, snapshot));
-        // Evict old snapshots beyond the buffer limit
+        let idx = self.snapshots.partition_point(|(t, _)| *t < server_time);
+        match self.snapshots.get_mut(idx) {
+            Some(slot) if slot.0 == server_time => slot.1 = snapshot,
+            _ => self.snapshots.insert(idx, (server_time, snapshot)),
+        }
+        // Evict the oldest (by server time) beyond the buffer limit
         while self.snapshots.len() > self.max_snapshots {
             self.snapshots.pop_front();
         }
