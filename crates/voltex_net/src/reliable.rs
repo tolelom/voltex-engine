@@ -164,7 +164,12 @@ impl OrderedChannel {
     pub fn receive(&mut self, sequence: u16, data: &[u8]) -> Vec<Vec<u8>> {
         let payload = self.reliable.receive_and_ack(sequence, data);
 
-        if let Some(payload) = payload {
+        // Only buffer sequences at or ahead of `next_deliver` (wrapping
+        // half-space). Anything behind was already delivered: a duplicate that
+        // outlived the de-dup window would otherwise sit in the buffer and be
+        // delivered one u16 wrap later in place of the real message.
+        let ahead = sequence.wrapping_sub(self.next_deliver) < 0x8000;
+        if let Some(payload) = payload.filter(|_| ahead) {
             self.buffer.insert(sequence, payload);
         }
 
