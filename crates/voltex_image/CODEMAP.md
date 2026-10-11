@@ -7,7 +7,7 @@ GPU 무의존(L0) asset codecs — PNG/JPG/glTF/OBJ/JSON 디코더 + PNG 인코�
 
 - `parse_png(data: &[u8]) -> Result<(u32, u32, Vec<u8>)>` — PNG → RGBA8 픽셀 (src/png.rs)
 - `parse_jpg(data: &[u8]) -> Result<(u32, u32, Vec<u8>)>` — JPEG Baseline + Progressive → RGBA8 (src/jpg/, src/progressive_jpeg.rs)
-- `parse_gltf(data: &[u8]) -> Result<GltfData>` — glTF 2.0 / GLB 파서 (src/gltf/)
+- `parse_gltf(data: &[u8]) -> Result<GltfData>` — glTF 2.0 / GLB 파서 (src/gltf/). 정점 속성은 `bufferView.byteStride`(인터리브) 지원 (v1.0.132)
 - `encode_rgba8(w: u32, h: u32, rgba: &[u8]) -> Vec<u8>` — RGBA8 → PNG (zlib stored block, 무압축) (src/png_encode.rs)
 - `GltfData`, `GltfMesh`, `GltfMaterial` — glTF 구조체 (src/gltf/)
 - `MeshVertex` — 위치/법선/UV/탄젠트 정점 POD (bytemuck::Pod + Zeroable) (src/vertex.rs)

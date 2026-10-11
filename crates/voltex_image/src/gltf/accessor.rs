@@ -214,7 +214,7 @@ fn get_buffer_data<'a>(
     accessor: &JsonValue,
     buffer_views: &[JsonValue],
     buffers: &'a [Vec<u8>],
-) -> crate::Result<(&'a [u8], usize)> {
+) -> crate::Result<(&'a [u8], usize, Option<usize>)> {
     let bv_idx = accessor
         .get("bufferView")
         .and_then(|v| v.as_u32())
@@ -230,7 +230,14 @@ fn get_buffer_data<'a>(
         .unwrap_or(0) as usize;
     let buffer = buffers.get(buf_idx).ok_or("Buffer index out of range")?;
     let offset = bv_offset + acc_offset;
-    Ok((buffer, offset))
+    // Interleaved vertex data: elements sit `byteStride` apart instead of
+    // packed. Only meaningful for vertex attributes (glTF 2.0 §3.6.2.2).
+    let stride = bv
+        .get("byteStride")
+        .and_then(|v| v.as_u32())
+        .map(|v| v as usize)
+        .filter(|&v| v > 0); // 0 is invalid (spec min 4); read as tightly packed
+    Ok((buffer, offset, stride))
 }
 
 fn read_accessor_vec3(
@@ -245,10 +252,10 @@ fn read_accessor_vec3(
             .and_then(|v| v.as_u32())
             .ok_or("Missing count")?,
     )?;
-    let (buffer, offset) = get_buffer_data(acc, buffer_views, buffers)?;
+    let (buffer, offset, stride) = get_buffer_data(acc, buffer_views, buffers)?;
     let mut result = Vec::with_capacity(count);
     for i in 0..count {
-        let o = offset + i * 12;
+        let o = offset + i * stride.unwrap_or(12);
         if o + 12 > buffer.len() {
             return Err("Buffer overflow reading vec3".into());
         }
@@ -272,10 +279,10 @@ fn read_accessor_vec2(
             .and_then(|v| v.as_u32())
             .ok_or("Missing count")?,
     )?;
-    let (buffer, offset) = get_buffer_data(acc, buffer_views, buffers)?;
+    let (buffer, offset, stride) = get_buffer_data(acc, buffer_views, buffers)?;
     let mut result = Vec::with_capacity(count);
     for i in 0..count {
-        let o = offset + i * 8;
+        let o = offset + i * stride.unwrap_or(8);
         if o + 8 > buffer.len() {
             return Err("Buffer overflow reading vec2".into());
         }
@@ -298,10 +305,10 @@ fn read_accessor_vec4(
             .and_then(|v| v.as_u32())
             .ok_or("Missing count")?,
     )?;
-    let (buffer, offset) = get_buffer_data(acc, buffer_views, buffers)?;
+    let (buffer, offset, stride) = get_buffer_data(acc, buffer_views, buffers)?;
     let mut result = Vec::with_capacity(count);
     for i in 0..count {
-        let o = offset + i * 16;
+        let o = offset + i * stride.unwrap_or(16);
         if o + 16 > buffer.len() {
             return Err("Buffer overflow reading vec4".into());
         }
@@ -335,7 +342,7 @@ fn read_accessor_indices(
         .get("componentType")
         .and_then(|v| v.as_u32())
         .ok_or("Missing componentType")?;
-    let (buffer, offset) = get_buffer_data(acc, buffer_views, buffers)?;
+    let (buffer, offset, _) = get_buffer_data(acc, buffer_views, buffers)?;
 
     let mut result = Vec::with_capacity(count);
     match comp_type {
@@ -394,13 +401,13 @@ fn read_accessor_joints(
         .get("componentType")
         .and_then(|v| v.as_u32())
         .unwrap_or(5123);
-    let (buffer, offset) = get_buffer_data(acc, buffer_views, buffers)?;
+    let (buffer, offset, stride) = get_buffer_data(acc, buffer_views, buffers)?;
     let mut result = Vec::with_capacity(count);
     match comp_type {
         5121 => {
             // UNSIGNED_BYTE
             for i in 0..count {
-                let o = offset + i * 4;
+                let o = offset + i * stride.unwrap_or(4);
                 if o + 4 > buffer.len() {
                     return Err("Buffer overflow reading joints u8".into());
                 }
@@ -415,7 +422,7 @@ fn read_accessor_joints(
         5123 => {
             // UNSIGNED_SHORT
             for i in 0..count {
-                let o = offset + i * 8;
+                let o = offset + i * stride.unwrap_or(8);
                 if o + 8 > buffer.len() {
                     return Err("Buffer overflow reading joints u16".into());
                 }
@@ -444,7 +451,7 @@ pub(super) fn read_accessor_mat4(
             .and_then(|v| v.as_u32())
             .ok_or("Missing count")?,
     )?;
-    let (buffer, offset) = get_buffer_data(acc, buffer_views, buffers)?;
+    let (buffer, offset, _) = get_buffer_data(acc, buffer_views, buffers)?;
     let mut result = Vec::with_capacity(count);
     for i in 0..count {
         let o = offset + i * 64;
@@ -487,7 +494,7 @@ pub(super) fn read_accessor_floats(
     let total = count
         .checked_mul(components)
         .ok_or("glTF accessor count*components overflow")?;
-    let (buffer, offset) = get_buffer_data(acc, buffer_views, buffers)?;
+    let (buffer, offset, _) = get_buffer_data(acc, buffer_views, buffers)?;
     let mut result = Vec::with_capacity(total);
     for i in 0..total {
         let o = offset + i * 4;
@@ -523,4 +530,60 @@ pub(super) fn read_indices_u16(buffer: &[u8], offset: usize, count: usize) -> Ve
             u16::from_le_bytes([buffer[o], buffer[o + 1]]) as u32
         })
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::json_parser::parse_json;
+
+    /// Two interleaved vertices: position (12 B) + uv (8 B) per vertex, so
+    /// the shared bufferView has byteStride 20 and the uv accessor starts at
+    /// byteOffset 12.
+    fn interleaved() -> (Vec<JsonValue>, Vec<JsonValue>, Vec<Vec<u8>>) {
+        let verts: [([f32; 3], [f32; 2]); 2] =
+            [([1.0, 2.0, 3.0], [0.25, 0.5]), ([4.0, 5.0, 6.0], [0.75, 1.0])];
+        let mut buf = Vec::new();
+        for (p, uv) in verts {
+            p.iter().chain(uv.iter()).for_each(|f| buf.extend(f.to_le_bytes()));
+        }
+        let accessors = parse_json(
+            r#"[{"bufferView":0,"byteOffset":0,"count":2,"type":"VEC3","componentType":5126},
+                {"bufferView":0,"byteOffset":12,"count":2,"type":"VEC2","componentType":5126}]"#,
+        )
+        .unwrap();
+        let views = parse_json(r#"[{"buffer":0,"byteOffset":0,"byteLength":40,"byteStride":20}]"#)
+            .unwrap();
+        (
+            accessors.as_array().unwrap().to_vec(),
+            views.as_array().unwrap().to_vec(),
+            vec![buf],
+        )
+    }
+
+    #[test]
+    fn vec3_reader_honours_byte_stride() {
+        let (acc, views, bufs) = interleaved();
+        let pos = read_accessor_vec3(&acc, &views, &bufs, 0).unwrap();
+        assert_eq!(pos, vec![[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]]);
+    }
+
+    #[test]
+    fn zero_byte_stride_reads_as_tightly_packed() {
+        let buf: Vec<u8> = [1.0f32, 2.0, 3.0, 4.0, 5.0, 6.0]
+            .iter()
+            .flat_map(|f| f.to_le_bytes())
+            .collect();
+        let acc = parse_json(r#"[{"bufferView":0,"count":2,"type":"VEC3","componentType":5126}]"#).unwrap();
+        let views = parse_json(r#"[{"buffer":0,"byteLength":24,"byteStride":0}]"#).unwrap();
+        let pos = read_accessor_vec3(acc.as_array().unwrap(), views.as_array().unwrap(), &[buf], 0).unwrap();
+        assert_eq!(pos, vec![[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]]);
+    }
+
+    #[test]
+    fn vec2_reader_honours_byte_stride() {
+        let (acc, views, bufs) = interleaved();
+        let uv = read_accessor_vec2(&acc, &views, &bufs, 1).unwrap();
+        assert_eq!(uv, vec![[0.25, 0.5], [0.75, 1.0]]);
+    }
 }

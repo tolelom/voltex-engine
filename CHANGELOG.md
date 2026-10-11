@@ -10,6 +10,21 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## v1.0.132 — 2026-10-12 — glTF 인터리브 정점(byteStride) 지원
+
+### Fix
+
+- **voltex_image glTF accessor**: `bufferView.byteStride`를 무시하고 원소를
+  항상 촘촘하게(vec3 = 12B 간격) 읽고 있었다. 위치·법선·UV를 한 버퍼에
+  인터리브한 glTF(Khronos 인터리브 샘플 등 일부 익스포터 출력)는 **에러 없이
+  깨진 정점**으로 로드됐다. 재현: 두 번째 정점 위치가 `[0.25, 0.5, 4.0]`(UV와
+  다음 정점이 섞임). 정점 속성 리더(vec2/vec3/vec4/joints)가 stride를
+  쓰도록 고쳤다. 인덱스·역바인드 행렬·애니메이션 데이터는 spec상 stride
+  대상이 아니라 그대로 둔다. `byteStride: 0`(spec 위반, 최소 4)은 촘촘한
+  배치로 읽는다.
+- 커버리지 순환 점검 중 발견(퍼징은 패닉만 잡아서 이런 조용한 오염은 못
+  찾는다). 테스트 +3.
+
 ## v1.0.131 — 2026-10-12 — inflate를 실제 zlib 출력으로 검증 (dynamic Huffman)
 
 ### Tests
