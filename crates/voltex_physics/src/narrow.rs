@@ -99,6 +99,9 @@ pub(crate) fn sphere_vs_box(
         closest_face = Vec3::new(sphere_pos.x, sphere_pos.y, bmax.z);
     }
 
+    // `normal` so far is the nearest face's outward direction — the way the
+    // sphere must leave. A→B (sphere→box) is the opposite.
+    let normal = -normal;
     let depth = min_dist + radius;
     let point_on_a = sphere_pos + normal * radius;
     let point_on_b = closest_face;
@@ -208,6 +211,19 @@ mod tests {
         assert!(r.is_some());
         let (_normal, depth, _pa, _pb) = r.unwrap();
         assert!(depth > 0.0);
+    }
+
+    #[test]
+    fn sphere_center_inside_box_normal_still_points_sphere_to_box() {
+        // Sphere centre just under the box's +Y face: the shortest way out is
+        // the sphere going up, i.e. the box (B) moving down along the A->B
+        // normal. The inside branch used to return the face's outward +Y,
+        // so the solver pushed the pair deeper into each other.
+        let (normal, depth, point_on_a, _) =
+            sphere_vs_box(Vec3::new(0.0, 0.8, 0.0), 0.5, Vec3::ZERO, Vec3::ONE).unwrap();
+        assert!(approx_vec(normal, Vec3::new(0.0, -1.0, 0.0)), "normal {normal:?}");
+        assert!(approx(depth, 0.7));
+        assert!(approx_vec(point_on_a, Vec3::new(0.0, 0.3, 0.0)), "deepest sphere point {point_on_a:?}");
     }
 
     // box_vs_box tests

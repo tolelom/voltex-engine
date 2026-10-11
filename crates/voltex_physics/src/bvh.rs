@@ -98,8 +98,10 @@ impl BvhTree {
 
         match (&self.nodes[a], &self.nodes[b]) {
             (BvhNode::Leaf { entity: ea, aabb: aabb_a }, BvhNode::Leaf { entity: eb, aabb: aabb_b }) => {
-                if a != b && ea.id <= eb.id && aabb_a.intersects(aabb_b) {
-                    pairs.push((*ea, *eb));
+                // Each unordered leaf pair is visited exactly once, in spatial
+                // order — so only normalize the order here, never filter on it.
+                if a != b && aabb_a.intersects(aabb_b) {
+                    pairs.push(if ea.id <= eb.id { (*ea, *eb) } else { (*eb, *ea) });
                 }
             }
             (BvhNode::Leaf { .. }, BvhNode::Internal { left, right, .. }) => {
@@ -298,6 +300,52 @@ mod tests {
             let t = (tree_pair.0.id.min(tree_pair.1.id), tree_pair.0.id.max(tree_pair.1.id));
             let b = (brute_pair.0.id, brute_pair.1.id);
             assert_eq!(t, b);
+        }
+    }
+
+    #[test]
+    fn overlapping_pair_is_found_when_id_order_opposes_spatial_order() {
+        // The traversal visits each leaf pair once, in spatial sort order. An
+        // `id <= id` filter there dropped every pair whose ids ran the other
+        // way, so roughly half of all real overlaps never reached narrowphase.
+        let entries = vec![
+            (make_entity(0), AABB::new(Vec3::new(1.0, 1.0, 1.0), Vec3::new(3.0, 3.0, 3.0))),
+            (make_entity(1), AABB::new(Vec3::ZERO, Vec3::new(2.0, 2.0, 2.0))),
+        ];
+        let pairs = BvhTree::build(&entries).query_pairs();
+        assert_eq!(pairs.len(), 1, "pair dropped: {pairs:?}");
+        assert_eq!((pairs[0].0.id, pairs[0].1.id), (0, 1), "pairs are emitted lower id first");
+    }
+
+    #[test]
+    fn query_pairs_matches_brute_force_for_random_layouts() {
+        let mut state = 0x2545_F491u32;
+        let mut next = move || {
+            state ^= state << 13;
+            state ^= state >> 17;
+            state ^= state << 5;
+            (state % 10_000) as f32 / 1000.0
+        };
+        for layout in 0..50 {
+            let entries: Vec<(Entity, AABB)> = (0..12)
+                .map(|i| {
+                    let min = Vec3::new(next(), next(), next());
+                    let size = Vec3::new(next() * 0.3, next() * 0.3, next() * 0.3);
+                    (make_entity(i), AABB::new(min, min + size))
+                })
+                .collect();
+            let mut got: Vec<(u32, u32)> =
+                BvhTree::build(&entries).query_pairs().iter().map(|(a, b)| (a.id, b.id)).collect();
+            got.sort();
+            let mut want = Vec::new();
+            for i in 0..entries.len() {
+                for j in (i + 1)..entries.len() {
+                    if entries[i].1.intersects(&entries[j].1) {
+                        want.push((entries[i].0.id, entries[j].0.id));
+                    }
+                }
+            }
+            assert_eq!(got, want, "layout {layout}");
         }
     }
 

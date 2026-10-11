@@ -283,14 +283,14 @@ pub(crate) fn epa(
         [1, 3, 2],
     ];
 
+    // Orient faces away from a fixed interior point, not by the sign of their
+    // distance to the origin: the origin can sit on (or numerically just past)
+    // a face, which flipped it, broke horizon-edge cancellation and made the
+    // face list explode. The tetrahedron centroid stays inside as EPA only
+    // ever grows the polytope.
+    let interior = (polytope[0] + polytope[1] + polytope[2] + polytope[3]) * 0.25;
     for indices in &face_indices {
-        let mut face = make_face(&polytope, *indices);
-        // Ensure outward-pointing normal (away from origin)
-        if face.distance < 0.0 {
-            face.indices.swap(0, 1);
-            face.normal = -face.normal;
-            face.distance = -face.distance;
-        }
+        let face = make_outward_face(&polytope, *indices, interior);
         if face.normal.length_squared() > 1e-10 {
             faces.push(face);
         }
@@ -351,12 +351,7 @@ pub(crate) fn epa(
 
         // Create new faces from horizon edges
         for edge in &edges {
-            let mut face = make_face(&polytope, [edge[0], edge[1], new_idx]);
-            if face.distance < 0.0 {
-                face.indices.swap(0, 1);
-                face.normal = -face.normal;
-                face.distance = -face.distance;
-            }
+            let face = make_outward_face(&polytope, [edge[0], edge[1], new_idx], interior);
             if face.normal.length_squared() > 1e-10 {
                 faces.push(face);
             }
@@ -370,6 +365,16 @@ pub(crate) fn epa(
     let point_on_b = support(b, pos_b, -normal);
 
     (normal, depth, point_on_a, point_on_b)
+}
+
+fn make_outward_face(polytope: &[Vec3], indices: [usize; 3], interior: Vec3) -> EpaFace {
+    let mut face = make_face(polytope, indices);
+    if face.normal.dot(polytope[indices[0]] - interior) < 0.0 {
+        face.indices.swap(0, 1);
+        face.normal = -face.normal;
+        face.distance = -face.distance;
+    }
+    face
 }
 
 fn make_face(polytope: &[Vec3], indices: [usize; 3]) -> EpaFace {
