@@ -82,17 +82,19 @@ fn read_i24_le(data: &[u8], offset: usize) -> crate::Result<i32> {
     }
 }
 
-/// Read a 32-bit float (little-endian).
+/// Read a 32-bit float (little-endian). NaN / ±inf (corrupt or hostile
+/// files) read as silence so they can't poison the mixer downstream.
 fn read_f32_le(data: &[u8], offset: usize) -> crate::Result<f32> {
     if offset + 4 > data.len() {
         return Err(format!("read_f32_le: offset {} out of bounds (len={})", offset, data.len()).into());
     }
-    Ok(f32::from_le_bytes([
+    let v = f32::from_le_bytes([
         data[offset],
         data[offset + 1],
         data[offset + 2],
         data[offset + 3],
-    ]))
+    ]);
+    Ok(if v.is_finite() { v } else { 0.0 })
 }
 
 /// Parse a WAV file from raw bytes into an [`AudioClip`].

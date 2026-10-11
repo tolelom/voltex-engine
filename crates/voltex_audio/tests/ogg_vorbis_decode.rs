@@ -396,3 +396,60 @@ fn zero_residue_ogg_decodes_to_exact_silence() {
         "expected exact silence from an all-zero spectrum"
     );
 }
+
+/// Mutation fuzz: corrupt the setup header (codebooks, floors, residues,
+/// mappings, modes) or an audio packet, then re-wrap in valid Ogg pages so
+/// the CRC passes and the bytes actually reach the Vorbis decoder. Also
+/// corrupt finished files directly to exercise the container parser.
+#[test]
+fn decoder_never_panics_on_corrupted_streams() {
+    use std::panic::{catch_unwind, AssertUnwindSafe};
+    let mut state = 0x0DD5_EED5u32;
+    let mut next = move || {
+        state ^= state << 13;
+        state ^= state >> 17;
+        state ^= state << 5;
+        state
+    };
+    let audio = audio_packet(&tone_spectrum());
+    let clean = ogg_vorbis_file(&[audio.clone(), audio.clone(), audio.clone()]);
+    for i in 0..3000 {
+        let file = match next() % 3 {
+            0 => {
+                let mut setup = setup_header_packet();
+                for _ in 0..1 + next() % 4 {
+                    let at = 7 + next() as usize % (setup.len() - 7); // keep the "\x05vorbis" tag
+                    setup[at] ^= 1 << (next() % 8);
+                }
+                let mut f = ogg_page(0x02, 0, 0, &[&id_header_packet()]);
+                f.extend_from_slice(&ogg_page(0x00, 0, 1, &[&comment_header_packet(), &setup]));
+                f.extend_from_slice(&ogg_page(0x04, 2 * N_HALF as u64, 2, &[&audio, &audio, &audio]));
+                f
+            }
+            1 => {
+                let mut bad = audio.clone();
+                for _ in 0..1 + next() % 4 {
+                    let at = next() as usize % bad.len();
+                    bad[at] = next() as u8;
+                }
+                bad.truncate(1 + next() as usize % bad.len());
+                ogg_vorbis_file(&[audio.clone(), bad, audio.clone()])
+            }
+            _ => {
+                let mut f = clean.clone();
+                for _ in 0..1 + next() % 6 {
+                    let at = next() as usize % f.len();
+                    f[at] = next() as u8;
+                }
+                f.truncate(next() as usize % (f.len() + 1));
+                f
+            }
+        };
+        let outcome = catch_unwind(AssertUnwindSafe(|| {
+            if let Ok(clip) = decode_ogg_vorbis_bytes(&file) {
+                assert!(clip.samples.iter().all(|s| s.is_finite()), "non-finite sample");
+            }
+        }));
+        assert!(outcome.is_ok(), "mutation {i} panicked the Ogg/Vorbis decoder");
+    }
+}

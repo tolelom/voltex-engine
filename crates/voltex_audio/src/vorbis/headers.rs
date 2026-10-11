@@ -172,8 +172,13 @@ pub(super) fn parse_id_header(packet: &[u8]) -> crate::Result<VorbisIdHeader> {
     let _bitrate_min = reader.read_u32()?;
 
     let blocksize_raw = reader.read_u8()?;
-    let blocksize_0 = 1u32 << (blocksize_raw & 0x0F);
-    let blocksize_1 = 1u32 << ((blocksize_raw >> 4) & 0x0F);
+    // Vorbis I §4.2.2: both exponents are 6..=13 (64..8192 samples).
+    let (exp_0, exp_1) = (blocksize_raw & 0x0F, blocksize_raw >> 4);
+    if !(6..=13).contains(&exp_0) || !(6..=13).contains(&exp_1) {
+        return Err(format!("Invalid Vorbis blocksize exponents {exp_0}/{exp_1}").into());
+    }
+    let blocksize_0 = 1u32 << exp_0;
+    let blocksize_1 = 1u32 << exp_1;
 
     if blocksize_0 > blocksize_1 {
         return Err("blocksize_0 > blocksize_1".into());
@@ -281,11 +286,51 @@ pub(super) fn parse_setup_header(packet: &[u8], channels: u8) -> crate::Result<V
         return Err("Missing framing bit in setup header".into());
     }
 
-    Ok(VorbisSetup {
+    let setup = VorbisSetup {
         codebooks,
         floors,
         residues,
         mappings,
         modes,
-    })
+    };
+    validate_setup(&setup, channels)?;
+    Ok(setup)
+}
+
+/// Every index the setup header stores is used unchecked by the packet
+/// decoder, so reject any that point past the tables they index (a corrupt
+/// or hostile file used to panic the decoder with out-of-bounds indexing).
+fn validate_setup(setup: &VorbisSetup, channels: u8) -> crate::Result<()> {
+    let books = setup.codebooks.len();
+    let book_ok = |b: i16| b < 0 || (b as usize) < books;
+    for floor in &setup.floors {
+        let classes = floor.class_dimensions.len();
+        if floor.partition_class.iter().any(|&c| c as usize >= classes)
+            || floor.class_masterbook.iter().any(|&b| b as usize >= books)
+            || floor.class_subclass_books.iter().flatten().any(|&b| !book_ok(b))
+        {
+            return Err("Vorbis floor references a missing class or codebook".into());
+        }
+    }
+    for residue in &setup.residues {
+        if residue.classbook as usize >= books || residue.books.iter().flatten().any(|&b| !book_ok(b)) {
+            return Err("Vorbis residue references a missing codebook".into());
+        }
+    }
+    for mapping in &setup.mappings {
+        let submaps = mapping.submaps as usize;
+        if mapping.mux.len() < channels as usize
+            || mapping.mux.iter().any(|&m| m as usize >= submaps)
+            || mapping.submap_floor.len() < submaps
+            || mapping.submap_residue.len() < submaps
+            || mapping.submap_floor.iter().any(|&f| f as usize >= setup.floors.len())
+            || mapping.submap_residue.iter().any(|&r| r as usize >= setup.residues.len())
+        {
+            return Err("Vorbis mapping references a missing submap, floor or residue".into());
+        }
+    }
+    if setup.modes.iter().any(|m| m.mapping as usize >= setup.mappings.len()) {
+        return Err("Vorbis mode references a missing mapping".into());
+    }
+    Ok(())
 }

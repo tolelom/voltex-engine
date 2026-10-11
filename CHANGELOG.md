@@ -10,6 +10,31 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## v1.0.165 — 2026-10-12 — 손상된 Vorbis setup으로 디코더 패닉, float WAV NaN 통과
+
+### Fix
+
+- **voltex_audio Vorbis setup 헤더 — 교차 참조 미검증**: setup 헤더에 저장된 인덱스를
+  패킷 디코더가 검사 없이 썼다. mode→mapping, mapping의 mux·submap floor·residue,
+  floor·residue→codebook, floor partition→class 참조가 모두 그랬다. 그래서 손상된 파일에서
+  범위 밖 인덱싱으로 패닉이 났다(재현: 길이 1 배열에 인덱스 32). 이제 setup 파싱 끝에서
+  모든 참조를 한 번에 검증하고 `Err`를 돌려준다. 블록 크기 지수도 규격(§4.2.2)대로
+  6~13만 허용한다. 지수 0이면 블록이 1샘플이 됐다.
+- **voltex_audio `parse_wav` — float WAV의 NaN/Inf가 샘플로 통과**: 32비트 float WAV의
+  NaN·±Inf 비트 패턴이 `AudioClip.samples`로 그대로 나왔다. 문서가 약속한 범위
+  [-1, 1]를 벗어나고 믹서로 전파될 수 있다. 무음(0.0)으로 읽는다.
+
+### Tests
+
+- **`tests/audio_fuzz.rs`**: 실제 WAV fixture 4개와 생성한 16/24/32f 파일을 헤더 위주로
+  변조해 1500회씩 넣는다. 패닉이 없어야 하고, 성공 시 채널 수 > 0, 프레임 정렬, 샘플이
+  유한해야 한다.
+- **`tests/ogg_vorbis_decode.rs` `decoder_never_panics_on_corrupted_streams`**: setup
+  헤더(코드북·floor·residue·mapping·mode)나 오디오 패킷을 변조한 뒤 CRC가 맞는 Ogg
+  페이지로 다시 감싼다. 그래서 바이트가 실제로 Vorbis 디코더까지 간다. 완성 파일
+  자체도 변조한다. 3000회. 개발 중에는 release 4만 회, debug 시드 2개 × 3000회로 돌려
+  깨끗함을 확인했다.
+
 ## v1.0.164 — 2026-10-12 — 손상된 JPEG에서 디코더 패닉 5종
 
 ### Fix
