@@ -547,7 +547,8 @@ fn deser_audio(
 
 /// Extract the `texture_path` / `mesh_path` / `audio_path` component payloads
 /// from a scene file. Format auto-detection: `VSCN` magic → binary, first
-/// non-whitespace `{` → JSON, anything else → legacy `.vscn` text (which
+/// non-whitespace `{` (after an optional UTF-8 BOM) → JSON, anything else →
+/// legacy `.vscn` text (which
 /// never carries registry components — empty result is correct). Unknown
 /// components in the scene are skipped by the registry contract; parse
 /// failures yield an empty list (the build warns nothing — a malformed scene
@@ -562,7 +563,7 @@ pub fn scan_scene_asset_paths(scene_bytes: &[u8]) -> Vec<String> {
     if scene_bytes.starts_with(b"VSCN") {
         let _ = voltex_ecs::deserialize_scene_binary(&mut world, scene_bytes, &registry);
     } else if let Ok(text) = std::str::from_utf8(scene_bytes) {
-        if text.trim_start().starts_with('{') {
+        if text.trim_start_matches('\u{FEFF}').trim_start().starts_with('{') {
             let _ = voltex_ecs::deserialize_scene_json(&mut world, text, &registry);
         }
         // else: legacy text scenes carry no registry components.
@@ -783,6 +784,18 @@ mod tests {
         assert!(scan_scene_asset_paths(b"scene v1\nentity 0\n").is_empty());
         // Garbage bytes → empty, no panic.
         assert!(scan_scene_asset_paths(&[0xFF, 0x00, 0x12]).is_empty());
+    }
+
+    #[test]
+    fn scan_scene_asset_paths_sees_through_utf8_bom() {
+        // A BOM-prefixed JSON scene used to be classified as legacy text and
+        // silently skipped by auto-bundling.
+        let json = make_scene_json("assets/hero.png", "assets/ship.obj", "assets/boom.wav");
+        let with_bom = format!("\u{FEFF}{json}");
+        assert_eq!(
+            scan_scene_asset_paths(with_bom.as_bytes()),
+            vec!["assets/boom.wav", "assets/hero.png", "assets/ship.obj"]
+        );
     }
 
     #[test]

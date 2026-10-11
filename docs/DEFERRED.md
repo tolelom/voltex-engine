@@ -242,7 +242,7 @@ high/medium 19건은 당일 해소 (CHANGELOG v1.0.114). LOW 4건은 실피해 �
 - ~~**CLI 멀티바이너리 crate에서 exe 이름 매칭 실패 시 `exes.last()` 폴백**~~ ✅ v1.0.116 — 후보 2개 이상이면 `AmbiguousExecutable` 에러. —
   project.name과 [[bin]] 불일치 시 에셋 생성기가 배포될 수 있음 (note 1줄만).
   이름 매칭 실패 + 후보 2개 이상이면 에러 승격 — v1.1.
-- **CLI 씬 스캔이 BOM 붙은 JSON을 legacy text로 오분류** — 자동 동봉만 조용히
+- ~~**CLI 씬 스캔이 BOM 붙은 JSON을 legacy text로 오분류**~~ ✅ v1.0.117(ecs JSON 파서 BOM 허용) + v1.0.118(CLI 판정 BOM 스킵). — 자동 동봉만 조용히
   스킵 (런타임 JSON 파서도 BOM 거부라 씬 자체가 먼저 터짐 — 실질 피해는 경고
   부재). 판정 전 BOM 스트립 — v1.1.
 - **CLI `assets = ["./**/*"]` 류 선언이 dist/를 자기 안으로 재귀 복사** — 소스

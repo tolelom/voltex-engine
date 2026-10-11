@@ -10,6 +10,15 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## v1.0.118 — 2026-10-12 — CLI 씬 스캔 BOM 오분류 해소 (감사 LOW 이월 3/4, 2부)
+
+### Fix
+
+- **voltex_cli `scan_scene_asset_paths`**: 포맷 판정 전에 UTF-8 BOM을 건너뛴다.
+  BOM 붙은 JSON 씬이 legacy text로 분류돼 씬이 참조하는 에셋 자동 동봉이
+  경고 없이 빠지던 것. v1.0.117(파서 BOM 허용)과 합쳐 BOM 씬이 빌드·실행
+  양쪽에서 동작. 테스트 +1.
+
 ## v1.0.117 — 2026-10-12 — JSON 씬 로더가 UTF-8 BOM 허용 (감사 LOW 이월 3/4, 1부)
 
 ### Fix
