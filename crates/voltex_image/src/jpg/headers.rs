@@ -105,6 +105,11 @@ pub(super) fn parse_sof(data: &[u8], pos: usize) -> crate::Result<(SofData, usiz
         let sampling = data[off + 1];
         let h_sample = sampling >> 4;
         let v_sample = sampling & 0x0F;
+        // ITU T.81 B.2.2: sampling factors are 1..=4. Zero divided by zero
+        // in the MCU geometry; larger values blow up the per-MCU block count.
+        if !(1..=4).contains(&h_sample) || !(1..=4).contains(&v_sample) {
+            return Err(format!("Invalid JPEG sampling factors {h_sample}x{v_sample}").into());
+        }
         let qt_id = data[off + 2];
         components.push(JpegComponent {
             id,
@@ -176,6 +181,11 @@ pub(super) fn parse_dht(
         let mut sym_offset: u16 = 0;
 
         for i in 0..16 {
+            // A valid prefix code has at most 2^(i+1) codes of length i+1;
+            // a corrupt (over-subscribed) table overflowed `code` here.
+            if code as u32 + counts[i] as u32 > 1u32 << (i + 1) {
+                return Err("DHT table is over-subscribed".into());
+            }
             offsets[i] = sym_offset;
             if counts[i] > 0 {
                 mincode[i] = code;

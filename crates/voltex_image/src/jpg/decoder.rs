@@ -21,7 +21,7 @@ pub(super) fn decode_scan(
     restart_interval: u16,
 ) -> crate::Result<(Vec<u8>, usize)> {
     // Parse SOS header
-    if pos + 2 > data.len() {
+    if pos + 3 > data.len() {
         return Err("SOS too short".into());
     }
     let seg_len = u16::from_be_bytes([data[pos], data[pos + 1]]) as usize;
@@ -30,6 +30,9 @@ pub(super) fn decode_scan(
     let mut scan_components = components.to_vec();
     let mut off = pos + 3;
     for comp in scan_components.iter_mut().take(ns) {
+        if off + 2 > data.len() {
+            return Err("SOS component list truncated".into());
+        }
         let _cs = data[off]; // component selector
         let td_ta = data[off + 1];
         comp.dc_table = td_ta >> 4;
@@ -88,14 +91,20 @@ pub(super) fn decode_scan(
                 for _ in 0..(blocks_h * blocks_v) {
                     let block = decode_block(
                         &mut reader,
-                        dc_tables[comp.dc_table as usize]
-                            .as_ref()
+                        // Table ids come straight from the file (SOF/SOS
+                        // nibbles, up to 15/255): index checked, not trusted.
+                        dc_tables
+                            .get(comp.dc_table as usize)
+                            .and_then(Option::as_ref)
                             .ok_or("Missing DC Huffman table")?,
-                        ac_tables[comp.ac_table as usize]
-                            .as_ref()
+                        ac_tables
+                            .get(comp.ac_table as usize)
+                            .and_then(Option::as_ref)
                             .ok_or("Missing AC Huffman table")?,
                         &mut dc_pred[ci],
-                        &qt_tables[comp.qt_id as usize],
+                        qt_tables
+                            .get(comp.qt_id as usize)
+                            .ok_or("Quantization table id out of range")?,
                     )?;
                     blocks.push(block);
                 }
@@ -133,6 +142,11 @@ fn decode_block(
 
     // DC coefficient
     let dc_len = reader.decode_huffman(dc_table)?;
+    // Baseline DC difference categories are 0..=11 (ITU T.81 F.1.2.1); a
+    // corrupt DHT can map to any byte, and `1 << dc_len` would overflow.
+    if dc_len > 11 {
+        return Err(format!("Invalid JPEG DC category {dc_len}").into());
+    }
     let dc_val = if dc_len > 0 {
         let bits = reader.read_bits(dc_len)? as i32;
         if bits < (1 << (dc_len - 1)) {
@@ -143,8 +157,10 @@ fn decode_block(
     } else {
         0
     };
-    *dc_pred += dc_val;
-    coeffs[0] = *dc_pred * qt[0] as i32;
+    // Garbage streams can drive the predictor anywhere; wrap instead of
+    // overflow-panicking (the pixels are garbage either way).
+    *dc_pred = dc_pred.wrapping_add(dc_val);
+    coeffs[0] = dc_pred.wrapping_mul(qt[0] as i32);
 
     // AC coefficients
     let mut k = 1;
