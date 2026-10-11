@@ -10,6 +10,19 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## v1.0.137 — 2026-10-12 — glTF 노드 `matrix` 변환 지원
+
+### Fix
+
+- **voltex_image glTF 노드**: 로컬 변환을 TRS 대신 column-major `matrix`로
+  준 노드(glTF 2.0 허용, 일부 익스포터·모델 아카이브에서 흔함)의 `matrix`를
+  읽지 않아 **에러 없이 항등 변환**으로 로드됐다. 이제 `matrix`가 있으면
+  translation·rotation(쿼터니언)·scale로 분해해 쓴다. 미러링(행렬식 < 0)은
+  음수 X 스케일로 보존한다. `voltex_image`는 L0(수학 crate 무의존)이라 분해를
+  직접 구현했다(Shepperd 방식, 네 분기 전부 테스트).
+- 테스트 +4 (T·R·S 합성 분해, 미러링, 축별 180° 회전 3종으로 분기 커버,
+  matrix 없을 때 TRS 유지).
+
 ## v1.0.136 — 2026-10-12 — PNG 디코더를 실제 인코더 출력으로 검증
 
 ### Tests
