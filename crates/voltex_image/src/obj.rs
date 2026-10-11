@@ -68,7 +68,9 @@ pub fn parse_obj(source: &str) -> ObjData {
             }
             "f" => {
                 let face: Vec<(u32, u32, u32)> =
-                    rest.split_whitespace().map(parse_face_vertex).collect();
+                    rest.split_whitespace()
+                        .map(|t| parse_face_vertex(t, positions.len(), uvs.len(), normals.len()))
+                        .collect();
                 if face.len() >= 3 {
                     faces.push(face);
                 }
@@ -239,27 +241,54 @@ pub fn compute_tangents(vertices: &mut [MeshVertex], indices: &[u32]) {
 }
 
 /// Parse a face vertex token of the form "v", "v/vt", "v//vn", or "v/vt/vn".
-/// Returns (v_idx, vt_idx, vn_idx) where 0 means absent.
-fn parse_face_vertex(token: &str) -> (u32, u32, u32) {
+/// Returns absolute 1-based `(v_idx, vt_idx, vn_idx)` where 0 means absent.
+/// Negative indices are relative to the elements defined so far (`-1` = the
+/// most recent), so they resolve against the counts at this face's line.
+fn parse_face_vertex(token: &str, n_v: usize, n_vt: usize, n_vn: usize) -> (u32, u32, u32) {
     let parts: Vec<&str> = token.split('/').collect();
-    let v = parts
-        .first()
-        .and_then(|s| s.parse::<u32>().ok())
-        .unwrap_or(0);
-    let vt = parts
-        .get(1)
-        .and_then(|s| s.parse::<u32>().ok())
-        .unwrap_or(0);
-    let vn = parts
-        .get(2)
-        .and_then(|s| s.parse::<u32>().ok())
-        .unwrap_or(0);
-    (v, vt, vn)
+    let resolve = |i: usize, count: usize| -> u32 {
+        match parts.get(i).and_then(|s| s.parse::<i64>().ok()) {
+            Some(n) if n > 0 => u32::try_from(n).unwrap_or(0),
+            Some(n) if n < 0 => {
+                let abs = count as i64 + n + 1;
+                if abs >= 1 { u32::try_from(abs).unwrap_or(0) } else { 0 }
+            }
+            _ => 0,
+        }
+    };
+    (resolve(0, n_v), resolve(1, n_vt), resolve(2, n_vn))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn positions_of(obj: &ObjData) -> Vec<[f32; 3]> {
+        obj.indices.iter().map(|&i| obj.vertices[i as usize].position).collect()
+    }
+
+    #[test]
+    fn negative_indices_are_relative_to_vertices_defined_so_far() {
+        // -1 is the most recently defined vertex *at that line*, so the two
+        // faces below reference different triangles despite identical tokens.
+        let src = "v 0 0 0\nv 1 0 0\nv 0 1 0\nf -3 -2 -1\n\
+                   v 5 5 5\nv 6 5 5\nv 5 6 5\nf -3 -2 -1\n";
+        let obj = parse_obj(src);
+        assert_eq!(
+            positions_of(&obj),
+            vec![
+                [0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0],
+                [5.0, 5.0, 5.0], [6.0, 5.0, 5.0], [5.0, 6.0, 5.0],
+            ]
+        );
+    }
+
+    #[test]
+    fn negative_indices_resolve_uvs_and_normals_too() {
+        let src = "v 0 0 0\nv 1 0 0\nv 0 1 0\nvt 0.5 0.25\nvn 0 0 1\nf -3/-1/-1 -2/-1/-1 -1/-1/-1\n";
+        let obj = parse_obj(src);
+        assert!(obj.vertices.iter().all(|v| v.uv == [0.5, 0.25] && v.normal == [0.0, 0.0, 1.0]));
+    }
 
     #[test]
     fn test_parse_triangle() {
