@@ -336,6 +336,7 @@ fn copy_assets(manifest_dir: &Path, dist_dir: &Path, manifest: &Manifest) -> Res
     // (`assets/levels` → `dist/assets/levels`). file_name 평탄화는
     // 중첩 선언을 잘못된 위치로 옮기고 (`dist/levels`), 마지막 컴포넌트가
     // 같은 두 선언을 합쳐버린다 — .vpkg 키(strip_prefix 보존)와도 어긋남.
+    let skip = build_output_dirs(manifest_dir);
     for dir in manifest
         .resolved_script_dirs(manifest_dir)
         .into_iter()
@@ -343,7 +344,7 @@ fn copy_assets(manifest_dir: &Path, dist_dir: &Path, manifest: &Manifest) -> Res
     {
         let rel = dir.strip_prefix(manifest_dir).unwrap_or(&dir);
         let dst = dist_dir.join(rel);
-        copy_optional_dir(&dir, &dst)?;
+        copy_optional_dir(&dir, &dst, &skip)?;
     }
     Ok(())
 }
@@ -459,12 +460,13 @@ pub fn pack_archive(manifest_dir: &Path, manifest: &Manifest, out_path: &Path) -
     }
 
     // 2. scripts
+    let skip = build_output_dirs(manifest_dir);
     for dir in manifest.resolved_script_dirs(manifest_dir) {
-        collect_into_entries(&dir, manifest_dir, &mut entries)?;
+        collect_into_entries(&dir, manifest_dir, &skip, &mut entries)?;
     }
     // 3. assets
     for dir in manifest.resolved_assets_dirs(manifest_dir) {
-        collect_into_entries(&dir, manifest_dir, &mut entries)?;
+        collect_into_entries(&dir, manifest_dir, &skip, &mut entries)?;
     }
 
     // 4. scene-referenced assets not covered by the declared dirs.
@@ -580,9 +582,18 @@ pub fn scan_scene_asset_paths(scene_bytes: &[u8]) -> Vec<String> {
     paths
 }
 
+/// Build output directories under the project root. A root-level glob
+/// (`assets = ["./**/*"]`) resolves to the project root itself, so walks
+/// must skip these or they pack/copy previous builds (and `dist/` into
+/// itself until the stack overflows).
+fn build_output_dirs(manifest_dir: &Path) -> Vec<PathBuf> {
+    vec![manifest_dir.join("dist"), manifest_dir.join("target")]
+}
+
 fn collect_into_entries(
     dir: &Path,
     relative_to: &Path,
+    skip: &[PathBuf],
     out: &mut Vec<(String, Vec<u8>)>,
 ) -> Result<()> {
     if !dir.exists() {
@@ -593,7 +604,10 @@ fn collect_into_entries(
         let ty = entry.file_type()?;
         let path = entry.path();
         if ty.is_dir() {
-            collect_into_entries(&path, relative_to, out)?;
+            if skip.contains(&path) {
+                continue;
+            }
+            collect_into_entries(&path, relative_to, skip, out)?;
         } else if ty.is_file() {
             let rel = path
                 .strip_prefix(relative_to)
@@ -738,6 +752,49 @@ mod tests {
         assert!(paths.contains(&"scene.vscn".to_string()));
         assert!(paths.contains(&"scripts/a.lua".to_string()));
         assert!(paths.contains(&"assets/sub/b.png".to_string()));
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// Project whose `assets = ["./**/*"]` resolves to the project root, with
+    /// leftovers from a previous build in `dist/` and cargo's `target/`.
+    fn root_glob_project(tag: &str) -> (PathBuf, Manifest) {
+        let root = std::env::temp_dir().join(format!("voltex_cli_root_glob_{tag}"));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(root.join("art")).unwrap();
+        std::fs::create_dir_all(root.join("dist").join("wrapper")).unwrap();
+        std::fs::create_dir_all(root.join("target").join("release")).unwrap();
+        std::fs::write(root.join("art").join("hero.png"), "h").unwrap();
+        std::fs::write(root.join("dist").join("wrapper").join("old.vpkg"), "old").unwrap();
+        std::fs::write(root.join("target").join("release").join("game.exe"), "x").unwrap();
+        let mut m = dummy("X", 100, 100);
+        m.build.assets = vec!["./**/*".to_string()];
+        (root, m)
+    }
+
+    #[test]
+    fn pack_archive_root_glob_skips_build_outputs() {
+        let (root, m) = root_glob_project("pack");
+        let archive_path = root.join("out.vpkg");
+        pack_archive(&root, &m, &archive_path).unwrap();
+        let bytes = std::fs::read(&archive_path).unwrap();
+        let reader = voltex_asset::VpkgReader::parse(&bytes).unwrap();
+        let keys: Vec<String> = reader.list().map(|s| s.to_string()).collect();
+        assert!(keys.iter().any(|k| k.ends_with("art/hero.png")), "{keys:?}");
+        assert!(
+            !keys.iter().any(|k| k.contains("dist/") || k.contains("target/")),
+            "build outputs must not be packed: {keys:?}"
+        );
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn copy_assets_root_glob_does_not_copy_dist_into_itself() {
+        let (root, m) = root_glob_project("copy");
+        let dist = root.join("dist");
+        copy_assets(&root, &dist, &m).unwrap();
+        assert!(dist.join("art").join("hero.png").exists());
+        assert!(!dist.join("dist").exists(), "dist copied into itself");
+        assert!(!dist.join("target").exists(), "cargo target copied into dist");
         let _ = std::fs::remove_dir_all(&root);
     }
 

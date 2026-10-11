@@ -245,7 +245,7 @@ high/medium 19건은 당일 해소 (CHANGELOG v1.0.114). LOW 4건은 실피해 �
 - ~~**CLI 씬 스캔이 BOM 붙은 JSON을 legacy text로 오분류**~~ ✅ v1.0.117(ecs JSON 파서 BOM 허용) + v1.0.118(CLI 판정 BOM 스킵). — 자동 동봉만 조용히
   스킵 (런타임 JSON 파서도 BOM 거부라 씬 자체가 먼저 터짐 — 실질 피해는 경고
   부재). 판정 전 BOM 스트립 — v1.1.
-- **CLI `assets = ["./**/*"]` 류 선언이 dist/를 자기 안으로 재귀 복사** — 소스
+- ~~**CLI `assets = ["./**/*"]` 류 선언이 dist/를 자기 안으로 재귀 복사**~~ ✅ v1.0.119 — dist/·target/ 스킵 (복사 + .vpkg 양쪽, 재현 시 스택 오버플로 확인). — 소스
   디렉토리가 dist를 포함하면 거부/스킵 — v1.1.
 
 또한 audit-runtime의 근본 원인 지적 1건을 설계 항목으로 이월:

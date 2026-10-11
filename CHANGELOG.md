@@ -10,6 +10,17 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## v1.0.119 — 2026-10-12 — 루트 글롭이 빌드 산출물을 삼키던 것 차단 (감사 LOW 이월 4/4)
+
+### Fix
+
+- **voltex_cli `copy_assets` / `pack_archive`**: `assets = ["./**/*"]`처럼
+  프로젝트 루트로 풀리는 선언이 `dist/`와 `target/`을 건너뛴다. 재현해 보니
+  감사 기록(LOW)보다 심각했다 — `dist/` 복사가 자기 자신 안으로 재귀해
+  **스택 오버플로로 `voltex build`가 죽었고**, `.vpkg`에는 이전 빌드의
+  `dist/wrapper/*.vpkg`와 cargo `target/` 산출물이 통째로 들어갔다.
+  `util::copy_optional_dir`에 skip 목록 인자 추가. 테스트 +2.
+
 ## v1.0.118 — 2026-10-12 — CLI 씬 스캔 BOM 오분류 해소 (감사 LOW 이월 3/4, 2부)
 
 ### Fix

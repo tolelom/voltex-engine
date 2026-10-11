@@ -54,7 +54,10 @@ pub fn copy_optional_file(src: &Path, dst: &Path) -> Result<()> {
     Ok(())
 }
 
-pub fn copy_optional_dir(src: &Path, dst: &Path) -> Result<()> {
+/// Recursively copy `src` into `dst`, skipping any directory listed in
+/// `skip` (build outputs such as `dist/` when `src` is the project root —
+/// otherwise the copy recurses into its own destination).
+pub fn copy_optional_dir(src: &Path, dst: &Path, skip: &[PathBuf]) -> Result<()> {
     if !src.exists() {
         return Ok(());
     }
@@ -64,10 +67,10 @@ pub fn copy_optional_dir(src: &Path, dst: &Path) -> Result<()> {
             src.display()
         )));
     }
-    copy_dir_recursive(src, dst)
+    copy_dir_recursive(src, dst, skip)
 }
 
-fn copy_dir_recursive(src: &Path, dst: &Path) -> Result<()> {
+fn copy_dir_recursive(src: &Path, dst: &Path, skip: &[PathBuf]) -> Result<()> {
     std::fs::create_dir_all(dst)?;
     for entry in std::fs::read_dir(src)? {
         let entry = entry?;
@@ -75,7 +78,10 @@ fn copy_dir_recursive(src: &Path, dst: &Path) -> Result<()> {
         let src_path = entry.path();
         let dst_path = dst.join(entry.file_name());
         if ty.is_dir() {
-            copy_dir_recursive(&src_path, &dst_path)?;
+            if skip.contains(&src_path) {
+                continue;
+            }
+            copy_dir_recursive(&src_path, &dst_path, skip)?;
         } else if ty.is_file() {
             std::fs::copy(&src_path, &dst_path)?;
         }
@@ -155,7 +161,7 @@ mod tests {
         std::fs::write(src.join("a.txt"), "a").unwrap();
         std::fs::write(src.join("nested").join("b.txt"), "b").unwrap();
 
-        copy_optional_dir(&src, &dst).unwrap();
+        copy_optional_dir(&src, &dst, &[]).unwrap();
         assert!(dst.join("a.txt").exists());
         assert!(dst.join("nested").join("b.txt").exists());
         let _ = std::fs::remove_dir_all(&root);
