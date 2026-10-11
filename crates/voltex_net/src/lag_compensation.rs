@@ -77,18 +77,26 @@ impl LagCompensation {
                 let t = if (a.timestamp - b.timestamp).abs() > 1e-6 {
                     (timestamp - b.timestamp) / (a.timestamp - b.timestamp)
                 } else { 0.0 };
-                // Interpolate positions
-                let mut result = Vec::new();
-                for (i, (pos_b, id)) in b.positions.iter().enumerate() {
-                    if let Some((pos_a, _)) = a.positions.get(i) {
-                        let lerped = [
-                            pos_b[0] + (pos_a[0] - pos_b[0]) * t,
-                            pos_b[1] + (pos_a[1] - pos_b[1]) * t,
-                            pos_b[2] + (pos_a[2] - pos_b[2]) * t,
-                        ];
-                        result.push((lerped, *id));
-                    }
-                }
+                // Pair entities by id — list order changes whenever something
+                // spawns or despawns between ticks. An entity missing from the
+                // later tick keeps its earlier position.
+                let later: std::collections::HashMap<u32, [f32; 3]> =
+                    a.positions.iter().map(|(p, id)| (*id, *p)).collect();
+                let result = b
+                    .positions
+                    .iter()
+                    .map(|(pos_b, id)| match later.get(id) {
+                        Some(pos_a) => (
+                            [
+                                pos_b[0] + (pos_a[0] - pos_b[0]) * t,
+                                pos_b[1] + (pos_a[1] - pos_b[1]) * t,
+                                pos_b[2] + (pos_a[2] - pos_b[2]) * t,
+                            ],
+                            *id,
+                        ),
+                        None => (*pos_b, *id),
+                    })
+                    .collect();
                 Some(result)
             }
             _ => self.rewind(timestamp).map(|e| e.positions.clone()),
@@ -102,6 +110,35 @@ impl LagCompensation {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn interpolation_pairs_entities_by_id_not_list_position() {
+        // Entity 2 spawned between the two ticks and was listed first; the
+        // index-based pairing lerped entity 1 toward entity 2's position.
+        let mut lc = LagCompensation::new(1000.0);
+        lc.record(HistoryEntry { tick: 1, timestamp: 0.0, positions: vec![([0.0, 0.0, 0.0], 1)] });
+        lc.record(HistoryEntry {
+            tick: 2,
+            timestamp: 0.1,
+            positions: vec![([100.0, 0.0, 0.0], 2), ([10.0, 0.0, 0.0], 1)],
+        });
+        let at = lc.rewind_interpolated(0.05).unwrap();
+        let one = at.iter().find(|(_, id)| *id == 1).expect("entity 1 present");
+        assert!((one.0[0] - 5.0).abs() < 1e-4, "entity 1 should be halfway to x=10, got {:?}", one.0);
+    }
+
+    #[test]
+    fn interpolation_keeps_entities_missing_from_the_later_tick() {
+        // Despawned before the later tick: report its last known position
+        // rather than silently dropping it from hit validation.
+        let mut lc = LagCompensation::new(1000.0);
+        lc.record(HistoryEntry { tick: 1, timestamp: 0.0, positions: vec![([1.0, 0.0, 0.0], 1), ([3.0, 0.0, 0.0], 2)] });
+        lc.record(HistoryEntry { tick: 2, timestamp: 0.1, positions: vec![([2.0, 0.0, 0.0], 2)] });
+        let at = lc.rewind_interpolated(0.05).unwrap();
+        assert_eq!(at.len(), 2, "{at:?}");
+        let one = at.iter().find(|(_, id)| *id == 1).unwrap();
+        assert_eq!(one.0, [1.0, 0.0, 0.0]);
+    }
 
     #[test]
     fn test_record_and_rewind() {
