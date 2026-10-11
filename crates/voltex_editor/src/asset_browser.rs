@@ -151,9 +151,15 @@ impl AssetBrowser {
         });
     }
 
+    /// Enter `dir_name` under the current directory. The joined path is
+    /// canonicalized before the root check — a component-wise `starts_with`
+    /// accepts `root/..`, so `..` segments must be resolved first.
     pub fn navigate_to(&mut self, dir_name: &str) {
-        let target = self.current.join(dir_name);
-        if target.starts_with(&self.root) && target.is_dir() {
+        let Ok(target) = std::fs::canonicalize(self.current.join(dir_name)) else {
+            return;
+        };
+        let root = std::fs::canonicalize(&self.root).unwrap_or_else(|_| self.root.clone());
+        if target.starts_with(&root) && target.is_dir() {
             self.current = target;
             self.refresh();
         }
@@ -613,6 +619,28 @@ mod tests {
         let mut browser = AssetBrowser::new(dir.clone());
         browser.navigate_to(".."); // should be rejected
         assert_eq!(browser.current, std::fs::canonicalize(&dir).unwrap());
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_root_guard_rejects_dotdot_with_non_canonical_root() {
+        // Windows' canonical (verbatim) root hides the bug because the OS
+        // refuses `..` inside `\\?\` paths; a plain root is what Linux/macOS
+        // get. `root/..` passes a component-wise `starts_with` check.
+        let dir = make_temp_dir("guard_plain");
+        fs::create_dir_all(dir.join("sub")).unwrap();
+        let mut browser = AssetBrowser::new(dir.clone());
+        browser.root = dir.clone();
+        browser.current = dir.clone();
+
+        browser.navigate_to("..");
+        assert_eq!(browser.current, dir, "`..` must not escape the root");
+        browser.navigate_to("sub/../..");
+        assert_eq!(browser.current, dir, "nested `..` must not escape the root");
+
+        browser.navigate_to("sub");
+        assert!(browser.current.ends_with("sub"), "normal navigation still works");
 
         let _ = fs::remove_dir_all(&dir);
     }

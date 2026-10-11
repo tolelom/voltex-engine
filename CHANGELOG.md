@@ -10,6 +10,16 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## v1.0.115 — 2026-10-12 — 에셋 브라우저 `..` 루트 탈출 차단 (감사 LOW 이월 1/4)
+
+### Fix
+
+- **voltex_editor asset_browser `navigate_to`**: 결합 경로를 canonicalize한
+  뒤 루트 검사. 기존 구현은 컴포넌트 단위 `starts_with`라 `root/..`를 루트
+  안으로 판정했다 — Windows는 canonical 루트가 verbatim(`\\?\`) 경로라 OS가
+  `..`를 거부해 가려졌고, Linux/macOS에서는 탈출 가능했다. 회귀 테스트는
+  비-canonical 루트로 `..`·`sub/../..` 탈출 거부 + 정상 진입 유지를 확인.
+
 ## v1.0.114 — 2026-08-09 — 3-도메인 병렬 감사: 발견 23건 중 19건 당일 해소
 
 v1.0.56 이후 처음의 심층 감사. 병렬 탐색 에이전트 3개가 미감사 표면

@@ -236,7 +236,7 @@
 high/medium 19건은 당일 해소 (CHANGELOG v1.0.114). LOW 4건은 실피해 조건이
 좁아 이월:
 
-- **에디터 asset_browser `navigate_to` root 가드가 `..` 미정규화** — 현재 UI
+- ~~**에디터 asset_browser `navigate_to` root 가드가 `..` 미정규화**~~ ✅ v1.0.115 — canonicalize 후 루트 검사. — 현재 UI
   경로(read_dir 결과만 전달)로는 탈출 불가, Windows verbatim 경로 부작용이
   이중 방어. join 결과 canonicalize 후 재검사로 강화 — v1.1.
 - **CLI 멀티바이너리 crate에서 exe 이름 매칭 실패 시 `exes.last()` 폴백** —
