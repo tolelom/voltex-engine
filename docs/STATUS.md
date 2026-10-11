@@ -173,6 +173,29 @@
 
 v1.0.9 부터는 **서비스 배포 완성도** 로드맵 (`docs/superpowers/specs/2026-05-21-service-readiness-roadmap.md`) 기준으로 진행.
 
+### 2026-10-12 — 무작위 속성 테스트·변조 퍼징 (v1.0.145 ~ v1.0.170)
+
+밤샘 후반부에는 독립 오라클(브루트포스·SDF·f64 기준값·단순 모델)과 비교하는 무작위
+속성 테스트, 실제 파일을 변조하는 퍼징을 crate마다 붙였다. 결함은 모두 재현 테스트가
+수정 전에 실패하는 것을 확인했다. 상세는 CHANGELOG 각 버전.
+
+- 물리: BVH 브로드페이즈가 겹침 쌍 약 절반 누락(id 순서 필터), EPA 면 폭주로 사실상
+  멈춤, 박스 내부 구 법선 반대, CCD가 접촉 중인 빠른 물체를 반감속하고 실제 터널링은
+  못 막음, 마찰이 운동 에너지 생성, ConvexHull 레이캐스트 법선 +Y 고정, 작은 삼각형
+  레이 누락(절대 epsilon)
+- ECS·에디터: undo 결함 4건(재부모·despawn 슬롯 재사용·계층 복원), 부모 despawn 후
+  자식 WorldTransform 동결
+- 수학: `Mat4::inverse`가 큰 직교 투영·작은 배율을 특이로 판정(절대 det 임계)
+- 네트워크: 아주 늦은 중복이 u16 wrap 뒤 진짜 메시지를 밀어냄, 보간 버퍼가 순서
+  뒤바뀐 스냅샷에서 틀린 구간 보간, 지연 보상이 엔티티를 목록 순서로 짝지음
+- 에셋: `AssetStorage` 재사용 세대 항상 1(ABA), 손상 `.vpkg` 헤더 하나로 137 GB 할당 abort
+- 디코더 패닉: JPEG 5종, Vorbis setup 교차 참조, glTF 인덱스 범위, TTF 파서·래스터라이저
+  다수(손상 폰트에서 즉시 패닉, NaN 곡선 무한 재귀). float WAV NaN 통과
+- 검증만 하고 버그 없던 것: 씬 왕복, ECS 모델, 내비메시 경로, 2D 타일 이동, 쿼터니언·
+  slerp·Euler, 스냅샷 diff, 패킷·암호문·VNAV·voltex.toml·OBJ·씬·PNG·deflate 퍼징,
+  Lua 엔진 API 쓰레기 인자
+- 구조: `voltex_cli/src/manifest/mod.rs` 600줄 초과 해소. 나머지 17개 초과 파일은 DEFERRED
+
 ### 2026-10-12 — 에셋·입력 경계 점검 (v1.0.129 ~ v1.0.144)
 
 밤샘 점검에서 실제 인코더 출력과 스펙 대조로 **에러 없이 데이터가 깨지던
@@ -2344,7 +2367,7 @@ crates/
 └── voltex_cli         — bin "voltex" (new/build/run), voltex.toml 매니페스트, .vpkg packing (B1+B2)
 ```
 
-## 테스트: 1669개 통과 (2026-10-12, Windows host, `cargo test --workspace`, GPU `#[ignore]` 제외 — `voltex_capture` GPU 테스트는 `--include-ignored`로 별도). crate별(라이브러리 + 통합 테스트 합): ecs 206+4, editor 206, renderer 200, audio 138+5, physics 121, runtime 118, image 99+12, math 99, ai 75, script 77, net 63, renderer_ecs 60, asset 38, depths 28, platform 21, leap 17, depths·leap 플레이스루 통합 3, capture 3, voltex 퍼사드+voltex_cli(실행 파일명이 둘 다 voltex라 로그에서 합산) 75+1. 아래 crate별 목록은 v1.0.12 시점 기록이다.
+## 테스트: 1759개 통과 (2026-10-12 05:45, Windows host, `cargo test --workspace`, GPU `#[ignore]` 제외 — `voltex_capture` GPU 테스트는 `--include-ignored`로 별도). 라이브러리 단위 테스트: editor 210, ecs 209, renderer 200, audio 139, physics 124, runtime 117, image 110, math 98, script 79, ai 76, net 65, renderer_ecs 60, asset 38, depths 28, platform 21, leap 17, capture 2, voltex 퍼사드+voltex_cli(실행 파일명이 둘 다 voltex라 로그에서 합산) 76. 통합 테스트 87(속성·퍼징 전용 20개 파일 포함), 문서 테스트 3. 아래 crate별 목록은 v1.0.12 시점 기록이다.
 
 ### (v1.0.12 시점 기록) ~1044개. `--lib` 기준은 989 (voltex_cli 는 bin-only 라 lib count 에서 빠지나 `cargo test -p voltex_cli` 로 55 개 실행됨). macOS host 에서는 +2 (CoreAudio 모듈) = 1038 예상. v1.0.1 +5 (input_system 순서/참조 ×2, Bounds default ×2, ScriptComponent default ×1). v1.0.3 +4 (canonicalize_friendly Windows verbatim strip ×3 + cross-OS integration ×1). v1.0.8 +21 (parser panic-resistance fuzz: PNG ×4 + JPG ×4 + GLTF ×5 + OBJ ×4 + WAV ×4). v1.0.9 +30 (OGG +11 + Vorbis +17 + decode_ogg_vorbis_bytes +2 — 모두 wire 직전까지 dead, 이제 실 컴파일). v1.0.10 +14 (voltex_runtime crash module ×11 + config crash log ×3). v1.0.11 +13 (voltex_cli schema/path validation + Levenshtein helper + error Display). v1.0.12 +4 (voltex_cli copy_license_files).
 
