@@ -20,6 +20,8 @@ pub mod navmesh;
 pub mod navmesh_builder;
 pub mod obstacle;
 pub mod pathfinding;
+#[cfg(test)]
+mod pathfinding_property_tests;
 pub mod steering;
 
 pub use error::{AiError, Result};

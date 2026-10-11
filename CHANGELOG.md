@@ -10,6 +10,18 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## v1.0.150 — 2026-10-12 — 내비메시 경로 탐색 무작위 속성 테스트
+
+### Tests
+
+- **voltex_ai `pathfinding_property_tests`**: 구멍이 무작위로 뚫린 9×7 격자
+  내비메시 40개(인접 관계는 공유 정점 쌍으로 구성)에서 무작위 출발·도착 480쌍.
+  `find_path`가 셀 BFS(오라클)의 연결 여부와 정확히 일치하는지, 경로의 시작·끝·
+  경유점이 메시 위인지, funnel 스무딩 경로를 촘촘히 샘플링해도 보행 영역을 벗어나지
+  않는지 본다. 통과(버그 없음). 생성기가 도달 가능·불가 양쪽을 충분히 만드는지도
+  단언. 과거에 고친 funnel apex 재시작 버그(코너 컷)를 되살리면 실패하는 것 확인.
+  `find_path_triangles`가 `pub(crate)`라 통합 테스트 대신 crate 내부 모듈로 둠.
+
 ## v1.0.149 — 2026-10-12 — ECS 코어 모델 기반 속성 테스트
 
 ### Tests
