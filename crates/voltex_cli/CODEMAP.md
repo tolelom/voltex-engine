@@ -35,7 +35,10 @@ icon = "assets/icon.ico"
 ```
 src/
 ├── main.rs       # dispatch + 도움말 (~50줄)
-├── manifest.rs   # Manifest struct + 미니 TOML 파서 + load_from_dir (~400줄)
+├── manifest/
+│   ├── mod.rs    # Manifest struct + 스키마 검증 + load_from_dir (~350줄)
+│   ├── toml.rs   # 미니 TOML 파서 (줄·열 위치 에러) (~270줄)
+│   └── tests.rs  # 단위 테스트 + 변조 퍼징
 ├── error.rs      # CliError + Display (사람-친화 메시지) + Result<T>
 ├── util.rs       # copy_optional_file/dir, escape_for_rust_string
 ├── new.rs        # scaffold (디렉토리 + 매니페스트 + 샘플 lua)

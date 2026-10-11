@@ -10,6 +10,25 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## v1.0.169 — 2026-10-12 — voltex.toml 파서 분리 + 퍼징
+
+### Refactor
+
+- **voltex_cli `manifest`**: `mod.rs`가 616줄로 600줄 한도를 넘어 있었다. 손으로 짠 미니
+  TOML 파서(섹션·값·문자열·배열 파싱, 줄·열 위치 에러)를 `manifest/toml.rs`로 옮겼다
+  (mod.rs 350줄, toml.rs 270줄). 동작 변화는 없다. CODEMAP 트리를 갱신했다.
+
+### Tests
+
+- **voltex_cli `manifest::tests::parse_never_panics_on_corrupted_manifests`**: 저장소의
+  voltex.toml 3개를 TOML 구문 문자·바이트 이동·임의 바이트·잘라내기로 3만 건 변조한다.
+  `Manifest::parse`가 패닉하지 않아야 한다(통과, 버그 없음).
+
+### Docs
+
+- DEFERRED: 600줄 한도 재위반 17개 파일(가장 큰 것은 `voltex_capture/src/scene.rs` 2787줄).
+  구조 분할 설계가 필요해 별도 사이클로 둔다.
+
 ## v1.0.168 — 2026-10-12 — 손상된 TTF 폰트로 에디터 패닉·무한 재귀
 
 ### Fix

@@ -556,3 +556,40 @@ fn manifest_path_missing_display_shows_path_and_base() {
     assert!(s.contains("missing.vscn"));
     assert!(s.contains("/tmp"));
 }
+
+#[test]
+fn parse_never_panics_on_corrupted_manifests() {
+    // voltex.toml is hand-edited; the in-house TOML subset parser must turn
+    // any byte soup into an error message, not a panic.
+    let seeds = [
+        include_str!("../../../../examples/tutorial_minigame/voltex.toml"),
+        include_str!("../../../../games/voltex_depths/voltex.toml"),
+        include_str!("../../../../games/voltex_survivor/voltex.toml"),
+    ];
+    let mut state = 0x7041_0001u32;
+    let mut next = move || {
+        state ^= state << 13;
+        state ^= state >> 17;
+        state ^= state << 5;
+        state
+    };
+    for i in 0..30_000u32 {
+        let mut b = seeds[i as usize % seeds.len()].as_bytes().to_vec();
+        for _ in 0..1 + next() % 4 {
+            let at = next() as usize % b.len();
+            b[at] = match next() % 3 {
+                0 => b"[]=\"'#.,\n \\{}0123456789"[next() as usize % 23],
+                1 => b[next() as usize % b.len()],
+                _ => next() as u8,
+            };
+        }
+        if next().is_multiple_of(5) {
+            b.truncate(next() as usize % b.len());
+        }
+        let text = String::from_utf8_lossy(&b).into_owned();
+        let outcome = std::panic::catch_unwind(|| {
+            let _ = Manifest::parse(&text);
+        });
+        assert!(outcome.is_ok(), "mutation {i} panicked Manifest::parse:\n{text}");
+    }
+}
