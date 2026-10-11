@@ -63,85 +63,33 @@ pub fn resolve_collisions(world: &mut World, contacts: &[ContactPoint], iteratio
             let v_rel = v_a - v_b;
             let v_rel_n = v_rel.dot(contact.normal);
 
-            // Effective mass including rotational terms
-            let r_a_cross_n = r_a.cross(contact.normal);
-            let r_b_cross_n = r_b.cross(contact.normal);
-            let angular_term_a = Vec3::new(
-                r_a_cross_n.x * inv_i_a.x,
-                r_a_cross_n.y * inv_i_a.y,
-                r_a_cross_n.z * inv_i_a.z,
-            ).cross(r_a).dot(contact.normal);
-            let angular_term_b = Vec3::new(
-                r_b_cross_n.x * inv_i_b.x,
-                r_b_cross_n.y * inv_i_b.y,
-                r_b_cross_n.z * inv_i_b.z,
-            ).cross(r_b).dot(contact.normal);
-
-            let effective_mass = inv_mass_sum + angular_term_a + angular_term_b;
+            let effective_mass = effective_mass_along(contact.normal, inv_mass_sum, r_a, inv_i_a, r_b, inv_i_b);
 
             // normal points A→B; v_rel_n > 0 means A approaches B → apply impulse
             let j = if v_rel_n > 0.0 {
                 let e = rb_a.restitution.min(rb_b.restitution);
-                let j = (1.0 + e) * v_rel_n / effective_mass;
-
-                // Linear impulse
-                velocity_changes.push((contact.entity_a, contact.normal * (-j * inv_mass_a), Vec3::ZERO));
-                velocity_changes.push((contact.entity_b, contact.normal * (j * inv_mass_b), Vec3::ZERO));
-
-                // Angular impulse: torque = r × impulse
-                let angular_impulse_a = r_a.cross(contact.normal * (-j));
-                let angular_impulse_b = r_b.cross(contact.normal * j);
-                let dw_a = Vec3::new(
-                    angular_impulse_a.x * inv_i_a.x,
-                    angular_impulse_a.y * inv_i_a.y,
-                    angular_impulse_a.z * inv_i_a.z,
-                );
-                let dw_b = Vec3::new(
-                    angular_impulse_b.x * inv_i_b.x,
-                    angular_impulse_b.y * inv_i_b.y,
-                    angular_impulse_b.z * inv_i_b.z,
-                );
-                velocity_changes.push((contact.entity_a, Vec3::ZERO, dw_a));
-                velocity_changes.push((contact.entity_b, Vec3::ZERO, dw_b));
-
-                j
+                (1.0 + e) * v_rel_n / effective_mass
             } else {
-                contact.depth / inv_mass_sum
+                0.0
             };
+            let dv_rel = push_impulse(&mut velocity_changes, contact, contact.normal * j, r_a, inv_mass_a, inv_i_a, r_b, inv_mass_b, inv_i_b);
 
-            // Coulomb friction: tangential impulse clamped to mu * normal impulse
-            let v_rel_tangent = v_rel - contact.normal * v_rel_n;
+            // Coulomb friction: only on a contact that is pushing (j > 0), sized
+            // with the tangent's own effective mass, from the slip left *after*
+            // the normal impulse. The old version used the normal's effective
+            // mass, the pre-impulse slip, and a depth-derived j on separating
+            // contacts — each of which could overshoot and inject energy.
+            let v_rel = v_rel + dv_rel;
+            let v_rel_tangent = v_rel - contact.normal * v_rel.dot(contact.normal);
             let tangent_len = v_rel_tangent.length();
 
-            if tangent_len > 1e-6 {
+            if j > 0.0 && tangent_len > 1e-6 {
                 let tangent = v_rel_tangent * (1.0 / tangent_len);
                 let mu = (rb_a.friction + rb_b.friction) * 0.5;
-
-                let jt = -v_rel_tangent.dot(tangent) / effective_mass;
-                let friction_j = if jt.abs() <= j * mu {
-                    jt
-                } else {
-                    j * mu * jt.signum()
-                };
-
-                velocity_changes.push((contact.entity_a, tangent * (friction_j * inv_mass_a), Vec3::ZERO));
-                velocity_changes.push((contact.entity_b, tangent * (-friction_j * inv_mass_b), Vec3::ZERO));
-
-                // Angular friction impulse
-                let angular_fric_a = r_a.cross(tangent * friction_j);
-                let angular_fric_b = r_b.cross(tangent * (-friction_j));
-                let dw_fric_a = Vec3::new(
-                    angular_fric_a.x * inv_i_a.x,
-                    angular_fric_a.y * inv_i_a.y,
-                    angular_fric_a.z * inv_i_a.z,
-                );
-                let dw_fric_b = Vec3::new(
-                    angular_fric_b.x * inv_i_b.x,
-                    angular_fric_b.y * inv_i_b.y,
-                    angular_fric_b.z * inv_i_b.z,
-                );
-                velocity_changes.push((contact.entity_a, Vec3::ZERO, dw_fric_a));
-                velocity_changes.push((contact.entity_b, Vec3::ZERO, dw_fric_b));
+                let tangent_mass = effective_mass_along(tangent, inv_mass_sum, r_a, inv_i_a, r_b, inv_i_b);
+                // Impulse on B along +tangent that would cancel the slip, clamped to the friction cone.
+                let jt = (tangent_len / tangent_mass).min(j * mu);
+                push_impulse(&mut velocity_changes, contact, tangent * jt, r_a, inv_mass_a, inv_i_a, r_b, inv_mass_b, inv_i_b);
             }
 
             // Position correction only on first iteration
@@ -170,6 +118,32 @@ pub fn resolve_collisions(world: &mut World, contacts: &[ContactPoint], iteratio
             }
         }
     }
+}
+
+/// Component-wise product (diagonal inverse inertia applied to a vector).
+fn scale(v: Vec3, inv_i: Vec3) -> Vec3 {
+    Vec3::new(v.x * inv_i.x, v.y * inv_i.y, v.z * inv_i.z)
+}
+
+/// Inverse effective mass of the contact along `dir` (linear + rotational).
+fn effective_mass_along(dir: Vec3, inv_mass_sum: f32, r_a: Vec3, inv_i_a: Vec3, r_b: Vec3, inv_i_b: Vec3) -> f32 {
+    inv_mass_sum
+        + scale(r_a.cross(dir), inv_i_a).cross(r_a).dot(dir)
+        + scale(r_b.cross(dir), inv_i_b).cross(r_b).dot(dir)
+}
+
+/// Queues `impulse` on B and `-impulse` on A, linear and angular. Returns the
+/// resulting change of the relative contact velocity `v_a - v_b`.
+#[allow(clippy::too_many_arguments)]
+fn push_impulse(
+    changes: &mut Vec<(Entity, Vec3, Vec3)>, contact: &ContactPoint, impulse: Vec3,
+    r_a: Vec3, inv_mass_a: f32, inv_i_a: Vec3, r_b: Vec3, inv_mass_b: f32, inv_i_b: Vec3,
+) -> Vec3 {
+    let (dv_a, dw_a) = (impulse * -inv_mass_a, scale(r_a.cross(-impulse), inv_i_a));
+    let (dv_b, dw_b) = (impulse * inv_mass_b, scale(r_b.cross(impulse), inv_i_b));
+    changes.push((contact.entity_a, dv_a, dw_a));
+    changes.push((contact.entity_b, dv_b, dw_b));
+    (dv_a + dw_a.cross(r_a)) - (dv_b + dw_b.cross(r_b))
 }
 
 fn wake_colliding_bodies(world: &mut World, contacts: &[ContactPoint]) {
@@ -351,7 +325,10 @@ mod tests {
         world.add(ball, Transform::from_position(Vec3::new(0.0, 0.4, 0.0)));
         world.add(ball, Collider::Sphere { radius: 0.5 });
         let mut rb = RigidBody::dynamic(1.0);
-        rb.velocity = Vec3::new(5.0, 0.0, 0.0);
+        // Coulomb friction needs a normal load: the ball is pressing into the
+        // floor (as gravity makes it every frame). With no approach there is
+        // no normal impulse and therefore no friction.
+        rb.velocity = Vec3::new(5.0, -1.0, 0.0);
         rb.gravity_scale = 0.0;
         rb.friction = 0.5;
         world.add(ball, rb);
