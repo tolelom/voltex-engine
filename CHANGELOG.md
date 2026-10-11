@@ -10,6 +10,24 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## v1.0.162 — 2026-10-12 — AssetStorage 슬롯 재사용 세대가 항상 1 (ABA)
+
+### Fix
+
+- **voltex_asset `AssetStorage` — 해제된 핸들이 새 에셋을 가리킴**: `release`가 슬롯을
+  `None`으로 비운 뒤 `insert`가 재사용 세대를 그 빈 슬롯에서 읽었다. 값이 없으니
+  `0 + 1`이 되어 매 재사용의 세대가 1이었다. 슬롯을 두 번째 쓰던 에셋의 핸들이 세 번째
+  에셋에 그대로 통했다(재현: a 해제 → b 해제 → c 삽입 후 `get(b) == "c"`). 해제된
+  메시·텍스처 핸들을 들고 있던 코드가 다른 에셋을 받는 ABA 결함이다. 해제 시점의 세대를
+  free list에 같이 보관하고 재사용 때 그 값에 +1 한다(`wrapping_add`). 공개 API는 그대로다.
+
+### Tests
+
+- **voltex_asset `tests/storage_property.rs`**: 결정적 ABA 회귀 테스트 1개와, insert ·
+  add_ref · release · replace_in_place를 무작위로 시드 3 × 5000 단계 섞어 단순 맵 모델과
+  비교하는 테스트 1개다. 모델 테스트는 매 단계 모든 옛 핸들의 `get`·`ref_count`와 `len`을
+  보고, 핸들 재발급이 없는지 확인한다.
+
 ## v1.0.161 — 2026-10-12 — 지연 보상 보간이 엔티티를 목록 순서로 짝지음
 
 ### Fix

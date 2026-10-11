@@ -18,7 +18,10 @@ struct AssetEntry<T> {
 /// to zero (see [`release`](Self::release)).
 pub struct AssetStorage<T> {
     entries: Vec<Option<AssetEntry<T>>>,
-    free_ids: Vec<u32>,
+    /// Freed slots with the generation they had. The slot itself is cleared
+    /// to `None`, so the generation must be remembered here — reading it back
+    /// from the empty slot made every reuse generation 1 (ABA).
+    free_ids: Vec<(u32, u32)>,
 }
 
 impl<T> AssetStorage<T> {
@@ -32,12 +35,8 @@ impl<T> AssetStorage<T> {
 
     /// Inserts a new asset and returns a handle with initial ref count = 1.
     pub fn insert(&mut self, asset: T) -> Handle<T> {
-        if let Some(id) = self.free_ids.pop() {
-            let generation = self.entries[id as usize]
-                .as_ref()
-                .map(|e| e.generation)
-                .unwrap_or(0)
-                + 1;
+        if let Some((id, freed_generation)) = self.free_ids.pop() {
+            let generation = freed_generation.wrapping_add(1);
             self.entries[id as usize] = Some(AssetEntry {
                 asset,
                 generation,
@@ -90,7 +89,7 @@ impl<T> AssetStorage<T> {
                     entry.ref_count = entry.ref_count.saturating_sub(1);
                     if entry.ref_count == 0 {
                         *slot = None;
-                        self.free_ids.push(handle.id);
+                        self.free_ids.push((handle.id, handle.generation));
                         return true;
                     }
                 }
