@@ -116,6 +116,11 @@ pub fn mix_sounds(
         } else {
             (base_volume, base_volume)
         };
+        // A NaN/inf volume or position would poison every other sound in the
+        // shared buffer — leave this one out of the mix instead.
+        if !vol_left.is_finite() || !vol_right.is_finite() {
+            continue;
+        }
 
         // Compute integer rate ratio for naive resampling.
         // For same-rate clips ratio == 1, so we read every frame.
@@ -186,9 +191,10 @@ pub fn mix_sounds(
         playing.remove(idx);
     }
 
-    // Clamp output to [-1.0, 1.0].
+    // Clamp output to [-1.0, 1.0]. `clamp` passes NaN through, so non-finite
+    // samples are zeroed explicitly — the device must never see them.
     for sample in output.iter_mut() {
-        *sample = sample.clamp(-1.0, 1.0);
+        *sample = if sample.is_finite() { sample.clamp(-1.0, 1.0) } else { 0.0 };
     }
 }
 
@@ -221,6 +227,24 @@ mod tests {
         for &s in &output {
             assert!((s - 0.5).abs() < 1e-6, "expected 0.5, got {}", s);
         }
+    }
+
+    #[test]
+    fn non_finite_input_never_reaches_the_device_buffer() {
+        // A NaN volume (or a NaN emitter position from a bad transform) would
+        // poison the whole mix; f32::clamp passes NaN through unchanged.
+        let clips = vec![make_mono_clip(1.0, 100, 44100), make_mono_clip(0.25, 100, 44100)];
+        let mut playing = vec![PlayingSound::new(0, f32::NAN, false), PlayingSound::new(1, 1.0, false)];
+        let mut output = Vec::new();
+        mix_sounds(&mut output, &mut playing, &clips, 44100, 2, 10, &Listener::default(), &MixerState::new());
+        assert!(output.iter().all(|s| s.is_finite()), "{:?}", &output[..4]);
+        // The healthy sound is still heard instead of being wiped out too.
+        assert!(output.iter().all(|s| (s - 0.25).abs() < 1e-6), "{:?}", &output[..4]);
+
+        let mut inf = vec![PlayingSound::new(0, f32::INFINITY, false)];
+        let mut output = Vec::new();
+        mix_sounds(&mut output, &mut inf, &clips, 44100, 1, 4, &Listener::default(), &MixerState::new());
+        assert!(output.iter().all(|s| s.is_finite() && s.abs() <= 1.0), "{output:?}");
     }
 
     #[test]
