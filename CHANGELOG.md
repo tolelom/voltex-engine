@@ -10,6 +10,15 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## v1.0.145 — 2026-10-12 — CMYK JPEG를 쓰레기 색 대신 에러로
+
+### Fix
+
+- **voltex_image `parse_jpg`**: 4성분(CMYK/YCCK, 인쇄용 툴이나 Photoshop이
+  씀) JPEG를 YCbCr 경로로 **조용히 디코드해 쓰레기 색**을 냈다(Pillow CMYK
+  픽스처로 재현). SOF에서 성분 수가 1(그레이)·3(YCbCr)이 아니면 에러를 낸다.
+  CMYK 지원 자체는 미지원으로 둔다. 테스트 +1.
+
 ## v1.0.144 — 2026-10-12 — WAV: EXTENSIBLE · 8비트 · 32비트 정수 PCM
 
 ### Additive

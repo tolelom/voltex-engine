@@ -87,3 +87,11 @@ fn progressive_jpeg_is_rejected_not_misdecoded() {
     assert!(voltex_image::progressive_jpeg::is_progressive_jpeg(jpg));
     assert!(parse_jpg(jpg).is_err(), "progressive must be an error, not garbage pixels");
 }
+
+#[test]
+fn cmyk_jpeg_is_rejected_not_misdecoded() {
+    // Pillow CMYK (4 components, Adobe APP14). Not supported; must be an
+    // error rather than three of the four channels read as YCbCr.
+    let jpg = include_bytes!("fixtures/jpg_cmyk.jpg");
+    assert!(parse_jpg(jpg).is_err());
+}

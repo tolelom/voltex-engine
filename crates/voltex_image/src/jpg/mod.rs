@@ -106,6 +106,15 @@ pub fn parse_jpg(data: &[u8]) -> crate::Result<(Vec<u8>, u32, u32)> {
                     )
                     .into());
                 }
+                // Only grayscale (1) and YCbCr (3) are decoded; CMYK/YCCK (4)
+                // would otherwise run through the YCbCr path as garbage colour.
+                if sof.num_components != 1 && sof.num_components != 3 {
+                    return Err(format!(
+                        "Unsupported JPEG component count: {} (only 1 or 3)",
+                        sof.num_components
+                    )
+                    .into());
+                }
                 num_components = sof.num_components;
                 components = sof.components;
                 found_sof = true;

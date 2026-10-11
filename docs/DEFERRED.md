@@ -261,5 +261,5 @@ high/medium 19건은 당일 해소 (CHANGELOG v1.0.114). LOW 4건은 실피해 �
 
 - **glTF 머티리얼 텍스처 미임포트** — `GltfMaterial`은 `baseColorFactor`·`metallicFactor`·`roughnessFactor`만 읽는다. `baseColorTexture`·`metallicRoughnessTexture`·`normalTexture`·`occlusionTexture`·`emissiveTexture`와 `images`/`textures`/`samplers` 배열, `textureInfo.texCoord`(TEXCOORD_1), `KHR_texture_transform`은 무시된다. 텍스처가 있는 모델은 색 계수만 입혀져 로드된다(에러 없음). 메시 UV는 `TEXCOORD_0`만 읽는다.
 - ~~**PNG**: 8비트 RGB/RGBA·비인터레이스만~~ ✅ v1.0.143 전 색 유형·비트 깊이 + tRNS 지원. 남은 것: Adam7 인터레이스(에러).
-- **JPEG**: baseline만(progressive는 에러). 서브샘플 크로마는 샘플 복제(libjpeg의 보간 업샘플보다 강한 색 경계가 거칠다).
+- **JPEG**: baseline·그레이/YCbCr만(progressive·CMYK는 에러, v1.0.145). 서브샘플 크로마는 샘플 복제(libjpeg의 보간 업샘플보다 강한 색 경계가 거칠다).
 - **Vorbis**: 엔진 디코더는 스펙대로 만든 스트림(통합 테스트)만 검증됐다. libvorbis 인코딩 파일(VQ 코드북·채널 커플링) 호환은 미검증.
