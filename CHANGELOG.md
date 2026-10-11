@@ -10,6 +10,22 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## v1.0.121 — 2026-10-12 — survivor 씬 version 누락 + 저장소 씬 전수 로드 가드
+
+### Fix
+
+- **games/voltex_survivor `scene.vscn`**: `{"entities":[]}` → `"version":1`
+  추가. survivor 실행 파일은 `with_scene_builder`로 월드를 채워 영향이
+  없었지만, `voltex build`(기본 kind=scene)로 만든 dist exe는 이 파일을
+  초기 씬으로 로드해 "Missing or invalid 'version'"으로 실패했다. v1.0.114가
+  스캐폴드에서 고친 것과 같은 종류의 결함이 저장소 게임에 남아 있던 것.
+
+### Tests
+
+- **voltex_ecs `tests/repo_scenes.rs`**: 저장소의 모든 `.vscn`(target/dist/
+  fuzz 제외)을 런타임과 같은 판정(binary magic → JSON)으로 로드. 새 씬
+  파일이 로드 불가 상태로 커밋되는 것을 막는다.
+
 ## v1.0.120 — 2026-10-12 — `World::clear()`가 generation을 올려 옛 핸들 별칭 차단
 
 설계: `docs/superpowers/specs/2026-10-12-world-clear-generation-design.md`.
