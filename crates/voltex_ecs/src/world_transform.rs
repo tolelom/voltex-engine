@@ -27,10 +27,12 @@ impl WorldTransform {
 /// `world.add(Children(...))` that introduced a cycle bypassing the
 /// `add_child` guard added in v1.0.42).
 pub fn propagate_transforms(world: &mut World) {
-    // Collect roots: entities with Transform but no Parent
+    // Roots: entities with Transform and no *live* Parent. A Parent pointing
+    // at a despawned entity (plain `world.despawn` leaves it dangling) would
+    // otherwise make the child unreachable and freeze its WorldTransform.
     let roots: Vec<Entity> = world
         .query::<Transform>()
-        .filter(|(e, _)| world.get::<Parent>(*e).is_none())
+        .filter(|(e, _)| world.get::<Parent>(*e).is_none_or(|p| !world.is_alive(p.0)))
         .map(|(e, _)| e)
         .collect();
 
@@ -72,6 +74,27 @@ mod tests {
     use super::*;
     use crate::hierarchy::add_child;
     use voltex_math::{Vec3, Vec4};
+
+    #[test]
+    fn child_of_a_despawned_parent_keeps_updating_as_a_root() {
+        // world.despawn(parent) leaves the child's Parent pointing at a dead
+        // handle. The child is then neither a root nor reachable from one, so
+        // its WorldTransform used to freeze at the last value forever.
+        let mut world = World::new();
+        let parent = world.spawn();
+        world.add(parent, Transform::from_position(Vec3::new(10.0, 0.0, 0.0)));
+        let child = world.spawn();
+        world.add(child, Transform::from_position(Vec3::new(1.0, 0.0, 0.0)));
+        add_child(&mut world, parent, child);
+        propagate_transforms(&mut world);
+
+        world.despawn(parent);
+        world.get_mut::<Transform>(child).unwrap().position = Vec3::new(5.0, 0.0, 0.0);
+        propagate_transforms(&mut world);
+
+        let x = world.get::<WorldTransform>(child).unwrap().0.cols[3][0];
+        assert!(approx_eq(x, 5.0), "orphan should follow its own transform, got x={x}");
+    }
 
     fn approx_eq(a: f32, b: f32) -> bool {
         (a - b).abs() < 1e-4

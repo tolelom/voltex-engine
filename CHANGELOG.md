@@ -10,6 +10,19 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## v1.0.147 — 2026-10-12 — 부모가 despawn된 자식의 WorldTransform 동결
+
+### Fix
+
+- **voltex_ecs `propagate_transforms`**: 루트를 "`Parent` 없는 엔티티"로만 골라서,
+  `world.despawn(parent)`(계층을 정리하지 않는 일반 despawn)로 부모가 사라진
+  자식은 루트도 아니고 부모에게서 도달하지도 못했다. 그래서 `WorldTransform`이
+  **마지막 값에 영원히 얼었다**. 움직여도 반영되지 않고 옛 자리에 렌더된다(재현:
+  x=5로 옮겨도 11에 고정). 적과 함께 무기·이펙트 자식을 지우는 흔한 패턴에서
+  생긴다. 살아 있지 않은 `Parent`를 가진 엔티티도 루트로 다루도록 고쳤다
+  (자기 로컬 변환을 월드 변환으로 사용). 씬 직렬화는 원래 죽은 부모를 "부모
+  없음"으로 처리해 안전했다. 테스트 +1.
+
 ## v1.0.146 — 2026-10-12 — 에디터 undo/redo 결함 4건 (무작위 속성 테스트로 발견)
 
 새 속성 테스트 `voltex_editor/src/session/undo_property_tests.rs`: 결정적
