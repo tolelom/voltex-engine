@@ -10,6 +10,20 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## v1.0.141 — 2026-10-12 — Lua 샌드박스 탈출 경로(`package`) 차단
+
+### Fix (security)
+
+- **voltex_script `create_sandbox`**: `os`·`io`·`debug` 전역은 지웠지만
+  `package`를 남겨 두었다. `package.loaded.os`·`.io`·`.debug`에 원래 모듈
+  테이블이 그대로 있어서 `package.loaded.os.execute(...)` 한 번이면 샌드박스가
+  무력화됐고, `package.loadlib`로 네이티브 DLL도 로드할 수 있었다(재현 테스트
+  2개 실패 확인). `package`를 차단 목록에 추가했다. 저장소의 Lua 스크립트는
+  `require`/`package`를 쓰지 않아 영향 없음.
+- 참고: 샌드박스는 설계상 자동 적용이 아니다(CODEMAP — 신뢰할 수 없는
+  스크립트 실행 전에 명시 호출). 출하 게임의 자체 스크립트에는 적용되지 않는다.
+- 테스트 +2.
+
 ## v1.0.140 — 2026-10-12 — 씬 JSON의 비ASCII 컴포넌트 이름
 
 ### Fix

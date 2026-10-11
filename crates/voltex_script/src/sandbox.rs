@@ -12,6 +12,9 @@ const BLOCKED_GLOBALS: &[&str] = &[
     "loadfile",
     "dofile",
     "require",
+    // package.loaded still references os/io/debug after their globals are
+    // removed, and package.loadlib loads native libraries — full escape.
+    "package",
     "load",       // can load arbitrary bytecode
     "rawget",     // bypass metatables
     "rawset",     // bypass metatables
@@ -45,6 +48,30 @@ mod tests {
         create_sandbox(&lua).unwrap();
         let result = lua.exec("os.execute('echo hello')");
         assert!(result.is_err(), "os.execute should be blocked");
+    }
+
+    #[test]
+    fn removed_libraries_are_not_reachable_through_package_loaded() {
+        // `os = nil` only drops the global; package.loaded still holds the
+        // module tables, so the sandbox was one lookup away from os.execute.
+        let lua = LuaState::new();
+        create_sandbox(&lua).unwrap();
+        for lib in ["os", "io", "debug"] {
+            let probe = format!("escaped = (package and package.loaded.{lib}) and 'yes' or 'no'");
+            let _ = lua.exec(&probe);
+            assert_ne!(
+                lua.get_global_string("escaped").as_deref(),
+                Some("yes"),
+                "{lib} reachable via package.loaded"
+            );
+        }
+    }
+
+    #[test]
+    fn native_library_loading_is_blocked() {
+        let lua = LuaState::new();
+        create_sandbox(&lua).unwrap();
+        assert!(lua.exec("package.loadlib('x.dll', 'f')").is_err(), "package.loadlib must be gone");
     }
 
     #[test]
