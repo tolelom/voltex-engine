@@ -119,12 +119,15 @@ impl World {
         self.allocator.restore_at_generation(id, target_generation)
     }
 
-    /// Drop every entity, every component storage, and the entity allocator.
-    /// Any externally-held `Entity` handles become invalid (their `is_alive`
-    /// returns false). Use before loading a scene from disk to enforce
-    /// "disk is the source of truth" semantics.
+    /// Drop every entity, component storage and resource. Entity slots are
+    /// freed with a generation bump rather than reset, so externally-held
+    /// `Entity` handles stay invalid even after new spawns reuse their ids.
+    /// Use before loading a scene from disk to enforce "disk is the source of
+    /// truth" semantics.
     pub fn clear(&mut self) {
-        *self = Self::new();
+        self.storages.clear();
+        self.resources.clear();
+        self.allocator.clear();
     }
 
     /// Attach (or overwrite) a component of type `T` on `entity`. The

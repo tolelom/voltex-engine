@@ -4,7 +4,7 @@
 ECS 코어 — Entity/Component/World/Query + Hierarchy + Scene 직렬화 + System Scheduler.
 
 ## 공개 API 진입점
-- `World` — type-erased 저장소 + query, `clear()` 로 전체 리셋 (src/world/mod.rs)
+- `World` — type-erased 저장소 + query, `clear()` 로 전체 리셋 — 슬롯은 generation bump로 해제해 clear 전 핸들은 재spawn 뒤에도 stale (v1.0.120, src/world/mod.rs)
 - `World::insert_resource::<T>` / `resource::<T>()` / `resource_mut` / `remove_resource` / `resource_or_insert_with` / `has_resource` — 엔티티 무관 싱글턴 공유 상태(게임 점수/설정/이벤트 큐/RNG). 시스템이 이미 `&mut World` 를 받아 추가 배선 없이 접근. `clear()` 시 함께 제거
 - `Events<T>` + `World::send_event::<T>` / `drain_events::<T>() -> Vec<T>` — 시스템 간 디커플 메시징 (src/events.rs). 리소스 기반(`Events<T>` 가 리소스). single-buffer drain — producer 를 consumer 보다 먼저 등록
 - `SpatialGrid` + `from_transforms(&World, cell_size)` / `insert` / `query_radius(center, r)` / `query_radius_into` / `nearest(point, exclude)` — 게임플레이 근접 쿼리용 균일 그리드 공간 해시 (src/spatial.rs). AoE/어그로/이웃 탐색. physics BVH(콜라이더)와 별개로 Transform 위치 기반. 프레임당 재구축

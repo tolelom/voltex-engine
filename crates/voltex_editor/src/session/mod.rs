@@ -133,6 +133,10 @@ pub struct EditorSession {
     /// Edit (default) or Play. Dispatch is rejected while in Play mode.
     pub mode: EditorMode,
     play_snapshot: Option<Vec<u8>>,
+    /// Entities in `play_snapshot` index order (the `Transform` query order
+    /// `serialize_scene_binary` writes). Maps a pre-Play handle to its
+    /// restored counterpart, since `World::clear()` stales old handles.
+    play_snapshot_order: Vec<Entity>,
     lifecycles: Vec<crate::lifecycle::LifecycleCallback>,
     /// Stack of pairs: (forward command, inverse). Top is the most recent action.
     undo_stack: Vec<(EditorCommand, Inverse)>,
@@ -156,6 +160,7 @@ impl EditorSession {
             log_path,
             mode: EditorMode::Edit,
             play_snapshot: None,
+            play_snapshot_order: Vec::new(),
             lifecycles: Vec::new(),
             undo_stack: Vec::new(),
             redo_stack: Vec::new(),
@@ -196,6 +201,11 @@ impl EditorSession {
                 self.play_snapshot = Some(
                     voltex_ecs::serialize_scene_binary(&self.world, &self.registry),
                 );
+                self.play_snapshot_order = self
+                    .world
+                    .query::<voltex_ecs::Transform>()
+                    .map(|(e, _)| e)
+                    .collect();
                 self.mode = EditorMode::Play;
                 self.fire_lifecycle(crate::lifecycle::LifecycleEvent::PlayStart);
                 self.undo_stack.clear();
@@ -204,11 +214,18 @@ impl EditorSession {
             (EditorMode::Play, EditorMode::Edit) => {
                 self.fire_lifecycle(crate::lifecycle::LifecycleEvent::PlayStop);
                 self.world.clear();
-                if let Some(data) = self.play_snapshot.take() {
-                    let _ = voltex_ecs::deserialize_scene_binary(
+                let restored = match self.play_snapshot.take() {
+                    Some(data) => voltex_ecs::deserialize_scene_binary(
                         &mut self.world, &data, &self.registry,
-                    );
-                }
+                    )
+                    .unwrap_or_default(),
+                    None => Vec::new(),
+                };
+                let order = std::mem::take(&mut self.play_snapshot_order);
+                self.selected = self
+                    .selected
+                    .and_then(|sel| order.iter().position(|e| *e == sel))
+                    .and_then(|idx| restored.get(idx).copied());
                 self.mode = EditorMode::Edit;
                 self.undo_stack.clear();
                 self.redo_stack.clear();

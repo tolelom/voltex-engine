@@ -36,9 +36,8 @@ impl AudioVoiceTracker {
     }
 
     /// Stop + untrack every tracked voice. Call when the world is replaced
-    /// wholesale (`load_scene` / game-side `world.clear()`): `clear()` resets
-    /// the entity allocator, so recycled handles can collide with tracked
-    /// keys and slip past [`Self::sweep_orphans`]'s liveness check.
+    /// wholesale (`load_scene`) to silence the previous scene immediately,
+    /// instead of waiting for the next sync's orphan sweep.
     pub fn stop_all(&mut self, audio: &AudioSystem) {
         for voice in self.voices.values() {
             audio.stop_voice(*voice);
@@ -47,13 +46,9 @@ impl AudioVoiceTracker {
     }
 
     /// Stop + untrack every voice whose entity no longer exists or no longer
-    /// carries an `AudioSource`.
-    ///
-    /// Limitation: after `World::clear()` the allocator restarts at
-    /// `(id 0, gen 0)`, so a recycled handle that happens to carry an
-    /// `AudioSource` again is indistinguishable from the original entity —
-    /// call [`Self::stop_all`] on wholesale world replacement instead of
-    /// relying on this sweep.
+    /// carries an `AudioSource`. Since v1.0.120 `World::clear()` bumps every
+    /// slot's generation, so entities from before a clear are always caught
+    /// here too.
     fn sweep_orphans(&mut self, world: &World, audio: &AudioSystem) {
         self.voices.retain(|&entity, voice| {
             let alive = world.is_alive(entity) && world.get::<AudioSource>(entity).is_some();
@@ -119,10 +114,10 @@ fn rotate(rotation: voltex_math::Quat, dir: Vec3) -> Vec3 {
 /// `voices` tracks the mixer voice issued per entity: play edges register,
 /// stop edges release, and entities that disappeared since the last call
 /// (despawn / component removal) get their orphan voice stopped automatically
-/// — no manual `src.stop()` before despawn needed. Exception: wholesale
-/// `world.clear()` recycles entity handles from `(0, 0)`, which this sweep
-/// cannot distinguish — call [`AudioVoiceTracker::stop_all`] alongside it
-/// (`RuntimeApp::load_scene` does this automatically).
+/// — no manual `src.stop()` before despawn needed, including after
+/// `world.clear()` (handles from before a clear are permanently stale).
+/// `RuntimeApp::load_scene` additionally calls [`AudioVoiceTracker::stop_all`]
+/// so the old scene goes silent at the swap rather than one sync later.
 pub fn audio_sync_system(
     world: &mut World,
     audio: &AudioSystem,
@@ -178,8 +173,8 @@ pub fn audio_sync_system(
                     audio.play(plan.clip_index, plan.volume, plan.looping)
                 };
                 // 같은 엔티티 키를 덮어쓸 때 이전 voice를 반드시 stop —
-                // world.clear() 후 재사용된 핸들이 sweep을 통과한 경우의
-                // 누수 상한선 (위 sweep_orphans doc 참고).
+                // one-shot 재트리거 등 같은 엔티티의 Play 엣지가 반복될 때의
+                // 누수 상한선.
                 if let Some(old) = voices.voices.insert(plan.entity, voice) {
                     audio.stop_voice(old);
                 }
@@ -320,7 +315,7 @@ mod tests {
     }
 
     #[test]
-    fn world_clear_handle_reuse_keeps_tracker_bounded_and_stop_all_drains() {
+    fn world_clear_stales_handles_so_sweep_catches_old_voice_and_stop_all_drains() {
         let audio = AudioSystem::new(vec![voltex_audio::AudioClip::new(
             vec![0.0; 8],
             44100,
@@ -342,19 +337,19 @@ mod tests {
         audio_sync_system(&mut world, &audio, None, &mut voices);
         assert_eq!(voices.len(), 1);
 
-        // clear()는 allocator까지 리셋 — 같은 (id, gen) 핸들이 재발급된다.
-        // 이 전제가 깨지면(=ECS가 generation bump로 바뀌면) 이 테스트와
-        // sweep_orphans의 한계 doc을 함께 갱신할 것.
+        // v1.0.120: clear()는 슬롯 generation을 올린다 — 같은 id가 재발급돼도
+        // 옛 핸들과 구분되므로 sweep이 이전 voice를 orphan으로 잡는다.
         world.clear();
         let e2 = world.spawn();
-        assert_eq!(e, e2, "clear() reissues identical handles (ABA premise)");
+        assert_eq!(e2.id, e.id, "slot is reused");
+        assert_ne!(e, e2, "but the handle is distinguishable (no ABA)");
         world.add(e2, voltex_ecs::Transform::new());
         world.add(e2, looping_src());
         audio_sync_system(&mut world, &audio, None, &mut voices);
-        // 재사용 핸들의 Play 엣지가 이전 voice를 덮어쓸 때 stop을 발행하고
-        // (믹서 측 stop 동작은 voltex_audio apply_command 단위 테스트가 커버)
-        // tracker는 무한 성장하지 않는다.
+        // 이전 voice는 sweep으로 stop+해제, 새 voice만 추적.
         assert_eq!(voices.len(), 1);
+        assert!(voices.voices.contains_key(&e2));
+        assert!(!voices.voices.contains_key(&e));
 
         // load_scene 경로가 쓰는 일괄 해제.
         voices.stop_all(&audio);

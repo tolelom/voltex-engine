@@ -2,7 +2,7 @@
 
 - 날짜: 2026-10-12
 - 출처: `docs/DEFERRED.md` "2026-08-09 감사 사이클 LOW 이월"의 설계 항목 (v1.0.114 audit-runtime 근본 원인 지적)
-- 상태: 설계 확정, 구현은 v1.0.120
+- 상태: v1.0.120 구현 완료 (구현 중 정정 2건은 아래 "구현 중 정정")
 
 ## 문제
 
@@ -42,7 +42,7 @@ World 밖에서 `Entity`를 들고 있다가 clear를 넘기는 곳:
 `World::clear()`는 allocator를 새로 만들지 않고 **살아 있는 모든 슬롯을 해제한다.** 해제할 때마다 generation이 오르므로 clear 전의 모든 핸들은 영구히 stale이 된다. 컴포넌트 저장소, 리소스, 이벤트 등 나머지 상태는 지금처럼 전부 초기화한다.
 
 - `EntityAllocator::clear()` 신설: 살아 있는 entry를 모두 `alive = false`, `generation += 1`로 바꾸고 free_list에 넣는다. free_list는 **id 내림차순으로 쌓아** `pop()`이 0부터 꺼내게 한다. 그러면 clear 뒤 spawn 순서는 이전처럼 id 0, 1, 2…이고 generation만 다르다. id에 기대는 디버그 출력이나 순서 가정은 유지된다.
-- 이미 해제된 슬롯은 generation이 이미 올라가 있으니 건드리지 않는다.
+- ~~이미 해제된 슬롯은 generation이 이미 올라가 있으니 건드리지 않는다.~~ → 구현 중 정정: 해제된 슬롯도 올린다(아래).
 - `World::clear()` = 저장소·리소스 초기화 + `allocator.clear()`.
 
 ### 기각한 대안
@@ -67,7 +67,12 @@ World 밖에서 `Entity`를 들고 있다가 clear를 넘기는 곳:
 - 회귀: `games/`·`examples/`의 실제 씬 파일 로드 테스트, v1.0.114 voice 누수 테스트(`audio_sync.rs`), editor E3 undo 테스트가 전부 그대로 통과해야 한다.
 - `AudioVoiceTracker::stop_all` 봉쇄는 남긴다. 씬 교체 때 이전 씬 소리를 끄는 것은 핸들 안전과 별개로 맞는 동작이다. `load_scene`의 "(0,0)부터 재발급" 주석만 고친다.
 
+## 구현 중 정정
+
+1. **해제된 슬롯도 generation을 올린다.** clear 전에 despawn된 슬롯은 generation이 `g+1`인 채로 남는다. 그래서 E3 undo의 `restore_at_generation(id, g)`이 clear 뒤에도 성공해 옛 엔티티를 새 씬에 되살릴 수 있었다. 지금 clear를 부르는 곳은 모두 undo 스택을 함께 비우지만, 보증은 allocator 안에서 닫는다. 회귀 테스트는 `clear_blocks_restore_of_a_handle_despawned_before_clear`.
+2. **에디터 선택 재매핑은 범위 안으로 옮겼다.** Play → Edit 복원은 스냅샷 순서대로 spawn한다. 그래서 예전 `selected`는 별칭 때문에 *우연히* 같은 엔티티를 계속 가리켰다. stale 판정이 생기면 Play를 멈출 때마다 선택이 사라지는 UX 회귀가 난다. 대응으로 Play 시작 때 `Transform` 쿼리 순서(= `serialize_scene_binary` 인덱스 순서)를 기록해 두고, 복원 뒤 같은 인덱스의 새 핸들로 옮긴다. Play 중에 생긴 엔티티를 선택하고 있었으면 대응물이 없으니 None으로 둔다.
+
 ## 범위 밖
 
-- `selected`·`last_entity`·`audio_listener`를 clear 때 None으로 정리하는 UX 처리. stale 판정으로 안전해지니 표시는 다음 프레임에 자연히 비워진다. 따로 필요하면 후속으로 한다.
+- `last_entity`·`audio_listener`와 에디터 LoadScene 뒤 `selected`를 None으로 정리하는 UX 처리. stale 판정으로 안전해지니 표시는 다음 프레임에 자연히 비워진다. 따로 필요하면 후속으로 한다.
 - net 세션 중 씬 교체 프로토콜.

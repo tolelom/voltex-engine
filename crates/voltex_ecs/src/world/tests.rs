@@ -34,12 +34,71 @@ fn clear_drops_all_entities_and_components() {
 #[test]
 fn clear_then_spawn_reuses_id_zero_with_fresh_generation() {
     let mut world = World::new();
-    let _e = world.spawn();
+    let old = world.spawn();
     world.clear();
     let e_new = world.spawn();
-    // Allocator was reset → new spawn starts back at id 0, gen 0.
+    // Slots are freed, not reset: id 0 comes back with a bumped generation,
+    // so the pre-clear handle can never alias the new entity.
     assert_eq!(e_new.id, 0);
-    assert_eq!(e_new.generation, 0);
+    assert_eq!(e_new.generation, 1);
+    assert!(!world.is_alive(old));
+}
+
+#[test]
+fn clear_keeps_pre_clear_handles_stale_after_respawn() {
+    let mut world = World::new();
+    let a = world.spawn();
+    world.add(a, Position { x: 1.0, y: 1.0 });
+    let b = world.spawn();
+    world.clear();
+
+    let a2 = world.spawn();
+    world.add(a2, Position { x: 9.0, y: 9.0 });
+    let _b2 = world.spawn();
+
+    assert!(!world.is_alive(a));
+    assert!(!world.is_alive(b));
+    assert!(world.get::<Position>(a).is_none(), "old handle must not read the new entity");
+}
+
+#[test]
+fn clear_with_mixed_freed_and_live_slots_stales_every_old_handle() {
+    let mut world = World::new();
+    let a = world.spawn();
+    let b = world.spawn();
+    let c = world.spawn();
+    world.despawn(b); // slot 1 already freed (generation bumped once)
+    world.clear();
+
+    let respawned: Vec<_> = (0..3).map(|_| world.spawn()).collect();
+    for old in [a, b, c] {
+        assert!(!world.is_alive(old), "{old:?} aliased after clear");
+    }
+    assert_eq!(world.entity_count(), 3);
+    assert!(respawned.iter().all(|e| world.is_alive(*e)));
+}
+
+#[test]
+fn clear_blocks_restore_of_a_handle_despawned_before_clear() {
+    // E3 undo revives a despawned handle at its old generation; that must not
+    // reach across a clear() into the new scene.
+    let mut world = World::new();
+    let e = world.spawn();
+    world.despawn(e);
+    world.clear();
+    assert!(!world.restore_at_generation(e.id, e.generation));
+    assert!(!world.is_alive(e));
+}
+
+#[test]
+fn clear_then_spawn_hands_out_ids_in_order() {
+    let mut world = World::new();
+    for _ in 0..3 {
+        world.spawn();
+    }
+    world.clear();
+    let ids: Vec<u32> = (0..4).map(|_| world.spawn().id).collect();
+    assert_eq!(ids, vec![0, 1, 2, 3]);
 }
 
 #[test]

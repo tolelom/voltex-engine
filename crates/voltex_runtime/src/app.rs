@@ -626,8 +626,8 @@ impl RuntimeApp {
     /// then JSON; via the configured `Vfs` if any, else disk). Existing
     /// entities are cleared first.
     pub fn load_scene(&mut self, path: &str) -> RuntimeResult<()> {
-        // clear()는 entity allocator를 리셋해 핸들이 (0,0)부터 재발급된다 —
-        // 재사용 핸들은 orphan sweep이 못 잡으므로 남은 voice를 먼저 전부 stop.
+        // clear() 뒤 이전 씬 핸들은 전부 stale이 된다(v1.0.120 generation bump).
+        // 이전 씬의 소리는 핸들과 별개로 씬 교체 시점에 끄는 게 맞으므로 전부 stop.
         if let Some(audio) = self.audio.as_ref() {
             self.audio_voices.stop_all(audio);
         }
@@ -1163,6 +1163,34 @@ mod tests {
             (pos.x - 3.0).abs() < 1e-4 && (pos.y - 4.0).abs() < 1e-4 && (pos.z - 5.0).abs() < 1e-4,
             "position should roundtrip, got {pos:?}"
         );
+    }
+
+    #[test]
+    fn load_scene_leaves_pre_load_handles_stale() {
+        // audio_listener (and any game-held Entity) set against the previous
+        // scene must not alias an entity of the newly loaded one.
+        let dir = std::env::temp_dir().join("voltex_runtime_scene_stale_test");
+        let _ = std::fs::create_dir_all(&dir);
+        let path = dir.join("scene.json");
+        let p = path.to_str().unwrap();
+
+        let cfg = RuntimeConfig::new()
+            .disable_physics()
+            .disable_scripts()
+            .disable_crash_log();
+        let mut app = RuntimeApp::new(cfg).unwrap();
+        let listener = app.world.spawn();
+        app.world.add(listener, Transform::from_position(Vec3::new(1.0, 0.0, 0.0)));
+        app.set_audio_listener(listener);
+        app.save_scene_json(p).unwrap();
+
+        app.load_scene(p).unwrap();
+
+        assert_eq!(app.world.entity_count(), 1);
+        assert_eq!(app.audio_listener, Some(listener));
+        assert!(!app.world.is_alive(listener), "old listener handle aliased a new entity");
+        assert!(app.world.get::<Transform>(listener).is_none());
+        let _ = std::fs::remove_file(&path);
     }
 
     #[test]

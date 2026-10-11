@@ -50,7 +50,7 @@ Immediate-mode UI 에디터 — 도킹/플로팅/뷰포트/인스펙터/에셋 �
 - `EditorMode { Edit, Play }` — 에디터의 user-facing state. (src/session.rs)
 - `EditorSession::set_mode(target)` — Edit↔Play 전환.
   - Edit→Play: `serialize_scene_binary` 로 snapshot 저장 → mode 전환 → `LifecycleEvent::PlayStart` 콜백 호출 → undo/redo 클리어.
-  - Play→Edit: `LifecycleEvent::PlayStop` 콜백 호출 → `World::clear()` → snapshot 으로 deserialize → mode 전환 → undo/redo 클리어.
+  - Play→Edit: `LifecycleEvent::PlayStop` 콜백 호출 → `World::clear()` → snapshot 으로 deserialize → 선택(`selected`)을 스냅샷 순서로 복원 엔티티에 재매핑(Play 중 생성 엔티티면 None) → mode 전환 → undo/redo 클리어.
   - 같은 모드 호출은 no-op.
 - `EditorSession::add_lifecycle(closure)` — `(LifecycleEvent, &mut World)` 받는 콜백 등록. 등록 순서대로 호출.
 - `lifecycle::LifecycleEvent { PlayStart, PlayStop }` + `lifecycle::LifecycleCallback` (src/lifecycle.rs)

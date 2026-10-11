@@ -252,6 +252,51 @@ fn set_mode_play_to_edit_restores_world_state() {
 }
 
 #[test]
+fn play_to_edit_remaps_selection_to_the_restored_entity() {
+    // World::clear() stales pre-Play handles; the selection must follow the
+    // same scene entity instead of disappearing (or aliasing another one).
+    let scene = temp_path("voltex_e2_selection.vscn");
+    cleanup(&scene);
+    let mut session = EditorSession::new(scene.clone());
+    let _a = session.dispatch(EditorCommand::Spawn).unwrap();
+    let b = session.dispatch(EditorCommand::Spawn).unwrap();
+    session.dispatch(EditorCommand::SetTransform {
+        entity: b,
+        position: Vec3::new(7.0, 0.0, 0.0),
+        rotation: Quat::IDENTITY,
+        scale: Vec3::new(1.0, 1.0, 1.0),
+    }).unwrap();
+    session.selected = Some(b);
+
+    session.set_mode(EditorMode::Play);
+    session.set_mode(EditorMode::Edit);
+
+    let sel = session.selected.expect("selection survives Play -> Edit");
+    assert!(!session.world.is_alive(b), "pre-Play handle is stale after restore");
+    assert!(session.world.is_alive(sel));
+    assert_eq!(
+        session.world.get::<Transform>(sel).unwrap().position,
+        Vec3::new(7.0, 0.0, 0.0),
+        "selection points at the same scene entity"
+    );
+    cleanup(&scene);
+}
+
+#[test]
+fn play_to_edit_clears_selection_of_a_play_spawned_entity() {
+    let scene = temp_path("voltex_e2_selection_play.vscn");
+    cleanup(&scene);
+    let mut session = EditorSession::new(scene.clone());
+    session.dispatch(EditorCommand::Spawn).unwrap();
+    session.set_mode(EditorMode::Play);
+    let spawned_in_play = session.world.spawn();
+    session.selected = Some(spawned_in_play);
+    session.set_mode(EditorMode::Edit);
+    assert_eq!(session.selected, None, "play-only entity has no Edit counterpart");
+    cleanup(&scene);
+}
+
+#[test]
 fn set_mode_same_mode_is_noop() {
     let scene = temp_path("voltex_e2_noop.vscn");
     cleanup(&scene);

@@ -116,6 +116,21 @@ impl EntityAllocator {
             })
     }
 
+    /// Free every slot and bump every generation — every handle issued so far
+    /// becomes permanently stale. Slots are kept (not reset) so a new
+    /// allocation can never reproduce an old `(id, generation)` pair. Already
+    /// freed slots are bumped too, so [`Self::restore_at_generation`] cannot
+    /// revive a pre-clear handle. The free list is rebuilt in descending id
+    /// order so allocation restarts at id 0.
+    pub fn clear(&mut self) {
+        for entry in &mut self.entries {
+            entry.alive = false;
+            entry.generation = entry.generation.wrapping_add(1);
+        }
+        self.free_list = (0..self.entries.len() as u32).rev().collect();
+        self.alive_count = 0;
+    }
+
     /// Re-activate a previously deallocated slot at the same generation it
     /// had before deallocation. Returns false if the slot is alive, out of
     /// range, or has moved past `target_generation` (e.g. the slot was

@@ -10,6 +10,30 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## v1.0.120 — 2026-10-12 — `World::clear()`가 generation을 올려 옛 핸들 별칭 차단
+
+설계: `docs/superpowers/specs/2026-10-12-world-clear-generation-design.md`.
+
+### Fix (behaviour change)
+
+- **voltex_ecs `World::clear()`**: allocator를 새로 만드는 대신
+  `EntityAllocator::clear()`(신설)로 모든 슬롯을 해제하고 generation을
+  올린다. clear 뒤 spawn id는 여전히 0, 1, 2…이지만 generation이 달라서
+  clear 전 핸들이 새 엔티티를 가리키지 않는다(`is_alive` false, `get` None).
+  해제된 슬롯도 올려 E3 undo의 `restore_at_generation`이 clear를 넘지 못함.
+  **바뀌는 동작**: clear 뒤 첫 spawn은 `(0,0)`이 아니라 `(0,1)` 이상.
+  씬 파일 3종은 부모를 로컬 인덱스로 저장하므로 파일 호환에는 영향 없음.
+- 이 변경으로 같이 해소되는 별칭 버그: `RuntimeApp::load_scene` 뒤 이전 씬의
+  `audio_listener`가 새 씬 엔티티를 리스너로 잡던 것. Lua·게임 코드가 보관한
+  핸들이 씬 교체 뒤 다른 엔티티에 작동하던 것.
+- **voltex_editor Play → Edit**: 선택을 스냅샷 순서로 복원된 엔티티에 재매핑.
+  예전에는 별칭 덕에 우연히 유지되던 선택이 stale 판정으로 사라지지 않게
+  하려는 것. Play 중에 생성된 엔티티를 선택하고 있었으면 None.
+- voltex_runtime `audio_sync`: 이제 sweep이 clear 전 voice도 잡는다. doc과
+  v1.0.114 회귀 테스트를 새 계약(ABA 없음)으로 갱신. `stop_all`은 씬 교체 때
+  이전 씬을 즉시 끄는 용도로 유지.
+- 테스트 +7 (ecs 4, editor 2, runtime 1), 기존 1건 계약 갱신.
+
 ## v1.0.119 — 2026-10-12 — 루트 글롭이 빌드 산출물을 삼키던 것 차단 (감사 LOW 이월 4/4)
 
 ### Fix
