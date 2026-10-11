@@ -44,7 +44,7 @@ icon = "assets/icon.png"
 
 | 키 | 타입 | 필수 | 기본 | 설명 |
 |---|---|---|---|---|
-| `name` | string | ✅ | — | 프로젝트 이름. `dist/` 의 exe 이름이 됨 (`dist/<name>.exe`). |
+| `name` | string | ✅ | — | 프로젝트 이름. `dist/` 의 exe 이름이 됨 (`dist/<name>.exe`). Rust 게임 crate 빌드에서는 이 이름과 같은 바이너리를 배포하며, 같은 이름이 없고 바이너리가 2개 이상이면 빌드가 실패한다(v1.0.116). |
 | `version` | string | ✅ | — | SemVer 권장. 현재 cargo 에는 전달하지 않음 (`voltex_runtime` 의 `--version` 은 자체 crate version) — 향후 동기화 예정. |
 
 ### `[build]` (선택, 전부 디폴트)

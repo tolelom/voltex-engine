@@ -56,6 +56,12 @@ pub enum CliError {
         path: PathBuf,
         base_dir: PathBuf,
     },
+    /// `cargo build` produced several executables and none is named after
+    /// `[project] name` — shipping a guess could package an asset generator.
+    AmbiguousExecutable {
+        project: String,
+        candidates: Vec<PathBuf>,
+    },
 }
 
 impl fmt::Display for CliError {
@@ -150,6 +156,18 @@ impl fmt::Display for CliError {
                     field,
                     path.display(),
                     base_dir.display()
+                )
+            }
+            CliError::AmbiguousExecutable { project, candidates } => {
+                let list: Vec<String> =
+                    candidates.iter().map(|p| p.display().to_string()).collect();
+                write!(
+                    f,
+                    "cargo built {} executables but none is named `{}`\n  candidates: {}\n  hint: rename the game's [[bin]] to `{}`, or set [project] name to the game binary's name",
+                    candidates.len(),
+                    project,
+                    list.join(", "),
+                    project
                 )
             }
         }

@@ -239,7 +239,7 @@ high/medium 19건은 당일 해소 (CHANGELOG v1.0.114). LOW 4건은 실피해 �
 - ~~**에디터 asset_browser `navigate_to` root 가드가 `..` 미정규화**~~ ✅ v1.0.115 — canonicalize 후 루트 검사. — 현재 UI
   경로(read_dir 결과만 전달)로는 탈출 불가, Windows verbatim 경로 부작용이
   이중 방어. join 결과 canonicalize 후 재검사로 강화 — v1.1.
-- **CLI 멀티바이너리 crate에서 exe 이름 매칭 실패 시 `exes.last()` 폴백** —
+- ~~**CLI 멀티바이너리 crate에서 exe 이름 매칭 실패 시 `exes.last()` 폴백**~~ ✅ v1.0.116 — 후보 2개 이상이면 `AmbiguousExecutable` 에러. —
   project.name과 [[bin]] 불일치 시 에셋 생성기가 배포될 수 있음 (note 1줄만).
   이름 매칭 실패 + 후보 2개 이상이면 에러 승격 — v1.1.
 - **CLI 씬 스캔이 BOM 붙은 JSON을 legacy text로 오분류** — 자동 동봉만 조용히

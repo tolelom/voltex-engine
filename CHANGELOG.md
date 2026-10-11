@@ -10,6 +10,17 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## v1.0.116 — 2026-10-12 — CLI 멀티바이너리 exe 추측 배포 차단 (감사 LOW 이월 2/4)
+
+### Fix (behaviour change)
+
+- **voltex_cli `pick_executable`**: `[project] name`과 같은 이름의 바이너리가
+  없을 때 마지막 산출물을 배포하던 폴백을 없앴다. 후보가 1개면 그대로
+  배포하고, 2개 이상이면 `CliError::AmbiguousExecutable`(후보 목록 + 이름
+  맞추라는 힌트)로 빌드를 실패시킨다 — 에셋 생성기 바이너리가 게임 대신
+  `dist/`에 들어가는 경로 차단. 저장소의 voltex.toml 게임(depths/survivor)은
+  이름이 일치해 영향 없음. 테스트 +3.
+
 ## v1.0.115 — 2026-10-12 — 에셋 브라우저 `..` 루트 탈출 차단 (감사 LOW 이월 1/4)
 
 ### Fix

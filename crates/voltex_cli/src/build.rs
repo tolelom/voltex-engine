@@ -227,12 +227,7 @@ fn build_rust_target(
 
     let stdout = String::from_utf8_lossy(&output.stdout);
     let exes = extract_executables(&stdout);
-    let Some(exe_src) = pick_executable(&exes, &manifest.project.name) else {
-        return Err(CliError::Io(
-            "cargo build succeeded but produced no executable — is the game crate a [[bin]]?"
-                .to_string(),
-        ));
-    };
+    let exe_src = pick_executable(&exes, &manifest.project.name)?;
     if exes.len() > 1 {
         eprintln!(
             "voltex build: note — {} executables built; shipping {}",
@@ -264,12 +259,27 @@ fn build_rust_target(
 }
 
 /// Choose which built executable to ship: the one whose file stem matches the
-/// manifest's project name (multi-bin crates build asset generators etc. too),
-/// falling back to the last artifact when nothing matches.
-fn pick_executable<'a>(exes: &'a [PathBuf], project_name: &str) -> Option<&'a PathBuf> {
-    exes.iter()
+/// manifest's project name (multi-bin crates build asset generators etc. too).
+/// Without a name match, a single artifact is still unambiguous; several are
+/// an error rather than a guess.
+fn pick_executable<'a>(exes: &'a [PathBuf], project_name: &str) -> Result<&'a PathBuf> {
+    if let Some(exe) = exes
+        .iter()
         .find(|p| p.file_stem().and_then(|s| s.to_str()) == Some(project_name))
-        .or_else(|| exes.last())
+    {
+        return Ok(exe);
+    }
+    match exes {
+        [] => Err(CliError::Io(
+            "cargo build succeeded but produced no executable — is the game crate a [[bin]]?"
+                .to_string(),
+        )),
+        [only] => Ok(only),
+        _ => Err(CliError::AmbiguousExecutable {
+            project: project_name.to_string(),
+            candidates: exes.to_vec(),
+        }),
+    }
 }
 
 /// Pull every non-null `"executable":"…"` value out of cargo's
@@ -656,13 +666,36 @@ mod tests {
             PathBuf::from(r"t\release\gen_sfx.exe"),
         ];
         // Name match wins regardless of artifact order.
-        assert_eq!(
-            pick_executable(&exes, "voltex_depths"),
-            Some(&exes[0])
-        );
-        // No match → last artifact.
-        assert_eq!(pick_executable(&exes, "other"), Some(&exes[1]));
-        assert_eq!(pick_executable(&[], "x"), None);
+        assert_eq!(pick_executable(&exes, "voltex_depths").unwrap(), &exes[0]);
+    }
+
+    #[test]
+    fn pick_executable_single_unmatched_artifact_is_shipped() {
+        // [[bin]] renamed away from project.name — the only candidate is
+        // still unambiguous.
+        let exes = vec![PathBuf::from(r"t\release\game_main.exe")];
+        assert_eq!(pick_executable(&exes, "mygame").unwrap(), &exes[0]);
+    }
+
+    #[test]
+    fn pick_executable_errors_when_no_name_match_among_several() {
+        // Guessing here could ship an asset generator as the game.
+        let exes = vec![
+            PathBuf::from(r"t\release\game_main.exe"),
+            PathBuf::from(r"t\release\gen_sfx.exe"),
+        ];
+        match pick_executable(&exes, "mygame") {
+            Err(CliError::AmbiguousExecutable { project, candidates }) => {
+                assert_eq!(project, "mygame");
+                assert_eq!(candidates, exes);
+            }
+            other => panic!("expected AmbiguousExecutable, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn pick_executable_errors_when_nothing_built() {
+        assert!(matches!(pick_executable(&[], "x"), Err(CliError::Io(_))));
     }
 
     #[test]
