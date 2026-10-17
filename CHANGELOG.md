@@ -26,12 +26,16 @@ recent on top. v0.x entries are organised by Cycle (see
   `AlsaBackend`·`CoreAudioBackend` 에 빠진 doc 주석을 넣고, aarch64 에서만 불필요해지는
   `as *const u8` 캐스트를 `.cast::<u8>()` 로 바꿨다. Windows 컴파일 결과와 동작은 같다. macOS 는 검증하지 않았다.
 - **deny.toml**: cargo-deny 0.19 가 거부하는 `highlight = "all-versions"` 를 `"all"` 로 바꿨다(설정 파싱 실패 해소).
+  `[advisories] ignore` 에 간접 의존 권고 4건(quick-xml RUSTSEC-2026-0194·0195 via wayland-scanner,
+  paste RUSTSEC-2024-0436 via metal, ttf-parser RUSTSEC-2026-0192 via sctk-adwaita)을 경로와 함께 넣었다.
+  `bans` 의 wildcard 34 crate 는 남아 있다 — `allow-wildcard-paths` 는 `publish` 를 제한한 crate 에만
+  적용되는데 workspace 에 그런 crate 가 없다.
 
 ### Build
 
 - **pre-push Linux clippy**: `scripts/check_linux_clippy.sh` 가 `aarch64-unknown-linux-gnu` 대상으로
   CI 와 같은 플래그의 clippy 를 돌린다. target 이 없으면 경고 후 건너뛴다. Lua C 소스를 크로스 컴파일할
-  수 없어 `voltex_script` 와 그 의존 crate 13개(37개 중)는 제외한다(스크립트에 목록).
+  수 없어 `voltex_script` 와 그 의존 crate 12개, 합쳐서 13개(37개 중)는 제외한다(스크립트에 목록).
 
 ## v1.0.173 — 2026-10-17 — 워크스페이스 버전 정합 + 600줄 한도 리팩터링
 
