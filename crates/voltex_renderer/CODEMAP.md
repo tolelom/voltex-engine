@@ -15,7 +15,7 @@ wgpu 기반 렌더링 — 메시/PBR/그림자/IBL/디퍼드/RT/post-process. �
 - `ColoredCameraUniform`, `create_colored_mesh_pipeline` — per-entity base_color 틴트 Blinn-Phong (BasicRenderer 전용, src/light.rs, src/mesh_colored.wgsl)
 - `Mesh` — 메시 데이터 + `Mesh::from_obj(device, source)` / `Mesh::from_gltf(device, bytes)` 모델 로더 (src/mesh.rs)
 - `Camera`, `FpsController` — 카메라 (src/camera.rs)
-- `GpuTexture`, `pbr_texture_bind_group_layout` 등 — GPU 텍스처 + PBR 바인딩 (src/texture.rs)
+- `GpuTexture`, `pbr_texture_bind_group_layout` 등 — GPU 텍스처 + PBR 바인딩 (src/texture/mod.rs)
 
 ### Image / Model (voltex_image 재export)
 - `parse_png`, `parse_jpg`, `parse_gltf`, `GltfData`, `GltfMesh`, `GltfMaterial`, `MeshVertex` 등 — `voltex_image` crate로 이동; `pub use voltex_image::{...}` 역호환 재export 유지 (src/lib.rs)

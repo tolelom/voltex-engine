@@ -4,9 +4,9 @@
 AI 기초 — NavMesh (수동 + 자동 voxelization), A* + Funnel, steering, 동적 장애물 회피.
 
 ## 공개 API 진입점
-- `NavMesh` — 폴리곤 기반 내비메시 (src/navmesh.rs)
+- `NavMesh` — 폴리곤 기반 내비메시 (src/navmesh/mod.rs)
 - `NavMeshBuilder` — voxelization 기반 자동 생성 (src/navmesh_builder/)
-- `find_path` — A* + String Pulling (Funnel) (src/pathfinding.rs)
+- `find_path` — A* + String Pulling (Funnel) (src/pathfinding/mod.rs)
 - Steering — `seek`, `flee`, `arrive`, `wander`, `follow_path` (src/steering.rs). `follow_path` 는 평면(XZ) — waypoint 를 에이전트 y 평면에 투영해 도달 판정/조향 (게임플레이 y 유지, navmesh 평면으로 침하 없음)
 - Flocking (boid) — `separation`, `cohesion`, `alignment` 순수 함수 + `Boid` 컴포넌트 + `BoidParams` + `flocking_system(world, &params, dt)` ECS 시스템 (src/flocking.rs). 시스템이 `SpatialGrid` 로 이웃 수집(~O(n)) 후 3법칙 가중합 → 속도/위치 적분(max_speed clamp). 스냅샷 후 일괄 기록(순서 무관)
 - `NavAgent` — ECS 컴포넌트 (src/nav_agent.rs). `target` 직접 대입도 동작 — 시스템이 `planned_target`(crate 내부)과 비교해 변경 감지 후 스스로 repath
@@ -15,9 +15,9 @@ AI 기초 — NavMesh (수동 + 자동 voxelization), A* + Funnel, steering, 동
 - `AiError`, `Result` — thiserror 기반 에러 (Generic/Io) (src/error.rs)
 
 ## 모듈 구조
-- `navmesh` — NavMesh 데이터 구조 + 직렬화 (src/navmesh.rs)
+- `navmesh` — NavMesh 데이터 구조 + 직렬화 (src/navmesh/mod.rs)
 - `navmesh_builder` — voxelization (src/navmesh_builder/: mod, voxelize, walkable, regions, triangulate)
-- `pathfinding` — A* + Funnel (src/pathfinding.rs)
+- `pathfinding` — A* + Funnel (src/pathfinding/mod.rs)
 - `steering` — steering behaviors (src/steering.rs)
 - `flocking` — boid separation/cohesion/alignment (SpatialGrid 로 이웃 수집) (src/flocking.rs)
 - `nav_agent` — ECS 컴포넌트 (src/nav_agent.rs)

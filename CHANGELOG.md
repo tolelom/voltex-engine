@@ -37,6 +37,7 @@ recent on top. v0.x entries are organised by Cycle (see
   옮겼다(`build/mod.rs` 565줄). `write_wrapper_*` 둘을 `pub(super)`로 열었다.
 - 확인: 커밋마다 `cargo test --workspace` 1762 통과·76 무시, GPU 캡처 47 통과(skip 0), clippy 경고 0.
   래퍼 경로는 `e2e_new_then_build_produces_dist_exe`(`--ignored`)로 실제 빌드까지 확인했다.
+- 옮긴 모듈을 가리키는 CODEMAP 경로(ai·ecs·editor·renderer·runtime·cli)를 새 위치로 고쳤다.
 
 ## v1.0.172 — 2026-10-12 — GPU 테스트 스크린샷 기록은 opt-in
 
