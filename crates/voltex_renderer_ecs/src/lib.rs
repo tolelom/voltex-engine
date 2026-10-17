@@ -14,6 +14,7 @@ pub mod assets;
 pub mod items;
 pub mod basic_renderer;
 mod debug_line_pass;
+mod sprite_pass;
 pub mod particle;
 pub mod renderable;
 pub mod skinned;
