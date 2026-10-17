@@ -237,7 +237,7 @@ impl BasicRenderer {
         // Per-entity camera uniform: PBR uses CameraUniform (w/ camera_pos), the
         // colored path uses SkinnedCameraUniform.
         let cam_aligned = if self.pbr_enabled {
-            let a = self.pbr_skinned_cam_aligned as usize;
+            let a = self.pbr_skinned.cam_aligned as usize;
             let mut staging = vec![0u8; n * a];
             for (i, it) in items.iter().take(n).enumerate() {
                 let cam = CameraUniform {
@@ -249,7 +249,7 @@ impl BasicRenderer {
                 let cb = bytemuck::bytes_of(&cam);
                 staging[i * a..i * a + cb.len()].copy_from_slice(cb);
             }
-            queue.write_buffer(&self.pbr_skinned_cam_buffer, 0, &staging);
+            queue.write_buffer(&self.pbr_skinned.cam_buffer, 0, &staging);
             a
         } else {
             let a = self.skinned.cam_aligned as usize;
@@ -268,14 +268,14 @@ impl BasicRenderer {
 
         // PBR skinned: stage per-entity material + build per-entity texture
         // bind groups (defaults for absent maps), mirroring the static pass.
-        let mat_aligned = self.pbr_skinned_material_aligned as usize;
+        let mat_aligned = self.pbr_skinned.material_aligned as usize;
         let skinned_tex_bgs: Vec<Option<wgpu::BindGroup>> = if self.pbr_enabled {
             let mut mat_staging = vec![0u8; n * mat_aligned];
             for (i, it) in items.iter().take(n).enumerate() {
                 let mb = bytemuck::bytes_of(&it.material);
                 mat_staging[i * mat_aligned..i * mat_aligned + mb.len()].copy_from_slice(mb);
             }
-            queue.write_buffer(&self.pbr_skinned_material_buffer, 0, &mat_staging);
+            queue.write_buffer(&self.pbr_skinned.material_buffer, 0, &mat_staging);
 
             let resolve = |h: Option<crate::assets::TextureHandle>| {
                 h.and_then(|h| assets.texture(h)).map(|t| (&t.view, &t.sampler))
@@ -293,13 +293,13 @@ impl BasicRenderer {
                     let (av, asamp) = resolve(it.texture)
                         .unwrap_or((&self.default_texture.view, &self.default_texture.sampler));
                     let (nv, nsamp) = resolve(it.pbr.and_then(|p| p.normal))
-                        .unwrap_or((&self.pbr_flat_normal.1, &self.pbr_flat_normal.2));
+                        .unwrap_or((&self.pbr.flat_normal.1, &self.pbr.flat_normal.2));
                     let (ov, osamp) = resolve(it.pbr.and_then(|p| p.orm))
                         .unwrap_or((&self.default_texture.view, &self.default_texture.sampler));
                     let (ev, esamp) = resolve(it.pbr.and_then(|p| p.emissive))
-                        .unwrap_or((&self.pbr_black.view, &self.pbr_black.sampler));
+                        .unwrap_or((&self.pbr.black.view, &self.pbr.black.sampler));
                     Some(create_pbr_full_texture_bind_group(
-                        &self.device, &self.pbr_tex_layout, av, asamp, nv, nsamp, ov, osamp, ev,
+                        &self.device, &self.pbr.tex_layout, av, asamp, nv, nsamp, ov, osamp, ev,
                         esamp,
                     ))
                 })
@@ -333,8 +333,8 @@ impl BasicRenderer {
         });
 
         if self.pbr_enabled {
-            pass.set_pipeline(&self.pbr_skinned_pipeline);
-            pass.set_bind_group(3, &self.pbr_shadow_bind_group, &[]);
+            pass.set_pipeline(&self.pbr_skinned.pipeline);
+            pass.set_bind_group(3, &self.pbr.shadow_bind_group, &[]);
             for (i, it) in items.iter().take(n).enumerate() {
                 let Some(mesh) = assets.skinned_mesh(it.handle) else {
                     continue;
@@ -343,12 +343,12 @@ impl BasicRenderer {
                 let pal_off = (i * pal_aligned) as u32;
                 let mat_off = (i * mat_aligned) as u32;
                 // g0 has two dynamic bindings (camera @0, palette @2).
-                pass.set_bind_group(0, &self.pbr_skinned_g0_bind_group, &[cam_off, pal_off]);
+                pass.set_bind_group(0, &self.pbr_skinned.g0_bind_group, &[cam_off, pal_off]);
                 let tex_bg = skinned_tex_bgs[i]
                     .as_ref()
-                    .unwrap_or(&self.pbr_default_texture_bind_group);
+                    .unwrap_or(&self.pbr.default_texture_bind_group);
                 pass.set_bind_group(1, tex_bg, &[]);
-                pass.set_bind_group(2, &self.pbr_skinned_material_bind_group, &[mat_off]);
+                pass.set_bind_group(2, &self.pbr_skinned.material_bind_group, &[mat_off]);
                 pass.set_vertex_buffer(0, mesh.vertex_buffer.slice(..));
                 pass.set_index_buffer(mesh.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
                 pass.draw_indexed(0..mesh.num_indices, 0, 0..1);
