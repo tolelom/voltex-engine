@@ -53,3 +53,10 @@ while read -r local_ref local_sha remote_ref remote_sha; do
 done
 
 echo -e "${GREEN}✓ pre-push: CHANGELOG check passed${NC}"
+
+# Linux target clippy (the CI runner's target). Skips with a warning when the
+# target is not installed; blocks the push on a Linux-only warning.
+if ! bash "$REPO_ROOT/scripts/check_linux_clippy.sh"; then
+    echo -e "${RED}✗ pre-push: Linux target clippy failed${NC}"
+    exit 1
+fi
