@@ -18,9 +18,9 @@ Headless offscreen 렌더링 + PNG 캡처. 윈도우 없는 환경에서 *실제
 | `OffscreenTarget::new(device, w, h)` / `read_rgba8(device, queue) -> Vec<u8>` | `target.rs` | `CAPTURE_FORMAT` = Rgba8UnormSrgb |
 | `encode_rgba8(w, h, &[u8]) -> Vec<u8>` / `save_png(path, w, h, &[u8])` | `png_encode.rs`, `lib.rs` | stored deflate, 무압축 |
 | `ImageStats::analyze(&[u8])` / `looks_blank()` | `lib.rs` | blank/단색 프레임 자동 탐지 |
-| `scene::render_single_cube` / `render_cube_grid` / `render_pbr_grid` | `scene.rs` | `(gpu, w, h) -> Vec<u8>` |
-| `scene::render_world(gpu, w, h, &mut World, cam_pos, yaw, pitch) -> Vec<u8>` | `scene.rs` | 외부 게임 crate가 자기 씬을 픽셀 검증하는 공개 진입점 (voltex_depths 도그푸딩용). 고정 라이트/FOV/1024 entity 상한 — doc 주석 참고 |
-| `scene::render_world_ortho(gpu, w, h, &mut World, cam_pos, yaw, pitch, ortho_height) -> Vec<u8>` | `scene.rs` | `render_world`의 직교 변형 — 런타임 `with_orthographic`과 동일 의미의 뷰 높이. 2D 게임이 실제 화면 구도로 픽셀 검증 (voltex_leap 도그푸딩용) |
+| `scene::render_single_cube` / `render_cube_grid` / `render_pbr_grid` | `scene/mod.rs` | `(gpu, w, h) -> Vec<u8>` |
+| `scene::render_world(gpu, w, h, &mut World, cam_pos, yaw, pitch) -> Vec<u8>` | `scene/mod.rs` | 외부 게임 crate가 자기 씬을 픽셀 검증하는 공개 진입점 (voltex_depths 도그푸딩용). 고정 라이트/FOV/1024 entity 상한 — doc 주석 참고 |
+| `scene::render_world_ortho(gpu, w, h, &mut World, cam_pos, yaw, pitch, ortho_height) -> Vec<u8>` | `scene/mod.rs` | `render_world`의 직교 변형 — 런타임 `with_orthographic`과 동일 의미의 뷰 높이. 2D 게임이 실제 화면 구도로 픽셀 검증 (voltex_leap 도그푸딩용) |
 | bin `capture` | `bin/capture.rs` | `cargo run -p voltex_capture --bin capture [out_dir]` |
 
 ## 의존성
@@ -36,7 +36,9 @@ src/
 ├── headless.rs         # HeadlessGpu (surface 없는 device/queue)
 ├── target.rs           # OffscreenTarget + readback
 ├── png_encode.rs       # 무의존 PNG 인코더 (+ CRC32/Adler32)
-├── scene.rs            # 데모 씬 렌더 (BasicRenderer / PBR) + draw_and_read 공용 꼬리 + 아래 형제 파일 re-export
+├── scene/
+│   ├── mod.rs          # 데모 씬 렌더 (BasicRenderer / PBR) + draw_and_read 공용 꼬리 + 아래 형제 파일 re-export
+│   └── tests.rs        # scene 단위·GPU 테스트
 ├── scene_texture.rs    # 텍스처·PNG·OBJ 로딩 씬 (private, scene:: 로 노출)
 ├── scene_hot_reload.rs # 텍스처·메시 핫리로드 씬 (private, scene:: 로 노출)
 ├── scene_sprite.rs     # 빌보드·스프라이트 시트·파티클 씬 (private, scene:: 로 노출)

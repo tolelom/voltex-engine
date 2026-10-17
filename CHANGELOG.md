@@ -10,6 +10,14 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## Unreleased — 2026-10-17 — capture scene 테스트 분리
+
+### Refactor
+
+- **voltex_capture `scene`**: 인라인 테스트를 `scene/tests.rs`로 옮겼다(`scene.rs` → `scene/mod.rs` 1140줄 +
+  `scene/tests.rs` 704줄). 코드는 바꾸지 않았고 형제 모듈 재노출과 `scene::render_*` 경로는 그대로다.
+  확인: 1762 통과·76 무시, GPU 캡처 47 통과(skip 0), 캡처 29장 분할 전과 픽셀 단위로 같음.
+
 ## v1.0.173 — 2026-10-17 — 워크스페이스 버전 정합 + 600줄 한도 리팩터링
 
 ### Fix
