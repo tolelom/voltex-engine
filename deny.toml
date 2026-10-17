@@ -39,7 +39,14 @@ db-urls = ["https://github.com/rustsec/advisory-db"]
 # Yanked crates and unmaintained crates are warnings, not failures. Promote
 # to "deny" once we've audited every transitive dep we own (planned v1.1).
 yanked = "warn"
-ignore = []
+# Transitive advisories with no fix we can pull in. Re-check when wgpu/winit
+# move: each entry names the only path the crate enters the graph by.
+ignore = [
+    { id = "RUSTSEC-2026-0194", reason = "quick-xml 0.39 via wayland-scanner, a proc-macro that parses its own bundled Wayland protocol XML at build time (Linux only)" },
+    { id = "RUSTSEC-2026-0195", reason = "quick-xml 0.39 via wayland-scanner, a proc-macro that parses its own bundled Wayland protocol XML at build time (Linux only)" },
+    { id = "RUSTSEC-2024-0436", reason = "paste (unmaintained) via metal -> wgpu-hal, a proc-macro on the macOS backend; no maintained replacement upstream" },
+    { id = "RUSTSEC-2026-0192", reason = "ttf-parser (unmaintained) via ab_glyph -> sctk-adwaita -> winit window decorations on Linux Wayland; no safe upgrade available" },
+]
 
 # ----------------------------------------------------------------------------
 # Licenses
