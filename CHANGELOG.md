@@ -25,6 +25,19 @@ recent on top. v0.x entries are organised by Cycle (see
   `CHANGELOG v1.0.173 != workspace 1.0.172` 형식으로 실패한다. 번호를 매길 때는 Cargo 버전도
   함께 올려야 한다.
 
+### Refactor
+
+- **600줄 한도: 인라인 테스트 분리 9개 파일** — v1.0.2 전례대로 `foo.rs`를
+  `foo/mod.rs` + `foo/tests.rs`로 나눴다. 코드는 바꾸지 않았고 테스트 블록만 옮겼다(4칸 내어쓰기,
+  여러 줄 문자열 안쪽 줄은 원문 그대로). 대상: voltex_ecs `scene`, voltex_editor
+  `asset_browser`·`panels/inspector`, voltex_renderer `texture`, voltex_ai `pathfinding`·`navmesh`,
+  voltex_capture `scene_skinned`, voltex_runtime `audio_sync`, voltex_cli `build`.
+- **voltex_cli `build`**: 테스트를 떼도 본문이 630줄이라 래퍼 크레이트 템플릿
+  (`write_wrapper_manifest`·`render_wrapper_main`·`write_wrapper_main`)을 `build/wrapper.rs`로
+  옮겼다(`build/mod.rs` 565줄). `write_wrapper_*` 둘을 `pub(super)`로 열었다.
+- 확인: 커밋마다 `cargo test --workspace` 1762 통과·76 무시, GPU 캡처 47 통과(skip 0), clippy 경고 0.
+  래퍼 경로는 `e2e_new_then_build_produces_dist_exe`(`--ignored`)로 실제 빌드까지 확인했다.
+
 ## v1.0.172 — 2026-10-12 — GPU 테스트 스크린샷 기록은 opt-in
 
 ### Changed (test-only)
