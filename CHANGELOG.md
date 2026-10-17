@@ -47,6 +47,11 @@ recent on top. v0.x entries are organised by Cycle (see
   순서는 그대로다.
 - 확인: 커밋마다 GPU 캡처 29장(capture 바이너리 14 + `VOLTEX_WRITE_SCREENSHOTS` 기록 15)을 분할 전과
   비교해 모두 픽셀 단위로 같았다(같은 커밋 3회 촬영의 차이도 0). GPU 테스트 출력에 wgpu 경고·패닉 없음.
+- **voltex_capture `scene`**: 씬 함수 22곳이 반복하던 encoder → `render` → submit → `read_rgba8` 꼬리를
+  `draw_and_read`로 모았다(모양이 다른 테스트 3곳은 그대로). 텍스처·핫리로드·스프라이트 씬과 그 테스트를
+  `scene_texture.rs`·`scene_hot_reload.rs`·`scene_sprite.rs`로 옮겼다. 새 모듈은 private이고 `scene`이
+  `pub use`로 다시 내보내 `voltex_capture::scene::render_*` 경로는 그대로다. `scene.rs`는 2780 → 1845줄
+  (그중 테스트 약 700줄)로 아직 600줄을 넘는다. 확인 방법은 위와 같다(29장 차이 0).
 
 ## v1.0.172 — 2026-10-12 — GPU 테스트 스크린샷 기록은 opt-in
 
