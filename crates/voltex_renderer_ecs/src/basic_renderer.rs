@@ -6,25 +6,20 @@
 use voltex_ecs::{MaterialHandle, World, WorldTransform};
 use voltex_math::{Mat4, Vec3, Vec4, AABB};
 use voltex_renderer::{
-    create_line_pipeline, create_pbr_full_texture_bind_group, create_pbr_pipeline,
+    create_pbr_full_texture_bind_group, create_pbr_pipeline,
     create_pbr_skinned_pipeline, create_shadow_pipeline, create_skinned_shadow_pipeline,
     create_sprite_pipeline,
-    line_camera_bind_group_layout,
     pbr_full_texture_bind_group_layout,
     pipeline::{create_colored_mesh_pipeline, create_skinned_mesh_pipeline},
     shadow_main_bind_group_layout, shadow_pass_bind_group_layout, sprite_uniform_bind_group_layout,
     BonePalette, CameraUniform, ColoredCameraUniform, GpuTexture, IblResources, LightData,
-    LightUniform, LightsUniform, LineCameraUniform, LineVertex, MaterialUniform, PointLight,
+    LightUniform, LightsUniform, LineVertex, MaterialUniform, PointLight,
     PointLightsUniform, ShadowMainUniform, ShadowMap, ShadowPassUniform, ShadowUniform,
     SkinnedCameraUniform, SpriteUniform, SPRITE_INDICES, SPRITE_QUAD, SHADOW_MAP_SIZE,
 };
 
 use crate::sprite::Sprite;
 use std::cell::{Cell, RefCell};
-
-/// Max debug-line vertices uploaded per frame (2 per segment). Fixed-capacity
-/// so `set_debug_lines` can stay `&self` (mirrors `set_point_lights`).
-const MAX_DEBUG_LINE_VERTICES: usize = 8192;
 
 /// Max billboard sprites drawn per frame (each needs one dynamic-UBO slot).
 const MAX_SPRITES: usize = 256;
@@ -85,11 +80,7 @@ pub struct BasicRenderer {
     shadow_main_bind_group: wgpu::BindGroup,
     // Immediate-mode debug lines (collider/nav/ray gizmos). Drawn last, over the
     // 3D scene, depth-tested but not depth-writing.
-    line_pipeline: wgpu::RenderPipeline,
-    line_camera_buffer: wgpu::Buffer,
-    line_camera_bind_group: wgpu::BindGroup,
-    line_vertex_buffer: wgpu::Buffer,
-    line_vertex_count: Cell<u32>,
+    debug_line_pass: crate::debug_line_pass::DebugLinePass,
     // Billboard sprites (camera-facing quads). Drawn after meshes + lines,
     // alpha-blended, depth-tested but not depth-writing.
     sprite_pipeline: wgpu::RenderPipeline,
@@ -376,28 +367,7 @@ impl BasicRenderer {
         });
 
         // ── Debug line resources ────────────────────────────────────────────
-        let line_cam_layout = line_camera_bind_group_layout(device);
-        let line_pipeline = create_line_pipeline(device, target_format, &line_cam_layout);
-        let line_camera_buffer = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("BasicRenderer Debug Line Camera UBO"),
-            size: std::mem::size_of::<LineCameraUniform>() as u64,
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
-        });
-        let line_camera_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("BasicRenderer Debug Line Camera BG"),
-            layout: &line_cam_layout,
-            entries: &[wgpu::BindGroupEntry {
-                binding: 0,
-                resource: line_camera_buffer.as_entire_binding(),
-            }],
-        });
-        let line_vertex_buffer = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("BasicRenderer Debug Line Vertex Buffer"),
-            size: (MAX_DEBUG_LINE_VERTICES * std::mem::size_of::<LineVertex>()) as u64,
-            usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
-        });
+        let debug_line_pass = crate::debug_line_pass::DebugLinePass::new(device, target_format);
 
         let tilemap_pass =
             crate::tilemap_pass::TilemapPass::new(device, queue, target_format, &tex_layout);
@@ -641,11 +611,7 @@ impl BasicRenderer {
             shadow_pass_aligned,
             shadow_main_buffer,
             shadow_main_bind_group,
-            line_pipeline,
-            line_camera_buffer,
-            line_camera_bind_group,
-            line_vertex_buffer,
-            line_vertex_count: Cell::new(0),
+            debug_line_pass,
             sprite_pipeline,
             sprite_quad_vbuf,
             sprite_quad_ibuf,
@@ -715,15 +681,7 @@ impl BasicRenderer {
     /// Call once per frame before [`render`](Self::render) (cheap uniform/vertex
     /// write).
     pub fn set_debug_lines(&self, queue: &wgpu::Queue, verts: &[LineVertex]) {
-        let n = verts.len().min(MAX_DEBUG_LINE_VERTICES) & !1; // even count (pairs)
-        if n > 0 {
-            queue.write_buffer(
-                &self.line_vertex_buffer,
-                0,
-                bytemuck::cast_slice(&verts[..n]),
-            );
-        }
-        self.line_vertex_count.set(n as u32);
+        self.debug_line_pass.set_lines(queue, verts);
     }
 
     /// World 의 모든 MeshHandle 엔티티를 dynamic-offset draw 로 렌더링한다.
@@ -861,7 +819,7 @@ impl BasicRenderer {
             queue, encoder, target_view, depth_view, world, assets, &self.default_texture, view_proj,
         );
         self.render_sprites(queue, encoder, target_view, depth_view, world, assets, view_proj, cam_pos);
-        self.render_debug_lines(queue, encoder, target_view, depth_view, view_proj);
+        self.debug_line_pass.render(queue, encoder, target_view, depth_view, view_proj);
     }
 
     /// Billboard pass: draws every entity carrying a [`WorldTransform`] + a
@@ -968,55 +926,6 @@ impl BasicRenderer {
             pass.set_bind_group(0, &self.sprite_uniform_bind_group, &[off]);
             pass.draw_indexed(0..SPRITE_INDICES.len() as u32, 0, 0..1);
         }
-    }
-
-    /// Final pass: draw the debug line segments set via [`set_debug_lines`]
-    /// (`LineList`, depth-tested against the scene, no depth write). No-op when
-    /// no lines are queued.
-    fn render_debug_lines(
-        &self,
-        queue: &wgpu::Queue,
-        encoder: &mut wgpu::CommandEncoder,
-        target_view: &wgpu::TextureView,
-        depth_view: &wgpu::TextureView,
-        view_proj: Mat4,
-    ) {
-        let count = self.line_vertex_count.get();
-        if count == 0 {
-            return;
-        }
-        let cam = LineCameraUniform {
-            view_proj: view_proj.cols,
-        };
-        queue.write_buffer(&self.line_camera_buffer, 0, bytemuck::bytes_of(&cam));
-
-        let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-            label: Some("BasicRenderer Debug Line Pass"),
-            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                view: target_view,
-                resolve_target: None,
-                depth_slice: None,
-                ops: wgpu::Operations {
-                    load: wgpu::LoadOp::Load,
-                    store: wgpu::StoreOp::Store,
-                },
-            })],
-            depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
-                view: depth_view,
-                depth_ops: Some(wgpu::Operations {
-                    load: wgpu::LoadOp::Load,
-                    store: wgpu::StoreOp::Store,
-                }),
-                stencil_ops: None,
-            }),
-            occlusion_query_set: None,
-            timestamp_writes: None,
-            multiview_mask: None,
-        });
-        pass.set_pipeline(&self.line_pipeline);
-        pass.set_bind_group(0, &self.line_camera_bind_group, &[]);
-        pass.set_vertex_buffer(0, self.line_vertex_buffer.slice(..));
-        pass.draw(0..count, 0..1);
     }
 
     /// The default colored Blinn-Phong mesh pass (clears the frame). Extracted
