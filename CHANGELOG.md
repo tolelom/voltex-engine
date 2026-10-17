@@ -10,7 +10,7 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
-## Unreleased — 2026-10-17 — 워크스페이스 버전을 CHANGELOG에 맞춤
+## v1.0.173 — 2026-10-17 — 워크스페이스 버전 정합 + 600줄 한도 리팩터링
 
 ### Fix
 

@@ -47,7 +47,7 @@ members = [
 # at the repo root. `version` tracks the engine release line so that
 # `voltex --version` (CARGO_PKG_VERSION of voltex_cli) reports the real
 # version instead of the old per-crate 0.1.0 placeholder.
-version = "1.0.172"
+version = "1.0.173"
 license = "MIT OR Apache-2.0"
 
 [workspace.dependencies]
