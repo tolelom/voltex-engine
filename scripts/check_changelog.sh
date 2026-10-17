@@ -72,6 +72,14 @@ if $CODE_TOUCHED && ! $CHANGELOG_TOUCHED; then
     exit 1
 fi
 
+# The newest numbered CHANGELOG entry must match the workspace version of the
+# commit being pushed (scripts/check_version.sh).
+VERSION_TMP="$(mktemp -d)"
+trap 'rm -rf "$VERSION_TMP"' EXIT
+git show "$HEAD:CHANGELOG.md" > "$VERSION_TMP/CHANGELOG.md"
+git show "$HEAD:Cargo.toml" > "$VERSION_TMP/Cargo.toml"
+bash "$(dirname "$0")/check_version.sh" "$VERSION_TMP/CHANGELOG.md" "$VERSION_TMP/Cargo.toml"
+
 if $CODE_TOUCHED; then
     echo "✓ CHANGELOG entry present for code changes ($BASE..$HEAD)"
 else

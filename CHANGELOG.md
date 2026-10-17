@@ -19,6 +19,11 @@ recent on top. v0.x entries are organised by Cycle (see
   크래시 리포트의 `voltex_runtime:` 줄은 `env!("CARGO_PKG_VERSION")`을 읽으므로 옛 번호를
   보고했다. 1.0.172로 맞췄다. 확인: `cargo run -p voltex_cli -- --version` → `voltex 1.0.172`.
 - README 버전 배지(v1.0.114)는 고치지 않았다(README 미커밋 변경과 함께 정리할 항목, NEXT.md).
+- **재발 방지**: `scripts/check_version.sh`가 번호 붙은 최신 CHANGELOG 항목(`## vX.Y.Z`,
+  `## Unreleased`는 건너뜀)과 `[workspace.package] version`을 비교한다. pre-push 훅과 PR CI가
+  부르는 `scripts/check_changelog.sh`가 push할 커밋의 두 파일로 이 검사를 돌리고, 다르면
+  `CHANGELOG v1.0.173 != workspace 1.0.172` 형식으로 실패한다. 번호를 매길 때는 Cargo 버전도
+  함께 올려야 한다.
 
 ## v1.0.172 — 2026-10-12 — GPU 테스트 스크린샷 기록은 opt-in
 
