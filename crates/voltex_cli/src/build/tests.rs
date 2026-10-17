@@ -1,3 +1,4 @@
+use super::wrapper::render_wrapper_main;
 use super::*;
 use crate::manifest::{BuildConfig, BuildKind, Manifest, ProjectInfo};
 use std::collections::HashMap;
