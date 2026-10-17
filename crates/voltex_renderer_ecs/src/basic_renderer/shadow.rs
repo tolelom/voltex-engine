@@ -156,15 +156,15 @@ impl BasicRenderer {
                     dpass.draw_indexed(0..mesh.num_indices, 0, 0..1);
                 }
                 if !skinned_casters.is_empty() {
-                    dpass.set_pipeline(&self.skinned_shadow_pipeline);
+                    dpass.set_pipeline(&self.skinned.shadow_pipeline);
                     for (i, handle) in skinned_casters.iter().enumerate() {
                         let Some(mesh) = assets.skinned_mesh(*handle) else {
                             continue;
                         };
-                        let cam_off = (i as u32) * self.skinned_cam_aligned;
-                        let pal_off = (i as u32) * self.palette_aligned;
-                        dpass.set_bind_group(0, &self.skinned_shadow_cam_bind_group, &[cam_off]);
-                        dpass.set_bind_group(1, &self.palette_bind_group, &[pal_off]);
+                        let cam_off = (i as u32) * self.skinned.cam_aligned;
+                        let pal_off = (i as u32) * self.skinned.palette_aligned;
+                        dpass.set_bind_group(0, &self.skinned.shadow_cam_bind_group, &[cam_off]);
+                        dpass.set_bind_group(1, &self.skinned.palette_bind_group, &[pal_off]);
                         dpass.set_vertex_buffer(0, mesh.vertex_buffer.slice(..));
                         dpass.set_index_buffer(mesh.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
                         dpass.draw_indexed(0..mesh.num_indices, 0, 0..1);
