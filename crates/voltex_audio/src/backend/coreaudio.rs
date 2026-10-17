@@ -126,6 +126,7 @@ extern "C" fn output_callback(
 
 // ── Backend impl ────────────────────────────────────────────────────────
 
+/// `AudioBackend` over a CoreAudio `AudioQueue` output.
 pub struct CoreAudioBackend {
     queue: AudioQueueRef,
     free: *mut Arc<FreeQueue>, // leaked Box; freed in shutdown after dispose
@@ -139,6 +140,8 @@ pub struct CoreAudioBackend {
 unsafe impl Send for CoreAudioBackend {}
 
 impl CoreAudioBackend {
+    /// Creates an f32 stereo @48 kHz output queue; returns
+    /// `BackendError::InitFailed` if CoreAudio cannot create or start it.
     pub fn new() -> Result<Self, BackendError> {
         let sample_rate = 48_000u32;
         let channels = 2u16;

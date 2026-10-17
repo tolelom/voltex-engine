@@ -5,15 +5,22 @@ use std::sync::mpsc;
 use std::thread;
 
 use crate::mixing::VoiceId;
-use crate::{AudioClip, PlayingSound, mix_sounds};
-use crate::spatial::{Listener, SpatialParams};
-use crate::mix_group::{MixGroup, MixerState};
+use crate::AudioClip;
+use crate::spatial::SpatialParams;
+use crate::mix_group::MixGroup;
+// Only the Windows audio thread applies commands (see `apply_command`).
+#[cfg(target_os = "windows")]
+use crate::{PlayingSound, spatial::Listener, mix_group::MixerState};
 
 // ---------------------------------------------------------------------------
 // AudioCommand
 // ---------------------------------------------------------------------------
 
 /// Commands sent to the audio thread.
+#[cfg_attr(
+    not(target_os = "windows"),
+    expect(dead_code, reason = "the silent non-Windows thread drops playback payloads")
+)]
 pub(crate) enum AudioCommand {
     /// Start playing a clip.
     Play {
@@ -245,6 +252,7 @@ impl Drop for AudioSystem {
 /// Apply one [`AudioCommand`] to the audio thread's state. Returns `true` for
 /// `Shutdown` (the caller should exit its loop). Extracted from the thread
 /// loop so the command semantics are unit-testable without a device.
+#[cfg(target_os = "windows")]
 pub(crate) fn apply_command(
     cmd: AudioCommand,
     playing: &mut Vec<PlayingSound>,
@@ -319,6 +327,7 @@ fn audio_thread(rx: mpsc::Receiver<AudioCommand>, clips: Vec<AudioClip>) {
 
 #[cfg(target_os = "windows")]
 fn audio_thread_windows(rx: mpsc::Receiver<AudioCommand>, mut clips: Vec<AudioClip>) {
+    use crate::mix_sounds;
     use crate::wasapi::WasapiDevice;
 
     let device = match WasapiDevice::new() {
@@ -484,6 +493,8 @@ mod tests {
         sys.stop_voice(a); // fire-and-forget, must not panic
     }
 
+    // Windows-only: the non-Windows thread never applies Play/StopVoice.
+    #[cfg(target_os = "windows")]
     #[test]
     fn apply_command_stop_voice_removes_only_that_voice() {
         let mut playing: Vec<PlayingSound> = Vec::new();

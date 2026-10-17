@@ -68,6 +68,7 @@ unsafe fn alsa_strerror(err: c_int) -> String {
 
 // ── Backend impl ─────────────────────────────────────────────────────────
 
+/// `AudioBackend` over an ALSA PCM handle on the "default" device.
 pub struct AlsaBackend {
     pcm: *mut snd_pcm_t,
     sample_rate: u32,
@@ -78,6 +79,8 @@ pub struct AlsaBackend {
 unsafe impl Send for AlsaBackend {}
 
 impl AlsaBackend {
+    /// Opens the "default" PCM device as f32 stereo @48 kHz; returns
+    /// `BackendError::InitFailed` if ALSA cannot open or configure it.
     pub fn new() -> Result<Self, BackendError> {
         let sample_rate = 48_000u32;
         let channels = 2u16;
@@ -89,7 +92,7 @@ impl AlsaBackend {
         unsafe {
             let rc = snd_pcm_open(
                 &mut pcm,
-                device.as_ptr() as *const u8,
+                device.as_ptr().cast::<u8>(),
                 SND_PCM_STREAM_PLAYBACK,
                 0,
             );
