@@ -7,17 +7,20 @@ use voltex_ecs::{MaterialHandle, World, WorldTransform};
 use voltex_math::{Mat4, Vec3, Vec4, AABB};
 use voltex_renderer::{
     create_pbr_full_texture_bind_group, create_pbr_pipeline,
-    create_pbr_skinned_pipeline, create_shadow_pipeline, create_skinned_shadow_pipeline,
+    create_pbr_skinned_pipeline, create_skinned_shadow_pipeline,
     pbr_full_texture_bind_group_layout,
     pipeline::{create_colored_mesh_pipeline, create_skinned_mesh_pipeline},
-    shadow_main_bind_group_layout, shadow_pass_bind_group_layout,
     BonePalette, CameraUniform, ColoredCameraUniform, GpuTexture, IblResources, LightData,
     LightUniform, LightsUniform, LineVertex, MaterialUniform, PointLight,
-    PointLightsUniform, ShadowMainUniform, ShadowMap, ShadowPassUniform, ShadowUniform,
+    PointLightsUniform, ShadowMap, ShadowUniform,
     SkinnedCameraUniform, SHADOW_MAP_SIZE,
 };
 
 use std::cell::{Cell, RefCell};
+
+mod shadow;
+
+use shadow::ShadowResources;
 
 use crate::assets::RenderAssets;
 use crate::items::collect_render_items;
@@ -66,13 +69,7 @@ pub struct BasicRenderer {
     skinned_shadow_cam_bind_group: wgpu::BindGroup,
     // Directional shadow mapping (off by default; enable with set_shadows).
     shadows_enabled: bool,
-    shadow_map: ShadowMap,
-    shadow_pipeline: wgpu::RenderPipeline,
-    shadow_pass_buffer: wgpu::Buffer,
-    shadow_pass_bind_group: wgpu::BindGroup,
-    shadow_pass_aligned: u32,
-    shadow_main_buffer: wgpu::Buffer,
-    shadow_main_bind_group: wgpu::BindGroup,
+    shadow: ShadowResources,
     // Immediate-mode debug lines (collider/nav/ray gizmos). Drawn last, over the
     // 3D scene, depth-tested but not depth-writing.
     debug_line_pass: crate::debug_line_pass::DebugLinePass,
@@ -206,61 +203,8 @@ impl BasicRenderer {
         });
 
         // ── Shadow mapping resources (group 3 of the colored shader) ────────
-        let shadow_map = ShadowMap::new(device);
-        let shadow_main_layout = shadow_main_bind_group_layout(device);
-        let shadow_main_buffer = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("BasicRenderer Shadow Main UBO"),
-            size: std::mem::size_of::<ShadowMainUniform>() as u64,
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
-        });
-        queue.write_buffer(
-            &shadow_main_buffer,
-            0,
-            bytemuck::bytes_of(&ShadowMainUniform::disabled()),
-        );
-        let shadow_main_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("BasicRenderer Shadow Main BG"),
-            layout: &shadow_main_layout,
-            entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: wgpu::BindingResource::TextureView(&shadow_map.view),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 1,
-                    resource: wgpu::BindingResource::Sampler(&shadow_map.sampler),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 2,
-                    resource: shadow_main_buffer.as_entire_binding(),
-                },
-            ],
-        });
-
-        // Shadow depth pass (per-entity light_vp_model dynamic UBO).
-        let shadow_pass_layout = shadow_pass_bind_group_layout(device);
-        let shadow_pipeline = create_shadow_pipeline(device, &shadow_pass_layout);
-        let shadow_pass_aligned =
-            (std::mem::size_of::<ShadowPassUniform>() as u32).div_ceil(alignment) * alignment;
-        let shadow_pass_buffer = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("BasicRenderer Shadow Pass UBO"),
-            size: (shadow_pass_aligned as usize * max_entities) as u64,
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
-        });
-        let shadow_pass_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("BasicRenderer Shadow Pass BG"),
-            layout: &shadow_pass_layout,
-            entries: &[wgpu::BindGroupEntry {
-                binding: 0,
-                resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
-                    buffer: &shadow_pass_buffer,
-                    offset: 0,
-                    size: wgpu::BufferSize::new(std::mem::size_of::<ShadowPassUniform>() as u64),
-                }),
-            }],
-        });
+        let (shadow, shadow_main_layout) =
+            ShadowResources::new(device, queue, alignment, max_entities);
 
         let pipeline = create_colored_mesh_pipeline(
             device,
@@ -464,7 +408,7 @@ impl BasicRenderer {
             0,
             bytemuck::bytes_of(&pbr_shadow_disabled()),
         );
-        let pbr_shadow_bind_group = shadow_map.create_bind_group(
+        let pbr_shadow_bind_group = shadow.map.create_bind_group(
             device,
             &pbr_shadow_layout,
             &pbr_shadow_uniform_buffer,
@@ -559,13 +503,7 @@ impl BasicRenderer {
             skinned_shadow_cam_buffer,
             skinned_shadow_cam_bind_group,
             shadows_enabled: false,
-            shadow_map,
-            shadow_pipeline,
-            shadow_pass_buffer,
-            shadow_pass_bind_group,
-            shadow_pass_aligned,
-            shadow_main_buffer,
-            shadow_main_bind_group,
+            shadow,
             debug_line_pass,
             sprite_pass,
             pbr_enabled: false,
@@ -664,80 +602,7 @@ impl BasicRenderer {
         warn_overflow_once(&self.mesh_overflow_warned, "mesh entities", items.len(), self.max_entities);
         let n = items.len().min(self.max_entities);
 
-        // ── Directional shadow depth pre-pass ───────────────────────────────
-        if self.shadows_enabled {
-            let light_vp = directional_light_vp(light.direction);
-            let sp_aligned = self.shadow_pass_aligned as usize;
-            let mut sp_staging = vec![0u8; n * sp_aligned];
-            for (i, item) in items.iter().take(n).enumerate() {
-                let u = ShadowPassUniform {
-                    light_vp_model: (light_vp * item.model).cols,
-                };
-                let o = i * sp_aligned;
-                sp_staging[o..o + std::mem::size_of::<ShadowPassUniform>()]
-                    .copy_from_slice(bytemuck::bytes_of(&u));
-            }
-            if n > 0 {
-                queue.write_buffer(&self.shadow_pass_buffer, 0, &sp_staging);
-            }
-            // Skinned casters: upload light-space camera + shared palette, then
-            // draw into the same depth map after the static meshes.
-            let skinned_casters = self.gather_skinned_shadow(queue, world, light_vp);
-            {
-                let mut dpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                    label: Some("BasicRenderer Shadow Depth Pass"),
-                    color_attachments: &[],
-                    depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
-                        view: &self.shadow_map.view,
-                        depth_ops: Some(wgpu::Operations {
-                            load: wgpu::LoadOp::Clear(1.0),
-                            store: wgpu::StoreOp::Store,
-                        }),
-                        stencil_ops: None,
-                    }),
-                    occlusion_query_set: None,
-                    timestamp_writes: None,
-                    multiview_mask: None,
-                });
-                dpass.set_pipeline(&self.shadow_pipeline);
-                for (i, item) in items.iter().take(n).enumerate() {
-                    let mesh = assets.mesh(item.mesh).expect("collect skipped stale");
-                    let off = (i as u32) * self.shadow_pass_aligned;
-                    dpass.set_bind_group(0, &self.shadow_pass_bind_group, &[off]);
-                    dpass.set_vertex_buffer(0, mesh.vertex_buffer.slice(..));
-                    dpass.set_index_buffer(mesh.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
-                    dpass.draw_indexed(0..mesh.num_indices, 0, 0..1);
-                }
-                if !skinned_casters.is_empty() {
-                    dpass.set_pipeline(&self.skinned_shadow_pipeline);
-                    for (i, handle) in skinned_casters.iter().enumerate() {
-                        let Some(mesh) = assets.skinned_mesh(*handle) else {
-                            continue;
-                        };
-                        let cam_off = (i as u32) * self.skinned_cam_aligned;
-                        let pal_off = (i as u32) * self.palette_aligned;
-                        dpass.set_bind_group(0, &self.skinned_shadow_cam_bind_group, &[cam_off]);
-                        dpass.set_bind_group(1, &self.palette_bind_group, &[pal_off]);
-                        dpass.set_vertex_buffer(0, mesh.vertex_buffer.slice(..));
-                        dpass.set_index_buffer(mesh.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
-                        dpass.draw_indexed(0..mesh.num_indices, 0, 0..1);
-                    }
-                }
-            }
-            let su = ShadowMainUniform {
-                light_view_proj: light_vp.cols,
-                shadow_map_size: SHADOW_MAP_SIZE as f32,
-                shadow_bias: 0.003,
-                _pad: [0.0; 2],
-            };
-            queue.write_buffer(&self.shadow_main_buffer, 0, bytemuck::bytes_of(&su));
-        } else {
-            queue.write_buffer(
-                &self.shadow_main_buffer,
-                0,
-                bytemuck::bytes_of(&ShadowMainUniform::disabled()),
-            );
-        }
+        self.shadow_prepass(queue, encoder, world, assets, &items, n, light);
 
         if self.pbr_enabled {
             // PBR shadow group uses the full ShadowUniform (also carries the sky
@@ -835,7 +700,7 @@ impl BasicRenderer {
         });
         pass.set_pipeline(&self.pipeline);
         pass.set_bind_group(2, &self.point_lights_bind_group, &[]);
-        pass.set_bind_group(3, &self.shadow_main_bind_group, &[]);
+        pass.set_bind_group(3, &self.shadow.main_bind_group, &[]);
         for (i, item) in items.iter().take(n).enumerate() {
             let mesh = assets
                 .mesh(item.mesh)
