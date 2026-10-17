@@ -25,6 +25,40 @@ pub(crate) fn unit_cube(device: &wgpu::Device) -> Mesh {
     Mesh::cube(device, 1.0)
 }
 
+/// Record one `BasicRenderer::render` into a fresh encoder, submit it and read
+/// the target back as RGBA8 (the shared tail of the scene functions below).
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn draw_and_read(
+    gpu: &HeadlessGpu,
+    target: &OffscreenTarget,
+    renderer: &BasicRenderer,
+    label: &str,
+    clear_color: wgpu::Color,
+    world: &mut World,
+    assets: &RenderAssets,
+    view_proj: Mat4,
+    cam_pos: Vec3,
+    light: LightUniform,
+) -> Vec<u8> {
+    let mut encoder = gpu
+        .device
+        .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some(label) });
+    renderer.render(
+        &gpu.queue,
+        &mut encoder,
+        &target.color_view,
+        &target.depth_view,
+        clear_color,
+        world,
+        assets,
+        view_proj,
+        cam_pos,
+        light,
+    );
+    gpu.queue.submit(Some(encoder.finish()));
+    target.read_rgba8(&gpu.device, &gpu.queue)
+}
+
 /// Render a 3×3 grid of cubes lit by the default directional light, viewed
 /// from a slightly elevated angle. Returns RGBA8 (`width*height*4`).
 pub fn render_cube_grid(gpu: &HeadlessGpu, width: u32, height: u32) -> Vec<u8> {
@@ -59,16 +93,11 @@ pub fn render_cube_grid(gpu: &HeadlessGpu, width: u32, height: u32) -> Vec<u8> {
     let view_proj = camera.view_projection();
     let light = LightUniform::new();
 
-    let mut encoder = gpu
-        .device
-        .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-            label: Some("capture cube_grid"),
-        });
-    renderer.render(
-        &gpu.queue,
-        &mut encoder,
-        &target.color_view,
-        &target.depth_view,
+    draw_and_read(
+        gpu,
+        &target,
+        &renderer,
+        "capture cube_grid",
         wgpu::Color {
             r: 0.1,
             g: 0.12,
@@ -80,10 +109,7 @@ pub fn render_cube_grid(gpu: &HeadlessGpu, width: u32, height: u32) -> Vec<u8> {
         view_proj,
         camera.position,
         light,
-    );
-    gpu.queue.submit(Some(encoder.finish()));
-
-    target.read_rgba8(&gpu.device, &gpu.queue)
+    )
 }
 
 /// Render a single large centered cube — the simplest "did anything draw"
@@ -115,16 +141,11 @@ pub fn render_single_cube(gpu: &HeadlessGpu, width: u32, height: u32) -> Vec<u8>
     let mut light = LightUniform::new();
     light.direction = [-0.4, -1.0, -0.6];
 
-    let mut encoder = gpu
-        .device
-        .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-            label: Some("capture single_cube"),
-        });
-    renderer.render(
-        &gpu.queue,
-        &mut encoder,
-        &target.color_view,
-        &target.depth_view,
+    draw_and_read(
+        gpu,
+        &target,
+        &renderer,
+        "capture single_cube",
         wgpu::Color {
             r: 0.05,
             g: 0.05,
@@ -136,10 +157,7 @@ pub fn render_single_cube(gpu: &HeadlessGpu, width: u32, height: u32) -> Vec<u8>
         view_proj,
         camera.position,
         light,
-    );
-    gpu.queue.submit(Some(encoder.finish()));
-
-    target.read_rgba8(&gpu.device, &gpu.queue)
+    )
 }
 
 /// Render a scene built entirely through the *declarative* renderable path:
@@ -180,16 +198,11 @@ pub fn render_materialized_primitives(gpu: &HeadlessGpu, width: u32, height: u32
     let mut light = LightUniform::new();
     light.direction = [-0.4, -1.0, -0.6];
 
-    let mut encoder = gpu
-        .device
-        .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-            label: Some("capture materialized_primitives"),
-        });
-    renderer.render(
-        &gpu.queue,
-        &mut encoder,
-        &target.color_view,
-        &target.depth_view,
+    draw_and_read(
+        gpu,
+        &target,
+        &renderer,
+        "capture materialized_primitives",
         wgpu::Color {
             r: 0.05,
             g: 0.05,
@@ -201,10 +214,7 @@ pub fn render_materialized_primitives(gpu: &HeadlessGpu, width: u32, height: u32
         view_proj,
         camera.position,
         light,
-    );
-    gpu.queue.submit(Some(encoder.finish()));
-
-    target.read_rgba8(&gpu.device, &gpu.queue)
+    )
 }
 
 /// Render a scene authored as **data**: a world of `PrimitiveMesh` +
@@ -254,16 +264,11 @@ pub fn render_data_authored_scene(gpu: &HeadlessGpu, width: u32, height: u32) ->
     let mut light = LightUniform::new();
     light.direction = [-0.4, -1.0, -0.6];
 
-    let mut encoder = gpu
-        .device
-        .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-            label: Some("capture data_authored_scene"),
-        });
-    renderer.render(
-        &gpu.queue,
-        &mut encoder,
-        &target.color_view,
-        &target.depth_view,
+    draw_and_read(
+        gpu,
+        &target,
+        &renderer,
+        "capture data_authored_scene",
         wgpu::Color {
             r: 0.05,
             g: 0.05,
@@ -275,10 +280,7 @@ pub fn render_data_authored_scene(gpu: &HeadlessGpu, width: u32, height: u32) ->
         view_proj,
         camera.position,
         light,
-    );
-    gpu.queue.submit(Some(encoder.finish()));
-
-    target.read_rgba8(&gpu.device, &gpu.queue)
+    )
 }
 
 /// Render a top-down boids-style swarm: many small, randomly-placed,
@@ -326,25 +328,18 @@ pub fn render_boids_swarm(gpu: &HeadlessGpu, width: u32, height: u32) -> Vec<u8>
     let mut light = LightUniform::new();
     light.direction = [-0.3, -1.0, -0.2];
 
-    let mut encoder = gpu
-        .device
-        .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-            label: Some("capture boids_swarm"),
-        });
-    renderer.render(
-        &gpu.queue,
-        &mut encoder,
-        &target.color_view,
-        &target.depth_view,
+    draw_and_read(
+        gpu,
+        &target,
+        &renderer,
+        "capture boids_swarm",
         wgpu::Color { r: 0.02, g: 0.02, b: 0.04, a: 1.0 },
         &mut world,
         &assets,
         view_proj,
         camera.position,
         light,
-    );
-    gpu.queue.submit(Some(encoder.finish()));
-    target.read_rgba8(&gpu.device, &gpu.queue)
+    )
 }
 
 /// Render an arbitrary caller-built `World` of *declarative* renderables
@@ -425,16 +420,11 @@ fn render_world_impl(
     let mut light = LightUniform::new();
     light.direction = [-0.4, -1.0, -0.6];
 
-    let mut encoder = gpu
-        .device
-        .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-            label: Some("capture render_world"),
-        });
-    renderer.render(
-        &gpu.queue,
-        &mut encoder,
-        &target.color_view,
-        &target.depth_view,
+    draw_and_read(
+        gpu,
+        &target,
+        &renderer,
+        "capture render_world",
         wgpu::Color {
             r: 0.05,
             g: 0.05,
@@ -446,9 +436,7 @@ fn render_world_impl(
         view_proj,
         camera.position,
         light,
-    );
-    gpu.queue.submit(Some(encoder.finish()));
-    target.read_rgba8(&gpu.device, &gpu.queue)
+    )
 }
 
 /// Render `voltex_survivor`'s seed scene through the *declarative* path it now
@@ -772,23 +760,18 @@ pub fn render_demo_like_cam(
     camera.pitch = pitch;
     let view_proj = camera.view_projection();
     let light = LightUniform::new();
-    let mut encoder = gpu
-        .device
-        .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("demo_like_cam") });
-    renderer.render(
-        &gpu.queue,
-        &mut encoder,
-        &target.color_view,
-        &target.depth_view,
+    draw_and_read(
+        gpu,
+        &target,
+        &renderer,
+        "demo_like_cam",
         wgpu::Color { r: 0.02, g: 0.02, b: 0.05, a: 1.0 },
         &mut world,
         &assets,
         view_proj,
         camera.position,
         light,
-    );
-    gpu.queue.submit(Some(encoder.finish()));
-    target.read_rgba8(&gpu.device, &gpu.queue)
+    )
 }
 
 /// Render a single cube with a pre-built [`GpuTexture`] via a runtime
@@ -822,23 +805,18 @@ pub fn render_cube_with_texture(
     camera.yaw = -0.7;
     camera.pitch = -0.4;
 
-    let mut encoder = gpu
-        .device
-        .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("capture tex") });
-    renderer.render(
-        &gpu.queue,
-        &mut encoder,
-        &target.color_view,
-        &target.depth_view,
+    draw_and_read(
+        gpu,
+        &target,
+        &renderer,
+        "capture tex",
         wgpu::Color { r: 0.05, g: 0.05, b: 0.08, a: 1.0 },
         &mut world,
         &assets,
         camera.view_projection(),
         camera.position,
         LightUniform::new(),
-    );
-    gpu.queue.submit(Some(encoder.finish()));
-    target.read_rgba8(&gpu.device, &gpu.queue)
+    )
 }
 
 /// Render a single cube whose diffuse texture is decoded from **PNG bytes**
@@ -876,23 +854,18 @@ pub fn render_cube_with_png(
     camera.yaw = -0.7;
     camera.pitch = -0.4;
 
-    let mut encoder = gpu
-        .device
-        .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("capture png tex") });
-    renderer.render(
-        &gpu.queue,
-        &mut encoder,
-        &target.color_view,
-        &target.depth_view,
+    Ok(draw_and_read(
+        gpu,
+        &target,
+        &renderer,
+        "capture png tex",
         wgpu::Color { r: 0.05, g: 0.05, b: 0.08, a: 1.0 },
         &mut world,
         &assets,
         camera.view_projection(),
         camera.position,
         LightUniform::new(),
-    );
-    gpu.queue.submit(Some(encoder.finish()));
-    Ok(target.read_rgba8(&gpu.device, &gpu.queue))
+    ))
 }
 
 /// Hot-reload regression helper. Renders one cube textured from `png_a`, then
@@ -931,23 +904,18 @@ pub fn render_texture_hot_reload(
     camera.pitch = -0.4;
 
     let render_once = |assets: &RenderAssets, world: &mut World| -> Vec<u8> {
-        let mut encoder = gpu
-            .device
-            .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("hot reload") });
-        renderer.render(
-            &gpu.queue,
-            &mut encoder,
-            &target.color_view,
-            &target.depth_view,
+        draw_and_read(
+            gpu,
+            &target,
+            &renderer,
+            "hot reload",
             wgpu::Color { r: 0.05, g: 0.05, b: 0.08, a: 1.0 },
             world,
             assets,
             camera.view_projection(),
             camera.position,
             LightUniform::new(),
-        );
-        gpu.queue.submit(Some(encoder.finish()));
-        target.read_rgba8(&gpu.device, &gpu.queue)
+        )
     };
 
     let frame_a = render_once(&assets, &mut world);
@@ -992,23 +960,18 @@ pub fn render_mesh_hot_reload(
     camera.pitch = -0.4;
 
     let render_once = |assets: &RenderAssets, world: &mut World| -> Vec<u8> {
-        let mut encoder = gpu
-            .device
-            .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("mesh hot reload") });
-        renderer.render(
-            &gpu.queue,
-            &mut encoder,
-            &target.color_view,
-            &target.depth_view,
+        draw_and_read(
+            gpu,
+            &target,
+            &renderer,
+            "mesh hot reload",
             wgpu::Color { r: 0.05, g: 0.05, b: 0.08, a: 1.0 },
             world,
             assets,
             camera.view_projection(),
             camera.position,
             LightUniform::new(),
-        );
-        gpu.queue.submit(Some(encoder.finish()));
-        target.read_rgba8(&gpu.device, &gpu.queue)
+        )
     };
 
     let frame_a = render_once(&assets, &mut world);
@@ -1075,23 +1038,18 @@ pub fn render_shadow_demo(gpu: &HeadlessGpu, width: u32, height: u32, shadows: b
     light.color = [1.0, 1.0, 1.0];
     light.ambient_strength = 0.12;
 
-    let mut encoder = gpu
-        .device
-        .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("shadow demo") });
-    renderer.render(
-        &gpu.queue,
-        &mut encoder,
-        &target.color_view,
-        &target.depth_view,
+    draw_and_read(
+        gpu,
+        &target,
+        &renderer,
+        "shadow demo",
         wgpu::Color { r: 0.1, g: 0.1, b: 0.15, a: 1.0 },
         &mut world,
         &assets,
         camera.view_projection(),
         camera.position,
         light,
-    );
-    gpu.queue.submit(Some(encoder.finish()));
-    target.read_rgba8(&gpu.device, &gpu.queue)
+    )
 }
 
 /// Render a white cube under a dim directional light + the given additive
@@ -1126,23 +1084,18 @@ pub fn render_cube_point_lit(
     light.ambient_strength = 0.08;
 
     renderer.set_point_lights(&gpu.queue, lights);
-    let mut encoder = gpu
-        .device
-        .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("capture plight") });
-    renderer.render(
-        &gpu.queue,
-        &mut encoder,
-        &target.color_view,
-        &target.depth_view,
+    draw_and_read(
+        gpu,
+        &target,
+        &renderer,
+        "capture plight",
         wgpu::Color { r: 0.0, g: 0.0, b: 0.0, a: 1.0 },
         &mut world,
         &assets,
         camera.view_projection(),
         camera.position,
         light,
-    );
-    gpu.queue.submit(Some(encoder.finish()));
-    target.read_rgba8(&gpu.device, &gpu.queue)
+    )
 }
 
 /// Render a large up-facing ground plane viewed from straight above, lit only
@@ -1196,23 +1149,18 @@ pub fn render_spot_lit(
     light.ambient_strength = 0.02;
 
     renderer.set_point_lights(&gpu.queue, lights);
-    let mut encoder = gpu
-        .device
-        .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("capture spot") });
-    renderer.render(
-        &gpu.queue,
-        &mut encoder,
-        &target.color_view,
-        &target.depth_view,
+    draw_and_read(
+        gpu,
+        &target,
+        &renderer,
+        "capture spot",
         wgpu::Color { r: 0.0, g: 0.0, b: 0.0, a: 1.0 },
         &mut world,
         &assets,
         camera.view_projection(),
         camera.position,
         light,
-    );
-    gpu.queue.submit(Some(encoder.finish()));
-    target.read_rgba8(&gpu.device, &gpu.queue)
+    )
 }
 
 /// Spawn an orange particle burst at the origin, advance it `ticks` times by
@@ -1250,23 +1198,18 @@ pub fn render_particle_burst(
         Camera::orthographic(Vec3::new(0.0, 0.0, 12.0), width as f32 / height as f32, 16.0);
     let light = LightUniform::new();
 
-    let mut encoder = gpu
-        .device
-        .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("capture parts") });
-    renderer.render(
-        &gpu.queue,
-        &mut encoder,
-        &target.color_view,
-        &target.depth_view,
+    draw_and_read(
+        gpu,
+        &target,
+        &renderer,
+        "capture parts",
         wgpu::Color { r: 0.0, g: 0.0, b: 0.0, a: 1.0 },
         &mut world,
         &assets,
         camera.view_projection(),
         camera.position,
         light,
-    );
-    gpu.queue.submit(Some(encoder.finish()));
-    target.read_rgba8(&gpu.device, &gpu.queue)
+    )
 }
 
 /// Render a row of 3 spheres (metallic 0.0 / 0.5 / 1.0, fixed roughness)
@@ -1300,23 +1243,18 @@ pub fn render_pbr_basic_renderer(gpu: &HeadlessGpu, width: u32, height: u32, pbr
     light.color = [1.0, 1.0, 1.0];
     light.ambient_strength = 0.1;
 
-    let mut encoder = gpu
-        .device
-        .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("capture pbr-br") });
-    renderer.render(
-        &gpu.queue,
-        &mut encoder,
-        &target.color_view,
-        &target.depth_view,
+    draw_and_read(
+        gpu,
+        &target,
+        &renderer,
+        "capture pbr-br",
         wgpu::Color { r: 0.05, g: 0.05, b: 0.08, a: 1.0 },
         &mut world,
         &assets,
         camera.view_projection(),
         camera.position,
         light,
-    );
-    gpu.queue.submit(Some(encoder.finish()));
-    target.read_rgba8(&gpu.device, &gpu.queue)
+    )
 }
 
 /// Render a single PBR sphere; when `normal_map` is set, attach a non-flat
@@ -1359,23 +1297,18 @@ pub fn render_pbr_sphere_normalmap(
     light.direction = [-0.3, -0.4, -1.0];
     light.ambient_strength = 0.1;
 
-    let mut encoder = gpu
-        .device
-        .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("capture pbr-nm") });
-    renderer.render(
-        &gpu.queue,
-        &mut encoder,
-        &target.color_view,
-        &target.depth_view,
+    draw_and_read(
+        gpu,
+        &target,
+        &renderer,
+        "capture pbr-nm",
         wgpu::Color { r: 0.02, g: 0.02, b: 0.04, a: 1.0 },
         &mut world,
         &assets,
         camera.view_projection(),
         camera.position,
         light,
-    );
-    gpu.queue.submit(Some(encoder.finish()));
-    target.read_rgba8(&gpu.device, &gpu.queue)
+    )
 }
 
 /// Render one white cube at world `depth` (more negative = farther from the
@@ -1412,23 +1345,18 @@ pub fn render_cube_at_depth(
     light.direction = [0.2, -0.3, -1.0];
     light.ambient_strength = 0.3;
 
-    let mut encoder = gpu
-        .device
-        .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("capture proj") });
-    renderer.render(
-        &gpu.queue,
-        &mut encoder,
-        &target.color_view,
-        &target.depth_view,
+    draw_and_read(
+        gpu,
+        &target,
+        &renderer,
+        "capture proj",
         wgpu::Color { r: 0.0, g: 0.0, b: 0.0, a: 1.0 },
         &mut world,
         &assets,
         camera.view_projection(),
         camera.position,
         light,
-    );
-    gpu.queue.submit(Some(encoder.finish()));
-    target.read_rgba8(&gpu.device, &gpu.queue)
+    )
 }
 
 /// Render a textured billboard sampling `frame` of a 2×2 sprite sheet. The
@@ -1477,23 +1405,18 @@ pub fn render_sprite_sheet_frame(gpu: &HeadlessGpu, width: u32, height: u32, fra
     let camera = Camera::orthographic(Vec3::new(0.0, 0.0, 8.0), width as f32 / height as f32, 6.0);
     let light = LightUniform::new();
 
-    let mut encoder = gpu
-        .device
-        .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("capture sheet") });
-    renderer.render(
-        &gpu.queue,
-        &mut encoder,
-        &target.color_view,
-        &target.depth_view,
+    draw_and_read(
+        gpu,
+        &target,
+        &renderer,
+        "capture sheet",
         wgpu::Color { r: 0.0, g: 0.0, b: 0.0, a: 1.0 },
         &mut world,
         &assets,
         camera.view_projection(),
         camera.position,
         light,
-    );
-    gpu.queue.submit(Some(encoder.finish()));
-    target.read_rgba8(&gpu.device, &gpu.queue)
+    )
 }
 
 /// Render a single magenta billboard [`Sprite`] at the world origin, viewed
@@ -1522,23 +1445,18 @@ pub fn render_billboard_sprite(
     camera.pitch = 0.0;
     let light = LightUniform::new();
 
-    let mut encoder = gpu
-        .device
-        .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("capture sprite") });
-    renderer.render(
-        &gpu.queue,
-        &mut encoder,
-        &target.color_view,
-        &target.depth_view,
+    draw_and_read(
+        gpu,
+        &target,
+        &renderer,
+        "capture sprite",
         wgpu::Color { r: 0.0, g: 0.0, b: 0.0, a: 1.0 },
         &mut world,
         &assets,
         camera.view_projection(),
         camera.position,
         light,
-    );
-    gpu.queue.submit(Some(encoder.finish()));
-    target.read_rgba8(&gpu.device, &gpu.queue)
+    )
 }
 
 /// Render only the given debug line segments (no meshes) on a black background,
@@ -1559,23 +1477,18 @@ pub fn render_debug_lines(
     let light = LightUniform::new();
 
     renderer.set_debug_lines(&gpu.queue, verts);
-    let mut encoder = gpu
-        .device
-        .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("capture lines") });
-    renderer.render(
-        &gpu.queue,
-        &mut encoder,
-        &target.color_view,
-        &target.depth_view,
+    draw_and_read(
+        gpu,
+        &target,
+        &renderer,
+        "capture lines",
         wgpu::Color { r: 0.0, g: 0.0, b: 0.0, a: 1.0 },
         &mut world,
         &assets,
         camera.view_projection(),
         camera.position,
         light,
-    );
-    gpu.queue.submit(Some(encoder.finish()));
-    target.read_rgba8(&gpu.device, &gpu.queue)
+    )
 }
 
 /// Render a cube textured with a 2×2 solid `color` (RGBA).
@@ -1611,23 +1524,18 @@ pub fn render_obj_model(gpu: &HeadlessGpu, width: u32, height: u32, obj_src: &st
     let mut light = LightUniform::new();
     light.direction = [-0.4, -1.0, -0.6];
 
-    let mut encoder = gpu
-        .device
-        .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("capture obj") });
-    renderer.render(
-        &gpu.queue,
-        &mut encoder,
-        &target.color_view,
-        &target.depth_view,
+    draw_and_read(
+        gpu,
+        &target,
+        &renderer,
+        "capture obj",
         wgpu::Color { r: 0.05, g: 0.05, b: 0.08, a: 1.0 },
         &mut world,
         &assets,
         camera.view_projection(),
         camera.position,
         light,
-    );
-    gpu.queue.submit(Some(encoder.finish()));
-    target.read_rgba8(&gpu.device, &gpu.queue)
+    )
 }
 
 #[cfg(test)]
