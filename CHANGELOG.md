@@ -10,6 +10,16 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
+## Unreleased — 2026-10-17 — 워크스페이스 버전을 CHANGELOG에 맞춤
+
+### Fix
+
+- **워크스페이스 버전이 1.0.114에 머묾**: `Cargo.toml`의 `[workspace.package] version`이
+  1.0.114였고 CHANGELOG는 v1.0.172까지 나가 있었다. `voltex --version`(voltex_cli)과
+  크래시 리포트의 `voltex_runtime:` 줄은 `env!("CARGO_PKG_VERSION")`을 읽으므로 옛 번호를
+  보고했다. 1.0.172로 맞췄다. 확인: `cargo run -p voltex_cli -- --version` → `voltex 1.0.172`.
+- README 버전 배지(v1.0.114)는 고치지 않았다(README 미커밋 변경과 함께 정리할 항목, NEXT.md).
+
 ## v1.0.172 — 2026-10-12 — GPU 테스트 스크린샷 기록은 opt-in
 
 ### Changed (test-only)
