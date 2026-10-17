@@ -17,9 +17,9 @@ ECS World ↔ voltex_renderer 브릿지. C0a 의 `MeshHandle` / `MaterialHandle`
 | `RenderAssets::replace_mesh(handle, Mesh) -> Result` | `assets.rs` | 핫리로드 — 기존 `MeshHandle` 뒤 GPU Mesh를 in-place 교체(generation 보존, 엔티티 재부착 불필요). 디코드는 호출자가 `Mesh::from_obj`/`from_gltf` 로. stale handle → Err |
 | `RenderItem { entity, model, mesh, material, texture }` | `items.rs` | per-frame 데이터 단위 (texture: Option<TextureHandle>) |
 | `collect_render_items(&mut World, &RenderAssets) -> Vec<RenderItem>` | `items.rs` | `propagate_transforms` 자동 호출 |
-| `BasicRenderer::new(device, queue, target_format, max_entities)` | `basic_renderer.rs` | mesh_shader.wgsl pipeline 소유 |
-| `BasicRenderer::render(queue, encoder, target_view, depth_view, clear_color, &mut World, &RenderAssets, view_proj, cam_pos, light)` | `basic_renderer.rs` | 메시 패스(colored Blinn-Phong 또는 `set_pbr_enabled` 시 PBR) + 스킨드 패스(colored 또는 PBR) + 스프라이트/파티클/디버그 라인 패스. PBR 시 메시·스킨드 모두 Cook-Torrance |
-| `BasicRenderer::set_point_lights(&queue, &[PointLight])` / `set_shadows(bool)` / `set_debug_lines(&queue, &[LineVertex])` | `basic_renderer.rs` | 매 프레임 호출(`&self`). 디버그 라인은 `LineList` depth-tested 마지막 패스 (MAX 8192 verts, 초과 drop) |
+| `BasicRenderer::new(device, queue, target_format, max_entities)` | `basic_renderer/mod.rs` | mesh_shader.wgsl pipeline 소유 |
+| `BasicRenderer::render(queue, encoder, target_view, depth_view, clear_color, &mut World, &RenderAssets, view_proj, cam_pos, light)` | `basic_renderer/mod.rs` | 메시 패스(colored Blinn-Phong 또는 `set_pbr_enabled` 시 PBR) + 스킨드 패스(colored 또는 PBR) + 스프라이트/파티클/디버그 라인 패스. PBR 시 메시·스킨드 모두 Cook-Torrance |
+| `BasicRenderer::set_point_lights(&queue, &[PointLight])` / `set_shadows(bool)` / `set_debug_lines(&queue, &[LineVertex])` | `basic_renderer/mod.rs` | 매 프레임 호출(`&self`). 디버그 라인은 `LineList` depth-tested 마지막 패스 (MAX 8192 verts, 초과 drop) |
 | `Sprite { texture, size, color, uv_rect, flip_x, roll_from_transform }` + `Sprite::solid` / `textured` / `with_uv_rect(rect)` / `with_roll_from_transform()` / `set_sheet_frame(cols,rows,index)` / `effective_uv_rect()` | `sprite.rs` | 카메라-facing 빌보드 컴포넌트. `WorldTransform`+`Sprite` 엔티티를 mesh 패스 후 alpha-blended·depth-tested(no write) 빌보드로 렌더. `uv_rect`로 스프라이트시트/아틀라스 프레임 선택, `flip_x`는 렌더 시점 u-스왑(표시 전용 — 애니 시스템과 충돌 없음, 렌더러는 `effective_uv_rect()` 사용). 카메라 right/up은 inverse VP에서 복원. `roll_from_transform`(기본 false)이면 엔티티 로컬 X축의 화면 투영 각도만큼 화면 평면에서 회전(`SpriteUniform.size.z`). 카메라 거리 기준 back-to-front 정렬(투명도 합성 순서 무관). MAX 256/frame |
 | `Particle { velocity, acceleration, age, lifetime, start/end_size, start/end_alpha }` + `Particle::new(vel,lifetime,size)` / `spawn_particle(world,pos,color,particle)` / `update_particles(&mut World, dt)` | `particle.rs` | CPU 파티클(=Transform+Sprite+Particle 엔티티). update가 이동·크기/알파 보간·수명 만료 despawn. RuntimeApp tick이 `update_particles` 자동 호출 |
 | `Tilemap { cols, rows, tile_size, tiles, texture, atlas, color }` + `Tilemap::solid(cols,rows,ts,color)` / `set(gx,gy,tile)` / `filled_count()` / `tilemap_vertices(&map,&world_mat)` | `tilemap.rs` | 배치 타일맵. 로컬 XY 평면 격자(gy +y 위), `tiles[gy*cols+gx]` 0=빈 칸·n=아틀라스 프레임 n-1(`set_sheet_frame`과 같은 규약). 빌보드 아님 — `WorldTransform`이 평면을 놓는다. `BasicRenderer`가 스킨드 다음·스프라이트 앞에 맵당 텍스처 바인드 1 + draw 1로 렌더(`tilemap_pass.rs`, 전체 MAX 16384 쿼드/frame, 초과 시 경고 1회). `Hidden` 존중. 씬 직렬화 미등록(Sprite와 동일) |
@@ -52,7 +52,13 @@ src/
 ├── error.rs            # RendererEcsError + Result<T>
 ├── assets.rs           # RenderAssets
 ├── items.rs            # RenderItem + collect_render_items
-├── basic_renderer.rs   # BasicRenderer (비스킨 + 스킨드 패스)
+├── basic_renderer/
+│   ├── mod.rs          # BasicRenderer struct·new·render(패스 순서)·colored 메시 패스·setter
+│   ├── shadow.rs       # ShadowResources + 그림자 깊이 전처리(shadow_prepass)
+│   ├── skinned.rs      # SkinnedResources + render_skinned / gather_skinned_shadow
+│   └── pbr.rs          # PbrResources / PbrSkinnedResources + pbr_color_pass
+├── debug_line_pass.rs  # BasicRenderer 디버그 라인 패스 (DebugLinePass)
+├── sprite_pass.rs      # BasicRenderer 빌보드 스프라이트 패스 (SpritePass) + cull_and_sort_sprites
 ├── renderable.rs       # PrimitiveMesh / MaterialDesc / materialize_renderables (선언적 렌더러블)
 ├── particle.rs         # Particle / spawn_particle / update_particles
 ├── sprite.rs           # Sprite / SpriteAnimation / update_sprite_animations

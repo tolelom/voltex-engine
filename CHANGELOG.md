@@ -38,6 +38,15 @@ recent on top. v0.x entries are organised by Cycle (see
 - 확인: 커밋마다 `cargo test --workspace` 1762 통과·76 무시, GPU 캡처 47 통과(skip 0), clippy 경고 0.
   래퍼 경로는 `e2e_new_then_build_produces_dist_exe`(`--ignored`)로 실제 빌드까지 확인했다.
 - 옮긴 모듈을 가리키는 CODEMAP 경로(ai·ecs·editor·renderer·runtime·cli)를 새 위치로 고쳤다.
+- **600줄 한도: voltex_renderer_ecs `BasicRenderer` 분할** — 1767줄 파일을 나눴다(`basic_renderer/mod.rs`
+  561줄). 독립적인 두 패스는 `TilemapPass`와 같은 방식의 패스 struct로 뗐다(`debug_line_pass.rs`
+  `DebugLinePass`, `sprite_pass.rs` `SpritePass`). 서로 자원을 나눠 쓰는 그림자·스킨드·PBR은
+  행동 없는 자원 묶음(`ShadowResources`·`SkinnedResources`·`PbrResources`·`PbrSkinnedResources`)과
+  같은 파일의 `impl BasicRenderer` 메서드로 옮겼다(`basic_renderer/{shadow,skinned,pbr}.rs`).
+  공개 API, 자원 생성 순서, `render()`의 패스·draw 순서, 바인드 그룹 레이아웃과 label, queue 쓰기
+  순서는 그대로다.
+- 확인: 커밋마다 GPU 캡처 29장(capture 바이너리 14 + `VOLTEX_WRITE_SCREENSHOTS` 기록 15)을 분할 전과
+  비교해 모두 픽셀 단위로 같았다(같은 커밋 3회 촬영의 차이도 0). GPU 테스트 출력에 wgpu 경고·패닉 없음.
 
 ## v1.0.172 — 2026-10-12 — GPU 테스트 스크린샷 기록은 opt-in
 
