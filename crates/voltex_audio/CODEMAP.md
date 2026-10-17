@@ -42,6 +42,7 @@
 - ALSA 는 Linux 전용 FFI — `backend::AlsaBackend` (cfg(target_os = "linux") only). `#[link(name = "asound")]` → 사용자 시스템에 `libasound2` (apt) 또는 `alsa-lib` (pacman) 설치 필요.
 - ALSA / CoreAudio 초기화 실패 시 `make_backend()` 가 stderr 에 경고 출력 후 `NullBackend` 로 fallback — 헤드리스 환경에서도 audio 스레드 panic 없음.
 - CoreAudio (`backend::CoreAudioBackend`, cfg(target_os = "macos") only): AudioToolbox 의 AudioQueue API 사용. `#[link(name = "AudioToolbox", kind = "framework")]` — macOS 표준 framework 라 별도 설치 불필요. f32 LE stereo @48kHz 고정. 4 buffer × 1024 frame Condvar 동기화로 push-style trait 에 wrap.
+- 명령 적용(`apply_command`)과 믹싱은 Windows 오디오 스레드만 한다 — `apply_command` 와 그 테스트는 `cfg(target_os = "windows")`. 비-Windows `AudioSystem` 스레드는 `AddClip`/`ReplaceClip`/`Shutdown` 만 처리하는 무음 모드라 `AudioCommand` 에 `cfg_attr(not(windows), expect(dead_code))`. 비-Windows 쪽 컴파일 경고는 Windows 호스트에서 보이지 않으니 `scripts/check_linux_clippy.sh` 로 확인한다 (pre-push 가 target 설치 시 실행)
 - ALSA / CoreAudio 둘 다 Windows dev 머신에서 작성됨 → 각 OS 에서 실제 cargo build + audio_demo 검증은 향후 (P1 spec § 8.1, B3 spec § 6).
 - `parse_ogg_pages` 는 페이지마다 CRC 를 검증하고 불일치는 **에러** — 깨진 바이트를 Vorbis 디코더에 넘기면 손상 프레임이 무음으로 degrade 돼 "파일 손상" 이 "코덱 실패" 로 오진된다. CRC 는 OGG 전용 파라미터(poly 0x04c11db7, init 0, 무반사, xorout 없음)라 zlib/PNG CRC 와 다르다 — 실 libvorbis 파일 9 페이지로 검증, `crc32_matches_the_reference_vector` 가 상시 가드
 - vorbis는 src/vorbis/ 디렉토리로 분리됨 (bit_reader, codebook, floor, residue, headers, imdct, decoder)
@@ -53,4 +54,4 @@
 - 단위 테스트: src/**/*.rs `#[cfg(test)]`
 - 통합 테스트: `tests/ogg_vorbis_decode.rs` — 코드로 생성한 실제 Ogg/Vorbis 파일(실 CRC + spec 형태 setup 헤더)을 `decode_ogg_vorbis_bytes` 로 끝까지 디코드하는 회귀 5개. 여기 fixture 를 고칠 땐 디코더에 맞추지 말고 spec 에 맞춰야 한다 (그래야 디코더 drift 를 잡는다)
 - 실행: `cargo test -p voltex_audio --lib`
-- 현재 테스트 개수: lib 138개 + 통합 5개 (Windows host 기준; VoiceId/stop_voice/apply_command +2, OGG CRC +4 포함). B3 의 CoreAudio 테스트 +2 는 macOS host 에서만 컴파일/실행 (cfg(target_os = "macos")).
+- 현재 테스트 개수: lib 138개 + 통합 5개 (Windows host 기준; VoiceId/stop_voice/apply_command +2, OGG CRC +4 포함. `apply_command` 테스트 1개는 Windows 전용이라 Linux host 는 1개 적다). B3 의 CoreAudio 테스트 +2 는 macOS host 에서만 컴파일/실행 (cfg(target_os = "macos")).

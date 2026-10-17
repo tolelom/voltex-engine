@@ -18,6 +18,21 @@ recent on top. v0.x entries are organised by Cycle (see
   `scene/tests.rs` 704줄). 코드는 바꾸지 않았고 형제 모듈 재노출과 `scene::render_*` 경로는 그대로다.
   확인: 1762 통과·76 무시, GPU 캡처 47 통과(skip 0), 캡처 29장 분할 전과 픽셀 단위로 같음.
 
+### Fix
+
+- **voltex_audio Linux 빌드**: Gitea CI(aarch64 Linux)의 `RUSTFLAGS=-D warnings` 빌드가 첫 실행부터
+  실패하던 원인을 없앴다. 명령 적용(`apply_command`)·믹싱 import·그 테스트를 `cfg(target_os = "windows")`
+  로 묶고, 무음 모드가 payload를 버리는 `AudioCommand` 에 비-Windows 한정 `expect(dead_code)` 를 달았다.
+  `AlsaBackend`·`CoreAudioBackend` 에 빠진 doc 주석을 넣고, aarch64 에서만 불필요해지는
+  `as *const u8` 캐스트를 `.cast::<u8>()` 로 바꿨다. Windows 컴파일 결과와 동작은 같다. macOS 는 검증하지 않았다.
+- **deny.toml**: cargo-deny 0.19 가 거부하는 `highlight = "all-versions"` 를 `"all"` 로 바꿨다(설정 파싱 실패 해소).
+
+### Build
+
+- **pre-push Linux clippy**: `scripts/check_linux_clippy.sh` 가 `aarch64-unknown-linux-gnu` 대상으로
+  CI 와 같은 플래그의 clippy 를 돌린다. target 이 없으면 경고 후 건너뛴다. Lua C 소스를 크로스 컴파일할
+  수 없어 `voltex_script` 와 그 의존 crate 13개(37개 중)는 제외한다(스크립트에 목록).
+
 ## v1.0.173 — 2026-10-17 — 워크스페이스 버전 정합 + 600줄 한도 리팩터링
 
 ### Fix
