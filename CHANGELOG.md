@@ -28,8 +28,9 @@ recent on top. v0.x entries are organised by Cycle (see
 - **deny.toml**: cargo-deny 0.19 가 거부하는 `highlight = "all-versions"` 를 `"all"` 로 바꿨다(설정 파싱 실패 해소).
   `[advisories] ignore` 에 간접 의존 권고 4건(quick-xml RUSTSEC-2026-0194·0195 via wayland-scanner,
   paste RUSTSEC-2024-0436 via metal, ttf-parser RUSTSEC-2026-0192 via sctk-adwaita)을 경로와 함께 넣었다.
-  `bans` 의 wildcard 34 crate 는 남아 있다 — `allow-wildcard-paths` 는 `publish` 를 제한한 crate 에만
-  적용되는데 workspace 에 그런 crate 가 없다.
+  workspace 37개 crate 모두 `publish = false`(`[workspace.package]` + `publish.workspace = true`)로 두고
+  `allow-wildcard-paths = true` 를 켜서 path 의존 wildcard 34 crate 를 해소했다 — 이 옵션은 `publish` 를
+  제한한 crate 에만 적용된다. 이제 `cargo deny check` 는 exit 0(경고만: duplicate 10, license-not-encountered 4).
 
 ### Build
 
