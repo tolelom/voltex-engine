@@ -36,8 +36,9 @@ feature-depth = 1
 # RustSec advisory db, refreshed at scan time.
 db-path = "~/.cargo/advisory-db"
 db-urls = ["https://github.com/rustsec/advisory-db"]
-# Yanked crates and unmaintained crates are warnings, not failures. Promote
-# to "deny" once we've audited every transitive dep we own (planned v1.1).
+# Yanked crates are warnings. In cargo-deny 0.19 unmaintained advisories
+# are errors for every crate in the graph (`unmaintained` scope defaults to
+# "all"), like vulnerabilities; accepted ones go in `ignore` with a reason.
 yanked = "warn"
 # Transitive advisories with no fix we can pull in. Re-check when wgpu/winit
 # move: each entry names the only path the crate enters the graph by.
@@ -90,6 +91,9 @@ exceptions = []
 # core deps to a single major (v1.1+).
 multiple-versions = "warn"
 wildcards = "deny"
+# Path dependencies between workspace crates carry no version. They are
+# exempt only because every member sets `publish = false` (Cargo.toml).
+allow-wildcard-paths = true
 highlight = "all"
 deny = []
 skip = []

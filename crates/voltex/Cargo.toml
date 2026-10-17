@@ -3,6 +3,7 @@ name = "voltex"
 version.workspace = true
 edition = "2021"
 license.workspace = true
+publish.workspace = true
 
 [dependencies]
 voltex_math = { workspace = true }

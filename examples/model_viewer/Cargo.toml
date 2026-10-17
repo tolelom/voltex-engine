@@ -3,6 +3,7 @@ name = "model_viewer"
 version = "0.1.0"
 edition = "2021"
 license.workspace = true
+publish.workspace = true
 
 [dependencies]
 voltex_math.workspace = true
