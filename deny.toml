@@ -83,7 +83,7 @@ exceptions = []
 # core deps to a single major (v1.1+).
 multiple-versions = "warn"
 wildcards = "deny"
-highlight = "all-versions"
+highlight = "all"
 deny = []
 skip = []
 skip-tree = []
