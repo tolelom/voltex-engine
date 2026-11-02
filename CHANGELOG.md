@@ -42,6 +42,9 @@ recent on top. v0.x entries are organised by Cycle (see
   `games/`의 게임 세 편과 crate 17개 전체를 적고, 기여 안내는 CONTRIBUTING.md로 넘겼다.
 - **CONTRIBUTING 재작성**: 커밋 메시지 형식을 실제 이력(`<type>(<범위>)`)에 맞추고, pre-push 훅(CHANGELOG 검사,
   Linux clippy)과 GPU 테스트 실행법을 넣었다. 자동 루프 정책, 소요 시간, 버전별 경위, 끊긴 README 참조를 뺐다.
+- **tutorial 정정**: 이미 구현된 기능을 "v1.1 후속"으로 적은 곳(Lua 입력, HUD, "+ script" 기본 경로)을 바로잡고,
+  옮겨진 `voltex_image::parse_gltf` 경로, 빈 씬의 `version` 필드를 맞췄다. 없는 Ctrl+Z 단축키, chapter별 커밋 대응 절,
+  스크린샷 자리 표시, 소요 시간을 뺐다. 에디터 조작은 실행해 보지 않았다(NEXT.md).
 
 ### CI
 

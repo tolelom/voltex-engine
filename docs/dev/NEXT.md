@@ -10,6 +10,7 @@
 |---|---|---|
 | 물리 체감 | `survivor_game`·`editor_demo`에서 물체 간 통과, 빠른 물체의 벽 충돌, 미끄러짐·정지 | v1.0.152 브로드페이즈 쌍 누락, v1.0.153 CCD, v1.0.154 마찰 |
 | 크래시 리포트 GPU 정보 | 실제 패닉 시 리포트에 어댑터 정보가 들어가는지 | v1.0.127 (컴파일만 확인) |
+| 튜토리얼 따라가기 | `docs/tutorial.md`를 처음부터 따라가며 에디터 조작(2~3장)이 문서와 같은지, 4장을 `input.is_key_pressed`·`add_input_system` 입력으로, 5장을 HUD(`with_hud`·`set_hud_fn`)로 바꿀지. 스크린샷도 이때 | 2026-11-02 코드 대조로만 고침 |
 
 물리 세 수정은 버그 수정이지만 손맛이 달라질 수 있습니다. 회귀로 보이면 해당 버전의 CHANGELOG 항목과 속성 테스트(`crates/voltex_physics/tests/*_property.rs`)부터 봅니다.
 
