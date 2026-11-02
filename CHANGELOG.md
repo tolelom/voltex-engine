@@ -45,6 +45,8 @@ recent on top. v0.x entries are organised by Cycle (see
 - **tutorial 정정**: 이미 구현된 기능을 "v1.1 후속"으로 적은 곳(Lua 입력, HUD, "+ script" 기본 경로)을 바로잡고,
   옮겨진 `voltex_image::parse_gltf` 경로, 빈 씬의 `version` 필드를 맞췄다. 없는 Ctrl+Z 단축키, chapter별 커밋 대응 절,
   스크린샷 자리 표시, 소요 시간을 뺐다. 에디터 조작은 실행해 보지 않았다(NEXT.md).
+- **examples/README 정리**: 빠져 있던 `boids_demo`·`game_ready_demo`를 표에 넣고, 표와 겹치는 카테고리 절, 작업 코드(D1+D2, M6),
+  60 FPS·5초 smoke 같은 검증 서술을 뺐다.
 
 ### CI
 
