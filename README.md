@@ -117,12 +117,13 @@ voltex_cli          voltex 명령(new·build·run)
 voltex_capture      오프스크린 렌더 캡처. 시각 회귀 확인용
 ```
 
-crate별 책임과 주의점은 각 crate의 `CODEMAP.md`에 있다.
+crate가 쌓인 순서, 한 프레임이 도는 순서, 코드 읽는 순서는 [docs/architecture.md](docs/architecture.md). crate별 책임과 주의점은 각 crate의 `CODEMAP.md`에 있다.
 
 ## 문서
 
 사용 문서
 
+- [docs/architecture.md](docs/architecture.md): crate 층, 한 프레임, 코드 읽는 순서
 - [docs/tutorial.md](docs/tutorial.md): 빈 프로젝트에서 미니 게임까지
 - [docs/voltex-toml-reference.md](docs/voltex-toml-reference.md): `voltex.toml` 필드
 - [docs/build-matrix.md](docs/build-matrix.md): OS별 빌드

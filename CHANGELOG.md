@@ -23,6 +23,8 @@ recent on top. v0.x entries are organised by Cycle (see
   `cargo run -p depths`, 빌드 결과는 `dist/survivor` 형태가 된다. 이 항목 위의 옛 기록은 당시 이름 그대로 둔다.
 - **README 저장소 구성 표**: 맨 위에 `engine/`·`tools/`·`games/`·`examples/`·`docs/`가 각각 무엇인지 적고,
   crate 구성 그림을 엔진과 도구로 나눴다(전에는 cli·capture가 facade 아래 엔진 부품처럼 그려져 있었다).
+- **구조 문서 `docs/architecture.md`**: crate 층(각 `Cargo.toml` 의존 기준), `RuntimeApp`에 맡기는 방법과 부품을
+  직접 조립하는 방법의 구분, `redraw`·`tick_systems_only` 기준 한 프레임 순서, 코드 읽는 순서를 적었다.
 
 - **voltex_capture `scene`**: 인라인 테스트를 `scene/tests.rs`로 옮겼다(`scene.rs` → `scene/mod.rs` 1140줄 +
   `scene/tests.rs` 704줄). 코드는 바꾸지 않았고 형제 모듈 재노출과 `scene::render_*` 경로는 그대로다.
