@@ -50,6 +50,10 @@ recent on top. v0.x entries are organised by Cycle (see
 - **게임·예제 README 정정**: voltex_survivor README가 이미 있는 Lua 입력·HUD를 "v1.1 한계"로 적던 것을 실제 구조(이동은
   Rust action map, 규칙은 Lua, 점수는 콘솔)로 바로잡았다. voltex_depths의 해소된 한계 3건(조준 DPI, 에셋 절대경로,
   y 가라앉음)을 지우고, 예제 README의 버전 언급을 뺐다. API 경로 30개는 현재 코드와 대조해 그대로 맞다.
+- **빌드·매니페스트·릴리스 문서 정정**: build-matrix는 게임 저장소에서 동작하지 않던 GitHub Actions 예시와 작업 코드를 빼고
+  OS별 준비물·에러·확인 범위만 남겼다. voltex-toml-reference는 `.vpkg`가 `dist/wrapper/`에 생기는 것, `voltex new`가
+  `[build]`까지 채운다는 것을 바로잡고 "향후 추가 후보" 절을 뺐다. release.md의 GitHub 미러 절차, visual/README의
+  "PNG 240px 이하"(실제 200~800px)를 고쳤다.
 
 ### CI
 

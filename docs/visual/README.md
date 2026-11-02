@@ -1,11 +1,9 @@
 # Visual verification
 
-Until now the engine's rendering had **never been visually verified** — the
-windowed examples can't be observed by automation, and the 6-second smoke
-tests only proved "no panic", not "draws the right thing". The
-[`voltex_capture`](../../crates/voltex_capture) crate closes that gap: it
-renders the *real* GPU pipelines into an offscreen texture and writes a PNG,
-turning "does it actually draw?" into a reproducible artifact.
+Windowed examples can't be observed by automation, and a smoke run only
+proves "no panic". The [`voltex_capture`](../../crates/voltex_capture) crate
+renders the engine's GPU pipelines into an offscreen texture and writes a PNG,
+so the output can be checked by eye and compared between builds.
 
 ## Reproduce
 
@@ -66,7 +64,7 @@ GPU: NVIDIA GeForce RTX 4080 SUPER (Vulkan).
 ## What was verified (2026-06-03 — game-ready 2D stack)
 
 GPU: NVIDIA GeForce RTX 4080 SUPER (Vulkan). All have `#[ignore]` GPU
-regressions in `voltex_capture/src/scene.rs` (run `cargo test -p voltex_capture
+regressions in `voltex_capture/src/scene/` (run `cargo test -p voltex_capture
 -- --ignored`).
 
 | PNG / test | Pipeline exercised | Result |
@@ -99,7 +97,7 @@ The windowed demos were each run for ~6 s on the RTX 4080 (Vulkan) under
   `RuntimeApp` bootstrap (window + ECS + systems + scheduler + audio + Lua
   script + render loop) runs clean for ~6 s.
 
-Full *offscreen pixel* capture of the deferred path is deferred to v1.1: the
+Full *offscreen pixel* capture of the deferred path is not done: the
 lighting pass samples SSGI and RT-shadow textures that are only meaningful once
 those passes run (which need RT features + a BLAS), so a passes-skipped offscreen
 replica would read uninitialised inputs. The deferred lighting BRDF is the same
@@ -110,6 +108,6 @@ Cook-Torrance already pixel-verified by `pbr_grid` / `multi_light`.
 - Deferred offscreen pixel capture (see above — runtime-verified instead).
 - Actual mouse/gizmo drag interaction (needs synthetic input injection).
 
-The reference PNGs here are downscaled (≤240px) and uncompressed (the encoder
+The reference PNGs here are small and uncompressed (the encoder
 emits stored deflate blocks). They are a point-in-time record; regenerate with
 the command above to diff against the current build.

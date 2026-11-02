@@ -62,7 +62,6 @@ Before tagging:
 
 - [ ] `CHANGELOG.md` has an entry for the new version (the `pre-push` hook
       already enforces this for code changes, but double-check).
-- [ ] `docs/dev/STATUS.md` reflects the latest cycle.
 - [ ] `cargo build --workspace` clean.
 - [ ] `cargo test --workspace --lib` passes.
 - [ ] `cargo clippy --workspace --all-targets -- -D warnings` clean.
@@ -72,8 +71,8 @@ Before tagging:
 ### GPU-host visual verification (run on a machine with a GPU + display)
 
 CI is headless, so it can verify *no panic* but never *correct pixels* or the
-RT/windowed paths. Before a release, run these on a real GPU host (added
-v1.0.55 — see [`docs/visual/README.md`](visual/README.md)):
+RT/windowed paths. Before a release, run these on a real GPU host (see
+[`docs/visual/README.md`](visual/README.md)):
 
 - [ ] `cargo run -p voltex_capture --bin capture` — renders every pipeline
       (BasicRenderer / PBR / shadows / multi-light / gizmos / editor UI) to
@@ -105,20 +104,6 @@ Each smoke test opens the default output device, pushes 64 frames of
 silence, and tears down. They graceful-skip with `eprintln!("skipping:
 no <backend> device")` when the device is missing, so they are safe to
 run unattended in a script.
-
-### First green CI run on GitHub mirror (F7)
-
-`.github/workflows/ci.yml` has been ready since v1.0; the only remaining
-gate is "we have actually run it green on a GitHub mirror". To flip the
-switch:
-
-- [ ] Push `master` to a GitHub mirror (`git remote add github
-      https://github.com/<org>/voltex.git && git push github master`).
-- [ ] Watch the Actions tab; expect `build-and-test` (Linux + Windows)
-      to go green. Advisory jobs (`macos`, `coverage`, `deny`) may stay
-      yellow.
-- [ ] Record the first green commit SHA in `docs/dev/STATUS.md` and tick
-      `F7` in `docs/dev/AUDIT-BACKLOG.md`.
 
 ## Manually triggering a release build
 
