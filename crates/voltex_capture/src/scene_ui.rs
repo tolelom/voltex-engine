@@ -196,7 +196,7 @@ mod tests {
         let rgba = render_ui_image_widget(&gpu, 320, 200);
 
         let (mut magenta, mut green) = (0usize, 0usize);
-        for p in rgba.chunks_exact(4) {
+        for p in rgba.as_chunks::<4>().0.iter() {
             if p[0] > 150 && p[1] < 100 && p[2] > 150 {
                 magenta += 1;
             } else if p[0] < 100 && p[1] > 150 && p[2] < 100 {

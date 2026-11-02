@@ -87,7 +87,7 @@ impl ImageStats {
         let mut black = 0usize;
         let mut lum_sum = 0.0f64;
         let mut colors = std::collections::HashSet::new();
-        for px in rgba.chunks_exact(4) {
+        for px in rgba.as_chunks::<4>().0.iter() {
             let (r, g, b) = (px[0], px[1], px[2]);
             if r == 0 && g == 0 && b == 0 {
                 black += 1;

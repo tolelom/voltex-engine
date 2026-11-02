@@ -188,11 +188,9 @@ unsafe extern "C" fn lua_find_in_radius(L: *mut ffi::lua_State) -> c_int {
     let hits = grid.query_radius(Vec3::new(x, y, z), r);
 
     ffi::lua_createtable(L, hits.len() as c_int, 0);
-    let mut index: ffi::lua_Integer = 1;
-    for entity in hits {
+    for (index, entity) in (1 as ffi::lua_Integer..).zip(hits) {
         push_entity_table(L, entity);
         ffi::lua_rawseti(L, -2, index);
-        index += 1;
     }
     1
 }
@@ -399,11 +397,9 @@ unsafe extern "C" fn lua_iter_entities(L: *mut ffi::lua_State) -> c_int {
         return 1;
     };
     ffi::lua_createtable(L, 0, 0);
-    let mut index: ffi::lua_Integer = 1;
-    for entity in world.live_entities() {
+    for (index, entity) in (1 as ffi::lua_Integer..).zip(world.live_entities()) {
         push_entity_table(L, entity);
         ffi::lua_rawseti(L, -2, index);
-        index += 1;
     }
     1
 }

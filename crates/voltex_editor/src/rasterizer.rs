@@ -184,18 +184,7 @@ mod tests {
     use crate::ttf_parser::TtfParser;
 
     fn load_test_font() -> Option<TtfParser> {
-        let paths = [
-            "C:/Windows/Fonts/arial.ttf",
-            "C:/Windows/Fonts/consola.ttf",
-        ];
-        for p in &paths {
-            if let Ok(data) = std::fs::read(p) {
-                if let Ok(parser) = TtfParser::parse(data) {
-                    return Some(parser);
-                }
-            }
-        }
-        None
+        TtfParser::parse(crate::test_font::minimal_ttf()).ok()
     }
 
     #[test]

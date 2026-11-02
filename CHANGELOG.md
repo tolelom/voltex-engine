@@ -31,6 +31,12 @@ recent on top. v0.x entries are organised by Cycle (see
   workspace 37개 crate 모두 `publish = false`(`[workspace.package]` + `publish.workspace = true`)로 두고
   `allow-wildcard-paths = true` 를 켜서 path 의존 wildcard 34 crate 를 해소했다 — 이 옵션은 `publish` 를
   제한한 crate 에만 적용된다. 이제 `cargo deny check` 는 exit 0(경고만: duplicate 10, license-not-encountered 4).
+- **Linux CI 통과**: Rust 1.99 clippy 새 lint(`chunks_exact_to_as_chunks`, `for_kv_map`, `explicit_counter_loop`)를
+  voltex_image·net·script·capture와 두 게임의 visual 테스트에서 고쳤다(`as_chunks::<N>()`, `values_mut()`, `zip`).
+  voltex_editor TTF 테스트 17개가 `C:/Windows/Fonts`를 읽어 Windows 밖에서 실패하던 것을, 메모리에서 만드는 최소
+  TrueType 폰트(`src/test_font.rs`)로 바꿨다. `ttf_fuzz`는 시스템 폰트가 없으면 건너뛰던 것을 이 폰트로 대신 돈다.
+  voltex_cli `pick_executable` 테스트의 `\` 경로 리터럴을 OS 경로 조립으로 바꿨다. 확인(Ubuntu, Rust 1.99.1,
+  `RUSTFLAGS=-D warnings`): build·clippy 경고 0, `test --workspace --lib` 1594 통과, `test -p voltex_cli` 72 통과.
 
 ### Docs
 

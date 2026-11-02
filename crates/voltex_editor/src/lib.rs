@@ -63,6 +63,8 @@ pub mod ttf_parser;
 pub mod rasterizer;
 pub mod glyph_cache;
 pub mod ttf_font;
+#[cfg(test)]
+mod test_font;
 pub use ttf_font::TtfFont;
 
 pub mod floating_panel;

@@ -175,7 +175,7 @@ mod tests {
             let mut r = 0u64;
             let mut b = 0u64;
             let mut n = 0u64;
-            for p in rgba.chunks_exact(4) {
+            for p in rgba.as_chunks::<4>().0.iter() {
                 if (p[0] as i32 - bg[0] as i32).abs() > 20
                     || (p[2] as i32 - bg[2] as i32).abs() > 20
                 {
@@ -224,7 +224,7 @@ mod tests {
         assert!(!ImageStats::analyze(&rgba).looks_blank(), "textured cube frame is blank");
         let bg = [rgba[0], rgba[1], rgba[2]];
         let (mut magenta_px, mut green_px) = (0u32, 0u32);
-        for p in rgba.chunks_exact(4) {
+        for p in rgba.as_chunks::<4>().0.iter() {
             let off_bg = (p[0] as i32 - bg[0] as i32).abs()
                 + (p[1] as i32 - bg[1] as i32).abs()
                 + (p[2] as i32 - bg[2] as i32).abs()
@@ -266,7 +266,7 @@ mod tests {
         // The cube should be red-dominant (texture sampled through the runtime).
         let bg = [rgba[0], rgba[1], rgba[2]];
         let (mut r, mut b, mut n) = (0u64, 0u64, 0u64);
-        for p in rgba.chunks_exact(4) {
+        for p in rgba.as_chunks::<4>().0.iter() {
             if (p[0] as i32 - bg[0] as i32).abs() > 20 || (p[2] as i32 - bg[2] as i32).abs() > 20 {
                 r += p[0] as u64;
                 b += p[2] as u64;

@@ -3,8 +3,8 @@ use crate::ImageStats;
 
 /// Count pixels whose RGB differs by more than `tol` between two frames.
 fn diff_pixels(a: &[u8], b: &[u8], tol: i32) -> usize {
-    a.chunks_exact(4)
-        .zip(b.chunks_exact(4))
+    a.as_chunks::<4>().0.iter()
+        .zip(b.as_chunks::<4>().0.iter())
         .filter(|(pa, pb)| {
             (pa[0] as i32 - pb[0] as i32).abs() > tol
                 || (pa[1] as i32 - pb[1] as i32).abs() > tol
@@ -129,9 +129,9 @@ fn runtime_skinned_pbr_path_renders_and_animates() {
 /// Count pixels that got darker (in luminance) in `a` vs `b` by more than
 /// `tol` — i.e. where a shadow fell.
 fn darkened_pixels(a: &[u8], b: &[u8], tol: i32) -> usize {
-    let lum = |p: &[u8]| p[0] as i32 + p[1] as i32 + p[2] as i32;
-    a.chunks_exact(4)
-        .zip(b.chunks_exact(4))
+    let lum = |p: &[u8; 4]| p[0] as i32 + p[1] as i32 + p[2] as i32;
+    a.as_chunks::<4>().0.iter()
+        .zip(b.as_chunks::<4>().0.iter())
         .filter(|(pa, pb)| lum(pb) - lum(pa) > tol)
         .count()
 }

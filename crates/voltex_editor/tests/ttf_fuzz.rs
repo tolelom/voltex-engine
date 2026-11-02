@@ -1,10 +1,14 @@
 //! Mutation fuzz for the in-house TrueType parser + rasterizer. Fonts are
 //! user-supplied files (the editor loads any `.ttf`), so a corrupted font
 //! must yield `Err` from `TtfFont::new` or glyphs that rasterize without
-//! panicking. Uses a system font as the seed; skips where none exists.
+//! panicking. Seeds from a system font when one exists, otherwise from the
+//! minimal in-memory test font.
 
 use std::panic::{catch_unwind, AssertUnwindSafe};
 use voltex_editor::TtfFont;
+
+#[path = "../src/test_font.rs"]
+mod test_font;
 
 struct XorShift(u32);
 impl XorShift {
@@ -16,18 +20,16 @@ impl XorShift {
     }
 }
 
-fn seed_font() -> Option<Vec<u8>> {
+fn seed_font() -> Vec<u8> {
     ["C:/Windows/Fonts/arial.ttf", "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", "/Library/Fonts/Arial.ttf"]
         .iter()
         .find_map(|p| std::fs::read(p).ok())
+        .unwrap_or_else(test_font::minimal_ttf)
 }
 
 #[test]
 fn ttf_loader_never_panics_on_corrupted_fonts() {
-    let Some(font) = seed_font() else {
-        eprintln!("no system TrueType font found; skipping");
-        return;
-    };
+    let font = seed_font();
     let mut rng = XorShift(0x77F0_0001);
     let iterations: u32 = std::env::var("VOLTEX_TTF_FUZZ_ITERS").ok().and_then(|v| v.parse().ok()).unwrap_or(300);
     for i in 0..iterations {

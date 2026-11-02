@@ -45,11 +45,18 @@ fn extract_executables_parses_cargo_json_messages() {
     assert!(extract_executables("garbage\n").is_empty());
 }
 
+/// `t/release/<name>` with the host's executable suffix.
+fn release_exe(name: &str) -> PathBuf {
+    Path::new("t")
+        .join("release")
+        .join(format!("{name}{}", std::env::consts::EXE_SUFFIX))
+}
+
 #[test]
 fn pick_executable_prefers_project_name_match() {
     let exes = vec![
-        PathBuf::from(r"t\release\voltex_depths.exe"),
-        PathBuf::from(r"t\release\gen_sfx.exe"),
+        release_exe("voltex_depths"),
+        release_exe("gen_sfx"),
     ];
     // Name match wins regardless of artifact order.
     assert_eq!(pick_executable(&exes, "voltex_depths").unwrap(), &exes[0]);
@@ -59,7 +66,7 @@ fn pick_executable_prefers_project_name_match() {
 fn pick_executable_single_unmatched_artifact_is_shipped() {
     // [[bin]] renamed away from project.name — the only candidate is
     // still unambiguous.
-    let exes = vec![PathBuf::from(r"t\release\game_main.exe")];
+    let exes = vec![release_exe("game_main")];
     assert_eq!(pick_executable(&exes, "mygame").unwrap(), &exes[0]);
 }
 
@@ -67,8 +74,8 @@ fn pick_executable_single_unmatched_artifact_is_shipped() {
 fn pick_executable_errors_when_no_name_match_among_several() {
     // Guessing here could ship an asset generator as the game.
     let exes = vec![
-        PathBuf::from(r"t\release\game_main.exe"),
-        PathBuf::from(r"t\release\gen_sfx.exe"),
+        release_exe("game_main"),
+        release_exe("gen_sfx"),
     ];
     match pick_executable(&exes, "mygame") {
         Err(CliError::AmbiguousExecutable { project, candidates }) => {

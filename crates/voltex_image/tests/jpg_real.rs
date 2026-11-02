@@ -24,8 +24,9 @@ fn decode(jpg: &[u8]) -> Vec<u8> {
 fn max_diff(jpg: &[u8], expected_rgb: &[u8], include: impl Fn(usize, usize) -> bool) -> u8 {
     let rgba = decode(jpg);
     assert_eq!(rgba.len(), expected_rgb.len() / 3 * 4);
-    rgba.chunks_exact(4)
-        .zip(expected_rgb.chunks_exact(3))
+    rgba.as_chunks::<4>().0
+        .iter()
+        .zip(expected_rgb.as_chunks::<3>().0)
         .enumerate()
         .filter(|(i, _)| include(i % W, i / W))
         .flat_map(|(_, (a, e))| (0..3).map(move |c| a[c].abs_diff(e[c])))

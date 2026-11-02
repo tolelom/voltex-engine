@@ -149,7 +149,7 @@ mod tests {
         fn mean_rb(rgba: &[u8]) -> (f64, f64) {
             let bg = [rgba[0], rgba[1], rgba[2]];
             let (mut r, mut b, mut n) = (0u64, 0u64, 0u64);
-            for p in rgba.chunks_exact(4) {
+            for p in rgba.as_chunks::<4>().0.iter() {
                 if (p[0] as i32 - bg[0] as i32).abs() > 20 || (p[2] as i32 - bg[2] as i32).abs() > 20 {
                     r += p[0] as u64;
                     b += p[2] as u64;
@@ -192,7 +192,7 @@ mod tests {
         // guaranteed background — both cubes are centered).
         fn coverage(rgba: &[u8]) -> usize {
             let bg = [rgba[0], rgba[1], rgba[2]];
-            rgba.chunks_exact(4)
+            rgba.as_chunks::<4>().0.iter()
                 .filter(|p| {
                     (p[0] as i32 - bg[0] as i32).abs() > 20
                         || (p[1] as i32 - bg[1] as i32).abs() > 20

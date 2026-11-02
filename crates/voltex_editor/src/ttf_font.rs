@@ -110,15 +110,7 @@ mod tests {
     use super::*;
 
     fn load_test_font() -> Option<TtfFont> {
-        let paths = ["C:/Windows/Fonts/arial.ttf", "C:/Windows/Fonts/consola.ttf"];
-        for p in &paths {
-            if let Ok(data) = std::fs::read(p) {
-                if let Ok(font) = TtfFont::new(&data, 24.0) {
-                    return Some(font);
-                }
-            }
-        }
-        None
+        TtfFont::new(&crate::test_font::minimal_ttf(), 24.0).ok()
     }
 
     #[test]

@@ -181,7 +181,7 @@ mod tests {
         };
         let mean_radius = |rgba: &[u8]| -> f64 {
             let (mut sum, mut n) = (0.0f64, 0u64);
-            for (i, p) in rgba.chunks_exact(4).enumerate() {
+            for (i, p) in rgba.as_chunks::<4>().0.iter().enumerate() {
                 if is_orange(p) {
                     let x = (i % 256) as f64 - 128.0;
                     let y = (i / 256) as f64 - 128.0;
@@ -360,7 +360,7 @@ mod tests {
         };
         // Count magenta pixels (the sprite color).
         let magenta = |rgba: &[u8]| -> u32 {
-            rgba.chunks_exact(4)
+            rgba.as_chunks::<4>().0.iter()
                 .filter(|p| p[0] > 120 && p[2] > 120 && p[1] < 80)
                 .count() as u32
         };

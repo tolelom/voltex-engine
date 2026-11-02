@@ -52,7 +52,7 @@ fn shadows_darken_ground_under_occluder() {
     crate::write_visual_record("shadow_on.png", 512, 512, &on);
     // Shadows on → overall darker (occluded ground region) than shadows off.
     let lum = |r: &[u8]| -> u64 {
-        r.chunks_exact(4).map(|p| p[0] as u64 + p[1] as u64 + p[2] as u64).sum()
+        r.as_chunks::<4>().0.iter().map(|p| p[0] as u64 + p[1] as u64 + p[2] as u64).sum()
     };
     assert!(lum(&on) < lum(&off), "shadowed frame should be darker overall");
 }
@@ -147,7 +147,7 @@ fn point_lights_add_colored_illumination() {
     // mean luminance over lit (non-near-black) pixels.
     fn mean_lum(rgba: &[u8]) -> f64 {
         let (mut s, mut n) = (0u64, 0u64);
-        for p in rgba.chunks_exact(4) {
+        for p in rgba.as_chunks::<4>().0.iter() {
             let sum = p[0] as u32 + p[1] as u32 + p[2] as u32;
             if sum > 24 {
                 s += sum as u64;
@@ -247,7 +247,7 @@ fn pbr_normal_map_perturbs_shading() {
     let flat = render_pbr_sphere_normalmap(&gpu, 256, 256, false);
     let mapped = render_pbr_sphere_normalmap(&gpu, 256, 256, true);
     let mut diff = 0u64;
-    for (a, b) in flat.chunks_exact(4).zip(mapped.chunks_exact(4)) {
+    for (a, b) in flat.as_chunks::<4>().0.iter().zip(mapped.as_chunks::<4>().0.iter()) {
         diff += (a[0] as i64 - b[0] as i64).unsigned_abs();
         diff += (a[1] as i64 - b[1] as i64).unsigned_abs();
         diff += (a[2] as i64 - b[2] as i64).unsigned_abs();
@@ -273,7 +273,7 @@ fn basic_renderer_pbr_path_shades_differently_than_colored() {
     assert!(!crate::ImageStats::analyze(&pbr).looks_blank(), "PBR frame blank");
     // Enabling PBR must visibly change shading vs the Blinn-Phong path.
     let mut diff = 0u64;
-    for (a, b) in colored.chunks_exact(4).zip(pbr.chunks_exact(4)) {
+    for (a, b) in colored.as_chunks::<4>().0.iter().zip(pbr.as_chunks::<4>().0.iter()) {
         diff += (a[0] as i64 - b[0] as i64).unsigned_abs();
         diff += (a[1] as i64 - b[1] as i64).unsigned_abs();
         diff += (a[2] as i64 - b[2] as i64).unsigned_abs();
@@ -294,7 +294,7 @@ fn orthographic_footprint_is_depth_independent() {
     };
     // Count lit (non-near-black) pixels — the cube's on-screen footprint.
     let footprint = |rgba: &[u8]| -> u32 {
-        rgba.chunks_exact(4)
+        rgba.as_chunks::<4>().0.iter()
             .filter(|p| p[0] as u32 + p[1] as u32 + p[2] as u32 > 30)
             .count() as u32
     };
@@ -410,7 +410,7 @@ fn loads_gltf_mesh() {
 fn object_pixels(rgba: &[u8]) -> usize {
     let bg = [rgba[0], rgba[1], rgba[2]];
     rgba
-        .chunks_exact(4)
+        .as_chunks::<4>().0.iter()
         .filter(|p| {
             (p[0] as i32 - bg[0] as i32).abs() > 20
                 || (p[1] as i32 - bg[1] as i32).abs() > 20
@@ -567,7 +567,7 @@ fn declarative_scene_renders_distinct_per_object_colors() {
 
     let mut has_green = false;
     let mut has_red = false;
-    for p in rgba.chunks_exact(4) {
+    for p in rgba.as_chunks::<4>().0.iter() {
         let (r, g, b) = (p[0] as i32, p[1] as i32, p[2] as i32);
         if g > r + 30 && g > b + 30 {
             has_green = true;

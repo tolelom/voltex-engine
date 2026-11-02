@@ -83,11 +83,8 @@ pub fn parse_jpg(data: &[u8]) -> crate::Result<(Vec<u8>, u32, u32)> {
                     .and_then(|v| v.checked_mul(4))
                     .ok_or("JPEG RGBA output size overflow")?;
                 let mut rgba = Vec::with_capacity(cap);
-                for pixel in rgb.chunks_exact(3) {
-                    rgba.push(pixel[0]);
-                    rgba.push(pixel[1]);
-                    rgba.push(pixel[2]);
-                    rgba.push(255);
+                for &[r, g, b] in rgb.as_chunks::<3>().0 {
+                    rgba.extend_from_slice(&[r, g, b, 255]);
                 }
                 return Ok((rgba, w, h));
             }

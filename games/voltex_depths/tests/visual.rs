@@ -36,7 +36,7 @@ fn dungeon_scene_renders_walls_player_enemies() {
     eprintln!("dungeon frame stats: {stats:?}");
     assert!(!stats.looks_blank(), "dungeon frame blank: {stats:?}");
     let (mut green, mut red) = (false, false);
-    for p in rgba.chunks_exact(4) {
+    for p in rgba.as_chunks::<4>().0 {
         let (r, g, b) = (p[0] as i32, p[1] as i32, p[2] as i32);
         // 비율 기반 — 셰이딩 스케일 무관, 문 주황 false-positive 배제.
         // 주의: 프레임버퍼는 sRGB라 선형 비율이 감마 압축됨 (비율^(1/2.4)).

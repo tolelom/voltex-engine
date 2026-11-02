@@ -187,8 +187,8 @@ mod tests {
         assert!(!ImageStats::analyze(&b).looks_blank(), "frame B blank");
         // The two frames must differ (player moved, totem waved, chaser closer).
         let diff = a
-            .chunks_exact(4)
-            .zip(b.chunks_exact(4))
+            .as_chunks::<4>().0.iter()
+            .zip(b.as_chunks::<4>().0.iter())
             .filter(|(p, q)| (p[0] as i32 - q[0] as i32).abs() > 16)
             .count();
         assert!(diff > 500, "frames should differ across the playthrough: {diff}");
@@ -214,8 +214,8 @@ mod tests {
         assert!(!ImageStats::analyze(&pbr).looks_blank(), "PBR demo frame blank");
         // PBR shading should differ from the colored path on the same scene.
         let diff = colored
-            .chunks_exact(4)
-            .zip(pbr.chunks_exact(4))
+            .as_chunks::<4>().0.iter()
+            .zip(pbr.as_chunks::<4>().0.iter())
             .filter(|(p, q)| (p[0] as i32 - q[0] as i32).abs() > 16)
             .count();
         assert!(diff > 500, "PBR demo should shade differently than colored: {diff}");

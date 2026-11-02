@@ -110,7 +110,7 @@ impl ReliableChannel {
         let now = Instant::now();
         let mut retransmits = Vec::new();
 
-        for (_, (send_time, data)) in self.pending_acks.iter_mut() {
+        for (send_time, data) in self.pending_acks.values_mut() {
             if now.duration_since(*send_time) >= timeout {
                 retransmits.push(data.clone());
                 *send_time = now;

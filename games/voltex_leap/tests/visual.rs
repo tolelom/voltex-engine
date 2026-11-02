@@ -42,7 +42,7 @@ fn level_scene_renders_tiles_spikes_door_coins() {
     //   문     [0.20,0.90,0.40] → g 우세
     //   코인   [1.00,0.85,0.20] → r≈g, b 열세
     let (mut red, mut green, mut gold) = (0u32, 0u32, 0u32);
-    for p in rgba.chunks_exact(4) {
+    for p in rgba.as_chunks::<4>().0 {
         let (r, g, b) = (p[0] as f32, p[1] as f32, p[2] as f32);
         if r > 60.0 && r > g * 1.5 && r > b * 1.5 {
             red += 1;
@@ -57,7 +57,7 @@ fn level_scene_renders_tiles_spikes_door_coins() {
     // 타일 회색 [0.45,0.45,0.5] → sRGB ≈ (179,179,186): r≈g, b 약간 우세.
     // 배경(63,63,80)·플레이어 흰색(255)과 밝기로 구분된다.
     let tile_gray = rgba
-        .chunks_exact(4)
+        .as_chunks::<4>().0.iter()
         .filter(|p| {
             let (r, g, b) = (p[0] as i32, p[1] as i32, p[2] as i32);
             (150..220).contains(&r) && (r - g).abs() <= 6 && (0..=20).contains(&(b - r))
