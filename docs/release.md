@@ -48,9 +48,7 @@ Triples and archive formats:
 
 ## Versioning
 
-Voltex follows SemVer. The CI `semver-check` job (added v1.0.33) compares
-each push against the `v1.0.0` tag. Promote to a blocking gate once
-tag-per-cycle is universal.
+Voltex follows SemVer.
 
 - **Patch** (`v1.0.X`): bug fixes, missing-docs sweeps, additive features
   that don't expand the API surface.
@@ -69,8 +67,7 @@ Before tagging:
 - [ ] `cargo test --workspace --lib` passes.
 - [ ] `cargo clippy --workspace --all-targets -- -D warnings` clean.
 - [ ] `cargo test -p voltex_cli --test e2e_new_build -- --ignored` passes
-      (heavy ~60s; the nightly cron also runs this, but a manual run before
-      a release tag is cheap insurance).
+      (heavy; also available as the manual `e2e-quickstart` CI job).
 
 ### GPU-host visual verification (run on a machine with a GPU + display)
 
@@ -117,9 +114,8 @@ switch:
 
 - [ ] Push `master` to a GitHub mirror (`git remote add github
       https://github.com/<org>/voltex.git && git push github master`).
-- [ ] Watch the Actions tab; expect `build-and-test` (Linux + Windows) +
-      `coverage` (Linux, F5 gate at 78%) to go green. Advisory jobs
-      (`macos`, `semver-check`, `license-check`, `deny-check`) may stay
+- [ ] Watch the Actions tab; expect `build-and-test` (Linux + Windows)
+      to go green. Advisory jobs (`macos`, `coverage`, `deny`) may stay
       yellow.
 - [ ] Record the first green commit SHA in `docs/dev/STATUS.md` and tick
       `F7` in `docs/dev/AUDIT-BACKLOG.md`.

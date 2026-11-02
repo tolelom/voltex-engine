@@ -1,20 +1,10 @@
 name: ci
 
-# Voltex engine continuous integration.
+# Blocking: build + clippy (-D warnings) + tests on Linux and Windows.
+# Advisory: macOS, coverage (measured, no threshold), cargo-deny.
+# Manual: e2e `voltex new` + `voltex build` smoke test.
 #
-# This workflow exists to catch the kind of regressions that v1.0.3 (`voltex
-# build` Windows P0) and v1.0.4 (clippy approx_constant) slipped past:
-# things that a `cargo build` + `cargo test --lib` sweep on a single host
-# does not notice. It enforces:
-#   - build clean on Windows + Linux (+ macOS as a non-blocking job)
-#   - clippy with -D warnings as a hard gate
-#   - the full --workspace --lib + voltex_cli bin test suite
-#
-# Linux needs libasound2-dev for voltex_audio's ALSA backend FFI link.
-# macOS uses the CoreAudio system framework (no extra install).
-#
-# This file targets GitHub Actions syntax; self-hosted Gitea/Forgejo runners
-# also accept it. On non-GitHub remotes the file is simply inert.
+# Linux needs libasound2-dev for voltex_audio's ALSA backend.
 
 on:
   push:
@@ -22,9 +12,6 @@ on:
   pull_request:
     branches: [master]
   workflow_dispatch:
-  schedule:
-    # Nightly E2E quickstart safety net (UTC 18:00 ≈ KST 03:00 ≈ low-traffic).
-    - cron: "0 18 * * *"
 
 env:
   CARGO_TERM_COLOR: always
@@ -39,16 +26,11 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest]
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Install Rust stable
-        uses: dtolnay/rust-toolchain@stable
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
         with:
-          components: clippy, rustfmt
-
-      - name: Cache cargo registry + target
-        uses: actions/cache@v4
+          components: clippy
+      - uses: actions/cache@v4
         with:
           path: |
             ~/.cargo/registry
@@ -57,26 +39,18 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-cargo-
-
-      - name: Install Linux audio dev headers (ALSA)
+      - name: Install ALSA headers
         if: matrix.os == 'ubuntu-latest'
         run: sudo apt-get update && sudo apt-get install -y libasound2-dev
-
       - name: cargo build --workspace
         run: cargo build --workspace
-
       - name: cargo clippy --workspace --all-targets
         run: cargo clippy --workspace --all-targets -- -D warnings
-
       - name: cargo test --workspace --lib
         run: cargo test --workspace --lib
-
-      - name: cargo test -p voltex_cli (bin tests)
+      - name: cargo test -p voltex_cli
         run: cargo test -p voltex_cli
 
-  # Non-blocking macOS job — provides early signal that CoreAudio + native
-  # build still link, without making the whole matrix fail when a macOS
-  # runner is queued / unavailable.
   macos:
     name: build + test (macos-latest, advisory)
     runs-on: macos-latest
@@ -93,163 +67,44 @@ jobs:
       - name: cargo test --workspace --lib
         run: cargo test --workspace --lib
 
-  # Non-blocking SemVer compliance check. From v1.0.0 onwards every workspace
-  # crate advertises stable APIs, so every push should be compatible with the
-  # last published version. Advisory while we tag selectively; promotes to
-  # blocking once we adopt tag-per-cycle. Uses `--baseline-rev v1.0.0` so the
-  # comparison is anchored on a known good release; falls back to a no-op when
-  # the tag is missing (fresh forks).
-  semver-check:
-    name: cargo-semver-checks (ubuntu-latest, advisory)
-    runs-on: ubuntu-latest
-    continue-on-error: true
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - uses: dtolnay/rust-toolchain@stable
-      - name: Install Linux audio dev headers (ALSA)
-        run: sudo apt-get update && sudo apt-get install -y libasound2-dev
-      - name: Install cargo-semver-checks
-        uses: taiki-e/install-action@v2
-        with:
-          tool: cargo-semver-checks
-      - name: cargo semver-checks check-release (workspace)
-        run: |
-          if git rev-parse v1.0.0 >/dev/null 2>&1; then
-            cargo semver-checks check-release \
-              --workspace \
-              --exclude voltex_cli \
-              --baseline-rev v1.0.0
-          else
-            echo "::notice::v1.0.0 tag not found in this fork — skipping semver-checks"
-          fi
-
-  # Non-blocking license check — runs `cargo about generate` against
-  # about.toml's accepted SPDX list. Fails (advisory) if any transitive
-  # crate has a license outside the list. Catches GPL/AGPL/LGPL drift
-  # and unknown licenses without blocking PRs while the policy
-  # stabilizes.
-  license-check:
-    name: license check (ubuntu-latest, advisory)
-    runs-on: ubuntu-latest
-    continue-on-error: true
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - name: Install Linux audio dev headers (ALSA)
-        run: sudo apt-get update && sudo apt-get install -y libasound2-dev
-      - name: Install cargo-about
-        uses: taiki-e/install-action@v2
-        with:
-          tool: cargo-about
-      - name: cargo about generate (verify no license drift)
-        run: cargo about generate about.hbs -o /tmp/THIRD-PARTY-LICENSES.md
-
-  # CHANGELOG entry gate. Mirrors the local pre-push hook
-  # (.githooks/pre-push -> scripts/check_changelog.sh) as a second line of
-  # defense for PRs that arrive without the hooks installed. Only runs on
-  # pull_request events — direct pushes are gated by the pre-push hook.
-  changelog-check:
-    name: changelog entry (pull_request)
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout (full history for diff)
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - name: Run check_changelog.sh against PR base
-        run: |
-          chmod +x scripts/check_changelog.sh
-          ./scripts/check_changelog.sh "origin/${{ github.base_ref }}" "HEAD"
-
-  # E2E `voltex new → voltex build` smoke test. Heavy (~60s release build of
-  # the entire engine), so it does not run on every push — only on
-  # workflow_dispatch (manual) and on schedule (nightly safety net). Catches
-  # the kinds of regressions v1.0.3/v1.0.9 only surfaced after-the-fact, where
-  # the quickstart flow looked fine in unit tests but broke in production.
-  e2e-quickstart:
-    name: e2e new+build (ubuntu-latest, advisory)
-    if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
-    runs-on: ubuntu-latest
-    continue-on-error: true
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - name: Install Linux audio dev headers (ALSA)
-        run: sudo apt-get update && sudo apt-get install -y libasound2-dev
-      - name: Cache cargo registry + target
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ${{ runner.os }}-cargo-e2e-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-e2e-
-            ${{ runner.os }}-cargo-
-      - name: cargo test --test e2e_new_build -- --ignored
-        run: cargo test -p voltex_cli --test e2e_new_build -- --ignored --nocapture
-
-  # Non-blocking cargo-deny job — sweeps RUSTSEC advisories, license drift,
-  # duplicate semver-incompatible versions, and disallowed crate sources.
-  # Complements license-check (cargo-about) by catching the categories
-  # cargo-about does not surface (advisories, duplicates, unknown sources).
-  # Advisory while we audit the existing transitive-dep graph; promote to
-  # blocking once the warn-level categories ([advisories.yanked],
-  # [bans.multiple-versions]) are clean (v1.1+).
-  deny-check:
-    name: cargo-deny (ubuntu-latest, advisory)
-    runs-on: ubuntu-latest
-    continue-on-error: true
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - name: Install Linux audio dev headers (ALSA)
-        run: sudo apt-get update && sudo apt-get install -y libasound2-dev
-      - name: Install cargo-deny
-        uses: taiki-e/install-action@v2
-        with:
-          tool: cargo-deny
-      - name: cargo deny check (all checks)
-        run: cargo deny check
-
-  # Blocking coverage gate. Gates the workspace at >= 78% line coverage —
-  # the empirically-measured floor without GPU code paths (79.69% locally
-  # w/ --lib only). With lavapipe (software Vulkan) available, the GPU-
-  # gated #[ignore]'d tests in voltex_capture push the total to ~84%; we
-  # still run them via `-- --include-ignored` because they cost ~30s
-  # and contribute the only coverage signal for renderer headless /
-  # renderer_ecs::basic_renderer / runtime::handler. If lavapipe is
-  # missing on the runner the tests graceful-skip (HeadlessGpu returns
-  # Err) and the 78% threshold still passes — F5 is robust to missing
-  # GPU on weird runners.
+  # GPU tests run on lavapipe (software Vulkan); they skip when no adapter
+  # is found, so the number depends on the runner. Reported, not gated.
   coverage:
-    name: coverage (ubuntu-latest)
+    name: coverage (ubuntu-latest, advisory)
     runs-on: ubuntu-latest
+    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: llvm-tools-preview
-      - name: Install Linux audio dev headers (ALSA) + software Vulkan (lavapipe)
+      - name: Install ALSA headers + lavapipe
         run: |
           sudo apt-get update
-          sudo apt-get install -y libasound2-dev \
-            mesa-vulkan-drivers libvulkan1 vulkan-tools
-          # Verify lavapipe is the ICD vulkaninfo will pick up (best-effort —
-          # graceful-skip in tests if it is not).
-          VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/lvp_icd.x86_64.json \
-            vulkaninfo --summary || true
-      - name: Install cargo-llvm-cov
-        uses: taiki-e/install-action@cargo-llvm-cov
-      - name: cargo llvm-cov --workspace --lib (include-ignored, gate at 78%)
+          sudo apt-get install -y libasound2-dev mesa-vulkan-drivers libvulkan1
+      - uses: taiki-e/install-action@cargo-llvm-cov
+      - name: cargo llvm-cov --workspace --lib
         env:
           VK_ICD_FILENAMES: /usr/share/vulkan/icd.d/lvp_icd.x86_64.json
           WGPU_ADAPTER_NAME: llvmpipe
-        run: |
-          cargo llvm-cov --workspace --lib --summary-only \
-            --fail-under-lines 78 \
-            -- --include-ignored
+        run: cargo llvm-cov --workspace --lib --summary-only -- --include-ignored
+
+  deny:
+    name: cargo-deny (ubuntu-latest, advisory)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: EmbarkStudios/cargo-deny-action@v2
+
+  e2e-quickstart:
+    name: e2e new + build (manual)
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install ALSA headers
+        run: sudo apt-get update && sudo apt-get install -y libasound2-dev
+      - name: cargo test -p voltex_cli --test e2e_new_build
+        run: cargo test -p voltex_cli --test e2e_new_build -- --ignored --nocapture

@@ -17,10 +17,8 @@
 
 | 항목 | 현상 | 선택지 |
 |---|---|---|
-| 커버리지 게이트 | GPU 없는 `--lib` 측정이 68.83%로 CI 게이트 78% 아래. 원인은 GPU 의존 crate 성장: 2026-05-28 게이트 도입 뒤 voltex_capture src 1757 -> 5065줄(`#[ignore]` GPU 테스트 6 -> 43개, 실행 안 된 테스트 본문도 미커버 줄로 집계), voltex_renderer_ecs 462 -> 4080줄. 세 GPU crate(renderer·renderer_ecs·capture)가 미커버 줄의 69%이고, 이를 뺀 나머지는 86.0%. lavapipe가 있는 CI(GPU 테스트 실행)는 82.90%라 통과, lavapipe 없는 runner는 실패 | lavapipe 설치를 필수로 두고 지금 게이트 유지 / GPU 없는 측정에서 세 GPU crate를 `--ignore-filename-regex`로 제외하고 별도 하한 / 하한을 낮춤 |
 | glTF 머티리얼 텍스처 | 텍스처를 무시하고 색 계수만 로드 ([DEFERRED](DEFERRED.md) "2026-10-12 밤샘 점검") | baseColor·normal부터 임포트 / 실제 glTF 에셋을 쓸 때까지 보류 |
 | `Packet::to_bytes` 길이 | 64 KiB 넘는 페이로드에서 u16 길이가 wrap (`crates/voltex_net/src/packet.rs`). UDP에선 OS가 먼저 막아 도달하지 않음 | `try_to_bytes() -> Result` 추가 / 다른 전송 계층을 붙일 때까지 보류 |
-| README | 미커밋 변경(`cargo run -p`)이 있고 버전 배지가 v1.0.114에 머묾 | 그 변경과 함께 버전 배지 갱신. coverage 배지는 커버리지 게이트 결론에 맞춤 |
 
 ## 3. 설계가 필요한 것
 

@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# Local coverage measurement for Voltex — mirrors the CI coverage job
-# (.github/workflows/ci.yml) so contributors can reproduce the gate
-# before pushing.
+# Local coverage measurement for Voltex. CI (.github/workflows/ci.yml)
+# reports coverage without a threshold; this script keeps an optional
+# local gate.
 #
 # Usage:
-#   scripts/coverage.sh            # summary, gate at 78% lines (CI default)
+#   scripts/coverage.sh            # summary, gate at 78% lines
 #   scripts/coverage.sh --html     # also generate an HTML report
 #   scripts/coverage.sh --lib-only # skip GPU-gated #[ignore]'d tests
 #
@@ -18,7 +18,7 @@
 #
 # The GPU-gated #[ignore] tests must run to pass the gate: without a GPU
 # (lavapipe absent) their bodies and the renderer code they exercise count
-# as uncovered. See docs/dev/NEXT.md "커버리지 게이트".
+# as uncovered. See docs/dev/AUDIT-BACKLOG.md F5.
 
 set -euo pipefail
 

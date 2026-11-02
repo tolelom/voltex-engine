@@ -195,10 +195,10 @@
 - **coverage 측정** ✅ v1.0.6 — baseline 82.06% functions / 82.74% lines (cargo llvm-cov --workspace --lib). 80% 목표 평균 달성.
 - **CLI 친화 메시지 (engine-path)** ✅ v1.0.6 — 1-line → 7-line help block (bash + PowerShell 양쪽 안내).
 - **GPU/winit 의존 4 crate (renderer 66 / runtime 61 / renderer_ecs 54 / platform 46%) 의 coverage 보완** — headless GPU adapter + event-loop stub 필요. v1.1+.
-- **`--fail-under-lines 80` CI gate** — 4 low-coverage crate 통합 테스트 도입 후 활성. v1.1+.
+- ~~**`--fail-under-lines 80` CI gate**~~ 하지 않음(2026-11-02). CI 커버리지는 측정만 한다.
 - **HTML coverage 리포트 (codecov/coveralls upload)** — CI 가 실제 runner 에서 동작한 후. v1.1+.
 - **외부 의존 라이선스 고지** ✅ v1.0.7 — THIRD-PARTY-LICENSES.md (4,795 라인) + about.toml/hbs + CI license-check job. 284 transitive 모두 permissive, 0 copyleft.
-- **license-check advisory → blocking** — CI 첫 green run 후 승격. v1.1+.
+- ~~**license-check advisory → blocking**~~ 하지 않음(2026-11-02). license-check 잡을 없애고 라이선스는 cargo-deny가 본다.
 - ~~**THIRD-PARTY-LICENSES.md 를 `voltex build` artifact 에 동봉**~~ ✅ v1.0.12 — 아래 "LICENSE-MIT/APACHE 파일 추가 + `voltex build` 라이선스 번들" 항목에서 함께 해소. `voltex_cli::build::copy_license_files` 가 엔진 루트의 THIRD-PARTY-LICENSES.md + LICENSE-MIT + LICENSE-APACHE 를 `dist/` 로 복사 (crates/voltex_cli/src/build.rs, +4 tests).
 - **`cargo-deny` 통합** — license + advisory + duplicate 통합 스캔. 현재 cargo-audit + cargo-about 으로 대체 가능. v1.1+.
 - **parser panic-resistance fuzz** ✅ v1.0.8 — 21 신규 test (PNG/JPG/WAV/GLTF/OBJ), panic 0건. 외부 dep 없는 inline xorshift32.

@@ -43,6 +43,13 @@ recent on top. v0.x entries are organised by Cycle (see
 - **CONTRIBUTING 재작성**: 커밋 메시지 형식을 실제 이력(`<type>(<범위>)`)에 맞추고, pre-push 훅(CHANGELOG 검사,
   Linux clippy)과 GPU 테스트 실행법을 넣었다. 자동 루프 정책, 소요 시간, 버전별 경위, 끊긴 README 참조를 뺐다.
 
+### CI
+
+- **CI 잡 축소**: 필수는 Linux·Windows build·clippy·test만 남겼다. coverage는 78% 게이트를 없애고 측정만 하는
+  advisory로 바꿨다(lavapipe 유무에 따라 통과가 갈렸다). semver-check(모든 crate가 `publish = false`),
+  license-check(cargo-deny와 중복), changelog-check(pre-push 훅과 중복)를 지우고, e2e는 매일 실행을 빼고 수동만
+  남겼다. cargo-deny는 `cargo-deny-action`으로 돌린다.
+
 ### Build
 
 - **pre-push Linux clippy**: `scripts/check_linux_clippy.sh` 가 `aarch64-unknown-linux-gnu` 대상으로
