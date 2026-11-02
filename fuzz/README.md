@@ -41,8 +41,7 @@ Each target is a thin wrapper that feeds raw libFuzzer input into the
 corresponding `parse_*` / `deserialize_*` entry point. The targets do
 **not** assert anything beyond "no panic / no UB", because every parser
 already has hardening for: zero / huge dimensions, missing fields,
-truncated payloads, OOB indices, and unsupported version bytes (see
-`docs/dev/STATUS.md` v1.0.40 ~ v1.0.46).
+truncated payloads, OOB indices, and unsupported version bytes.
 
 A discovered crash gets written to `fuzz/artifacts/<target>/<sha1>`. Use
 that file as a regression-test fixture and add a hand-written test that
@@ -51,5 +50,5 @@ calls the same entry point with the same bytes.
 ## CI
 
 The fuzz crate is **excluded from the workspace** so `cargo build
---workspace` / `cargo test --workspace` ignore it. Running the targets
-is a separate cycle, not gated on every PR.
+--workspace` / `cargo test --workspace` ignore it. CI does not run the
+targets; run them by hand.

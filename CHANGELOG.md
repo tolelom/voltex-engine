@@ -54,6 +54,8 @@ recent on top. v0.x entries are organised by Cycle (see
   OS별 준비물·에러·확인 범위만 남겼다. voltex-toml-reference는 `.vpkg`가 `dist/wrapper/`에 생기는 것, `voltex new`가
   `[build]`까지 채운다는 것을 바로잡고 "향후 추가 후보" 절을 뺐다. release.md의 GitHub 미러 절차, visual/README의
   "PNG 240px 이하"(실제 200~800px)를 고쳤다.
+- **fuzz 산출물 gitignore**: `cargo fuzz`가 만드는 `fuzz/target`·`corpus`·`artifacts`·`coverage`가 무시되지 않던 것을
+  `.gitignore`에 넣었다(루트 `/target` 규칙은 `fuzz/target`에 적용되지 않는다).
 
 ### CI
 
