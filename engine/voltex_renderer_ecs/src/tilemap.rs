@@ -1,6 +1,5 @@
 //! `Tilemap` component: a grid of atlas-indexed cells drawn by
-//! `BasicRenderer` as one batched draw (see
-//! `docs/superpowers/specs/2026-10-12-tilemap-batch-render-design.md`).
+//! `BasicRenderer` as one batched draw.
 
 use crate::assets::TextureHandle;
 use voltex_math::{Mat4, Vec4};

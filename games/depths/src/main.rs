@@ -1,5 +1,4 @@
 //! Voltex Depths — 탑다운 트윈스틱 던전. 도그푸딩 게임 1편.
-//! 설계: docs/superpowers/specs/2026-06-11-voltex-depths-game-design.md
 use std::cell::RefCell;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;

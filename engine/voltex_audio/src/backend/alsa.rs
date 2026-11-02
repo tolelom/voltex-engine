@@ -7,8 +7,7 @@
 //!
 //! NOTE: this module is compiled only when `cfg(target_os = "linux")`. The
 //! initial version was written on Windows and has not yet been runtime-
-//! verified against a real Linux machine — see `docs/superpowers/specs/
-//! 2026-05-21-p1-audio-backend-design.md` § 8.1.
+//! verified against a real Linux machine.
 
 #![cfg(target_os = "linux")]
 #![allow(non_camel_case_types, non_snake_case)]

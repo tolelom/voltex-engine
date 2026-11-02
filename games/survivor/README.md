@@ -35,4 +35,3 @@ voltex build --engine-path ../..
 - 스크립트끼리는 빈 엔티티를 이벤트로 쓴다. 적을 맞히면 `kill_marker`, 플레이어가 맞으면 `damage_marker` 엔티티를 만들고, `game.lua`가 이를 거둬 점수와 목숨에 반영한다.
 - Lua가 `spawn_entity()`로 만든 엔티티에는 `main.rs`의 시스템이 태그를 보고 스크립트와 메시·재질 핸들을 붙인다. 그래서 새 엔티티가 바로 그려지고 움직인다.
 
-설계: `docs/superpowers/specs/2026-05-21-d3-flagship-game-design.md`

@@ -37,6 +37,10 @@ recent on top. v0.x entries are organised by Cycle (see
   옮겼다. 옛 설명과 달리 `voltex_image`, `voltex_runtime`에도 에러 타입이 있다. 컴포넌트 예제의 `data[..4]`는 짧은
   데이터에서 패닉 나므로 `get(..4)`로 바꾸고, 예제가 컴파일·동작하는 것을 임시 테스트로 확인했다.
 - **`.claude/` 추적 중단**: AI 작업 지침(`.claude/CLAUDE.md`)은 저장소에 두지 않고 `.gitignore`에 `/.claude/`를 넣었다.
+- **끝난 개발 기록 삭제**: `docs/superpowers/`(설계·구현 계획 134개), `docs/dev/STATUS.md`(단계별 작업 로그, CHANGELOG와 중복),
+  `v1.0-retrospective`, `v1.0-pub-audit`, `dogfood-friction` 1·2를 지웠다. 남은 할 일과 알려진 한계(`NEXT`, `DEFERRED`,
+  `AUDIT-BACKLOG`)만 남긴다. 코드 주석·README의 "설계: …" 출처 표기를 지우고, AUDIT-BACKLOG B1의 재검토 조건은 지운 판정
+  문서에서 항목 안으로 옮겼다. 지운 파일은 `git log --diff-filter=D -- <경로>`로 커밋을 찾아 `git show <커밋>^:<경로>`로 꺼낸다.
 
 - **voltex_capture `scene`**: 인라인 테스트를 `scene/tests.rs`로 옮겼다(`scene.rs` → `scene/mod.rs` 1140줄 +
   `scene/tests.rs` 704줄). 코드는 바꾸지 않았고 형제 모듈 재노출과 `scene::render_*` 경로는 그대로다.

@@ -10,7 +10,7 @@
 | [`tools/`](tools) | 엔진을 쓰는 도구. `voltex_cli`(게임 빌드 명령 `voltex`), `voltex_capture`(렌더 결과 PNG 캡처) |
 | [`games/`](games) | 엔진으로 만든 게임 3편 |
 | [`examples/`](examples) | 기능별 짧은 예제 |
-| [`docs/`](docs) | 사용 문서. `docs/dev/`와 `docs/superpowers/`는 개발 기록 |
+| [`docs/`](docs) | 사용 문서. `docs/dev/`는 남은 할 일과 알려진 한계 |
 
 ## 스크린샷
 
@@ -133,8 +133,7 @@ crate가 쌓인 순서, 한 프레임이 도는 순서, 코드 읽는 순서는 
 개발 기록
 
 - [CHANGELOG.md](CHANGELOG.md): 버전별 변경
-- [docs/superpowers/](docs/superpowers/): 설계(specs)와 구현 계획(plans)
-- [docs/dev/](docs/dev/): 작업 현황, 미룬 항목
+- [docs/dev/](docs/dev/): 남은 할 일(NEXT), 미룬 항목과 알려진 한계(DEFERRED), 감사 백로그(AUDIT-BACKLOG)
 
 ## 기여
 

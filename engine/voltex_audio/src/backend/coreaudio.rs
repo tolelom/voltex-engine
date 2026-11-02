@@ -13,8 +13,7 @@
 //!
 //! NOTE: this module is compiled only when `cfg(target_os = "macos")`. The
 //! initial version was written on a Windows development machine and has
-//! not yet been runtime-verified against real Mac hardware — see
-//! `docs/superpowers/specs/2026-05-21-b3-multi-os-build-design.md` § 6.
+//! not yet been runtime-verified against real Mac hardware.
 
 #![cfg(target_os = "macos")]
 #![allow(non_camel_case_types, non_snake_case)]

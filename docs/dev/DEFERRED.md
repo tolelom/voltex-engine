@@ -182,7 +182,7 @@
 - ~~**충돌/트리거 이벤트 런타임 노출**~~ ✅ 2026-06-03 — `RuntimeApp::set_collision_fn(\|contacts, &mut world, dt\|)`. 매 프레임 `detect_collisions` 결과(entity_a/entity_b 페어) 전달. `enable_physics` 무관 실행(트리거 존). game_ready_demo의 "잡힘"을 거리 계산 → 실제 Collider 충돌 이벤트로 교체. +1 테스트.
 - ~~**런타임 조명 고정**~~ ✅ 2026-06-03 — `RuntimeConfig::with_light(dir,color,ambient)` + `RuntimeApp::set_light_fn(\|light,world,dt\|)` (day/night·flicker). 기본값은 기존 `LightUniform::new()` 와 동일(역호환). 단일 directional light — 런타임 멀티 라이트(PBR 통합)는 후속.
 - **1573 missing_docs** — facade prelude + tier-1 API 만 보장. crate 별 점진 작성 v1.1. v1.0.19 부터 시작: voltex_math 59→0, v1.0.20 voltex_platform 38→0. 나머지 11 crate (~1476): asset / net / ai / physics / audio / ecs / script / renderer_ecs / editor / runtime / renderer.
-- **`pub(crate)` 다운그레이드** — 후보 노트 (`docs/dev/v1.0-pub-audit.md`) 만 작성. 실 변경 v1.1.
+- **`pub(crate)` 다운그레이드** — 후보 노트만 작성. 실 변경 v1.1. 노트는 지웠고 `git log --diff-filter=D -- docs/dev/v1.0-pub-audit.md`로 지운 커밋을 찾아 꺼낸다.
 - **600줄 한도 위반 4건** ✅ v1.0.2 에서 재분리.
 - **macOS/Linux 백엔드 runtime** — Cycle 10 (P1) ALSA + Cycle 11 (B3) CoreAudio 코드 작성 완료. 실 머신 audio 출력 v1.1.
 - **`voltex build` Windows P0** ✅ v1.0.3 fix (canonicalize \\?\ verbatim prefix strip).
@@ -249,7 +249,7 @@ high/medium 19건은 당일 해소 (CHANGELOG v1.0.114). LOW 4건은 실피해 �
   디렉토리가 dist를 포함하면 거부/스킵 — v1.1.
 
 또한 audit-runtime의 근본 원인 지적 1건을 설계 항목으로 이월:
-- ✅ v1.0.120 (`docs/superpowers/specs/2026-10-12-world-clear-generation-design.md`) — 슬롯 해제 + generation bump. 에디터 선택 재매핑 포함.
+- ✅ v1.0.120 — 슬롯 해제 + generation bump. 에디터 선택 재매핑 포함.
   ~~**`World::clear()`가 entity allocator까지 리셋해 핸들 (0,0)부터 재발급**~~ —
   용어집의 "generation 기반 재사용 안전" 보증이 clear() 경로에서만 깨진다
   (v1.0.114에서 audio voice 누수로 실증, 봉쇄 수정 적용됨). 근본 수정은

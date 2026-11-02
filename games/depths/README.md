@@ -3,7 +3,7 @@
 > 탑다운 트윈스틱 던전 슈터. WASD 이동 + 마우스 조준/발사, 적 3종
 > (추적자 / 사수 / 보스) + region 기반 문 진행. survivor(Lua 주도)와
 > 반대로 게임 로직을 **100% Rust**로 작성해 엔진의 Rust API 워크플로를
-> 도그푸딩한 결과물. 발견한 마찰은 `docs/dev/dogfood-friction.md`에 기록.
+> 도그푸딩한 결과물.
 
 ## 실행
 
@@ -62,5 +62,3 @@ cargo test -p depths --test visual -- --ignored  # GPU 시각 회귀 (GPU 필요
 
 - navmesh가 닫힌 문도 지나갈 수 있는 곳으로 본다. 적이 문 너머로 경로를 잡을 수 있어, 방에 들어가야 그 방의 적이 깨어나게 해서 보완한다.
 
-스펙: `docs/superpowers/specs/2026-06-11-voltex-depths-game-design.md`
-플랜: `docs/superpowers/plans/2026-06-11-voltex-depths.md`

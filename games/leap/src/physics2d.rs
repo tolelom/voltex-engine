@@ -1,7 +1,7 @@
 //! 게임 물리 튜닝 + `voltex::physics::grid2d` 어댑터.
 //!
-//! 충돌 코어는 v1.0.113에서 `voltex_physics::grid2d`로 승격됨
-//! (dogfood-friction-2 #4). 여기엔 게임 소유 상수(중력)와 LevelMap 어댑터만
+//! 충돌 코어는 v1.0.113에서 `voltex_physics::grid2d`로 승격됨.
+//! 여기엔 게임 소유 상수(중력)와 LevelMap 어댑터만
 //! 남는다. 동작 동일성은 이 파일의 기존 테스트 4개가 회귀 가드.
 
 use crate::level::{LevelMap, TILE};
