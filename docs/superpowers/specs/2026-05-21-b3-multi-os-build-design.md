@@ -230,7 +230,7 @@ voltex: manifest targets do not include host triple.
 | `crates/voltex_cli/src/error.rs` | 2 variants 추가 |
 | `crates/voltex_cli/src/build.rs` | host_triple 검증 로직 + 단위 테스트 +2 |
 | `docs/build-matrix.md` | 신규 |
-| `docs/STATUS.md` | Cycle 11 entry 추가 |
+| `docs/dev/STATUS.md` | Cycle 11 entry 추가 |
 | `docs/superpowers/specs/2026-05-20-voltex-v1.0-roadmap.md` | Cycle 11 마커 `[ ]` → `[✅]` |
 
 ## 5. 테스트 (+3 최소)

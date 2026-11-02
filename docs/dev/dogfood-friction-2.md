@@ -1,7 +1,7 @@
 # 도그푸딩 마찰 로그 2 — voltex_leap (2D 스택)
 
 게임 2편(2D 사이드뷰 플랫포머, `games/voltex_leap`) 제작 중 발견한 엔진 워크플로
-마찰. 형식은 1편(`docs/dogfood-friction.md`)과 동일: 하려던 것 / 마찰 / 우회 /
+마찰. 형식은 1편(`docs/dev/dogfood-friction.md`)과 동일: 하려던 것 / 마찰 / 우회 /
 제안 / P0~P2. 엔진 즉석 수정은 진행을 실제로 막을 때만. 이 로그가 다음 엔진
 사이클 입력이 된다.
 

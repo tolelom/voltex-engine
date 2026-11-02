@@ -169,7 +169,7 @@
 ## 🎉 v1.0 release — 2026-05-21 (tag `v1.0.0`) → **v1.0.1** ~ **v1.0.9** patches
 
 15 cycle / 37 세션 / 약 4 일에 걸쳐 진행된 v1.0 로드맵 완료. 회고는
-[docs/v1.0-retrospective.md](v1.0-retrospective.md). 미뤄진 항목은 v1.1+ 후속.
+[docs/dev/v1.0-retrospective.md](v1.0-retrospective.md). 미뤄진 항목은 v1.1+ 후속.
 
 v1.0.9 부터는 **서비스 배포 완성도** 로드맵 (`docs/superpowers/specs/2026-05-21-service-readiness-roadmap.md`) 기준으로 진행.
 
@@ -298,7 +298,7 @@ leap을 새 API로 마이그레이션해 실검증 (P2 3건 잔여 — 로그 �
 - **검증**: 단위 16 + 헤드리스 풀 플레이스루(봇이 본편 MAP 실클리어 —
   "이 레벨은 클리어 가능"이 테스트로 보증) + GPU 시각 회귀
   (`docs/visual/leap_level.png`) + 스모크 런 그린.
-- **새 마찰 로그**: `docs/dogfood-friction-2.md` — 6건 (P1 3 + P2 3).
+- **새 마찰 로그**: `docs/dev/dogfood-friction-2.md` — 6건 (P1 3 + P2 3).
   진행을 막은 마찰은 0건, 지난 사이클 개선 항목들은 전부 우회 없이 동작.
   P1 요지: SpriteAnimation 프레임 오프셋 부재(상태별 시트 분리 강제),
   Sprite flip 1급 지원 부재(tick 순서 의존 uv 재적용), render_world 직교
@@ -310,7 +310,7 @@ leap을 새 API로 마이그레이션해 실검증 (P2 3건 잔여 — 로그 �
 
 Depths friction 로그의 잔여 6건(P1 4 + P2 2)을 TDD로 일괄 해소 + 미배선 모듈
 CI 가드 신설. 커밋 7개 (항목당 atomic). 상세는 CHANGELOG v1.0.110 /
-`docs/dogfood-friction.md`(전 항목 취소선).
+`docs/dev/dogfood-friction.md`(전 항목 취소선).
 
 - **#3 planar follow_path** — waypoint를 에이전트 y 평면에 투영 (도달 XZ,
   force 평면 유지, goal snap y 보존). 게임플레이 y≠0 에이전트의 침하/정지 해소.
@@ -346,7 +346,7 @@ SFX/BGM. 엔진 Rust API 워크플로 도그푸딩이 목적.
   픽셀 검증하는 진입점 (friction #7 해소). depths GPU 시각 회귀가 사용.
 - **검증**: 단위 28 (lib 27 + main 1) + 헤드리스 풀 플레이스루(`tests/playthrough.rs`) + GPU 시각
   회귀(`tests/visual.rs`) 그린. debug/release 스모크 런 panic/validation 0.
-- **friction 로그 8건** (P1 6건 중 2건 해소, P2 2건) — `docs/dogfood-friction.md`
+- **friction 로그 8건** (P1 6건 중 2건 해소, P2 2건) — `docs/dev/dogfood-friction.md`
   머리말에 다음 엔진 사이클 후보 정리. `voltex build`가 Rust 로직 게임을
   패키징 못 하는 갭(friction #8) 포함.
 - 스펙: `docs/superpowers/specs/2026-06-11-voltex-depths-game-design.md`,
@@ -2217,7 +2217,7 @@ v1.0 release 후 실 머신 (Windows) 검증에서 4개 회귀 발견, 즉시 fi
   - `player.lua`: 가장 가까운 적을 향해 0.8초 주기로 projectile 발사. 방향은 spawned projectile 의 rotation.y 에 인코딩.
   - `enemy.lua`: 1.2 unit/sec 로 player 추적, 충돌 거리 ≤ 0.55 시 `damage_marker` drop + self-destruct.
   - `projectile.lua`: rotation.y 방향으로 6 unit/sec 이동, enemy 충돌 시 `kill_marker` drop + 양쪽 despawn, 3초 lifetime.
-- **`docs/v1.0-retrospective.md` (신규)** — 무엇이 성공 / v1.1 deferral / 통계 / 다음 우선 순위.
+- **`docs/dev/v1.0-retrospective.md` (신규)** — 무엇이 성공 / v1.1 deferral / 통계 / 다음 우선 순위.
 - **git tag `v1.0.0`** 로컬 부착. 사용자가 push 시 원격 release 활성.
 - 검증 한계: 3 OS exe 산출은 Mac / Linux 머신에서의 빌드 + 실행 (사용자 PR). Windows 에서는 `cargo build --workspace` 클린 + `cargo run -p voltex_survivor` 빌드 가능.
 - 테스트 +0 (코드 변경: voltex_runtime + input_system 무회귀; 916 lib tests 유지).
@@ -2236,7 +2236,7 @@ v1.0 release 후 실 머신 (Windows) 검증에서 4개 회귀 발견, 즉시 fi
 - **`voltex` facade prelude 보강**: C0a (Bounds/MeshHandle/MaterialHandle) + S1 (ScriptComponent) + B0 (RuntimeApp/RuntimeConfig) + B2 (Vfs) 추가. `pub use voltex_runtime as runtime` 모듈 re-export 추가 (B0 의 누락 fix). 신규 prelude 타입 6개의 컴파일 검증 테스트.
 - **Tier-1 API rustdoc** — voltex_ecs::World/Entity 의 핵심 메서드 (spawn/despawn/is_alive/add/get/get_mut/remove/entity_count) + voltex_editor::EditorCommand 10 variants + EditorSession 구조체 docstring.
 - **CHANGELOG.md (신규)** — Cycle 1~13 + M1~M7 + Phase 1~8 7~10 highlights 정리. Unreleased / per-cycle 섹션 구조.
-- **docs/v1.0-pub-audit.md (신규)** — pub(crate) 다운그레이드 후보 노트 (실제 변경은 v1.1 후속).
+- **docs/dev/v1.0-pub-audit.md (신규)** — pub(crate) 다운그레이드 후보 노트 (실제 변경은 v1.1 후속).
 - **deferral 정책 명시** — 전체 1586 missing_docs sweep + `#![warn(missing_docs)]` crate 적용 + 실제 pub(crate) 다운그레이드는 v1.1. v1.0 은 prelude + tier-1 API 한정 보장.
 - 테스트 +0 (rustdoc 변경 외 의미 있는 코드 변경 없음). 916 lib tests 유지.
 - spec: docs/superpowers/specs/2026-05-21-a-rustdoc-prelude-changelog-design.md
@@ -2402,7 +2402,7 @@ crates/
 ## 다음 작업 후보 (2026-05-20 8-7 이후) — ✅ 8/8 전부 해소 (역사 기록용)
 
 > **이 목록은 백로그가 아니다.** 2026-05-20 시점의 후보였고 8개 항목 모두 완료됐다
-> (최종 확인 v1.0.110). 미완 작업은 `docs/DEFERRED.md` 를 볼 것. 6번의 "다음:"
+> (최종 확인 v1.0.110). 미완 작업은 `docs/dev/DEFERRED.md` 를 볼 것. 6번의 "다음:"
 > 후속 아이디어(`get_world_transform`, Lua query iterator)만 아직 미구현이다.
 
 1. ~~**inspector 통합**~~ — ✅ Phase 8-6. 단일 `panels::*` 경로.
@@ -2422,8 +2422,8 @@ cd game_engine
 cargo test --workspace --lib   # 검증: 942개 통과해야 함 (v1.0.8 시점)
 ```
 
-진행 상황과 다음 단계는 이 파일과 `docs/DEFERRED.md`, `docs/superpowers/plans/`, `docs/superpowers/specs/` 를 본다. 자동 루프가 master에 계속 작업을 푸시할 수 있으므로 작업 전 `git pull --ff-only` 필수.
+진행 상황과 다음 단계는 이 파일과 `docs/dev/DEFERRED.md`, `docs/superpowers/plans/`, `docs/superpowers/specs/` 를 본다. 자동 루프가 master에 계속 작업을 푸시할 수 있으므로 작업 전 `git pull --ff-only` 필수.
 
 ## 간소화/미뤄진 항목
 
-상세: `docs/DEFERRED.md`
+상세: `docs/dev/DEFERRED.md`

@@ -9,7 +9,7 @@
 `set_sheet_frame`, `Particle`, `Lifetime`, `add_texture_png`)은 capture 회귀로만
 검증됐고 **실게임으로 도그푸딩된 적이 없다**. Depths(3D 탑다운 슈터, 100% Rust)와
 겹치지 않는 장르로 2D 워크플로 전반을 실전 투입해 **새 마찰 로그
-(`docs/dogfood-friction-2.md`)** 를 시작한다.
+(`docs/dev/dogfood-friction-2.md`)** 를 시작한다.
 
 도그푸딩 원칙은 1편과 동일: 게임 로직 100% Rust, 엔진 즉석 수정은 진행을 실제로
 막을 때만, 마찰은 로그에 기록하고 다음 엔진 사이클 입력으로 쓴다.
@@ -92,5 +92,5 @@ games/voltex_leap/
 - 게임이 `cargo run -p voltex_leap` 로 부팅·플레이 가능 (수동 확인은 사용자
   배치 검증으로 위임 — 헤드리스/GPU 검증까지가 이번 세션 책임).
 - 위 검증 4종 그린.
-- `docs/dogfood-friction-2.md` 신설 + 발견 마찰 전건 기록 (P0~P2 등급).
+- `docs/dev/dogfood-friction-2.md` 신설 + 발견 마찰 전건 기록 (P0~P2 등급).
 - STATUS/CHANGELOG 갱신, atomic commit 체인.

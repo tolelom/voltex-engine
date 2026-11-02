@@ -539,7 +539,7 @@ roadmap 의 "사용자 main 이 5줄 미만" 은 본문 줄 수. spec 의 runtim
 | Cargo.toml (workspace) | + voltex_runtime member + workspace dep |
 | examples/runtime_demo | 신규 example |
 | 다른 crate | 변경 없음 |
-| docs/STATUS.md | Cycle 6 entry |
+| docs/dev/STATUS.md | Cycle 6 entry |
 | docs/superpowers/specs/2026-05-20-voltex-v1.0-roadmap.md | `[✅]` |
 
 facade crate `voltex` 는 `pub use voltex_runtime as runtime;` 한 줄 추가 옵션 (의도적 미적용 — voltex 는 "라이브러리 컬렉션", voltex_runtime 은 "조립된 앱" → 별도 패키지로 명확히 분리. Cycle 13 의 A 작업에서 재검토).

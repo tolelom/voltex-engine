@@ -1299,9 +1299,9 @@ git commit -m "feat(editor_demo): rewrite as scene editor using EditorSession"
 Run: `cargo test --workspace --lib 2>&1 | grep "test result" | sort | uniq -c`
 Expected: 기존 485 + 새로 추가된 voltex_editor 테스트 (약 14개) → 모든 라인 `0 failed`.
 
-- [ ] **Step 2: Update docs/STATUS.md**
+- [ ] **Step 2: Update docs/dev/STATUS.md**
 
-`docs/STATUS.md` 의 **Phase 8-4: Immediate Mode UI (Editor)** 섹션 아래에 추가:
+`docs/dev/STATUS.md` 의 **Phase 8-4: Immediate Mode UI (Editor)** 섹션 아래에 추가:
 
 ```markdown
 ### Phase 8-5: Editor Command Foundation
@@ -1316,7 +1316,7 @@ Expected: 기존 485 + 새로 추가된 voltex_editor 테스트 (약 14개) → 
 - [ ] **Step 3: Final commit**
 
 ```bash
-git add docs/STATUS.md
+git add docs/dev/STATUS.md
 git commit -m "docs: record Phase 8-5 editor command foundation"
 ```
 

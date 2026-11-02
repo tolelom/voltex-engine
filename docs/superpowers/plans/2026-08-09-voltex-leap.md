@@ -11,7 +11,7 @@
 ## Global Constraints
 
 - 게임 로직 100% Rust. Lua/에디터 저작 비범위.
-- 엔진 crate 즉석 수정 금지 — 마찰은 `docs/dogfood-friction-2.md`에 기록 (진행을 실제로 막을 때만 예외).
+- 엔진 crate 즉석 수정 금지 — 마찰은 `docs/dev/dogfood-friction-2.md`에 기록 (진행을 실제로 막을 때만 예외).
 - workspace build/clippy(`-D warnings`)/test 그린 유지. 파일 600줄 한도.
 - 게임 평면 = XY (X 수평, Y 수직↑), 전 엔티티 z=0. TILE = 1.0 world unit.
 - ASCII 맵: 행 0 = 최상단. `world_y = (rows-1-row) as f32 * TILE`. 셀 중심 = `(gx as f32 + 0.5, gy_world as f32 + 0.5)` 아님 — **셀 좌하단 기준 + 0.5 오프셋** 즉 중심 = `(gx + 0.5, world_row + 0.5)`.
@@ -559,8 +559,8 @@ fn main_map_parses() {
 ### Task 11: 마찰 로그 + 문서 마무리
 
 **Files:**
-- Create: `docs/dogfood-friction-2.md` (구현 중 계속 누적 — 이 태스크에서 머리말/등급 정리)
-- Modify: `docs/STATUS.md` (신규 섹션), `CHANGELOG.md` (v1.0.111), 루트 `Cargo.toml` version, `README.md` 배지(있으면)
+- Create: `docs/dev/dogfood-friction-2.md` (구현 중 계속 누적 — 이 태스크에서 머리말/등급 정리)
+- Modify: `docs/dev/STATUS.md` (신규 섹션), `CHANGELOG.md` (v1.0.111), 루트 `Cargo.toml` version, `README.md` 배지(있으면)
 
 - [ ] **Step 1: friction-2 머리말** — 1편 로그 형식 미러: 항목 테이블(하려던 것/마찰/우회/제안/P등급) + 요약.
 - [ ] **Step 2: STATUS/CHANGELOG** — 게임 개요, 검증 결과, 마찰 건수 요약.

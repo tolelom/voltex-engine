@@ -596,8 +596,8 @@ git commit -m "feat(renderer): add hardware RT shadows to deferred_demo"
 ## Task 5: 문서 업데이트
 
 **Files:**
-- Modify: `docs/STATUS.md`
-- Modify: `docs/DEFERRED.md`
+- Modify: `docs/dev/STATUS.md`
+- Modify: `docs/dev/DEFERRED.md`
 
 - [ ] **Step 1: STATUS.md에 Phase 7-3 추가**
 
@@ -626,6 +626,6 @@ git commit -m "feat(renderer): add hardware RT shadows to deferred_demo"
 - [ ] **Step 3: 커밋**
 
 ```bash
-git add docs/STATUS.md docs/DEFERRED.md
+git add docs/dev/STATUS.md docs/dev/DEFERRED.md
 git commit -m "docs: add Phase 7-3 RT shadows status and deferred items"
 ```

@@ -279,7 +279,7 @@ v1 UI 한계: dropdown 이 아니라 컴포넌트 6개 버튼을 세로 나열 (
 | `crates/voltex_editor/src/session.rs` | Inverse 3 variants + capture/apply 분기 + Despawn 그룹 이동 + 테스트 +5 |
 | `crates/voltex_editor/src/panels/inspector.rs` | Add Component 버튼 그룹 + 테스트 +2 (로직 분리하여) |
 | `crates/voltex_editor/CODEMAP.md` + `crates/voltex_ecs/CODEMAP.md` | API 갱신 |
-| `docs/STATUS.md` | Cycle 12 entry |
+| `docs/dev/STATUS.md` | Cycle 12 entry |
 | `docs/superpowers/specs/2026-05-20-voltex-v1.0-roadmap.md` | Cycle 12 마커 `[✅]` |
 
 ## 5. 테스트 (+12 최소 목표, roadmap 명시 +12)

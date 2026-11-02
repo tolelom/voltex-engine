@@ -145,8 +145,8 @@ scene = "missing.vscn"   # ✗ ManifestPathMissing { field: "build.scene", path:
 ## 관련 문서
 
 - [`CONTRIBUTING.md`](../CONTRIBUTING.md) — 의존성 정책 / 600줄 한도 / 에러 표준
-- [`docs/STATUS.md`](STATUS.md) — v1.0.x 패치 상세 (v1.0.11 schema 강화 / v1.0.12 라이선스 번들)
-- [`docs/DEFERRED.md`](DEFERRED.md) — 향후 추가 예정 필드 후보
+- [`docs/dev/STATUS.md`](dev/STATUS.md) — v1.0.x 패치 상세 (v1.0.11 schema 강화 / v1.0.12 라이선스 번들)
+- [`docs/dev/DEFERRED.md`](dev/DEFERRED.md) — 향후 추가 예정 필드 후보
 - [`crates/voltex_cli/src/manifest/mod.rs`](../crates/voltex_cli/src/manifest/mod.rs) — 파서 + validate_schema + validate_paths 본체
 
 ## 향후 추가 후보 (v1.1+)

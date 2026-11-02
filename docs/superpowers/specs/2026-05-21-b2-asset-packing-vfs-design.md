@@ -200,7 +200,7 @@ voltex_asset::AssetLoader 가 internal 로 fs 사용 → Vfs 로 swap 하면 호
 | voltex_runtime::lib | re-export Vfs |
 | voltex_cli::build | pack_archive 추가, wrapper main.rs 가 include_bytes 사용 |
 | 다른 crate | 변경 없음 |
-| docs/STATUS.md, roadmap | Cycle 9 |
+| docs/dev/STATUS.md, roadmap | Cycle 9 |
 
 ## 12. Done 기준 (로드맵 § Cycle 9)
 - [ ] `voltex_asset::vpkg` + `vfs` 신규 모듈, 외부 의존 0

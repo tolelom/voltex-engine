@@ -1116,8 +1116,8 @@ git commit -m "feat(physics): add detect_collisions ECS integration"
 ## Task 8: 문서 업데이트 + 최종 커밋
 
 **Files:**
-- Modify: `docs/STATUS.md`
-- Modify: `docs/DEFERRED.md`
+- Modify: `docs/dev/STATUS.md`
+- Modify: `docs/dev/DEFERRED.md`
 - Modify: `CLAUDE.md`
 
 - [ ] **Step 1: STATUS.md에 Phase 5-1 추가**
@@ -1150,6 +1150,6 @@ crate 구조에 `voltex_physics` 추가.
 - [ ] **Step 3: 커밋**
 
 ```bash
-git add docs/STATUS.md docs/DEFERRED.md CLAUDE.md
+git add docs/dev/STATUS.md docs/dev/DEFERRED.md CLAUDE.md
 git commit -m "docs: add Phase 5-1 collision detection status and deferred items"
 ```

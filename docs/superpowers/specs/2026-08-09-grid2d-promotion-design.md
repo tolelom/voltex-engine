@@ -1,7 +1,7 @@
 # voltex_physics::grid2d — 2D 타일 충돌 승격 설계 (friction-2 #4)
 
 날짜: 2026-08-09
-입력: `docs/dogfood-friction-2.md` #4 (P2), seed: `games/voltex_leap/src/physics2d.rs`
+입력: `docs/dev/dogfood-friction-2.md` #4 (P2), seed: `games/voltex_leap/src/physics2d.rs`
 
 ## 판정
 

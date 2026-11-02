@@ -221,8 +221,8 @@ voltex (facade, L4)
 - [docs/release.md](docs/release.md) — release tagging + 산출물 자동화 (v1.0.34)
 - [examples/README.md](examples/README.md) — 14 example 추천 학습 순서 + 카테고리별
 - [CONTRIBUTING.md](CONTRIBUTING.md) — 외부 contributor 가이드 (의존성 정책 / 600줄 / 에러 표준 / 첫 PR 체크리스트)
-- [docs/STATUS.md](docs/STATUS.md) — 작업 현황 + Cycle history + 테스트 통계
-- [docs/DEFERRED.md](docs/DEFERRED.md) — 간소화 / 미뤄진 항목 목록
+- [docs/dev/STATUS.md](docs/dev/STATUS.md) — 작업 현황 + Cycle history + 테스트 통계
+- [docs/dev/DEFERRED.md](docs/dev/DEFERRED.md) — 간소화 / 미뤄진 항목 목록
 - [CHANGELOG.md](CHANGELOG.md) — Cycle 별 주요 변경
 - [docs/superpowers/specs/2026-03-24-voltex-engine-design.md](docs/superpowers/specs/2026-03-24-voltex-engine-design.md) — 전체 엔진 설계 (원본 spec)
 - [docs/superpowers/specs/2026-05-20-voltex-v1.0-roadmap.md](docs/superpowers/specs/2026-05-20-voltex-v1.0-roadmap.md) — v1.0 까지의 cycle 로드맵

@@ -182,7 +182,7 @@
 - ~~**충돌/트리거 이벤트 런타임 노출**~~ ✅ 2026-06-03 — `RuntimeApp::set_collision_fn(\|contacts, &mut world, dt\|)`. 매 프레임 `detect_collisions` 결과(entity_a/entity_b 페어) 전달. `enable_physics` 무관 실행(트리거 존). game_ready_demo의 "잡힘"을 거리 계산 → 실제 Collider 충돌 이벤트로 교체. +1 테스트.
 - ~~**런타임 조명 고정**~~ ✅ 2026-06-03 — `RuntimeConfig::with_light(dir,color,ambient)` + `RuntimeApp::set_light_fn(\|light,world,dt\|)` (day/night·flicker). 기본값은 기존 `LightUniform::new()` 와 동일(역호환). 단일 directional light — 런타임 멀티 라이트(PBR 통합)는 후속.
 - **1573 missing_docs** — facade prelude + tier-1 API 만 보장. crate 별 점진 작성 v1.1. v1.0.19 부터 시작: voltex_math 59→0, v1.0.20 voltex_platform 38→0. 나머지 11 crate (~1476): asset / net / ai / physics / audio / ecs / script / renderer_ecs / editor / runtime / renderer.
-- **`pub(crate)` 다운그레이드** — 후보 노트 (`docs/v1.0-pub-audit.md`) 만 작성. 실 변경 v1.1.
+- **`pub(crate)` 다운그레이드** — 후보 노트 (`docs/dev/v1.0-pub-audit.md`) 만 작성. 실 변경 v1.1.
 - **600줄 한도 위반 4건** ✅ v1.0.2 에서 재분리.
 - **macOS/Linux 백엔드 runtime** — Cycle 10 (P1) ALSA + Cycle 11 (B3) CoreAudio 코드 작성 완료. 실 머신 audio 출력 v1.1.
 - **`voltex build` Windows P0** ✅ v1.0.3 fix (canonicalize \\?\ verbatim prefix strip).

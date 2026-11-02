@@ -13,7 +13,7 @@
 //! v1 limitation: we don't store per-entity mesh bounds in ECS yet, so picking
 //! uses a unit-sphere approximation (radius * max(scale)). This is fine for the
 //! editor_demo's cube grid; future work can switch to AABB once meshes carry
-//! bounds. Documented in docs/DEFERRED.md.
+//! bounds. Documented in docs/dev/DEFERRED.md.
 
 use voltex_ecs::{Entity, Transform, World};
 use voltex_math::{Mat4, Ray, Vec3, Vec4, AABB};

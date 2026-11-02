@@ -554,8 +554,8 @@ git commit -m "refactor(capture): use voltex_image::encode_rgba8, drop duplicate
 - Modify: `crates/voltex_renderer/CODEMAP.md`
 - Modify: `crates/voltex_capture/CODEMAP.md`
 - Modify: `CLAUDE.md`
-- Modify: `docs/AUDIT-BACKLOG.md`
-- Modify: `docs/STATUS.md`
+- Modify: `docs/dev/AUDIT-BACKLOG.md`
+- Modify: `docs/dev/STATUS.md`
 - Modify: `CHANGELOG.md`
 
 - [ ] **Step 1: Add `voltex_image` to the facade crate**
@@ -593,13 +593,13 @@ Update the `voltex_renderer` line to show it now depends on `voltex_image`, and 
 
 - [ ] **Step 5: Mark audit items done**
 
-In `docs/AUDIT-BACKLOG.md`:
+In `docs/dev/AUDIT-BACKLOG.md`:
 - Change `- [ ] **E1**` to `- [x] **E1**` and append the commit hashes.
 - Change `- [~] **C1**` to `- [x] **C1**` noting it was resolved as part of E1 (checksums consolidated in `voltex_image::checksum`).
 
 - [ ] **Step 6: Update STATUS + CHANGELOG**
 
-In `docs/STATUS.md`: add `voltex_image` to the crate list/structure and note the renderer God-crate reduction. In `CHANGELOG.md`: add an entry describing the E1 split + C1 dedup.
+In `docs/dev/STATUS.md`: add `voltex_image` to the crate list/structure and note the renderer God-crate reduction. In `CHANGELOG.md`: add an entry describing the E1 split + C1 dedup.
 
 - [ ] **Step 7: Full workspace verification**
 

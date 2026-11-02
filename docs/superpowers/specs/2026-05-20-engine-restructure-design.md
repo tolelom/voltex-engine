@@ -325,7 +325,7 @@ implementation plan 작성 시 결정:
 
 ## 관련 문서
 
-- `docs/STATUS.md` — 현재 작업 상태
-- `docs/DEFERRED.md` — 미뤄진 항목
+- `docs/dev/STATUS.md` — 현재 작업 상태
+- `docs/dev/DEFERRED.md` — 미뤄진 항목
 - `docs/superpowers/specs/2026-03-24-voltex-engine-design.md` — 전체 엔진 설계 (원본)
 - 본 spec 이후 작성될 `docs/superpowers/plans/2026-05-20-engine-restructure-*.md` — 마일스톤별 plan

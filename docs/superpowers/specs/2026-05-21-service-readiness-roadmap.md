@@ -46,7 +46,7 @@
 | v1.0.23 | pre-commit hook (`.githooks/pre-commit` + 설치 스크립트) — fmt + clippy + test --lib quick | 로컬에서 회귀 1차 차단 |
 | v1.0.24 | voltex_math 100% missing_docs (가장 작고 stable한 crate부터) | 1573 missing_docs 점진 해소 시작 |
 | v1.0.25 | voltex_ecs 100% missing_docs | 핵심 API 명세화 |
-| v1.0.26 | pub(crate) 다운그레이드 — `docs/v1.0-pub-audit.md` 후보 실 적용 | API surface 축소 |
+| v1.0.26 | pub(crate) 다운그레이드 — `docs/dev/v1.0-pub-audit.md` 후보 실 적용 | API surface 축소 |
 | v1.0.27 | headless GPU test harness 첫 실험 (voltex_platform → voltex_renderer 순) | coverage 80% gate 의 4 GPU crate 의 첫 발자국 |
 
 ## 우선순위 원칙

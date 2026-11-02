@@ -42,7 +42,7 @@ corresponding `parse_*` / `deserialize_*` entry point. The targets do
 **not** assert anything beyond "no panic / no UB", because every parser
 already has hardening for: zero / huge dimensions, missing fields,
 truncated payloads, OOB indices, and unsupported version bytes (see
-`docs/STATUS.md` v1.0.40 ~ v1.0.46).
+`docs/dev/STATUS.md` v1.0.40 ~ v1.0.46).
 
 A discovered crash gets written to `fuzz/artifacts/<target>/<sha1>`. Use
 that file as a regression-test fixture and add a hand-written test that

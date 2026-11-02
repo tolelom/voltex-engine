@@ -62,7 +62,7 @@
 - [Tutorial (30 min)](docs/tutorial.md) — 0 에서 빌드된 게임까지.
 - [Build Matrix](docs/build-matrix.md) — 3 OS 빌드 명령.
 - [CHANGELOG](CHANGELOG.md)
-- [STATUS](docs/STATUS.md) — 작업 현황 + cycle history.
+- [STATUS](docs/dev/STATUS.md) — 작업 현황 + cycle history.
 
 ## License
 MIT OR Apache-2.0 (사용자 선택). `THIRD_PARTY_LICENSES` 에 winit + wgpu 라이선스 고지.
@@ -122,7 +122,7 @@ examples/tutorial_minigame/
 | `examples/tutorial_minigame/scene.vscn` | 신규 (hand-edited JSON, 3~5 entity) |
 | `examples/tutorial_minigame/scripts/{spinner,player,enemy}.lua` | 신규 |
 | `Cargo.toml` (workspace) | tutorial_minigame 멤버 추가 |
-| `docs/STATUS.md` | Cycle 14 entry + Examples 목록 +1 |
+| `docs/dev/STATUS.md` | Cycle 14 entry + Examples 목록 +1 |
 | `docs/superpowers/specs/2026-05-20-voltex-v1.0-roadmap.md` | Cycle 14 마커 `[✅]` |
 
 ## 5. Done 기준

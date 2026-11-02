@@ -11,7 +11,7 @@
 
 1. **`games/voltex_survivor/` 신규** — `examples/` 와 분리. voltex CLI 의 표준 프로젝트 레이아웃 (`voltex.toml` + `scene.vscn` + `scripts/` + `assets/`) + `src/main.rs` (Rust 진입점, voltex_runtime 기반).
 2. **게임 코드의 90%+ Lua / scene** — Rust 측은 RuntimeApp 부트스트랩 + 입력 처리만. 게임플레이 (이동, 공격, 적 AI, 점수, lives, wave) 는 Lua.
-3. **`docs/v1.0-retrospective.md` 신규** — 무엇이 잘 됐고 무엇이 v1.1 로 미뤄졌는지.
+3. **`docs/dev/v1.0-retrospective.md` 신규** — 무엇이 잘 됐고 무엇이 v1.1 로 미뤄졌는지.
 4. **`STATUS.md` 에 "v1.0 release 완료" 라인 추가** + **git tag `v1.0.0`** 로컬 부착 (사용자가 푸시).
 
 ## 2. 비포함
@@ -184,8 +184,8 @@ end
 | `games/voltex_survivor/assets/.gitkeep` | 신규 |
 | `games/voltex_survivor/src/main.rs` | 신규 (RuntimeApp + input system + mesh upload) |
 | `Cargo.toml` (workspace) | `games/voltex_survivor` 멤버 추가 |
-| `docs/v1.0-retrospective.md` | 신규 |
-| `docs/STATUS.md` | Cycle 15 entry + "v1.0 release 완료" 라인 |
+| `docs/dev/v1.0-retrospective.md` | 신규 |
+| `docs/dev/STATUS.md` | Cycle 15 entry + "v1.0 release 완료" 라인 |
 | `docs/superpowers/specs/2026-05-20-voltex-v1.0-roadmap.md` | Cycle 15 마커 `[✅]` |
 | `README.md` | "v1.0 released" badge (선택) |
 | `git tag v1.0.0` | 로컬 부착 |
@@ -195,7 +195,7 @@ end
 - [x] `cargo build --workspace` 클린 (voltex_survivor 컴파일)
 - [x] `cargo run -p voltex_survivor` 으로 실행 가능 (수동 검증 권장; 자동 게이트는 빌드)
 - [x] 게임 로직 100% Lua (코드 inspection 으로 확인)
-- [x] `docs/v1.0-retrospective.md` 작성
+- [x] `docs/dev/v1.0-retrospective.md` 작성
 - [x] STATUS.md 의 "v1.0 release 완료" 라인 + 날짜 + tag 참조
 - [x] `git tag v1.0.0` 로컬 부착 (사용자가 push 시 release 활성)
 
@@ -206,7 +206,7 @@ end
 | **1** | `games/voltex_survivor/` 스캐폴드 (Cargo.toml + voltex.toml + scene.vscn + src/main.rs 의 RuntimeApp + cube mesh + input system) + workspace 등록 |
 | **2** | scripts/{game,player,enemy,projectile}.lua 4개 작성 + scene.vscn 의 초기 entity 시드 (player + ground + game 매니저) |
 | **3** | 실제 동작 검증 + 미세 조정 (cube 충돌 거리, wave 간격, 발사 속도 등) |
-| **4** | `docs/v1.0-retrospective.md` + STATUS.md "v1.0 release 완료" + roadmap 마커 + `git tag v1.0.0` |
+| **4** | `docs/dev/v1.0-retrospective.md` + STATUS.md "v1.0 release 완료" + roadmap 마커 + `git tag v1.0.0` |
 
 ## 7. 리스크
 
@@ -223,4 +223,4 @@ end
 - `docs/superpowers/specs/2026-05-20-voltex-v1.0-roadmap.md` § Cycle 15
 - `examples/survivor_game/` (기존, 대조용)
 - `examples/tutorial_minigame/` (Cycle 14, 패턴 참고)
-- 이후 작성될 `docs/v1.0-retrospective.md`
+- 이후 작성될 `docs/dev/v1.0-retrospective.md`

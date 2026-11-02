@@ -29,7 +29,7 @@
    - voltex_ecs core: `World`, `Entity`, `Component` trait, `ComponentRegistry`, `Transform`, `Parent`/`Children`
    - voltex_editor core: `EditorSession`, `EditorCommand` (variants)
 4. **CHANGELOG.md (v0.x → v1.0 highlights)** — Cycle 1~13 의 주요 변경을 7~10 항목으로 요약.
-5. **`pub(crate)` downgrade 후보 식별** — 강제 변경은 안 함, 후보 목록만 `docs/v1.0-pub-audit.md` 같은 follow-up 노트에 기록.
+5. **`pub(crate)` downgrade 후보 식별** — 강제 변경은 안 함, 후보 목록만 `docs/dev/v1.0-pub-audit.md` 같은 follow-up 노트에 기록.
 
 ### 2.2 v1.1 로 deferral (scope out)
 
@@ -56,7 +56,7 @@
 |---|---|
 | **1** | `cargo doc` warning 0 만들기: voltex_math/voltex_renderer/voltex_physics/voltex_ai/voltex_script 의 intra-doc link 깨짐 fix. voltex facade vs voltex_renderer 파일 충돌 (`output filename collision`) 해결. |
 | **2** | facade `voltex::prelude` 보강 + tier-1 API rustdoc (~50 항목). 변경 시 `cargo doc` 재실행으로 추가 워닝 0 유지. |
-| **3** | `CHANGELOG.md` 작성 + `docs/v1.0-pub-audit.md` (pub(crate) 후보 노트) + STATUS.md / roadmap 갱신. |
+| **3** | `CHANGELOG.md` 작성 + `docs/dev/v1.0-pub-audit.md` (pub(crate) 후보 노트) + STATUS.md / roadmap 갱신. |
 
 ## 4. 검증 게이트
 
@@ -77,4 +77,4 @@
 ## 6. 관련 문서
 
 - `docs/superpowers/specs/2026-05-20-voltex-v1.0-roadmap.md` § Cycle 13
-- 이후 작성될 `CHANGELOG.md`, `docs/v1.0-pub-audit.md`
+- 이후 작성될 `CHANGELOG.md`, `docs/dev/v1.0-pub-audit.md`

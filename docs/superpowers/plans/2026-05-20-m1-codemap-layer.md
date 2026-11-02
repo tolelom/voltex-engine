@@ -786,8 +786,8 @@ cat CLAUDE.md
 Rust 게임 엔진 프로젝트. wgpu 28.0 + winit 0.30 기반.
 
 ## 작업 현황
-- `docs/STATUS.md` — 완료된 Phase, crate 구조, 테스트 현황, 다음 작업
-- `docs/DEFERRED.md` — 간소화/미뤄진 항목 목록
+- `docs/dev/STATUS.md` — 완료된 Phase, crate 구조, 테스트 현황, 다음 작업
+- `docs/dev/DEFERRED.md` — 간소화/미뤄진 항목 목록
 
 ## 스펙
 - `docs/superpowers/specs/2026-03-24-voltex-engine-design.md` — 전체 엔진 설계

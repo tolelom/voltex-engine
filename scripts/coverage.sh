@@ -18,7 +18,7 @@
 #
 # The GPU-gated #[ignore] tests must run to pass the gate: without a GPU
 # (lavapipe absent) their bodies and the renderer code they exercise count
-# as uncovered. See docs/NEXT.md "커버리지 게이트".
+# as uncovered. See docs/dev/NEXT.md "커버리지 게이트".
 
 set -euo pipefail
 

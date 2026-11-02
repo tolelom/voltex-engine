@@ -689,8 +689,8 @@ git commit -m "feat(editor): integrate docking into editor_demo"
 ### Task 5: Update docs
 
 **Files:**
-- Modify: `docs/STATUS.md`
-- Modify: `docs/DEFERRED.md`
+- Modify: `docs/dev/STATUS.md`
+- Modify: `docs/dev/DEFERRED.md`
 
 - [ ] **Step 1: Update STATUS.md**
 
@@ -710,6 +710,6 @@ Update test count.
 - [ ] **Step 3: Commit**
 
 ```bash
-git add docs/STATUS.md docs/DEFERRED.md
+git add docs/dev/STATUS.md docs/dev/DEFERRED.md
 git commit -m "docs: update STATUS.md and DEFERRED.md with docking system"
 ```

@@ -331,7 +331,7 @@ fn max_penetration(nm: &NavMesh, path: &[Vec3]) -> f32 {
 
 #[test]
 fn test_funnel_zigzag_stays_inside_corridor() {
-    // Regression for the SSF apex-restart bug (docs/DEFERRED.md). The funnel
+    // Regression for the SSF apex-restart bug (docs/dev/DEFERRED.md). The funnel
     // must touch the interior corner at (-2.862, 4.1572) so the path stays
     // inside the zig-zag corridor. The pre-fix `continue`-from-current-index
     // funnel skipped that corner, producing a path ~0.41 units outside.

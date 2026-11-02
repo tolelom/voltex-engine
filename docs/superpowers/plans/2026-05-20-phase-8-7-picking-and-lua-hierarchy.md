@@ -98,7 +98,7 @@
 
 - [ ] **D2: Update `crates/voltex_script/CODEMAP.md` (engine_api function count 12 → 15)**
 
-- [ ] **D3: Update `docs/STATUS.md` Phase 8-7 section + test counts**
+- [ ] **D3: Update `docs/dev/STATUS.md` Phase 8-7 section + test counts**
 
 - [ ] **D4: `cargo test --workspace --lib` — verify 783 + new tests all pass**
 

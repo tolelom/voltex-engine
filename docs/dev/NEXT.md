@@ -30,7 +30,7 @@
 | 안에서 시작하는 레이 규약 | Box는 t=0, Sphere·Capsule은 출구 t. 통일하면 동작이 바뀌므로 호출 측이 t=0을 어떻게 쓰는지 확인 필요 | [DEFERRED](DEFERRED.md) "레이캐스트" |
 | `.vpkg` 4 GiB 한계 | 인덱스 offset·size가 u32. 포맷 버전을 올릴지, 쓰기 단계에서 에러를 낼지 호환성 결정 필요 | [DEFERRED](DEFERRED.md) "`.vpkg` 4 GiB 한계" |
 | 지연 보상 타임스탬프 정밀도 | `HistoryEntry.timestamp`가 f32라 서버 가동 수 시간 뒤 ms 정밀도 손실 가능. 공개 필드라 타입 변경은 API 변경 (`crates/voltex_net/src/lag_compensation.rs`) | CHANGELOG v1.0.161 |
-| CI 첫 green run | GitHub 미러 push가 사용자 작업. 그 전엔 CI 게이트가 실제로 돌지 않음 | [AUDIT-BACKLOG](AUDIT-BACKLOG.md) F7, [release.md](release.md) |
+| CI 첫 green run | GitHub 미러 push가 사용자 작업. 그 전엔 CI 게이트가 실제로 돌지 않음 | [AUDIT-BACKLOG](AUDIT-BACKLOG.md) F7, [release.md](../release.md) |
 
 ## 4. 동작이 바뀐 것 (게임 코드 점검용)
 

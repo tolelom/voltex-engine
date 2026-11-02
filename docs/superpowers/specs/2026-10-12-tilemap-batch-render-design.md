@@ -1,7 +1,7 @@
 # 타일맵 배치 렌더 설계
 
 - 날짜: 2026-10-12
-- 출처: `docs/dogfood-friction-2.md` #5 (P2) — 타일맵 개념이 없어 솔리드 셀마다 `Sprite` 엔티티를 하나씩 만들었다.
+- 출처: `docs/dev/dogfood-friction-2.md` #5 (P2) — 타일맵 개념이 없어 솔리드 셀마다 `Sprite` 엔티티를 하나씩 만들었다.
 - 상태: 확정. B3a(엔진) → B3b(voltex_leap 마이그레이션) 순서로 구현.
 
 ## 문제

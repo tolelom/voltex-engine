@@ -1,8 +1,8 @@
 # Contributing to Voltex Engine
 
 이 문서는 Voltex Engine 에 코드를 추가/수정하려는 사람을 위한
-가이드. 자세한 작업 현황은 [`docs/STATUS.md`](docs/STATUS.md),
-미뤄진 항목은 [`docs/DEFERRED.md`](docs/DEFERRED.md), 자동 진행 로드맵은
+가이드. 자세한 작업 현황은 [`docs/dev/STATUS.md`](docs/dev/STATUS.md),
+미뤄진 항목은 [`docs/dev/DEFERRED.md`](docs/dev/DEFERRED.md), 자동 진행 로드맵은
 [`docs/superpowers/specs/2026-05-21-service-readiness-roadmap.md`](docs/superpowers/specs/2026-05-21-service-readiness-roadmap.md) 참고.
 
 ## 개발 환경
@@ -80,7 +80,7 @@ script, renderer, editor, runtime, cli.
 - 단위 테스트는 동일 파일 `#[cfg(test)] mod tests` 에 위치.
 - 통합 테스트는 `tests/` 디렉토리.
 - GPU/winit 의존 없는 path 는 무조건 unit-testable 해야 함 (4 crate
-  predominantly GPU/winit 가 coverage 80% 미달 — `docs/STATUS.md` 의
+  predominantly GPU/winit 가 coverage 80% 미달 — `docs/dev/STATUS.md` 의
   v1.0.6 섹션 참조).
 - 외부 dep 추가 없이 fuzz: inline xorshift32 (v1.0.8 패턴 참고).
 

@@ -1,7 +1,7 @@
 # DependencyScheduler 병렬 실행 — YAGNI 판정
 
 - 날짜: 2026-10-12
-- 출처: `docs/AUDIT-BACKLOG.md` B1 (보류 항목), CLAUDE.md 용어집 "실제 병렬 실행은 future work"
+- 출처: `docs/dev/AUDIT-BACKLOG.md` B1 (보류 항목), CLAUDE.md 용어집 "실제 병렬 실행은 future work"
 - 결론: **구현하지 않는다.** 그룹 빌드(`build_schedule`)만 있는 지금 상태를 유지한다.
 
 ## 확인한 사실

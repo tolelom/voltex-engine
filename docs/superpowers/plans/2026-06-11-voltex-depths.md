@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** 탑다운 트윈스틱 던전 클리어 게임 `games/voltex_depths` — 타이틀→플레이→클리어/게임오버 루프 + SFX/BGM + 빌드 배포까지. 엔진 도그푸딩이 목적이며 마찰은 `docs/dogfood-friction.md`에 기록한다.
+**Goal:** 탑다운 트윈스틱 던전 클리어 게임 `games/voltex_depths` — 타이틀→플레이→클리어/게임오버 루프 + SFX/BGM + 빌드 배포까지. 엔진 도그푸딩이 목적이며 마찰은 `docs/dev/dogfood-friction.md`에 기록한다.
 
 **Architecture:** ASCII 그리드 → 엔티티/NavMesh를 만드는 순수 `level` 모듈 위에, `combat`(투사체/피격/사망), `enemy`(추적자/사수/보스 AI), `game_state`(문/HUD/phase) 시스템을 얹고 `main.rs`가 RuntimeApp에 배선한다. 게임 상태 공유는 World 리소스(클리어 시 소멸 OK인 것) + `Rc<RefCell<>>` 클로저 캡처(phase/map/카메라 VP — World.clear() 생존 필요)로 나눈다. 신규 엔진 기능 0이 원칙; 막히면 friction 기록 후 최소 우회.
 
@@ -68,7 +68,7 @@ ui.draw_text(text, x, y, [u8;4]); ui.draw_rect(x, y, w, h, [u8;4]); ui.screen_wi
 ### Task 1: 스캐폴드 + 마찰 로그
 
 **Files:**
-- Create: `games/voltex_depths/Cargo.toml`, `games/voltex_depths/voltex.toml`, `games/voltex_depths/src/main.rs`, `games/voltex_depths/assets/.gitkeep`, `docs/dogfood-friction.md`
+- Create: `games/voltex_depths/Cargo.toml`, `games/voltex_depths/voltex.toml`, `games/voltex_depths/src/main.rs`, `games/voltex_depths/assets/.gitkeep`, `docs/dev/dogfood-friction.md`
 - Modify: `Cargo.toml` (워크스페이스 루트 — members에 `"games/voltex_depths"` 추가, `"games/voltex_survivor"` 줄 38 옆)
 
 - [ ] **Step 1: 파일 생성**
@@ -115,7 +115,7 @@ fn main() -> RuntimeResult<()> {
 }
 ```
 
-`docs/dogfood-friction.md`:
+`docs/dev/dogfood-friction.md`:
 ```markdown
 # 도그푸딩 마찰 로그 — voltex_depths
 
@@ -1791,7 +1791,7 @@ Run: `cargo test -p voltex_depths --test visual -- --ignored`. Expected: PASS (R
 - [ ] **Step 2: 릴리스 빌드 E2E** — `cargo run -p voltex_cli -- build` (games/voltex_depths에서, voltex CLI 사용법은 crates/voltex_cli README/STATUS v1.0.55 참조) 또는 실패 시 `cargo build --release -p voltex_depths`로 대체하고 manifest 마찰 기록. 산출 exe 실행 확인(8초 스모크).
 - [ ] **Step 3: README** — `games/voltex_depths/README.md`: 조작법, 실행/빌드 명령, gen_sfx 재생성, 스크린샷(`docs/visual/depths_dungeon.png`) 링크, known limitations (창 크기 고정 조준, navmesh가 닫힌 문을 워크블 취급 — region 활성화로 보완).
 - [ ] **Step 4: STATUS.md / CHANGELOG.md 갱신** — 기존 v1.0.x 항목 포맷으로 요약 (게임 추가 + render_world + friction 로그 개시).
-- [ ] **Step 5: friction 로그 정리** — `docs/dogfood-friction.md`에 누적된 항목들을 P0~P2로 정렬하고 머리말에 "다음 엔진 사이클 후보" 요약 추가.
+- [ ] **Step 5: friction 로그 정리** — `docs/dev/dogfood-friction.md`에 누적된 항목들을 P0~P2로 정렬하고 머리말에 "다음 엔진 사이클 후보" 요약 추가.
 - [ ] **Step 6: 최종 검증** — `cargo build --workspace && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --lib`. Expected: 전부 그린.
 - [ ] **Step 7: Commit** — `git commit -m "docs(depths): README + STATUS/CHANGELOG + friction log wrap-up"`
 

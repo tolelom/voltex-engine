@@ -3,7 +3,7 @@
 > 탑다운 트윈스틱 던전 슈터. WASD 이동 + 마우스 조준/발사, 적 3종
 > (추적자 / 사수 / 보스) + region 기반 문 진행. voltex_survivor(Lua 주도)와
 > 반대로 게임 로직을 **100% Rust**로 작성해 엔진의 Rust API 워크플로를
-> 도그푸딩한 결과물. 발견한 마찰은 `docs/dogfood-friction.md`에 기록.
+> 도그푸딩한 결과물. 발견한 마찰은 `docs/dev/dogfood-friction.md`에 기록.
 
 ## 실행
 

@@ -64,7 +64,7 @@ Before tagging:
 
 - [ ] `CHANGELOG.md` has an entry for the new version (the `pre-push` hook
       already enforces this for code changes, but double-check).
-- [ ] `docs/STATUS.md` reflects the latest cycle.
+- [ ] `docs/dev/STATUS.md` reflects the latest cycle.
 - [ ] `cargo build --workspace` clean.
 - [ ] `cargo test --workspace --lib` passes.
 - [ ] `cargo clippy --workspace --all-targets -- -D warnings` clean.
@@ -121,8 +121,8 @@ switch:
       `coverage` (Linux, F5 gate at 78%) to go green. Advisory jobs
       (`macos`, `semver-check`, `license-check`, `deny-check`) may stay
       yellow.
-- [ ] Record the first green commit SHA in `docs/STATUS.md` and tick
-      `F7` in `docs/AUDIT-BACKLOG.md`.
+- [ ] Record the first green commit SHA in `docs/dev/STATUS.md` and tick
+      `F7` in `docs/dev/AUDIT-BACKLOG.md`.
 
 ## Manually triggering a release build
 

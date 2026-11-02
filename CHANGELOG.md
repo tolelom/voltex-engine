@@ -32,6 +32,12 @@ recent on top. v0.x entries are organised by Cycle (see
   `allow-wildcard-paths = true` 를 켜서 path 의존 wildcard 34 crate 를 해소했다 — 이 옵션은 `publish` 를
   제한한 crate 에만 적용된다. 이제 `cargo deny check` 는 exit 0(경고만: duplicate 10, license-not-encountered 4).
 
+### Docs
+
+- **작업 문서 `docs/dev/`로 이동**: `STATUS`·`DEFERRED`·`NEXT`·`AUDIT-BACKLOG`·`dogfood-friction`(2개)·
+  `v1.0-pub-audit`·`v1.0-retrospective`를 옮기고 문서·코드 주석·스크립트의 경로를 갱신했다. `docs/` 바로 아래에는
+  사용 문서(tutorial, voltex-toml-reference, build-matrix, release, visual)만 남는다.
+
 ### Build
 
 - **pre-push Linux clippy**: `scripts/check_linux_clippy.sh` 가 `aarch64-unknown-linux-gnu` 대상으로
@@ -1099,7 +1105,7 @@ clippy(-D warnings)/test 그린.
 
 ## v1.0.112 — 2026-08-09 — 2D 스프라이트 저작 1급 지원 (friction-2 P1 3건 해소)
 
-leap 도그푸딩 직후 후속 사이클 — `docs/dogfood-friction-2.md` P1 전건 해소 +
+leap 도그푸딩 직후 후속 사이클 — `docs/dev/dogfood-friction-2.md` P1 전건 해소 +
 leap 마이그레이션으로 실검증. 설계:
 `docs/superpowers/specs/2026-08-09-sprite-authoring-friction-design.md`.
 
@@ -1143,7 +1149,7 @@ jump) 스프라이트 시트 전환 + uv 스왑 좌우 반전, 절차 생성 SFX
   본편 MAP을 실클리어 + 사망/재시작 리셋) + GPU 시각 회귀(`tests/visual.rs`,
   RTX 4080 — 가시/문/코인 색 비율 + `docs/visual/leap_level.png`) + 8초
   스모크 런 (panic/validation 0, 시트 4장 로드 확인).
-- **마찰 로그 신설**: `docs/dogfood-friction-2.md` — 6건 (P1 3: SpriteAnimation
+- **마찰 로그 신설**: `docs/dev/dogfood-friction-2.md` — 6건 (P1 3: SpriteAnimation
   프레임 오프셋 부재 / Sprite flip 1급 지원 부재 / render_world 직교 미지원,
   P2 3: 2D 타일 충돌 헬퍼 / 타일맵 배치 렌더 / 빌보드 z-rot). 지난 사이클
   개선(gpu_init·asset_root·audio 시드·orphan voice)은 전부 우회 없이 동작.
@@ -1189,7 +1195,7 @@ DEFERRED 의 "실제 `.ogg` 파일 디코드 검증" 항목 처리.
 ## [v1.0.110] — 2026-07-07 — 도그푸딩 마찰 일괄 해소 (friction 9/9)
 
 Voltex Depths 도그푸딩이 남긴 마찰 6건(P1 4 + P2 2)을 한 세션에서 해소 +
-미배선 모듈 가드 신설. 상세는 `docs/dogfood-friction.md`.
+미배선 모듈 가드 신설. 상세는 `docs/dev/dogfood-friction.md`.
 
 ### Breaking (시그니처 변경 — 워크스페이스 내 호출부 전부 갱신됨)
 
@@ -1263,7 +1269,7 @@ flagship voltex_survivor의 대칭). 적 3종(추적자/사수/보스) + region 
 
 - voltex_depths 단위 29 + 플레이스루 + GPU 시각 회귀 그린. debug/release
   스모크 런 panic/wgpu validation error 0.
-- 도그푸딩 마찰 8건 기록 (`docs/dogfood-friction.md`) — `voltex build`가
+- 도그푸딩 마찰 8건 기록 (`docs/dev/dogfood-friction.md`) — `voltex build`가
   Rust 로직 게임 패키징 불가(#8) 등 P1 4건이 다음 엔진 사이클 입력.
 
 ## [v1.0.85] — 2026-06-04 — Lua `find_in_radius` (spatial query for scripts)
@@ -2105,7 +2111,7 @@ editor/audio 추가 의존(L3.5 → L3/L1, 방향 유효).
 
 ## [v1.0.58] — 2026-05-28 — Quat Transform + fuzz + coverage gate + audio smoke (E3b/F4/F5/F6/F7)
 
-Closes every remaining item in `docs/AUDIT-BACKLOG.md`.
+Closes every remaining item in `docs/dev/AUDIT-BACKLOG.md`.
 
 ### Breaking — Transform.rotation Vec3 → Quat (E3b)
 
@@ -4147,7 +4153,7 @@ suggestions across `voltex_math`, `voltex_audio`, `voltex_platform`,
 - `voltex_runtime::RuntimeApp::add_input_system(F)` — per-frame system that
   receives `&InputState` alongside `&mut World, f32`. Powers WASD movement
   for voltex_survivor.
-- `docs/v1.0-retrospective.md` — what worked, what was deferred, statistics,
+- `docs/dev/v1.0-retrospective.md` — what worked, what was deferred, statistics,
   next-priority list for v1.1.
 - `STATUS.md`: v1.0 release header + Cycle 15 entry.
 - Git tag `v1.0.0` (local — user push activates remote release).
@@ -4188,7 +4194,7 @@ suggestions across `voltex_math`, `voltex_audio`, `voltex_platform`,
 - Full `#![warn(missing_docs)]` sweep — 1586 missing public-item docstrings
   across the workspace. v1.0 documents prelude + tier-1 API only.
 - Public-item `pub(crate)` audit. Candidate list lives in
-  `docs/v1.0-pub-audit.md` (notes only, no code changes).
+  `docs/dev/v1.0-pub-audit.md` (notes only, no code changes).
 
 ---
 
@@ -4345,7 +4351,7 @@ suggestions across `voltex_math`, `voltex_audio`, `voltex_platform`,
 - Final verification + `hierarchy_demo` migration (M7).
 
 ### Phases 1–8 (2026-03-24 → 2026-05-19)
-Foundation through editor command machinery. See `docs/STATUS.md` for the
+Foundation through editor command machinery. See `docs/dev/STATUS.md` for the
 per-phase breakdown (Foundation → Rendering → ECS+Scene → PBR → Physics →
 Audio → Advanced rendering → AI/Net/Lua/Editor + Editor Command).
 

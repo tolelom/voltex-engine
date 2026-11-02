@@ -1,7 +1,7 @@
 # World::clear() generation 보증 설계
 
 - 날짜: 2026-10-12
-- 출처: `docs/DEFERRED.md` "2026-08-09 감사 사이클 LOW 이월"의 설계 항목 (v1.0.114 audit-runtime 근본 원인 지적)
+- 출처: `docs/dev/DEFERRED.md` "2026-08-09 감사 사이클 LOW 이월"의 설계 항목 (v1.0.114 audit-runtime 근본 원인 지적)
 - 상태: v1.0.120 구현 완료 (구현 중 정정 2건은 아래 "구현 중 정정")
 
 ## 문제

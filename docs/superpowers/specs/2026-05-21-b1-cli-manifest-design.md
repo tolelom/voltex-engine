@@ -207,7 +207,7 @@ build.rs 의 cargo invocation 자체를 단위 테스트하는 건 비용 과다
 | voltex_cli (5 신규 모듈) | 신규 |
 | voltex_cli::main | spike 의 단일 main 을 dispatch 로 분리 |
 | 다른 crate | 변경 없음 |
-| docs/STATUS.md | Cycle 8 entry |
+| docs/dev/STATUS.md | Cycle 8 entry |
 | docs/superpowers/specs/.../roadmap.md | Cycle 8 `[✅]` |
 | 새 폴더 `crates/voltex_cli/CODEMAP.md` | 신규 |
 

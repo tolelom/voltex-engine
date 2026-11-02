@@ -1,7 +1,7 @@
 # 2D 스프라이트 저작 1급 지원 — friction-2 P1 해소 설계
 
 날짜: 2026-08-09
-입력: `docs/dogfood-friction-2.md` #1, #2, #3 (P1 전건)
+입력: `docs/dev/dogfood-friction-2.md` #1, #2, #3 (P1 전건)
 상태: 자율 세션 (leap 도그푸딩 직후 후속 사이클)
 
 ## 목적

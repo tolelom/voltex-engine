@@ -4,7 +4,7 @@
 //! only. These items are the planned API surface for progressive decoding
 //! and are intentionally `pub` so a future progressive decoder (in this
 //! crate or downstream) can wire them up without an API churn. F8 left
-//! them `pub` for the same reason — see audit note in `docs/AUDIT-BACKLOG.md`.
+//! them `pub` for the same reason — see audit note in `docs/dev/AUDIT-BACKLOG.md`.
 
 /// Progressive JPEG scan parameters.
 #[derive(Debug, Clone)]

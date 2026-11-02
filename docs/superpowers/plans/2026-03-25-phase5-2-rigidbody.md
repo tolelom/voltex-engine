@@ -578,8 +578,8 @@ git commit -m "feat(physics): add impulse collision response and physics_step"
 ## Task 4: 문서 업데이트
 
 **Files:**
-- Modify: `docs/STATUS.md`
-- Modify: `docs/DEFERRED.md`
+- Modify: `docs/dev/STATUS.md`
+- Modify: `docs/dev/DEFERRED.md`
 
 - [ ] **Step 1: STATUS.md에 Phase 5-2 추가**
 
@@ -609,6 +609,6 @@ Phase 5-1 아래에 추가:
 - [ ] **Step 3: 커밋**
 
 ```bash
-git add docs/STATUS.md docs/DEFERRED.md
+git add docs/dev/STATUS.md docs/dev/DEFERRED.md
 git commit -m "docs: add Phase 5-2 rigid body simulation status and deferred items"
 ```
