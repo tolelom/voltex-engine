@@ -1,6 +1,6 @@
 # game_ready_demo
 
-Hands-on demo of the v1.0.59 "game-ready" wiring — all in one window.
+Runtime features working together in one window.
 
 ```bash
 cargo run -p game_ready_demo
@@ -38,5 +38,5 @@ caught repeatedly — each catch fires a fresh beep and bumps the counter.
 This demo uses the default colored Blinn-Phong runtime path. Full **PBR**
 (Cook-Torrance + multi-light + albedo/normal/ORM/emissive maps) is now available
 in the runtime too — opt in with `RuntimeConfig::with_pbr(true)` and attach a
-`PbrTextures` component for material maps. PBR **skinning** is still on the
-Blinn-Phong path (deferred to v1.1).
+`PbrTextures` component for material maps. PBR **skinning** still uses the
+Blinn-Phong path.

@@ -47,6 +47,9 @@ recent on top. v0.x entries are organised by Cycle (see
   스크린샷 자리 표시, 소요 시간을 뺐다. 에디터 조작은 실행해 보지 않았다(NEXT.md).
 - **examples/README 정리**: 빠져 있던 `boids_demo`·`game_ready_demo`를 표에 넣고, 표와 겹치는 카테고리 절, 작업 코드(D1+D2, M6),
   60 FPS·5초 smoke 같은 검증 서술을 뺐다.
+- **게임·예제 README 정정**: voltex_survivor README가 이미 있는 Lua 입력·HUD를 "v1.1 한계"로 적던 것을 실제 구조(이동은
+  Rust action map, 규칙은 Lua, 점수는 콘솔)로 바로잡았다. voltex_depths의 해소된 한계 3건(조준 DPI, 에셋 절대경로,
+  y 가라앉음)을 지우고, 예제 README의 버전 언급을 뺐다. API 경로 30개는 현재 코드와 대조해 그대로 맞다.
 
 ### CI
 

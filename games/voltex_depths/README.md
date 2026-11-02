@@ -12,8 +12,8 @@ cargo run -p voltex_depths            # 개발 빌드
 cargo run -p voltex_depths --release  # 릴리스
 ```
 
-`voltex build`(CLI 패키징)도 지원한다 — v1.0.110의 `kind = "rust"` 빌드
-모드를 이 게임의 `voltex.toml`이 사용 중이다 (friction #8 해소).
+`voltex build`로도 빌드된다. 이 게임의 `voltex.toml`은 Rust 게임용 `kind = "rust"` 빌드
+모드를 쓴다.
 
 ## 조작
 
@@ -60,16 +60,7 @@ cargo test -p voltex_depths --test visual -- --ignored  # GPU 시각 회귀 (GPU
 
 ## 알려진 한계
 
-- ~~창 크기 1280x720 고정 조준 / DPI 100% 가정~~ — **해소** (friction #4):
-  조준 NDC 변환이 `input.window_size()`(물리 픽셀, 리사이즈/DPI 반영)를 사용.
-  조준점에 노란 십자 디버그 마커가 항상 표시됨 (도그푸딩 진단용 — 마커
-  위치가 곧 게임이 인식한 클릭 위치).
-- **에셋 절대경로** — `CARGO_MANIFEST_DIR` 기준이라 빌드 머신 밖 배포 exe는
-  소리가 안 남 (friction #6, #8).
-- **navmesh가 닫힌 문을 워크블 취급** — 적이 문 너머로 경로를 잡을 수 있어
-  region 활성화(방에 들어가야 적이 깨어남)로 보완 (friction 로그 참고).
-- **적이 경로 추종 중 y=0으로 가라앉음** — `follow_path` 도달 판정이 3D
-  거리라 y 보정 불가, 목표 도달 시 y=0.5로 복귀 (friction #3).
+- navmesh가 닫힌 문도 지나갈 수 있는 곳으로 본다. 적이 문 너머로 경로를 잡을 수 있어, 방에 들어가야 그 방의 적이 깨어나게 해서 보완한다.
 
 스펙: `docs/superpowers/specs/2026-06-11-voltex-depths-game-design.md`
 플랜: `docs/superpowers/plans/2026-06-11-voltex-depths.md`

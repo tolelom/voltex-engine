@@ -1,7 +1,7 @@
 # boids_demo
 
-Capstone demo for the v1.0.62–80 authoring/runtime stack — a flocking swarm
-assembled almost entirely from the primitives added across that range.
+A flocking swarm built almost entirely from the declarative authoring and
+runtime primitives.
 
 ## What it demonstrates
 

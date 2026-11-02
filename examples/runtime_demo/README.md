@@ -1,7 +1,7 @@
 # runtime_demo
 
 `RuntimeApp` "hello world" — the entire main loop is four lines. Builds a
-solar-system scene programmatically + shows HUD usage (v1.0.32).
+solar-system scene programmatically and shows the HUD.
 
 ## What it demonstrates
 
@@ -11,7 +11,7 @@ solar-system scene programmatically + shows HUD usage (v1.0.32).
 - `with_gpu_init` callback that runs once when the GPU comes up (used here
   to upload meshes + materials).
 - `add_system` (no input) + `add_input_system` (gets InputState) registration.
-- HUD primitive (v1.0.32) — the window title shows
+- HUD: the window title shows
   "voltex_runtime: solar system | N planets, M moons | XX fps".
 
 ## Run
@@ -28,5 +28,5 @@ cargo run -p runtime_demo --release
 
 ## Next step
 
-→ [`tutorial_minigame`](../tutorial_minigame) — the 30-minute tutorial's
+→ [`tutorial_minigame`](../tutorial_minigame) — the tutorial's
 final output (player + enemies + Lua scripts on top of `RuntimeApp`).
