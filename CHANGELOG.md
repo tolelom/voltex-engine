@@ -39,7 +39,7 @@ recent on top. v0.x entries are organised by Cycle (see
   사용 문서(tutorial, voltex-toml-reference, build-matrix, release, visual)만 남는다.
 - **README 재작성**: 실행 명령을 `cargo run -p <name>`으로 바로잡고(example은 독립 패키지라 `--example`로는
   실행되지 않는다, tutorial의 두 곳도 함께), 버전·커버리지·개수처럼 시점이 지나면 틀리는 배지와 수치를 뺐다.
-  `games/`의 게임 세 편과 crate 17개 전체, 검증 범위(Windows 실행 확인, Linux 교차 clippy, macOS 미확인)를 적었다.
+  `games/`의 게임 세 편과 crate 17개 전체를 적고, 기여 안내는 CONTRIBUTING.md로 넘겼다.
 
 ### Build
 

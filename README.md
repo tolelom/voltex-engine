@@ -106,10 +106,6 @@ voltex              facade. 하위 crate 재노출과 prelude
 
 crate별 책임과 주의점은 각 crate의 `CODEMAP.md`에 있다.
 
-## 검증 범위
-
-개발과 실행 확인은 Windows에서 했다. Linux는 aarch64 교차 컴파일 clippy까지 확인했고 실행은 확인하지 않았다. macOS는 확인하지 않았다. OS별 빌드 요구 사항은 [docs/build-matrix.md](docs/build-matrix.md).
-
 ## 문서
 
 사용 문서
@@ -128,17 +124,10 @@ crate별 책임과 주의점은 각 crate의 `CODEMAP.md`에 있다.
 
 ## 기여
 
-규칙(의존성 정책, 파일 600줄 한도, 에러 처리, 커밋 형식)은 [CONTRIBUTING.md](CONTRIBUTING.md)에 있다. 커밋 전에 아래를 통과시킨다.
-
-```bash
-cargo clippy --workspace --all-targets -- -D warnings
-cargo test --workspace --lib
-```
-
-`bash .githooks/install.sh`(Windows는 `.githooks/install.ps1`)로 훅을 설치하면 커밋할 때 위 두 명령이, push할 때 CHANGELOG 검사가 자동으로 돈다.
+코드를 고치기 전에 [CONTRIBUTING.md](CONTRIBUTING.md)를 읽는다. 개발 환경, 커밋 전에 돌릴 검사와 git 훅 설치, 코드 규칙(의존성 추가 기준, 파일 600줄 한도, 에러 처리), 커밋 메시지 형식이 정리돼 있다.
 
 ## 라이선스
 
-[MIT](LICENSE-MIT) 또는 [Apache-2.0](LICENSE-APACHE) 중 하나를 골라 따른다. 기여한 코드도 같은 조건으로 배포된다.
+[MIT](LICENSE-MIT) 또는 [Apache-2.0](LICENSE-APACHE) 중 하나를 골라 따른다.
 
 의존 crate의 라이선스 고지는 [THIRD-PARTY-LICENSES.md](THIRD-PARTY-LICENSES.md).
