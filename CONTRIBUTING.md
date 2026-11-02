@@ -48,7 +48,7 @@ bash .githooks/install.sh      # Linux·macOS
 
 ### 에러 처리
 
-crate마다 `<Crate>Error` enum과 `Result<T>` alias를 둔다(thiserror). 예외 crate와 변환 패턴은 [CLAUDE.md](CLAUDE.md)의 "공통 패턴 인덱스".
+crate마다 `<Crate>Error` enum과 `Result<T>` alias를 둔다(thiserror). 예외 crate와 변환 패턴은 [.claude/CLAUDE.md](.claude/CLAUDE.md)의 "공통 패턴 인덱스".
 
 ### 컴포넌트
 

@@ -30,6 +30,9 @@ recent on top. v0.x entries are organised by Cycle (see
   `scripts/gen_third_party_licenses.sh`로 다시 만들었다. 설정에 지원 OS 4개(`targets`)를 넣어 생성한 머신과 관계없이
   OS 전용 의존까지 담고, 빌드·테스트 전용 의존과 워크스페이스 crate는 뺐다. 지원 OS 4개의 `cargo tree` 결과와 대조해
   빠진 crate가 없다. CONTRIBUTING의 의존성 설명(log·pollster는 엔진 crate도 쓴다)과 release 체크리스트를 맞췄다.
+- **CLAUDE.md를 `.claude/`로 이동**: 루트에서 AI 작업 지침을 뺐다. Claude Code는 `.claude/CLAUDE.md`도 읽는다.
+  `docs/architecture.md`와 겹치던 crate 의존 그래프 절은 그 문서를 가리키는 두 줄로 줄였다. README 첫 줄의 외부 의존
+  설명("winit, wgpu, bytemuck 셋")을 실제 의존(thiserror·log·pollster 포함)에 맞췄다.
 
 - **voltex_capture `scene`**: 인라인 테스트를 `scene/tests.rs`로 옮겼다(`scene.rs` → `scene/mod.rs` 1140줄 +
   `scene/tests.rs` 704줄). 코드는 바꾸지 않았고 형제 모듈 재노출과 `scene::render_*` 경로는 그대로다.

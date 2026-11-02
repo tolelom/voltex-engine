@@ -1,6 +1,6 @@
 # Voltex Engine
 
-> Rust로 만든 3D 게임 엔진. 외부 런타임 의존은 winit, wgpu, bytemuck 셋이고, 수학, 이미지·메시 파서, 물리, 오디오, 에디터 UI, Lua 바인딩, 빌드 도구까지 직접 구현했다.
+> Rust로 만든 3D 게임 엔진. 외부 crate는 wgpu·winit(GPU와 창)과 작은 보조 crate(bytemuck, thiserror, log, pollster)만 쓰고, 수학, 이미지·메시 파서, 물리, 오디오, 에디터 UI, Lua 바인딩, 빌드 도구까지 직접 구현했다. Lua는 C 소스를 넣어 직접 빌드한다.
 
 ## 저장소 구성
 
