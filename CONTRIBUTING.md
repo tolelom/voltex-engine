@@ -6,7 +6,7 @@
 
 - Rust stable과 clippy(`rustup component add clippy`)
 - Linux는 ALSA 헤더: `sudo apt-get install -y libasound2-dev`
-- 선택 도구: cargo-llvm-cov(커버리지), cargo-about(의존 crate 라이선스 목록), cargo-deny(취약점·라이선스 검사, 설정은 `deny.toml`)
+- 선택 도구: cargo-llvm-cov(커버리지), cargo-about(의존 crate 라이선스 고지 생성, `cargo install --locked cargo-about --features cli`), cargo-deny(취약점·라이선스 검사, 설정은 `deny.toml`)
 - 파서 퍼징: [fuzz/README.md](fuzz/README.md)
 
 ## 커밋 전 검사
@@ -38,7 +38,9 @@ bash .githooks/install.sh      # Linux·macOS
 
 ### 의존성
 
-런타임 외부 crate는 winit, wgpu, bytemuck만 쓴다. 빌드 전용으로 thiserror(derive 매크로)와 cc(Lua C 소스 빌드)를 쓰고, example과 바이너리에서만 log, env_logger, pollster를 쓴다. 나머지는 직접 구현한다. 새 외부 crate는 추가하기 전에 먼저 논의한다.
+엔진 외부 crate는 wgpu·winit(GPU와 창)과 작은 보조 crate(bytemuck, thiserror, log, pollster)만 쓴다. Lua는 C 소스를 저장소에 넣어 `cc`로 빌드하고, env_logger는 예제와 게임에서만 쓴다. 나머지는 직접 구현한다. 새 외부 crate는 추가하기 전에 먼저 논의한다.
+
+의존 crate를 바꾸면 `scripts/gen_third_party_licenses.sh`로 `THIRD-PARTY-LICENSES.md`를 다시 만든다. `voltex build`가 이 파일을 게임 `dist/`에 같이 넣는다.
 
 ### 파일 크기
 

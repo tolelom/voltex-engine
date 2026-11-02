@@ -65,6 +65,8 @@ Before tagging:
 - [ ] `cargo build --workspace` clean.
 - [ ] `cargo test --workspace --lib` passes.
 - [ ] `cargo clippy --workspace --all-targets -- -D warnings` clean.
+- [ ] `scripts/gen_third_party_licenses.sh` leaves `THIRD-PARTY-LICENSES.md`
+      unchanged (otherwise commit the regenerated file).
 - [ ] `cargo test -p voltex_cli --test e2e_new_build -- --ignored` passes
       (heavy; also available as the manual `e2e-quickstart` CI job).
 

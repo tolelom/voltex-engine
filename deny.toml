@@ -1,6 +1,6 @@
 # cargo-deny configuration for Voltex.
 #
-# Why: complements `about.toml` (cargo-about handles license listing only) with
+# Why: complements `scripts/licenses/about.toml` (cargo-about handles license listing only) with
 # a single tool that also catches RUSTSEC advisories, duplicate crate versions,
 # yanked crates, and disallowed sources. Wired into CI as an advisory gate so
 # new transitive vulnerabilities surface immediately without blocking merges
@@ -53,7 +53,7 @@ ignore = [
 # Licenses
 # ----------------------------------------------------------------------------
 #
-# Mirrors about.toml's accepted SPDX list. cargo-about is the canonical
+# Mirrors scripts/licenses/about.toml's accepted SPDX list. cargo-about is the canonical
 # license listing for THIRD-PARTY-LICENSES.md in build output;
 # cargo-deny double-checks the same policy at the CI level so license drift
 # also fails `cargo deny check`, not just the about-generate step.

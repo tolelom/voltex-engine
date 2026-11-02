@@ -3,8 +3,8 @@
 # Voltex itself is dual MIT OR Apache-2.0. This file declares which
 # transitive-dependency licenses are acceptable. The Rust ecosystem is
 # dominated by permissive licenses (MIT, Apache-2.0, BSD-*), so this list
-# stays small. Any new transitive license outside this list will cause
-# `cargo about generate` to fail in CI, forcing a conscious decision.
+# stays small. Any new transitive license outside this list makes
+# `scripts/gen_third_party_licenses.sh` fail, forcing a conscious decision.
 #
 # License IDs are SPDX identifiers.
 
@@ -26,9 +26,20 @@ accepted = [
     "OFL-1.1",
 ]
 
-# We ship a single dual-licensed crate so 'targets' defaults are fine
-# (current host triple). For multi-OS license sweeps, CI overrides with
-# --target on each runner.
+# Every OS `voltex build` supports, so one file covers platform-only
+# dependencies (windows-sys, objc2, wayland, ...) whichever host runs it.
+targets = [
+    "x86_64-unknown-linux-gnu",
+    "x86_64-pc-windows-msvc",
+    "x86_64-apple-darwin",
+    "aarch64-apple-darwin",
+]
+
+# Only what ships inside a built game: skip build scripts' and tests'
+# dependencies, and the workspace's own crates (all `publish = false`).
+ignore-build-dependencies = true
+ignore-dev-dependencies = true
+private = { ignore = true }
 
 # No per-crate overrides today. If a future transitive comes in with an
 # unrecognized notice format, add a section like:

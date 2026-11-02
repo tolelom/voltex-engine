@@ -25,6 +25,11 @@ recent on top. v0.x entries are organised by Cycle (see
   crate 구성 그림을 엔진과 도구로 나눴다(전에는 cli·capture가 facade 아래 엔진 부품처럼 그려져 있었다).
 - **구조 문서 `docs/architecture.md`**: crate 층(각 `Cargo.toml` 의존 기준), `RuntimeApp`에 맡기는 방법과 부품을
   직접 조립하는 방법의 구분, `redraw`·`tick_systems_only` 기준 한 프레임 순서, 코드 읽는 순서를 적었다.
+- **라이선스 고지 재생성**: `THIRD-PARTY-LICENSES.md`는 v1.0.7 이후 다시 만들지 않아 외부 crate 16개가 빠지고
+  워크스페이스 crate 31개가 들어 있었다. cargo-about 설정(`about.toml`·`about.hbs`)을 `scripts/licenses/`로 옮기고
+  `scripts/gen_third_party_licenses.sh`로 다시 만들었다. 설정에 지원 OS 4개(`targets`)를 넣어 생성한 머신과 관계없이
+  OS 전용 의존까지 담고, 빌드·테스트 전용 의존과 워크스페이스 crate는 뺐다. 지원 OS 4개의 `cargo tree` 결과와 대조해
+  빠진 crate가 없다. CONTRIBUTING의 의존성 설명(log·pollster는 엔진 crate도 쓴다)과 release 체크리스트를 맞췄다.
 
 - **voltex_capture `scene`**: 인라인 테스트를 `scene/tests.rs`로 옮겼다(`scene.rs` → `scene/mod.rs` 1140줄 +
   `scene/tests.rs` 704줄). 코드는 바꾸지 않았고 형제 모듈 재노출과 `scene::render_*` 경로는 그대로다.
