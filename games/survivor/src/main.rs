@@ -1,4 +1,4 @@
-//! voltex_survivor — v1.0 flagship game.
+//! survivor — v1.0 flagship game.
 //!
 //! Game logic lives in `scripts/*.lua` + `scene.vscn`. The Rust side does
 //! three things:
@@ -7,7 +7,7 @@
 //! 2. Seed the scene with a ground plane + player + game manager entity.
 //! 3. Translate keyboard input into player Transform deltas (WASD/arrows).
 //!
-//! The flagship test for v1.0: `cargo run -p voltex_survivor` boots a game
+//! The flagship test for v1.0: `cargo run -p survivor` boots a game
 //! whose behaviour is fully described by Lua + scene.
 
 use voltex::ecs::Tag;

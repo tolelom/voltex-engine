@@ -93,7 +93,7 @@ The windowed demos were each run for ~6 s on the RTX 4080 (Vulkan) under
   hardware — coverage neither CI (headless, no RT) nor the offscreen harness
   reaches.
 - `ibl_demo`, `shadow_demo` — initialise and render clean.
-- `voltex_survivor` (flagship), `runtime_demo`, `survivor_game` — the full
+- `survivor` (flagship), `runtime_demo`, `survivor_game` — the full
   `RuntimeApp` bootstrap (window + ECS + systems + scheduler + audio + Lua
   script + render loop) runs clean for ~6 s.
 

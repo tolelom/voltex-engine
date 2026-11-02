@@ -29,4 +29,4 @@ them over time).
 ## Next step
 
 Read `examples/game_ready_demo` for input/nav/audio wiring, or
-`games/voltex_survivor` for a Lua-scripted game on the same runtime.
+`games/survivor` for a Lua-scripted game on the same runtime.

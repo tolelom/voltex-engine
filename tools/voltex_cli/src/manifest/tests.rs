@@ -563,8 +563,8 @@ fn parse_never_panics_on_corrupted_manifests() {
     // any byte soup into an error message, not a panic.
     let seeds = [
         include_str!("../../../../examples/tutorial_minigame/voltex.toml"),
-        include_str!("../../../../games/voltex_depths/voltex.toml"),
-        include_str!("../../../../games/voltex_survivor/voltex.toml"),
+        include_str!("../../../../games/depths/voltex.toml"),
+        include_str!("../../../../games/survivor/voltex.toml"),
     ];
     let mut state = 0x7041_0001u32;
     let mut next = move || {

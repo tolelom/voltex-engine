@@ -2,7 +2,7 @@
 
 Archive snapshot of the early "Survivor" prototype written directly against
 ECS + physics + facade — kept for contrast with
-[`games/voltex_survivor`](../../games/voltex_survivor) (the same game
+[`games/survivor`](../../games/survivor) (the same game
 rebuilt on `RuntimeApp`, with its rules in Lua).
 
 ## Why kept
@@ -23,6 +23,6 @@ cargo run -p survivor_game --release
 ## Not recommended as a learning path
 
 New users should start with [`runtime_demo`](../runtime_demo) →
-[`tutorial_minigame`](../tutorial_minigame) → [`../games/voltex_survivor`](../../games/voltex_survivor).
+[`tutorial_minigame`](../tutorial_minigame) → [`../games/survivor`](../../games/survivor).
 This crate stays in the workspace only for the comparison + as a smoke
 test that direct-Rust gameplay code still compiles.

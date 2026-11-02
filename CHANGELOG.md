@@ -18,6 +18,9 @@ recent on top. v0.x entries are organised by Cycle (see
   `tools/voltex_capture`)로 나눴다. 루트 `Cargo.toml`의 members를 엔진·도구·게임·예제 묶음으로 다시 적었다.
   `voltex build`가 만드는 래퍼 crate는 엔진 경로의 `engine/voltex_runtime`을 가리킨다. 저장소를 도는 테스트
   (`module_wiring`, `repo_scenes`)와 pre-push·`check_changelog.sh`의 코드 경로 목록도 새 폴더로 바꿨다.
+- **게임 이름에서 `voltex_` 제거**: `voltex_survivor`·`voltex_depths`·`voltex_leap`을 `survivor`·`depths`·`leap`으로
+  바꿨다(폴더, 패키지, `voltex.toml`의 `name`). 엔진 crate와 이름 모양이 같아 구별되지 않았다. 실행은
+  `cargo run -p depths`, 빌드 결과는 `dist/survivor` 형태가 된다. 이 항목 위의 옛 기록은 당시 이름 그대로 둔다.
 
 - **voltex_capture `scene`**: 인라인 테스트를 `scene/tests.rs`로 옮겼다(`scene.rs` → `scene/mod.rs` 1140줄 +
   `scene/tests.rs` 704줄). 코드는 바꾸지 않았고 형제 모듈 재노출과 `scene::render_*` 경로는 그대로다.

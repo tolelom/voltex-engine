@@ -33,9 +33,9 @@ EXCLUDES=(
     survivor_game     # depends on voltex_script
     triangle          # depends on voltex_script
     tutorial_minigame # depends on voltex_script
-    voltex_depths     # depends on voltex_script
-    voltex_leap       # depends on voltex_script
-    voltex_survivor   # depends on voltex_script
+    depths            # depends on voltex_script
+    leap              # depends on voltex_script
+    survivor          # depends on voltex_script
 )
 
 YELLOW='\033[0;33m'

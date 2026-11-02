@@ -9,10 +9,10 @@ use voltex::ecs::Tag;
 use voltex::prelude::*;
 use voltex_runtime::{RuntimeApp, RuntimeConfig, RuntimeResult, Timer};
 
-use voltex_depths::{combat, enemy, game_state};
-use voltex_depths::combat::*;
-use voltex_depths::components::*;
-use voltex_depths::level::*;
+use depths::{combat, enemy, game_state};
+use depths::combat::*;
+use depths::components::*;
+use depths::level::*;
 
 const MAP: &[&str] = &[
     "#############################################################",
@@ -292,7 +292,7 @@ fn spawn_bgm(world: &mut World) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use voltex_depths::components::EnemyKind;
+    use depths::components::EnemyKind;
 
     #[test]
     fn main_map_parses_with_expected_structure() {

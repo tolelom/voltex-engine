@@ -6,13 +6,13 @@
 
 ```bash
 # 워크스페이스에서
-cargo run -p voltex_survivor --release
+cargo run -p survivor --release
 
 # 실행 파일 하나로 빌드
-cd games/voltex_survivor
+cd games/survivor
 voltex build --engine-path ../..
-./dist/voltex_survivor.exe       # Windows
-./dist/voltex_survivor           # Linux·macOS
+./dist/survivor.exe       # Windows
+./dist/survivor           # Linux·macOS
 ```
 
 조작: WASD 또는 방향키로 이동, 발사는 자동, ESC로 종료. 점수, 웨이브, 남은 목숨은 콘솔에 찍힌다.

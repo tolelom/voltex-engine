@@ -1,5 +1,5 @@
 //! 절차 생성 에셋: SFX/BGM wav + 스프라이트시트 PNG.
-//! `cargo run -p voltex_leap --bin gen_assets` 로 assets/ 재생성.
+//! `cargo run -p leap --bin gen_assets` 로 assets/ 재생성.
 //!
 //! 플레이어는 단일 8×1 시트 — idle 0-1 / run 2-5 / jump 6 / 여분 7.
 //! 클립 선택은 `SpriteAnimation::clip`의 first_frame (friction-2 #1 해소 검증).

@@ -21,9 +21,9 @@ members = [
     "tools/voltex_capture",
     "tools/voltex_cli",
     # 엔진으로 만든 게임
-    "games/voltex_depths",
-    "games/voltex_leap",
-    "games/voltex_survivor",
+    "games/depths",
+    "games/leap",
+    "games/survivor",
     # 기능별 예제
     "examples/asset_demo",
     "examples/audio_demo",

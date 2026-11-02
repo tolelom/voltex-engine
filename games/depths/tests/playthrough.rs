@@ -2,7 +2,7 @@
 //! RuntimeApp::tick_systems_only의 실제 실행 순서(collision_fn → user_systems)를
 //! 따라 main.rs의 시스템들을 직접 조합한다.
 use voltex::prelude::*;
-use voltex_depths::{combat, components::*, game_state, level};
+use depths::{combat, components::*, game_state, level};
 
 /// P·문·적이 모두 z=2 행에 정렬된 3방 맵 — 스크립트가 +x 직선 이동만으로
 /// 문을 통과할 수 있다. (문 gate: 왼쪽 방=c, 가운데 방=s 클리어 시 개방)
@@ -62,9 +62,9 @@ fn full_playthrough_kill_unlock_boss_victory() {
         // main.rs repath = Timer::repeating(0.5) → frame 29에 첫 발화.
         let due = frame % 30 == 29;
         let m = map.clone();
-        voltex_depths::enemy::enemy_ai_system(&mut w, &m, dt, due);
+        depths::enemy::enemy_ai_system(&mut w, &m, dt, due);
         voltex::ai::nav_agent_system(&mut w, &nav, dt);
-        voltex_depths::enemy::velocity_system(&mut w, &m, dt);
+        depths::enemy::velocity_system(&mut w, &m, dt);
         combat::projectile_system(&mut w, &m, dt);
         let out = combat::death_system(&mut w);
         game_state::door_system(&mut w, &mut map);

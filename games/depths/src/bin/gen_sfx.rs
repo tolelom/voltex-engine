@@ -1,4 +1,4 @@
-//! 절차 생성 SFX/BGM. `cargo run -p voltex_depths --bin gen_sfx` 로 assets/ 재생성.
+//! 절차 생성 SFX/BGM. `cargo run -p depths --bin gen_sfx` 로 assets/ 재생성.
 use std::f32::consts::TAU;
 use std::io::Write;
 

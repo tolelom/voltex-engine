@@ -458,6 +458,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "depths"
+version = "0.1.0"
+dependencies = [
+ "env_logger",
+ "voltex",
+ "voltex_capture",
+ "voltex_runtime",
+]
+
+[[package]]
 name = "dispatch"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -930,6 +940,16 @@ name = "khronos_api"
 version = "3.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e2db585e1d738fc771bf08a151420d3ed193d9d895a36df7f6f8a9456b911ddc"
+
+[[package]]
+name = "leap"
+version = "0.1.0"
+dependencies = [
+ "env_logger",
+ "voltex",
+ "voltex_capture",
+ "voltex_runtime",
+]
 
 [[package]]
 name = "libc"
@@ -1917,6 +1937,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6637bab7722d379c8b41ba849228d680cc12d0a45ba1fa2b48f2a30577a06731"
 
 [[package]]
+name = "survivor"
+version = "0.1.0"
+dependencies = [
+ "env_logger",
+ "voltex",
+ "voltex_renderer",
+ "voltex_runtime",
+ "wgpu",
+ "winit",
+]
+
+[[package]]
 name = "survivor_game"
 version = "0.1.0"
 dependencies = [
@@ -2193,16 +2225,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "voltex_depths"
-version = "0.1.0"
-dependencies = [
- "env_logger",
- "voltex",
- "voltex_capture",
- "voltex_runtime",
-]
-
-[[package]]
 name = "voltex_ecs"
 version = "1.0.173"
 dependencies = [
@@ -2230,16 +2252,6 @@ version = "1.0.173"
 dependencies = [
  "bytemuck",
  "thiserror 2.0.18",
-]
-
-[[package]]
-name = "voltex_leap"
-version = "0.1.0"
-dependencies = [
- "env_logger",
- "voltex",
- "voltex_capture",
- "voltex_runtime",
 ]
 
 [[package]]
@@ -2330,18 +2342,6 @@ dependencies = [
  "voltex_audio",
  "voltex_ecs",
  "voltex_math",
-]
-
-[[package]]
-name = "voltex_survivor"
-version = "0.1.0"
-dependencies = [
- "env_logger",
- "voltex",
- "voltex_renderer",
- "voltex_runtime",
- "wgpu",
- "winit",
 ]
 
 [[package]]

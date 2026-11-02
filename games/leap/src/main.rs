@@ -10,10 +10,10 @@ use voltex::prelude::*;
 use voltex::renderer_ecs::{spawn_particle, TextureHandle};
 use voltex_runtime::{Lifetime, RuntimeApp, RuntimeConfig, RuntimeResult};
 
-use voltex_leap::components::*;
-use voltex_leap::game_state::{self, GamePhase};
-use voltex_leap::level::*;
-use voltex_leap::MAP;
+use leap::components::*;
+use leap::game_state::{self, GamePhase};
+use leap::level::*;
+use leap::MAP;
 
 /// 초기 창 크기 (논리 픽셀).
 const SCREEN: (u32, u32) = (1280, 720);

@@ -6,7 +6,7 @@
 //!
 //! 전제: 한 프레임 이동량이 `tile` 미만 (스윕 없음 — 속도 × dt ≪ tile).
 //! 관통 시 접촉면에 스냅 + 해당 축 속도 0. 중력/점프 같은 튜닝 상수는
-//! 게임 영역 (voltex_leap `physics2d.rs`에서 승격 — dogfood-friction-2 #4).
+//! 게임 영역 (leap `physics2d.rs`에서 승격 — dogfood-friction-2 #4).
 
 use voltex_math::Vec3;
 

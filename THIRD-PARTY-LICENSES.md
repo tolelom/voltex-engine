@@ -3825,7 +3825,7 @@ Used by:
 - [survivor_game 0.1.0]()
 - [triangle 0.1.0]()
 - [tutorial_minigame 0.1.0]()
-- [voltex_survivor 0.1.0]()
+- [survivor 0.1.0]()
 - [block2 0.5.1](https://github.com/madsmtm/objc2)
 - [block 0.1.6](http://github.com/SSheldon/rust-block)
 - [dispatch 0.2.0](http://github.com/SSheldon/rust-dispatch)

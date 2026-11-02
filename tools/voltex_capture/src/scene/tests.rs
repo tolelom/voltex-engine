@@ -547,7 +547,7 @@ fn data_authored_scene_renders_nonblank() {
 #[test]
 #[ignore]
 fn declarative_scene_renders_distinct_per_object_colors() {
-    // voltex_survivor (v1.0.70) renders its objects via PrimitiveMesh +
+    // survivor (v1.0.70) renders its objects via PrimitiveMesh +
     // MaterialDesc. This proves those per-object colors actually reach the
     // screen distinctly — a green player pixel and a red enemy pixel both
     // exist (everything was white before the material-color path).

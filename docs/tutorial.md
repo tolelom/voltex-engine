@@ -243,4 +243,4 @@ voltex: cross-compile not supported.
 | 그림자·IBL | `examples/shadow_demo`, `multi_light_demo`, `ibl_demo`, `deferred_demo` |
 | 오디오 | `examples/audio_demo` |
 | 네트워크 | `voltex_net`의 스냅샷과 보간 |
-| 완성된 게임 | `games/voltex_survivor`(Lua), `games/voltex_depths`(Rust) |
+| 완성된 게임 | `games/survivor`(Lua), `games/depths`(Rust) |

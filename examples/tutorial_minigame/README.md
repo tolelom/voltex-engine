@@ -37,5 +37,5 @@ cargo run -p tutorial_minigame --release
 
 ## Next step
 
-→ [`../games/voltex_survivor`](../../games/voltex_survivor) — flagship
+→ [`../games/survivor`](../../games/survivor) — flagship
 game written 100% in Lua + scenes on top of the same `RuntimeApp`.

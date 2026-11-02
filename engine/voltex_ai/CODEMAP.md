@@ -29,7 +29,7 @@ AI 기초 — NavMesh (수동 + 자동 voxelization), A* + Funnel, steering, 동
 - 외부 crate: 없음
 
 ## 변경 시 주의점
-- navmesh_builder는 src/navmesh_builder/ 디렉토리로 분리됨 (M3 완료). 분리 후 lib.rs 미배선으로 죽어 있다가 voltex_depths 투입 시점에 배선 (`pub use NavMeshBuilder`) — 파이프라인 단계 fn(voxelize 등)은 pub(crate)
+- navmesh_builder는 src/navmesh_builder/ 디렉토리로 분리됨 (M3 완료). 분리 후 lib.rs 미배선으로 죽어 있다가 depths 투입 시점에 배선 (`pub use NavMeshBuilder`) — 파이프라인 단계 fn(voxelize 등)은 pub(crate)
 - voxelize는 삼각형 winding 무관 (normal 미사용, 높이차로 slope 판정). agent_radius erosion은 `ceil(radius/cell_size)` 보크셀 단위
 - navmesh.rs는 497줄
 - VNAV 바이너리 포맷 변경 시 저장된 내비메시 호환 깨짐

@@ -59,9 +59,9 @@ fn main() -> voltex::runtime::RuntimeResult<()> {
 
 | 게임 | 내용 | 실행 |
 |---|---|---|
-| [voltex_survivor](games/voltex_survivor/README.md) | 웨이브 서바이벌. 게임 로직을 Lua와 씬 파일로 작성 | `cargo run -p voltex_survivor` |
-| [voltex_depths](games/voltex_depths/README.md) | 탑다운 트윈스틱 던전 슈터. 게임 로직을 Rust로 작성 | `cargo run -p voltex_depths` |
-| voltex_leap | 2D 사이드뷰 플랫포머. 스프라이트와 타일맵으로 제작 | `cargo run -p voltex_leap` |
+| [survivor](games/survivor/README.md) | 웨이브 서바이벌. 게임 로직을 Lua와 씬 파일로 작성 | `cargo run -p survivor` |
+| [depths](games/depths/README.md) | 탑다운 트윈스틱 던전 슈터. 게임 로직을 Rust로 작성 | `cargo run -p depths` |
+| leap | 2D 사이드뷰 플랫포머. 스프라이트와 타일맵으로 제작 | `cargo run -p leap` |
 
 ## 기능
 

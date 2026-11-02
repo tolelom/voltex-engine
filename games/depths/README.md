@@ -1,15 +1,15 @@
 # Voltex Depths — 도그푸딩 게임 1편
 
 > 탑다운 트윈스틱 던전 슈터. WASD 이동 + 마우스 조준/발사, 적 3종
-> (추적자 / 사수 / 보스) + region 기반 문 진행. voltex_survivor(Lua 주도)와
+> (추적자 / 사수 / 보스) + region 기반 문 진행. survivor(Lua 주도)와
 > 반대로 게임 로직을 **100% Rust**로 작성해 엔진의 Rust API 워크플로를
 > 도그푸딩한 결과물. 발견한 마찰은 `docs/dev/dogfood-friction.md`에 기록.
 
 ## 실행
 
 ```bash
-cargo run -p voltex_depths            # 개발 빌드
-cargo run -p voltex_depths --release  # 릴리스
+cargo run -p depths            # 개발 빌드
+cargo run -p depths --release  # 릴리스
 ```
 
 `voltex build`로도 빌드된다. 이 게임의 `voltex.toml`은 Rust 게임용 `kind = "rust"` 빌드
@@ -28,14 +28,14 @@ cargo run -p voltex_depths --release  # 릴리스
 효과음/BGM(`assets/*.wav`)은 절차 생성. 변경 시:
 
 ```bash
-cargo run -p voltex_depths --bin gen_sfx
+cargo run -p depths --bin gen_sfx
 ```
 
 ## 테스트
 
 ```bash
-cargo test -p voltex_depths                       # 단위 + 헤드리스 풀 플레이스루
-cargo test -p voltex_depths --test visual -- --ignored  # GPU 시각 회귀 (GPU 필요)
+cargo test -p depths                       # 단위 + 헤드리스 풀 플레이스루
+cargo test -p depths --test visual -- --ignored  # GPU 시각 회귀 (GPU 필요)
 ```
 
 시각 회귀는 던전 씬을 오프스크린 렌더해 플레이어(green)/적(red) 픽셀

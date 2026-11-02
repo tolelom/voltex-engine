@@ -4,12 +4,12 @@
 //! (ORTHO_HEIGHT 12, 플레이어 스폰 부근)를 재현해 단언한다.
 use voltex::prelude::*;
 use voltex_capture::{HeadlessGpu, ImageStats};
-use voltex_leap::game_state::spawn_level;
-use voltex_leap::level::LevelMap;
-use voltex_leap::MAP;
+use leap::game_state::spawn_level;
+use leap::level::LevelMap;
+use leap::MAP;
 
 #[test]
-#[ignore] // GPU 필요: cargo test -p voltex_leap --test visual -- --ignored
+#[ignore] // GPU 필요: cargo test -p leap --test visual -- --ignored
 fn level_scene_renders_tiles_spikes_door_coins() {
     let gpu = match HeadlessGpu::new() {
         Ok(g) => g,

@@ -1,10 +1,10 @@
 //! GPU 시각 회귀: 던전 씬이 실제 픽셀로 렌더되는지 (RTX 4080에서 -- --ignored로 실행).
 use voltex::prelude::*;
 use voltex_capture::{HeadlessGpu, ImageStats};
-use voltex_depths::level::{build_level, LevelMap};
+use depths::level::{build_level, LevelMap};
 
 #[test]
-#[ignore] // GPU 필요: cargo test -p voltex_depths --test visual -- --ignored
+#[ignore] // GPU 필요: cargo test -p depths --test visual -- --ignored
 fn dungeon_scene_renders_walls_player_enemies() {
     let gpu = match HeadlessGpu::new() {
         Ok(g) => g,

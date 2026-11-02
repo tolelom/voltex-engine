@@ -351,7 +351,7 @@ pub fn render_boids_swarm(gpu: &HeadlessGpu, width: u32, height: u32) -> Vec<u8>
 /// Render an arbitrary caller-built `World` of *declarative* renderables
 /// (`PrimitiveMesh` + `MaterialDesc` entities): materialize → `BasicRenderer`
 /// → RGBA8. The public entry point for game crates to pixel-verify their own
-/// scenes (added for voltex_depths dogfooding).
+/// scenes (added for depths dogfooding).
 ///
 /// Fixed contract (not parameters — parameterize when a second game needs it):
 /// - Light: one asymmetric directional, direction `[-0.4, -1.0, -0.6]`
@@ -445,7 +445,7 @@ fn render_world_impl(
     )
 }
 
-/// Render `voltex_survivor`'s seed scene through the *declarative* path it now
+/// Render `survivor`'s seed scene through the *declarative* path it now
 /// uses (v1.0.70): a gray ground, a green player, and a red enemy declared with
 /// `PrimitiveMesh` + `MaterialDesc`, materialized, and drawn with the runtime's
 /// elevated camera. Proves the flagship's per-object colors survive
@@ -455,7 +455,7 @@ pub fn render_declarative_colored_scene(gpu: &HeadlessGpu, width: u32, height: u
 
     let mut world = World::new();
 
-    // Mirror voltex_survivor::setup_scene roles (gray ground, green player) plus
+    // Mirror survivor::setup_scene roles (gray ground, green player) plus
     // a runtime-spawned-style red enemy.
     let mut ground_t = Transform::from_position(Vec3::new(0.0, -0.5, 0.0));
     ground_t.scale = Vec3::new(20.0, 0.1, 20.0);

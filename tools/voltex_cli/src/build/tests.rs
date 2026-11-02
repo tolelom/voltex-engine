@@ -55,11 +55,11 @@ fn release_exe(name: &str) -> PathBuf {
 #[test]
 fn pick_executable_prefers_project_name_match() {
     let exes = vec![
-        release_exe("voltex_depths"),
+        release_exe("depths"),
         release_exe("gen_sfx"),
     ];
     // Name match wins regardless of artifact order.
-    assert_eq!(pick_executable(&exes, "voltex_depths").unwrap(), &exes[0]);
+    assert_eq!(pick_executable(&exes, "depths").unwrap(), &exes[0]);
 }
 
 #[test]

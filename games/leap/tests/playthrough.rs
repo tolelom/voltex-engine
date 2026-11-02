@@ -3,11 +3,11 @@
 
 use voltex::ecs::Tag;
 use voltex::prelude::*;
-use voltex_leap::components::*;
-use voltex_leap::enemy::WALKER_HALF;
-use voltex_leap::game_state::{self, StepOutcome};
-use voltex_leap::level::{grid_at, LevelMap};
-use voltex_leap::MAP;
+use leap::components::*;
+use leap::enemy::WALKER_HALF;
+use leap::game_state::{self, StepOutcome};
+use leap::level::{grid_at, LevelMap};
+use leap::MAP;
 
 const DT: f32 = 1.0 / 60.0;
 
@@ -114,7 +114,7 @@ fn walking_into_spike_pit_dies_then_restart_resets() {
     let p = world.find_by_tag("player").unwrap();
     assert_eq!(world.get::<CoinCount>(p).unwrap().0, 0);
     let pos = world.get::<Transform>(p).unwrap().position;
-    let spawn = voltex_leap::level::cell_center(map.player_spawn.0, map.player_spawn.1);
+    let spawn = leap::level::cell_center(map.player_spawn.0, map.player_spawn.1);
     assert!((pos.x - spawn.x).abs() < 1e-6 && (pos.y - spawn.y).abs() < 1e-6);
     let _ = world.query::<Tag>(); // Tag 쿼리 가능 확인 (플레이어 태그 유지)
 }

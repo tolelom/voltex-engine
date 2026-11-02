@@ -82,7 +82,7 @@ RT/windowed paths. Before a release, run these on a real GPU host (see
 - [ ] Smoke-run the windowed demos for ~6s each with no panic / wgpu validation
       error (only benign Vulkan loader warnings are expected):
       `RUST_LOG=warn <timeout 6> cargo run -p deferred_demo` (also `ibl_demo`,
-      `shadow_demo`, `runtime_demo`, `voltex_survivor`). `deferred_demo` is the
+      `shadow_demo`, `runtime_demo`, `survivor`). `deferred_demo` is the
       one that exercises ray-tracing feature acquisition + BLAS.
 - [ ] Full CLI build→run: `voltex new <dir> && cd <dir> &&
       voltex build --engine-path <repo>` then launch `dist/<name>.exe` — the
