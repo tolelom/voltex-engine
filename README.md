@@ -2,6 +2,16 @@
 
 > Rust로 만든 3D 게임 엔진. 외부 런타임 의존은 winit, wgpu, bytemuck 셋이고, 수학, 이미지·메시 파서, 물리, 오디오, 에디터 UI, Lua 바인딩, 빌드 도구까지 직접 구현했다.
 
+## 저장소 구성
+
+| 폴더 | 내용 |
+|---|---|
+| [`engine/`](engine) | 엔진 crate. 게임 코드는 facade crate `voltex` 하나로 엔진 전체를 쓴다 |
+| [`tools/`](tools) | 엔진을 쓰는 도구. `voltex_cli`(게임 빌드 명령 `voltex`), `voltex_capture`(렌더 결과 PNG 캡처) |
+| [`games/`](games) | 엔진으로 만든 게임 3편 |
+| [`examples/`](examples) | 기능별 짧은 예제 |
+| [`docs/`](docs) | 사용 문서. `docs/dev/`와 `docs/superpowers/`는 개발 기록 |
+
 ## 스크린샷
 
 엔진 렌더러로 그린 화면이다. 다시 찍는 방법은 [docs/visual](docs/visual/README.md).
@@ -80,6 +90,8 @@ fn main() -> voltex::runtime::RuntimeResult<()> {
 
 ## crate 구성
 
+`engine/`
+
 ```
 voltex              facade. 하위 crate 재노출과 prelude
 ├── voltex_math       벡터·행렬·쿼터니언·AABB·Ray
@@ -95,9 +107,14 @@ voltex              facade. 하위 crate 재노출과 prelude
 ├── voltex_renderer_ecs  ECS 데이터로 렌더링하는 연결층
 ├── voltex_physics    충돌·강체·레이캐스트
 ├── voltex_editor     즉시 모드 UI와 에디터
-├── voltex_runtime    창·렌더·물리·스크립트를 묶은 앱 진입점
-├── voltex_cli        voltex 명령(new·build·run)
-└── voltex_capture    오프스크린 렌더 캡처. 시각 회귀 확인용
+└── voltex_runtime    창·렌더·물리·스크립트를 묶은 앱 진입점
+```
+
+`tools/`
+
+```
+voltex_cli          voltex 명령(new·build·run)
+voltex_capture      오프스크린 렌더 캡처. 시각 회귀 확인용
 ```
 
 crate별 책임과 주의점은 각 crate의 `CODEMAP.md`에 있다.

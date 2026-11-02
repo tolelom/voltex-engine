@@ -21,6 +21,8 @@ recent on top. v0.x entries are organised by Cycle (see
 - **게임 이름에서 `voltex_` 제거**: `voltex_survivor`·`voltex_depths`·`voltex_leap`을 `survivor`·`depths`·`leap`으로
   바꿨다(폴더, 패키지, `voltex.toml`의 `name`). 엔진 crate와 이름 모양이 같아 구별되지 않았다. 실행은
   `cargo run -p depths`, 빌드 결과는 `dist/survivor` 형태가 된다. 이 항목 위의 옛 기록은 당시 이름 그대로 둔다.
+- **README 저장소 구성 표**: 맨 위에 `engine/`·`tools/`·`games/`·`examples/`·`docs/`가 각각 무엇인지 적고,
+  crate 구성 그림을 엔진과 도구로 나눴다(전에는 cli·capture가 facade 아래 엔진 부품처럼 그려져 있었다).
 
 - **voltex_capture `scene`**: 인라인 테스트를 `scene/tests.rs`로 옮겼다(`scene.rs` → `scene/mod.rs` 1140줄 +
   `scene/tests.rs` 704줄). 코드는 바꾸지 않았고 형제 모듈 재노출과 `scene::render_*` 경로는 그대로다.
