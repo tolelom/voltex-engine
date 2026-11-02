@@ -1,4 +1,4 @@
-//! Repo hygiene: every `.rs` file under `crates/*/src` and `games/*/src` must
+//! Repo hygiene: every `.rs` file under `engine/*/src`, `tools/*/src` and `games/*/src` must
 //! be reachable from its crate's module tree. A file that no `mod x;`
 //! declaration references is silently dead code — it never compiles, its
 //! tests never run, and CODEMAPs drift (dogfood friction #1: `navmesh_builder/`
@@ -18,7 +18,7 @@ use std::path::{Path, PathBuf};
 const ALLOWLIST: &[&str] = &[];
 
 fn workspace_root() -> PathBuf {
-    // crates/voltex/tests → repo root is two levels up from CARGO_MANIFEST_DIR.
+    // engine/voltex/tests → repo root is two levels up from CARGO_MANIFEST_DIR.
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .parent()
         .and_then(Path::parent)
@@ -63,7 +63,7 @@ fn declares_module(haystack: &str, stem: &str) -> bool {
 fn every_src_file_is_wired_into_its_module_tree() {
     let root = workspace_root();
     let mut crate_dirs: Vec<PathBuf> = Vec::new();
-    for group in ["crates", "games"] {
+    for group in ["engine", "tools", "games"] {
         let Ok(entries) = std::fs::read_dir(root.join(group)) else { continue };
         for entry in entries.flatten() {
             let p = entry.path();

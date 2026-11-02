@@ -29,7 +29,7 @@ cargo run -p triangle
 `voltex` CLI가 프로젝트를 만들고, 씬·스크립트·에셋을 실행 파일 하나에 묶는다.
 
 ```bash
-cargo install --path crates/voltex_cli
+cargo install --path tools/voltex_cli
 export VOLTEX_REPO=$(pwd)        # 엔진 경로. 없으면 --engine-path로 지정
 
 cd ~/projects

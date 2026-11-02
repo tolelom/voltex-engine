@@ -22,7 +22,7 @@ fn e2e_new_then_build_produces_dist_exe() {
     let voltex_bin = env!("CARGO_BIN_EXE_voltex");
 
     // Workspace root = three levels up from this test file
-    // (crates/voltex_cli/tests/e2e_new_build.rs → repo root).
+    // (tools/voltex_cli/tests/e2e_new_build.rs → repo root).
     let workspace_root: PathBuf = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .ancestors()
         .nth(2)

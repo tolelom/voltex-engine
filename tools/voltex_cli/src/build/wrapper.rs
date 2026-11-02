@@ -7,7 +7,7 @@ use crate::manifest::Manifest;
 use crate::util::escape_for_rust_string;
 
 pub(super) fn write_wrapper_manifest(wrapper_dir: &Path, engine_path: &Path) -> Result<()> {
-    let runtime_path = engine_path.join("crates").join("voltex_runtime");
+    let runtime_path = engine_path.join("engine").join("voltex_runtime");
     let runtime_path_str = runtime_path.to_string_lossy().replace('\\', "/");
     let manifest = format!(
         r#"[package]

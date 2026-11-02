@@ -1,7 +1,7 @@
 # Visual verification
 
 Windowed examples can't be observed by automation, and a smoke run only
-proves "no panic". The [`voltex_capture`](../../crates/voltex_capture) crate
+proves "no panic". The [`voltex_capture`](../../tools/voltex_capture) crate
 renders the engine's GPU pipelines into an offscreen texture and writes a PNG,
 so the output can be checked by eye and compared between builds.
 

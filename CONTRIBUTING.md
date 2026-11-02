@@ -30,7 +30,7 @@ bash .githooks/install.sh      # Linux·macOS
 ```
 
 - 커밋할 때: clippy와 `cargo test --workspace --lib`
-- push할 때: crates/, examples/, games/를 바꿨는데 CHANGELOG.md를 고치지 않았으면 막는다. aarch64 Linux 대상 clippy도 돈다(타깃이 없으면 건너뜀).
+- push할 때: engine/, tools/, examples/, games/를 바꿨는데 CHANGELOG.md를 고치지 않았으면 막는다. aarch64 Linux 대상 clippy도 돈다(타깃이 없으면 건너뜀).
 
 한 번 건너뛸 때는 `--no-verify`.
 

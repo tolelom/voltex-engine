@@ -1,43 +1,47 @@
 [workspace]
 resolver = "2"
 members = [
-    "crates/voltex",
-    "crates/voltex_math",
-    "crates/voltex_platform",
-    "crates/voltex_renderer",
-    "crates/voltex_renderer_ecs",
-    "crates/voltex_image",
-    "crates/voltex_ecs",
-    "crates/voltex_asset",
-    "examples/triangle",
-    "examples/model_viewer",
-    "examples/many_cubes",
-    "examples/hierarchy_demo",
-    "examples/asset_demo",
-    "examples/pbr_demo",
-    "examples/multi_light_demo",
-    "examples/shadow_demo",
-    "examples/ibl_demo",
-    "examples/deferred_demo",
-    "crates/voltex_physics",
-    "crates/voltex_audio",
-    "examples/audio_demo",
-    "crates/voltex_ai",
-    "crates/voltex_net",
-    "crates/voltex_script",
-    "crates/voltex_editor",
-    "crates/voltex_runtime",
-    "crates/voltex_cli",
-    "crates/voltex_capture",
-    "examples/editor_demo",
-    "examples/survivor_game",
-    "examples/runtime_demo",
-    "examples/tutorial_minigame",
-    "examples/game_ready_demo",
-    "examples/boids_demo",
-    "games/voltex_survivor",
+    # 엔진
+    "engine/voltex",
+    "engine/voltex_ai",
+    "engine/voltex_asset",
+    "engine/voltex_audio",
+    "engine/voltex_ecs",
+    "engine/voltex_editor",
+    "engine/voltex_image",
+    "engine/voltex_math",
+    "engine/voltex_net",
+    "engine/voltex_physics",
+    "engine/voltex_platform",
+    "engine/voltex_renderer",
+    "engine/voltex_renderer_ecs",
+    "engine/voltex_runtime",
+    "engine/voltex_script",
+    # 엔진을 쓰는 도구
+    "tools/voltex_capture",
+    "tools/voltex_cli",
+    # 엔진으로 만든 게임
     "games/voltex_depths",
     "games/voltex_leap",
+    "games/voltex_survivor",
+    # 기능별 예제
+    "examples/asset_demo",
+    "examples/audio_demo",
+    "examples/boids_demo",
+    "examples/deferred_demo",
+    "examples/editor_demo",
+    "examples/game_ready_demo",
+    "examples/hierarchy_demo",
+    "examples/ibl_demo",
+    "examples/many_cubes",
+    "examples/model_viewer",
+    "examples/multi_light_demo",
+    "examples/pbr_demo",
+    "examples/runtime_demo",
+    "examples/shadow_demo",
+    "examples/survivor_game",
+    "examples/triangle",
+    "examples/tutorial_minigame",
 ]
 
 [workspace.package]
@@ -54,23 +58,23 @@ license = "MIT OR Apache-2.0"
 publish = false
 
 [workspace.dependencies]
-voltex = { path = "crates/voltex" }
-voltex_math = { path = "crates/voltex_math" }
-voltex_platform = { path = "crates/voltex_platform" }
-voltex_renderer = { path = "crates/voltex_renderer" }
-voltex_renderer_ecs = { path = "crates/voltex_renderer_ecs" }
-voltex_image = { path = "crates/voltex_image" }
-voltex_ecs = { path = "crates/voltex_ecs" }
-voltex_asset = { path = "crates/voltex_asset" }
-voltex_physics = { path = "crates/voltex_physics" }
-voltex_audio = { path = "crates/voltex_audio" }
-voltex_ai = { path = "crates/voltex_ai" }
-voltex_net = { path = "crates/voltex_net" }
-voltex_script = { path = "crates/voltex_script" }
-voltex_editor = { path = "crates/voltex_editor" }
-voltex_runtime = { path = "crates/voltex_runtime" }
-voltex_cli = { path = "crates/voltex_cli" }
-voltex_capture = { path = "crates/voltex_capture" }
+voltex = { path = "engine/voltex" }
+voltex_math = { path = "engine/voltex_math" }
+voltex_platform = { path = "engine/voltex_platform" }
+voltex_renderer = { path = "engine/voltex_renderer" }
+voltex_renderer_ecs = { path = "engine/voltex_renderer_ecs" }
+voltex_image = { path = "engine/voltex_image" }
+voltex_ecs = { path = "engine/voltex_ecs" }
+voltex_asset = { path = "engine/voltex_asset" }
+voltex_physics = { path = "engine/voltex_physics" }
+voltex_audio = { path = "engine/voltex_audio" }
+voltex_ai = { path = "engine/voltex_ai" }
+voltex_net = { path = "engine/voltex_net" }
+voltex_script = { path = "engine/voltex_script" }
+voltex_editor = { path = "engine/voltex_editor" }
+voltex_runtime = { path = "engine/voltex_runtime" }
+voltex_cli = { path = "tools/voltex_cli" }
+voltex_capture = { path = "tools/voltex_capture" }
 wgpu = "28.0"
 winit = "0.30"
 bytemuck = { version = "1", features = ["derive"] }

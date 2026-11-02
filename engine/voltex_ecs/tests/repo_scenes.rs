@@ -33,7 +33,7 @@ fn collect_scenes(dir: &Path, out: &mut Vec<PathBuf>) {
 #[test]
 fn every_repo_scene_file_loads() {
     let mut scenes = Vec::new();
-    for top in ["games", "examples", "crates", "assets", "docs"] {
+    for top in ["games", "examples", "engine", "tools", "assets", "docs"] {
         collect_scenes(&repo_root().join(top), &mut scenes);
     }
     assert!(!scenes.is_empty(), "scene discovery found nothing — walk is broken");

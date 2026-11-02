@@ -29,7 +29,7 @@ cargo test --workspace
 
 ## Crate 의존성 그래프
 
-각 crate의 자세한 책임/API는 `crates/<crate>/CODEMAP.md` 참고.
+각 crate의 자세한 책임/API는 `engine/<crate>/CODEMAP.md`, `tools/<crate>/CODEMAP.md` 참고.
 
 ```
 L0 (no voltex deps):

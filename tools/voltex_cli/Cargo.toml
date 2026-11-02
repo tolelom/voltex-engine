@@ -14,13 +14,13 @@ path = "src/main.rs"
 doc = false
 
 [dependencies]
-voltex_asset = { path = "../voltex_asset" }
+voltex_asset = { path = "../../engine/voltex_asset" }
 # Scene parsing for build-time asset-reference scanning (workspace crate —
 # the external-deps-zero policy holds; pulls only math/asset, no GPU).
-voltex_ecs = { path = "../voltex_ecs" }
+voltex_ecs = { path = "../../engine/voltex_ecs" }
 
 [dev-dependencies]
 # E2E bundle test encodes a real PNG / WAV the engine's own decoders read
 # (workspace crates — external-deps-zero policy holds for dev deps too).
-voltex_image = { path = "../voltex_image" }
-voltex_audio = { path = "../voltex_audio" }
+voltex_image = { path = "../../engine/voltex_image" }
+voltex_audio = { path = "../../engine/voltex_audio" }

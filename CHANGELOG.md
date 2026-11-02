@@ -14,6 +14,11 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ### Refactor
 
+- **폴더 구성 `engine/`·`tools/`**: `crates/`를 엔진 crate 15개(`engine/`)와 엔진을 쓰는 도구(`tools/voltex_cli`,
+  `tools/voltex_capture`)로 나눴다. 루트 `Cargo.toml`의 members를 엔진·도구·게임·예제 묶음으로 다시 적었다.
+  `voltex build`가 만드는 래퍼 crate는 엔진 경로의 `engine/voltex_runtime`을 가리킨다. 저장소를 도는 테스트
+  (`module_wiring`, `repo_scenes`)와 pre-push·`check_changelog.sh`의 코드 경로 목록도 새 폴더로 바꿨다.
+
 - **voltex_capture `scene`**: 인라인 테스트를 `scene/tests.rs`로 옮겼다(`scene.rs` → `scene/mod.rs` 1140줄 +
   `scene/tests.rs` 704줄). 코드는 바꾸지 않았고 형제 모듈 재노출과 `scene::render_*` 경로는 그대로다.
   확인: 1762 통과·76 무시, GPU 캡처 47 통과(skip 0), 캡처 29장 분할 전과 픽셀 단위로 같음.

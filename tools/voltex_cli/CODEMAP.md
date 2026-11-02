@@ -53,7 +53,7 @@ src/
 1. `--manifest-path` 또는 cwd 에서 `voltex.toml` 로드
 2. `--target` 또는 `manifest.build.targets[0]` 또는 host triple 결정
 3. `<project>/dist/wrapper/{Cargo.toml,src/main.rs}` 생성
-   - `Cargo.toml`: `voltex_runtime` path 의존 (engine_path 의 `crates/voltex_runtime`)
+   - `Cargo.toml`: `voltex_runtime` path 의존 (engine_path 의 `engine/voltex_runtime`)
    - `src/main.rs`: `RuntimeApp::new(RuntimeConfig::new().with_window_title(...).with_window_size(...).with_audio(Vec::new()).with_vfs(...).with_initial_scene(...))?.run()` — **오디오 상시 활성** (AudioPath resolve/스크립트 오디오가 audio 단계 뒤에 있음; 디바이스 실패는 graceful 무음 — v1.0.106)
 4. wrapper 디렉토리에서 `cargo build --release`
 5. `target/release/wrapper(.exe)` → `dist/<name>(.exe)` 복사
@@ -82,7 +82,7 @@ src/
 ## 수동 검증 절차
 ```bash
 export VOLTEX_REPO=<engine repo root>
-cargo install --path crates/voltex_cli   # 1회
+cargo install --path tools/voltex_cli   # 1회
 cd /tmp
 voltex new mygame
 cd mygame

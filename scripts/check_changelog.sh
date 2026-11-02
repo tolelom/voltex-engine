@@ -47,7 +47,7 @@ while IFS= read -r file; do
     TOUCHED_PATHS+=("$file")
     case "$file" in
         # Code paths that should produce a CHANGELOG entry.
-        crates/*|examples/*|games/*)
+        engine/*|tools/*|examples/*|games/*)
             # …unless it's a docs-only file inside a code dir.
             case "$file" in
                 *.md|*/CODEMAP.md) ;;

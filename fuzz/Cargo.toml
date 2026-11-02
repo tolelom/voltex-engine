@@ -13,10 +13,10 @@ cargo-fuzz = true
 [dependencies]
 libfuzzer-sys = "0.4"
 
-voltex_image = { path = "../crates/voltex_image" }
-voltex_ecs = { path = "../crates/voltex_ecs" }
-voltex_net = { path = "../crates/voltex_net" }
-voltex_ai = { path = "../crates/voltex_ai" }
+voltex_image = { path = "../engine/voltex_image" }
+voltex_ecs = { path = "../engine/voltex_ecs" }
+voltex_net = { path = "../engine/voltex_net" }
+voltex_ai = { path = "../engine/voltex_ai" }
 
 [[bin]]
 name = "fuzz_png"

@@ -6,7 +6,7 @@
 #
 # Reads commit ranges from stdin (git's pre-push protocol). For each pushed ref,
 # delegates to scripts/check_changelog.sh which inspects the diff and fails the
-# push if code paths (crates/, examples/, games/) changed without a matching
+# push if code paths (engine/, tools/, examples/, games/) changed without a matching
 # CHANGELOG.md edit.
 
 set -e

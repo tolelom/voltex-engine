@@ -17,7 +17,7 @@
 ```bash
 git clone https://git.tolelom.xyz/tolelom/game_engine voltex
 cd voltex
-cargo install --path crates/voltex_cli
+cargo install --path tools/voltex_cli
 ```
 
 `voltex --help`가 동작하면 된다.

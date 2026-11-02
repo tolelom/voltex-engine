@@ -107,4 +107,4 @@ glob이 프로젝트 루트 전체를 잡아도 `dist/`와 `target/`은 복사�
 
 `voltex run`은 `voltex build`와 같은 옵션을 받고, 빌드한 뒤 실행한다.
 
-파서 구현: [crates/voltex_cli/src/manifest/mod.rs](../crates/voltex_cli/src/manifest/mod.rs).
+파서 구현: [tools/voltex_cli/src/manifest/mod.rs](../tools/voltex_cli/src/manifest/mod.rs).
