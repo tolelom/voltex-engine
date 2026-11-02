@@ -4,21 +4,17 @@
 
 ## 스크린샷
 
-헤드리스 오프스크린 캡처(`voltex_capture`)로 얻은 실제 렌더 결과다. 재현 방법은 [docs/visual](docs/visual/README.md).
+엔진 렌더러로 그린 화면이다. 다시 찍는 방법은 [docs/visual](docs/visual/README.md).
 
-| PBR | 그림자 | 다중 광원 |
+| PBR 재질 | 그림자 | 다중 광원 |
 |---|---|---|
 | ![PBR sphere grid](docs/visual/pbr_grid.png) | ![Shadow scene](docs/visual/shadow_scene.png) | ![Multi-light](docs/visual/multi_light.png) |
-| metallic·roughness 격자, IBL | 2패스 shadow map | 컬러 point·spot 광원 |
 
 | 기즈모 | 에디터 UI |
 |---|---|
 | ![Translate gizmo](docs/visual/gizmo_translate.png) | ![Editor UI](docs/visual/editor_ui.png) |
-| 이동·회전·크기 핸들 | 즉시 모드 UI, 폰트 아틀라스 |
 
 ## 실행해 보기
-
-example은 각각 독립 패키지라 `-p`로 실행한다.
 
 ```bash
 git clone https://git.tolelom.xyz/tolelom/game_engine
@@ -44,7 +40,7 @@ voltex run                       # 빌드 후 실행
 
 PowerShell에서는 `$env:VOLTEX_REPO='C:/path/to/game_engine'`. 처음부터 따라가는 안내는 [docs/tutorial.md](docs/tutorial.md).
 
-코드로 시작할 때는 facade crate 하나만 가져오면 된다.
+Rust 코드에서는 `voltex` crate 하나로 엔진 전체를 쓴다.
 
 ```rust
 use voltex::prelude::*;
@@ -65,22 +61,22 @@ fn main() -> voltex::runtime::RuntimeResult<()> {
 |---|---|---|
 | [voltex_survivor](games/voltex_survivor/README.md) | 웨이브 서바이벌. 게임 로직을 Lua와 씬 파일로 작성 | `cargo run -p voltex_survivor` |
 | [voltex_depths](games/voltex_depths/README.md) | 탑다운 트윈스틱 던전 슈터. 게임 로직을 Rust로 작성 | `cargo run -p voltex_depths` |
-| voltex_leap | 2D 사이드뷰 플랫포머. 2D 스프라이트·타일 경로 검증용 | `cargo run -p voltex_leap` |
+| voltex_leap | 2D 사이드뷰 플랫포머. 스프라이트와 타일맵으로 제작 | `cargo run -p voltex_leap` |
 
 ## 기능
 
 | 영역 | 내용 |
 |---|---|
-| ECS | generation 기반 Entity, Component trait, Scheduler, 부모·자식 계층, 씬 JSON·바이너리 직렬화 |
-| 렌더링 | PBR, normal map, CSM·point·spot 그림자, IBL, 디퍼드 G-Buffer, SSGI, 하드웨어 레이트레이싱 그림자·반사·AO, HDR·Bloom·TAA·SSR·DOF 후처리 |
-| 파서 | OBJ, glTF 2.0·GLB, PNG, JPG(Baseline·Progressive), BMP, WAV, OGG Vorbis |
-| 물리 | Sphere·Box·Capsule·ConvexHull·Mesh 콜라이더, GJK·EPA, BVH, 강체(마찰·sleep·island), CCD, 레이캐스트 |
-| 오디오 | WASAPI·ALSA·CoreAudio 백엔드, 3D 사운드, 도플러, HRTF, 리버브, 믹서 그룹 |
-| AI | NavMesh(복셀화 자동 생성), A*와 funnel 경로, steering, 동적 장애물 회피 |
-| 네트워크 | UDP, 신뢰·순서 보장 채널, 스냅샷 delta 압축, 보간, 지연 보상 |
-| 스크립트 | Lua 5.4 C 소스를 직접 빌드해 FFI로 연결, 엔티티별 스크립트, 핫 리로드 |
-| 에디터 | 즉시 모드 UI, 도킹, 3D 뷰포트, Hierarchy·Inspector, 자체 TTF 래스터라이저, 기즈모, Play·Stop, Undo·Redo |
-| 빌드 | `voltex` CLI, `voltex.toml` 매니페스트, `.vpkg` 아카이브를 실행 파일에 포함 |
+| ECS | 엔티티·컴포넌트 저장, 부모·자식 계층, 씬 저장·불러오기 |
+| 렌더링 | PBR 재질, 실시간 그림자, 디퍼드 렌더링, 레이트레이싱 그림자·반사, 후처리 |
+| 물리 | 다양한 모양의 충돌 판정, 강체 시뮬레이션, 레이캐스트 |
+| 오디오 | OS별 출력 백엔드, 3D 위치 사운드, 믹서 |
+| AI | 내비게이션 메시 자동 생성, 경로 탐색, 이동 조종 |
+| 네트워크 | UDP 위의 신뢰 전송, 상태 동기화와 보간 |
+| 스크립트 | Lua 5.4, 엔티티별 스크립트, 핫 리로드 |
+| 에디터 | 도킹 UI, 3D 뷰포트, 인스펙터, 기즈모, 실행·정지, 실행 취소 |
+| 파일 | 이미지·모델·오디오 디코더(PNG, JPG, glTF, OBJ, WAV, OGG) 직접 구현 |
+| 빌드 | `voltex` CLI가 게임과 에셋을 실행 파일 하나로 묶음 |
 
 ## crate 구성
 
@@ -124,7 +120,7 @@ crate별 책임과 주의점은 각 crate의 `CODEMAP.md`에 있다.
 
 ## 기여
 
-코드를 고치기 전에 [CONTRIBUTING.md](CONTRIBUTING.md)를 읽는다. 개발 환경, 커밋 전에 돌릴 검사와 git 훅 설치, 코드 규칙(의존성 추가 기준, 파일 600줄 한도, 에러 처리), 커밋 메시지 형식이 정리돼 있다.
+코드를 고치려면 [CONTRIBUTING.md](CONTRIBUTING.md)를 먼저 읽는다.
 
 ## 라이선스
 
