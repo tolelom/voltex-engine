@@ -88,7 +88,7 @@ window_size = [1280, 720]
 
 ```bash
 cd /path/to/voltex
-cargo run --example editor_demo
+cargo run -p editor_demo
 ```
 
 `<screenshot: editor_demo 실행 직후 화면, 도크 + 빈 viewport>`
@@ -170,7 +170,7 @@ Play 중에는 dispatch (Spawn / SetTransform / Despawn 등) 가 모두
 `EditorError::ModeMismatch` 로 거부된다. Stop 누르면 Play 직전 상태가
 완벽히 복원 (등록된 컴포넌트만 한정 — 자세한 정책은 [E2 spec](superpowers/specs/2026-05-20-e2-play-stop-lifecycle-design.md)).
 
-> 체크포인트: `cargo run --example editor_demo` → Spawn → "+ script" →
+> 체크포인트: `cargo run -p editor_demo` → Spawn → "+ script" →
 > path 채우기 → Play → 큐브가 회전해야 함.
 
 ---
