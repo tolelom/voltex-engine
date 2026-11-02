@@ -25,9 +25,10 @@ GPU가 필요한 테스트는 `#[ignore]`로 빠져 있다. GPU가 있는 기기
 ### git 훅
 
 ```bash
-bash .githooks/install.sh      # Linux·macOS
-.\.githooks\install.ps1        # Windows PowerShell
+git config core.hooksPath scripts/hooks
 ```
+
+훅은 `scripts/hooks/`에 있고, 실제 검사는 `scripts/`의 스크립트가 한다.
 
 - 커밋할 때: clippy와 `cargo test --workspace --lib`
 - push할 때: engine/, tools/, examples/, games/를 바꿨는데 CHANGELOG.md를 고치지 않았으면 막는다. aarch64 Linux 대상 clippy도 돈다(타깃이 없으면 건너뜀).

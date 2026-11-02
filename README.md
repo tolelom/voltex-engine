@@ -7,9 +7,10 @@
 | 폴더 | 내용 |
 |---|---|
 | [`engine/`](engine) | 엔진 crate. 게임 코드는 facade crate `voltex` 하나로 엔진 전체를 쓴다 |
-| [`tools/`](tools) | 엔진을 쓰는 도구. `voltex_cli`(게임 빌드 명령 `voltex`), `voltex_capture`(렌더 결과 PNG 캡처) |
+| [`tools/`](tools) | 엔진을 쓰는 Rust 프로그램. `voltex_cli`(게임 빌드 명령 `voltex`), `voltex_capture`(렌더 결과 PNG 캡처) |
 | [`games/`](games) | 엔진으로 만든 게임 3편 |
 | [`examples/`](examples) | 기능별 짧은 예제 |
+| [`scripts/`](scripts) | 저장소 관리용 셸 스크립트. git 훅, CHANGELOG·버전 검사, 커버리지, 라이선스 고지 생성 |
 | [`docs/`](docs) | 사용 문서. `docs/dev/`는 남은 할 일과 알려진 한계 |
 
 ## 스크린샷

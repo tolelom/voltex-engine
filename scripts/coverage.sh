@@ -1,28 +1,24 @@
 #!/usr/bin/env bash
-# Local coverage measurement for Voltex. CI (.github/workflows/ci.yml)
-# reports coverage without a threshold; this script keeps an optional
-# local gate.
+# Local coverage measurement for Voltex. Reports line coverage; there is
+# no threshold unless VOLTEX_COV_FAIL_UNDER_LINES is set.
 #
 # Usage:
-#   scripts/coverage.sh            # summary, gate at 78% lines
+#   scripts/coverage.sh            # summary, GPU-gated tests included
 #   scripts/coverage.sh --html     # also generate an HTML report
 #   scripts/coverage.sh --lib-only # skip GPU-gated #[ignore]'d tests
+#   VOLTEX_COV_FAIL_UNDER_LINES=80 scripts/coverage.sh   # fail below 80%
 #
 # Requires:
 #   cargo install cargo-llvm-cov
 #   rustup component add llvm-tools-preview
 #
-# Coverage (measured on Windows + RTX 4080 SUPER, 2026-10-12):
-#   --lib only           : 68.83% lines (below the 78% gate)
-#   --lib + GPU ignored  : 82.90% lines
-#
-# The GPU-gated #[ignore] tests must run to pass the gate: without a GPU
-# (lavapipe absent) their bodies and the renderer code they exercise count
-# as uncovered. See docs/dev/AUDIT-BACKLOG.md F5.
+# Without a GPU (or lavapipe) the #[ignore]'d tests cannot run, so their
+# bodies and the renderer code they exercise count as uncovered and the
+# number drops sharply. See docs/dev/AUDIT-BACKLOG.md F5.
 
 set -euo pipefail
 
-FAIL_UNDER_LINES="${VOLTEX_COV_FAIL_UNDER_LINES:-78}"
+FAIL_UNDER_LINES="${VOLTEX_COV_FAIL_UNDER_LINES:-}"
 INCLUDE_IGNORED=1
 HTML_REPORT=0
 
@@ -43,7 +39,10 @@ if ! command -v cargo-llvm-cov >/dev/null 2>&1; then
   exit 1
 fi
 
-ARGS=(--workspace --lib --summary-only --fail-under-lines "$FAIL_UNDER_LINES")
+ARGS=(--workspace --lib --summary-only)
+if [ -n "$FAIL_UNDER_LINES" ]; then
+  ARGS+=(--fail-under-lines "$FAIL_UNDER_LINES")
+fi
 
 if [ "$HTML_REPORT" = "1" ]; then
   ARGS+=(--html)

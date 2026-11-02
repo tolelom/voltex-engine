@@ -41,6 +41,10 @@ recent on top. v0.x entries are organised by Cycle (see
   `v1.0-retrospective`, `v1.0-pub-audit`, `dogfood-friction` 1·2를 지웠다. 남은 할 일과 알려진 한계(`NEXT`, `DEFERRED`,
   `AUDIT-BACKLOG`)만 남긴다. 코드 주석·README의 "설계: …" 출처 표기를 지우고, AUDIT-BACKLOG B1의 재검토 조건은 지운 판정
   문서에서 항목 안으로 옮겼다. 지운 파일은 `git log --diff-filter=D -- <경로>`로 커밋을 찾아 `git show <커밋>^:<경로>`로 꺼낸다.
+- **git 훅을 `scripts/hooks/`로 이동**: 저장소 관리 셸 스크립트를 `scripts/` 한 곳에 모았다. 설치는
+  `git config core.hooksPath scripts/hooks` 한 줄이라 `install.sh`·`install.ps1`을 지웠다. 훅과 스크립트 파일이 git에
+  실행 권한 없이(100644) 들어 있어 Linux·macOS에서 clone 직후 훅이 건너뛰어지던 것을 100755로 바로잡았다.
+  `scripts/coverage.sh`는 기본 78% 기준을 없애고 `VOLTEX_COV_FAIL_UNDER_LINES`를 줄 때만 기준을 건다.
 
 - **voltex_capture `scene`**: 인라인 테스트를 `scene/tests.rs`로 옮겼다(`scene.rs` → `scene/mod.rs` 1140줄 +
   `scene/tests.rs` 704줄). 코드는 바꾸지 않았고 형제 모듈 재노출과 `scene::render_*` 경로는 그대로다.
