@@ -2,8 +2,8 @@
 
 Archive snapshot of the early "Survivor" prototype written directly against
 ECS + physics + facade — kept for contrast with
-[`games/voltex_survivor`](../../games/voltex_survivor) (which is the same
-game rewritten 100% in Lua + scenes).
+[`games/voltex_survivor`](../../games/voltex_survivor) (the same game
+rebuilt on `RuntimeApp`, with its rules in Lua).
 
 ## Why kept
 

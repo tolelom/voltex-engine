@@ -62,6 +62,10 @@ recent on top. v0.x entries are organised by Cycle (see
   "PNG 240px 이하"(실제 200~800px)를 고쳤다.
 - **fuzz 산출물 gitignore**: `cargo fuzz`가 만드는 `fuzz/target`·`corpus`·`artifacts`·`coverage`가 무시되지 않던 것을
   `.gitignore`에 넣었다(루트 `/target` 규칙은 `fuzz/target`에 적용되지 않는다).
+- **루트 `assets/` 정리**: 어디서도 읽지 않던 `assets/scripts/spinner.lua`를 지웠다(`voltex new`는 같은 스크립트를
+  직접 만들고, tutorial_minigame은 자기 사본을 쓴다). `assets/cube.obj`는 예제와 voltex_capture·voltex_image 테스트가
+  함께 읽어 루트에 둔다. survivor_game 설명을 `collect_render_items`로 PBR 파이프라인을 직접 돌리는 예제로 고치고,
+  "100% Lua로 다시 썼다"는 문구를 실제 구조(`RuntimeApp` 위에 규칙만 Lua)로 바로잡았다.
 
 ### CI
 

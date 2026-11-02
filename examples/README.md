@@ -27,7 +27,7 @@ cargo run -p <name> --release   # 릴리스 빌드. 렌더링 예제는 이쪽�
 | [game_ready_demo](game_ready_demo) | 런타임 기능 모음: Lua 입력, 내비게이션, 충돌 이벤트, 3D 사운드, 스키닝, 파티클, 디버그 드로잉 |
 | [boids_demo](boids_demo) | 선언형 렌더링으로 만든 군집 시뮬레이션 |
 | [tutorial_minigame](tutorial_minigame) | [튜토리얼](../docs/tutorial.md) 완성본 |
-| [survivor_game](survivor_game) | `games/voltex_survivor`의 초기 Rust 버전. 비교용으로 보관 |
+| [survivor_game](survivor_game) | `collect_render_items`로 직접 PBR 파이프라인을 돌리는 예제. `games/voltex_survivor`의 초기 Rust 버전 |
 
 완성된 게임은 [games/](../games)에 있다.
 
