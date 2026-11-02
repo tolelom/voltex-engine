@@ -48,11 +48,54 @@ bash .githooks/install.sh      # Linux·macOS
 
 ### 에러 처리
 
-crate마다 `<Crate>Error` enum과 `Result<T>` alias를 둔다(thiserror). 예외 crate와 변환 패턴은 [.claude/CLAUDE.md](.claude/CLAUDE.md)의 "공통 패턴 인덱스".
+에러를 돌려주는 엔진 crate는 `src/error.rs`에 `<Crate>Error` enum과 `Result<T>` alias를 둔다(thiserror).
+
+- 공통 variant는 `Generic(String)`과 `#[from] std::io::Error`. `From<String>`, `From<&str>`이 있어 `?`와 `"메시지".into()`로 문자열 에러를 바로 올릴 수 있다.
+- `voltex_editor`의 `EditorError`는 `PartialEq`·`Clone`을 유지하려고 io 에러를 `Io(String)`으로 담는다.
+- 에러 타입이 없는 crate: `voltex_math`, `voltex_platform`, `voltex_physics`.
+- 도구는 예외다. `voltex_cli`는 외부 crate 없이 직접 쓴 `CliError`, `voltex_capture`는 `Result<_, String>`.
 
 ### 컴포넌트
 
-직렬화할 컴포넌트는 `voltex_ecs::Component`를 구현하고 `ComponentRegistry::register::<T>()`로 등록한다. `NAME`을 바꾸면 기존 씬 파일을 읽지 못한다.
+씬 파일에 저장할 컴포넌트는 `voltex_ecs::Component`를 구현하고 `ComponentRegistry`에 등록한다. 등록하지 않은 컴포넌트는 `serialize_scene_json`, `serialize_scene_binary` 결과에 빠진다.
+
+```rust
+use voltex_ecs::{Component, ComponentRegistry, Entity, World};
+
+struct Health(u32);
+
+impl Component for Health {
+    const NAME: &'static str = "health"; // 바꾸면 기존 씬 파일을 못 읽는다
+
+    fn serialize(world: &World, entity: Entity) -> Option<Vec<u8>> {
+        let h = world.get::<Health>(entity)?;
+        Some(h.0.to_le_bytes().to_vec())
+    }
+
+    fn deserialize(world: &mut World, entity: Entity, data: &[u8]) -> voltex_ecs::Result<()> {
+        let bytes: [u8; 4] = data
+            .get(..4)
+            .and_then(|b| b.try_into().ok())
+            .ok_or("health: 4바이트 미만")?;
+        world.add(entity, Health(u32::from_le_bytes(bytes)));
+        Ok(())
+    }
+}
+
+let mut registry = ComponentRegistry::new();
+registry.register_defaults(); // Transform, Tag, MeshHandle, MaterialHandle, Bounds, ScriptComponent
+registry.register::<Health>();
+```
+
+씬 파일은 사용자가 고칠 수 있는 입력이라 `deserialize`는 짧거나 깨진 데이터에도 패닉 없이 에러를 돌려준다. trait를 구현할 수 없는 외부 타입은 `register_raw(name, ser, deser)`로 등록한다.
+
+### 시스템
+
+시스템은 `fn(&mut World)` 함수나 같은 모양의 클로저다. `RuntimeApp`을 쓰는 게임은 `RuntimeConfig::with_system_setup`에서 등록하고, 단독으로 돌릴 때는 `voltex_ecs::Scheduler`의 `add`, `run_all`을 쓴다.
+
+### import
+
+게임과 예제는 facade `voltex`로 가져온다. `use voltex::prelude::*`에 수학, ECS 핵심, 입력, `RuntimeApp` 같은 자주 쓰는 타입이 있고, 렌더러·물리처럼 영역이 정해진 타입은 `voltex::renderer::GpuContext`, `voltex::physics::RigidBody`처럼 모듈 경로로 쓴다.
 
 ### 테스트
 

@@ -33,6 +33,9 @@ recent on top. v0.x entries are organised by Cycle (see
 - **CLAUDE.md를 `.claude/`로 이동**: 루트에서 AI 작업 지침을 뺐다. Claude Code는 `.claude/CLAUDE.md`도 읽는다.
   `docs/architecture.md`와 겹치던 crate 의존 그래프 절은 그 문서를 가리키는 두 줄로 줄였다. README 첫 줄의 외부 의존
   설명("winit, wgpu, bytemuck 셋")을 실제 의존(thiserror·log·pollster 포함)에 맞췄다.
+- **CONTRIBUTING 코드 규칙 보강**: `.claude/CLAUDE.md`에만 있던 에러 처리·컴포넌트 등록·시스템·import 규칙을 코드와 대조해
+  옮겼다. 옛 설명과 달리 `voltex_image`, `voltex_runtime`에도 에러 타입이 있다. 컴포넌트 예제의 `data[..4]`는 짧은
+  데이터에서 패닉 나므로 `get(..4)`로 바꾸고, 예제가 컴파일·동작하는 것을 임시 테스트로 확인했다.
 
 - **voltex_capture `scene`**: 인라인 테스트를 `scene/tests.rs`로 옮겼다(`scene.rs` → `scene/mod.rs` 1140줄 +
   `scene/tests.rs` 704줄). 코드는 바꾸지 않았고 형제 모듈 재노출과 `scene::render_*` 경로는 그대로다.
