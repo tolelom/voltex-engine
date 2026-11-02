@@ -40,6 +40,8 @@ recent on top. v0.x entries are organised by Cycle (see
 - **README 재작성**: 실행 명령을 `cargo run -p <name>`으로 바로잡고(example은 독립 패키지라 `--example`로는
   실행되지 않는다, tutorial의 두 곳도 함께), 버전·커버리지·개수처럼 시점이 지나면 틀리는 배지와 수치를 뺐다.
   `games/`의 게임 세 편과 crate 17개 전체를 적고, 기여 안내는 CONTRIBUTING.md로 넘겼다.
+- **CONTRIBUTING 재작성**: 커밋 메시지 형식을 실제 이력(`<type>(<범위>)`)에 맞추고, pre-push 훅(CHANGELOG 검사,
+  Linux clippy)과 GPU 테스트 실행법을 넣었다. 자동 루프 정책, 소요 시간, 버전별 경위, 끊긴 README 참조를 뺐다.
 
 ### Build
 
