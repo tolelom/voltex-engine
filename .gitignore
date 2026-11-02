@@ -4,7 +4,7 @@
 *.pdb
 /scenes
 /.superpowers
-/.claude/settings.local.json
+/.claude/
 /fuzz/target
 /fuzz/corpus
 /fuzz/artifacts
