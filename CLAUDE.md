@@ -21,7 +21,6 @@ cargo test --workspace
 ```
 
 ## 규칙
-- Cargo path: `export PATH="$HOME/.cargo/bin:$PATH"` (Windows bash)
 - wgpu 28.0 API: `immediate_size`, `multiview_mask`, `TexelCopyTextureInfo` 등 28.0 전용 필드 사용
 - WGSL vec3 alignment: Rust struct에서 vec3 뒤에 padding 필요 (16바이트 정렬)
 - max_bind_groups=4 (group 0~3). 리소스를 합쳐서 4개 이내로 유지
