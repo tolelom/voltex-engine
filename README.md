@@ -2,8 +2,6 @@
 
 > Rust로 만든 3D 게임 엔진. 외부 런타임 의존은 winit, wgpu, bytemuck 셋이고, 수학, 이미지·메시 파서, 물리, 오디오, 에디터 UI, Lua 바인딩, 빌드 도구까지 직접 구현했다.
 
-![license: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-green)
-
 ## 스크린샷
 
 헤드리스 오프스크린 캡처(`voltex_capture`)로 얻은 실제 렌더 결과다. 재현 방법은 [docs/visual](docs/visual/README.md).
@@ -141,4 +139,6 @@ cargo test --workspace --lib
 
 ## 라이선스
 
-MIT 또는 Apache-2.0 중 선택([LICENSE-MIT](LICENSE-MIT), [LICENSE-APACHE](LICENSE-APACHE)). 의존 crate의 라이선스 고지는 [THIRD-PARTY-LICENSES.md](THIRD-PARTY-LICENSES.md)에 있고, `cargo about generate about.hbs -o THIRD-PARTY-LICENSES.md`로 다시 만든다.
+[MIT](LICENSE-MIT) 또는 [Apache-2.0](LICENSE-APACHE) 중 하나를 골라 따른다. 기여한 코드도 같은 조건으로 배포된다.
+
+의존 crate의 라이선스 고지는 [THIRD-PARTY-LICENSES.md](THIRD-PARTY-LICENSES.md).
