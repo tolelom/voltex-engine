@@ -102,13 +102,15 @@ mod tests {
     #[test]
     fn test_should_fixed_update_accumulates() {
         let mut timer = GameTimer::new(60);
-        thread::sleep(Duration::from_millis(100));
+        // Backdate instead of sleeping: CI runners oversleep, which made
+        // the count drift past the expected range.
+        timer.last_frame = Instant::now() - Duration::from_millis(100);
         timer.tick();
         let mut count = 0;
         while timer.should_fixed_update() {
             count += 1;
         }
-        assert!((5..=7).contains(&count), "Expected ~6 fixed updates, got {count}");
+        assert_eq!(count, 6, "100 ms at 60 Hz should drain 6 fixed updates");
     }
 
     #[test]
