@@ -310,7 +310,7 @@ impl AudioBackend for CoreAudioBackend {
         // SAFETY: `buffer` came from AudioQueueAllocateBuffer in new() and
         // is owned by us until we re-enqueue it just below.
         let cap_bytes = unsafe { (*buffer).audio_data_bytes_capacity } as usize;
-        let bytes_in = samples.len() * std::mem::size_of::<f32>();
+        let bytes_in = std::mem::size_of_val(samples);
         let copy_bytes = bytes_in.min(cap_bytes);
         let frames = copy_bytes / (self.channels as usize * std::mem::size_of::<f32>());
         unsafe {
