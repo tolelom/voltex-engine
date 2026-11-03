@@ -2,9 +2,9 @@
 #
 # Why: complements `scripts/licenses/about.toml` (cargo-about handles license listing only) with
 # a single tool that also catches RUSTSEC advisories, duplicate crate versions,
-# yanked crates, and disallowed sources. Wired into CI as an advisory gate so
-# new transitive vulnerabilities surface immediately without blocking merges
-# while we triage them.
+# yanked crates, and disallowed sources. In CI, bans/licenses/sources block
+# merges; advisories run as a separate advisory job so a new transitive
+# RUSTSEC entry surfaces without blocking unrelated PRs while we triage it.
 #
 # Run locally:
 #   cargo install cargo-deny

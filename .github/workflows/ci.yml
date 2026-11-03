@@ -1,8 +1,10 @@
 name: ci
 
-# Blocking: build + clippy (-D warnings) + tests on Linux and Windows.
-# Advisory: macOS, coverage (measured, no threshold), cargo-deny.
-# Manual: e2e `voltex new` + `voltex build` smoke test.
+# Blocking: build + clippy (-D warnings) + tests on Linux, Windows and macOS;
+#           cargo-deny bans, licenses and sources.
+# Advisory: cargo-deny advisories (a new RUSTSEC entry should not block
+#           unrelated PRs).
+# Manual:   coverage, e2e `voltex new` + `voltex build` smoke test.
 #
 # Linux needs libasound2-dev for voltex_audio's ALSA backend.
 
@@ -12,6 +14,10 @@ on:
   pull_request:
     branches: [master]
   workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   CARGO_TERM_COLOR: always
@@ -24,23 +30,15 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        os: [ubuntu-latest, windows-latest, macos-latest]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy
-      - uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-
+      - uses: Swatinem/rust-cache@v2
       - name: Install ALSA headers
-        if: matrix.os == 'ubuntu-latest'
+        if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y libasound2-dev
       - name: cargo build --workspace
         run: cargo build --workspace
@@ -51,30 +49,28 @@ jobs:
       - name: cargo test -p voltex_cli
         run: cargo test -p voltex_cli
 
-  macos:
-    name: build + test (macos-latest, advisory)
-    runs-on: macos-latest
-    continue-on-error: true
+  deny:
+    name: cargo-deny (${{ matrix.checks }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        checks: [bans licenses sources, advisories]
+    continue-on-error: ${{ matrix.checks == 'advisories' }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/checkout@v7
+      - uses: EmbarkStudios/cargo-deny-action@v2
         with:
-          components: clippy
-      - name: cargo build --workspace
-        run: cargo build --workspace
-      - name: cargo clippy --workspace --all-targets
-        run: cargo clippy --workspace --all-targets -- -D warnings
-      - name: cargo test --workspace --lib
-        run: cargo test --workspace --lib
+          command: check ${{ matrix.checks }}
 
   # GPU tests run on lavapipe (software Vulkan); they skip when no adapter
-  # is found, so the number depends on the runner. Reported, not gated.
+  # is found, so the number depends on the runner.
   coverage:
-    name: coverage (ubuntu-latest, advisory)
+    name: coverage (manual)
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
-    continue-on-error: true
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: llvm-tools-preview
@@ -89,21 +85,14 @@ jobs:
           WGPU_ADAPTER_NAME: llvmpipe
         run: cargo llvm-cov --workspace --lib --summary-only -- --include-ignored
 
-  deny:
-    name: cargo-deny (ubuntu-latest, advisory)
-    runs-on: ubuntu-latest
-    continue-on-error: true
-    steps:
-      - uses: actions/checkout@v4
-      - uses: EmbarkStudios/cargo-deny-action@v2
-
   e2e-quickstart:
     name: e2e new + build (manual)
     if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
       - name: Install ALSA headers
         run: sudo apt-get update && sudo apt-get install -y libasound2-dev
       - name: cargo test -p voltex_cli --test e2e_new_build
