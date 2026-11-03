@@ -28,8 +28,8 @@
 ## 실행해 보기
 
 ```bash
-git clone https://git.tolelom.xyz/tolelom/game_engine
-cd game_engine
+git clone https://github.com/tolelom/voltex-engine.git
+cd voltex-engine
 cargo run -p triangle
 ```
 

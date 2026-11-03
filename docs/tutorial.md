@@ -15,7 +15,7 @@
 ### 1.2 voltex CLI 설치
 
 ```bash
-git clone https://git.tolelom.xyz/tolelom/game_engine voltex
+git clone https://github.com/tolelom/voltex-engine.git voltex
 cd voltex
 cargo install --path tools/voltex_cli
 ```
