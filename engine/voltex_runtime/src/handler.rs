@@ -197,7 +197,7 @@ impl ApplicationHandler for RuntimeHandler {
                 app.input.process_scroll(y);
             }
             WindowEvent::RedrawRequested => {
-                redraw(app, event_loop);
+                redraw(app);
             }
             _ => {}
         }
@@ -212,7 +212,7 @@ impl ApplicationHandler for RuntimeHandler {
     }
 }
 
-fn redraw(app: &mut RuntimeApp, event_loop: &ActiveEventLoop) {
+fn redraw(app: &mut RuntimeApp) {
     app.timer.tick();
     let dt = app
         .config
@@ -327,17 +327,13 @@ fn redraw(app: &mut RuntimeApp, event_loop: &ActiveEventLoop) {
     // Acquire swapchain texture (graceful resize/recover).
     let state = app.runtime_state.as_mut().unwrap();
     let output = match state.gpu.surface.get_current_texture() {
-        Ok(t) => t,
-        Err(wgpu::SurfaceError::Lost) => {
+        wgpu::CurrentSurfaceTexture::Success(t) | wgpu::CurrentSurfaceTexture::Suboptimal(t) => t,
+        wgpu::CurrentSurfaceTexture::Lost => {
             let (w, h) = state.window.inner_size();
             state.gpu.resize(w, h);
             return;
         }
-        Err(wgpu::SurfaceError::OutOfMemory) => {
-            event_loop.exit();
-            return;
-        }
-        Err(_) => return,
+        _ => return,
     };
     let view = output.texture.create_view(&wgpu::TextureViewDescriptor::default());
     let mut encoder = state.gpu.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
@@ -392,7 +388,7 @@ fn redraw(app: &mut RuntimeApp, event_loop: &ActiveEventLoop) {
     }
 
     state.gpu.queue.submit(std::iter::once(encoder.finish()));
-    output.present();
+    state.gpu.queue.present(output);
 }
 
 

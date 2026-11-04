@@ -109,7 +109,7 @@ impl UiRenderer {
         // --- Pipeline layout ---
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("UI Pipeline Layout"),
-            bind_group_layouts: &[&bind_group_layout],
+            bind_group_layouts: &[Some(&bind_group_layout)],
             immediate_size: 0,
         });
 
@@ -415,7 +415,7 @@ fn build_ui_pipeline(
         vertex: wgpu::VertexState {
             module: shader,
             entry_point: Some("vs_main"),
-            buffers: &[VERTEX_LAYOUT],
+            buffers: &[Some(VERTEX_LAYOUT)],
             compilation_options: Default::default(),
         },
         fragment: Some(wgpu::FragmentState {

@@ -75,7 +75,7 @@ voltex_editor = { path = "engine/voltex_editor" }
 voltex_runtime = { path = "engine/voltex_runtime" }
 voltex_cli = { path = "tools/voltex_cli" }
 voltex_capture = { path = "tools/voltex_capture" }
-wgpu = "28.0"
+wgpu = "30.0"
 winit = "0.30"
 bytemuck = { version = "1", features = ["derive"] }
 pollster = "1.0"

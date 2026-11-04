@@ -5,8 +5,8 @@
 pub fn light_volume_stencil_mark() -> wgpu::DepthStencilState {
     wgpu::DepthStencilState {
         format: wgpu::TextureFormat::Depth24PlusStencil8,
-        depth_write_enabled: false,
-        depth_compare: wgpu::CompareFunction::Always,
+        depth_write_enabled: Some(false),
+        depth_compare: Some(wgpu::CompareFunction::Always),
         stencil: wgpu::StencilState {
             front: wgpu::StencilFaceState {
                 compare: wgpu::CompareFunction::Always,
@@ -31,8 +31,8 @@ pub fn light_volume_stencil_mark() -> wgpu::DepthStencilState {
 pub fn light_volume_stencil_test() -> wgpu::DepthStencilState {
     wgpu::DepthStencilState {
         format: wgpu::TextureFormat::Depth24PlusStencil8,
-        depth_write_enabled: false,
-        depth_compare: wgpu::CompareFunction::Always,
+        depth_write_enabled: Some(false),
+        depth_compare: Some(wgpu::CompareFunction::Always),
         stencil: wgpu::StencilState {
             front: wgpu::StencilFaceState {
                 compare: wgpu::CompareFunction::NotEqual,
@@ -61,7 +61,7 @@ mod tests {
     fn test_mark_stencil_format() {
         let state = light_volume_stencil_mark();
         assert_eq!(state.format, wgpu::TextureFormat::Depth24PlusStencil8);
-        assert!(!state.depth_write_enabled);
+        assert_eq!(state.depth_write_enabled, Some(false));
     }
 
     #[test]

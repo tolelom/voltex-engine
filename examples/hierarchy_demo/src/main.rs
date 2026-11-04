@@ -393,17 +393,13 @@ impl ApplicationHandler for HierarchyDemoApp {
 
                 // ---- Render ----
                 let output = match state.gpu.surface.get_current_texture() {
-                    Ok(t) => t,
-                    Err(wgpu::SurfaceError::Lost) => {
+                    wgpu::CurrentSurfaceTexture::Success(t) | wgpu::CurrentSurfaceTexture::Suboptimal(t) => t,
+                    wgpu::CurrentSurfaceTexture::Lost => {
                         let (w, h) = state.window.inner_size();
                         state.gpu.resize(w, h);
                         return;
                     }
-                    Err(wgpu::SurfaceError::OutOfMemory) => {
-                        event_loop.exit();
-                        return;
-                    }
-                    Err(_) => return,
+                    _ => return,
                 };
 
                 let view = output
@@ -469,7 +465,7 @@ impl ApplicationHandler for HierarchyDemoApp {
                 }
 
                 state.gpu.queue.submit(std::iter::once(encoder.finish()));
-                output.present();
+                state.gpu.queue.present(output);
             }
 
             _ => {}

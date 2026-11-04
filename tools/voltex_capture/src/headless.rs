@@ -23,9 +23,9 @@ impl HeadlessGpu {
     }
 
     async fn new_async() -> Result<Self, String> {
-        let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor {
+        let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
             backends: wgpu::Backends::PRIMARY,
-            ..Default::default()
+            ..wgpu::InstanceDescriptor::new_without_display_handle()
         });
 
         let adapter = instance
@@ -33,6 +33,7 @@ impl HeadlessGpu {
                 power_preference: wgpu::PowerPreference::HighPerformance,
                 compatible_surface: None,
                 force_fallback_adapter: false,
+                apply_limit_buckets: false,
             })
             .await
             .map_err(|e| format!("no GPU adapter available (headless): {e}"))?;

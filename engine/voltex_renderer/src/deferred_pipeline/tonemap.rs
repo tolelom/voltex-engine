@@ -72,7 +72,7 @@ pub fn create_tonemap_pipeline(
 
     let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
         label: Some("Tonemap Pipeline Layout"),
-        bind_group_layouts: &[layout],
+        bind_group_layouts: &[Some(layout)],
         immediate_size: 0,
     });
 
@@ -82,7 +82,7 @@ pub fn create_tonemap_pipeline(
         vertex: wgpu::VertexState {
             module: &shader,
             entry_point: Some("vs_main"),
-            buffers: &[FullscreenVertex::LAYOUT],
+            buffers: &[Some(FullscreenVertex::LAYOUT)],
             compilation_options: wgpu::PipelineCompilationOptions::default(),
         },
         fragment: Some(wgpu::FragmentState {

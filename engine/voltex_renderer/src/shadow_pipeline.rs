@@ -32,7 +32,7 @@ pub fn create_shadow_pipeline(
 
     let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
         label: Some("Shadow Pipeline Layout"),
-        bind_group_layouts: &[shadow_pass_layout],
+        bind_group_layouts: &[Some(shadow_pass_layout)],
         immediate_size: 0,
     });
 
@@ -42,7 +42,7 @@ pub fn create_shadow_pipeline(
         vertex: wgpu::VertexState {
             module: &shader,
             entry_point: Some("vs_main"),
-            buffers: &[MESH_VERTEX_LAYOUT],
+            buffers: &[Some(MESH_VERTEX_LAYOUT)],
             compilation_options: wgpu::PipelineCompilationOptions::default(),
         },
         fragment: None,
@@ -57,8 +57,8 @@ pub fn create_shadow_pipeline(
         },
         depth_stencil: Some(wgpu::DepthStencilState {
             format: SHADOW_FORMAT,
-            depth_write_enabled: true,
-            depth_compare: wgpu::CompareFunction::Less,
+            depth_write_enabled: Some(true),
+            depth_compare: Some(wgpu::CompareFunction::Less),
             stencil: wgpu::StencilState::default(),
             bias: wgpu::DepthBiasState {
                 constant: 2,

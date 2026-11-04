@@ -199,7 +199,7 @@ pub fn create_lighting_pipeline(
 
     let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
         label: Some("Deferred Lighting Pipeline Layout"),
-        bind_group_layouts: &[gbuffer_layout, lights_layout, shadow_layout],
+        bind_group_layouts: &[Some(gbuffer_layout), Some(lights_layout), Some(shadow_layout)],
         immediate_size: 0,
     });
 
@@ -209,7 +209,7 @@ pub fn create_lighting_pipeline(
         vertex: wgpu::VertexState {
             module: &shader,
             entry_point: Some("vs_main"),
-            buffers: &[FullscreenVertex::LAYOUT],
+            buffers: &[Some(FullscreenVertex::LAYOUT)],
             compilation_options: wgpu::PipelineCompilationOptions::default(),
         },
         fragment: Some(wgpu::FragmentState {

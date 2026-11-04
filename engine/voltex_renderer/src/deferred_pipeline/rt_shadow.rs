@@ -90,7 +90,7 @@ pub fn create_rt_shadow_pipeline(
 
     let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
         label: Some("RT Shadow Pipeline Layout"),
-        bind_group_layouts: &[gbuffer_layout, data_layout],
+        bind_group_layouts: &[Some(gbuffer_layout), Some(data_layout)],
         immediate_size: 0,
     });
 
