@@ -67,9 +67,9 @@ impl GpuContext {
     async fn new_async(window: Arc<Window>, extra_features: wgpu::Features) -> Result<Self> {
         let size = window.inner_size();
 
-        let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor {
+        let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
             backends: wgpu::Backends::PRIMARY,
-            ..Default::default()
+            ..wgpu::InstanceDescriptor::new_without_display_handle()
         });
 
         let surface = instance
@@ -81,6 +81,7 @@ impl GpuContext {
                 power_preference: wgpu::PowerPreference::HighPerformance,
                 compatible_surface: Some(&surface),
                 force_fallback_adapter: false,
+                apply_limit_buckets: false,
             })
             .await
             .map_err(|e| RendererError::GpuInit(format!("no suitable GPU adapter found: {e}")))?;
@@ -123,6 +124,8 @@ impl GpuContext {
         let config = wgpu::SurfaceConfiguration {
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
             format: surface_format,
+            // Auto는 wgpu 29 이전의 동작(sRGB, fp16이면 선형 확장 sRGB)을 그대로 따른다.
+            color_space: wgpu::SurfaceColorSpace::Auto,
             width: size.width.max(1),
             height: size.height.max(1),
             present_mode: surface_caps.present_modes[0],

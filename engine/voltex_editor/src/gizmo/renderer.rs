@@ -79,7 +79,7 @@ impl GizmoRenderer {
 
         let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("Gizmo PL"),
-            bind_group_layouts: &[&bind_layout],
+            bind_group_layouts: &[Some(&bind_layout)],
             immediate_size: 0,
         });
 
@@ -112,7 +112,7 @@ impl GizmoRenderer {
             vertex: wgpu::VertexState {
                 module: &shader,
                 entry_point: Some("vs_main"),
-                buffers: &[LineVertex::LAYOUT],
+                buffers: &[Some(LineVertex::LAYOUT)],
                 compilation_options: wgpu::PipelineCompilationOptions::default(),
             },
             fragment: Some(wgpu::FragmentState {
@@ -136,8 +136,8 @@ impl GizmoRenderer {
             },
             depth_stencil: Some(wgpu::DepthStencilState {
                 format: depth_format,
-                depth_write_enabled: false,
-                depth_compare: wgpu::CompareFunction::Always,
+                depth_write_enabled: Some(false),
+                depth_compare: Some(wgpu::CompareFunction::Always),
                 stencil: wgpu::StencilState::default(),
                 bias: wgpu::DepthBiasState::default(),
             }),

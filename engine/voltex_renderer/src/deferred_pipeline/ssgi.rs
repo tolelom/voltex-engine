@@ -122,7 +122,7 @@ pub fn create_ssgi_pipeline(
 
     let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
         label: Some("SSGI Pipeline Layout"),
-        bind_group_layouts: &[gbuffer_layout, data_layout],
+        bind_group_layouts: &[Some(gbuffer_layout), Some(data_layout)],
         immediate_size: 0,
     });
 
@@ -132,7 +132,7 @@ pub fn create_ssgi_pipeline(
         vertex: wgpu::VertexState {
             module: &shader,
             entry_point: Some("vs_main"),
-            buffers: &[FullscreenVertex::LAYOUT],
+            buffers: &[Some(FullscreenVertex::LAYOUT)],
             compilation_options: wgpu::PipelineCompilationOptions::default(),
         },
         fragment: Some(wgpu::FragmentState {

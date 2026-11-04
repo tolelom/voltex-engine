@@ -118,7 +118,7 @@ impl OffscreenTarget {
             .poll(wgpu::PollType::wait_indefinitely())
             .expect("device poll");
 
-        let mapped = slice.get_mapped_range();
+        let mapped = slice.get_mapped_range().expect("map readback buffer");
         let mut out = Vec::with_capacity((unpadded_bytes_per_row * self.height) as usize);
         for row in 0..self.height {
             let start = (row * padded_bytes_per_row) as usize;

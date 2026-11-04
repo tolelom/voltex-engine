@@ -80,7 +80,7 @@ pub fn create_line_pipeline(
 
     let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
         label: Some("Debug Line Pipeline Layout"),
-        bind_group_layouts: &[camera_layout],
+        bind_group_layouts: &[Some(camera_layout)],
         immediate_size: 0,
     });
 
@@ -90,7 +90,7 @@ pub fn create_line_pipeline(
         vertex: wgpu::VertexState {
             module: &shader,
             entry_point: Some("vs_main"),
-            buffers: &[LINE_VERTEX_LAYOUT],
+            buffers: &[Some(LINE_VERTEX_LAYOUT)],
             compilation_options: wgpu::PipelineCompilationOptions::default(),
         },
         fragment: Some(wgpu::FragmentState {
@@ -114,8 +114,8 @@ pub fn create_line_pipeline(
         },
         depth_stencil: Some(wgpu::DepthStencilState {
             format: DEPTH_FORMAT,
-            depth_write_enabled: false,
-            depth_compare: wgpu::CompareFunction::LessEqual,
+            depth_write_enabled: Some(false),
+            depth_compare: Some(wgpu::CompareFunction::LessEqual),
             stencil: wgpu::StencilState::default(),
             bias: wgpu::DepthBiasState::default(),
         }),
