@@ -44,8 +44,8 @@ jobs:
         run: cargo build --workspace
       - name: cargo clippy --workspace --all-targets
         run: cargo clippy --workspace --all-targets -- -D warnings
-      - name: cargo test --workspace --lib
-        run: cargo test --workspace --lib
+      - name: cargo test --workspace --lib --tests
+        run: cargo test --workspace --lib --tests
       - name: cargo test -p voltex_cli
         run: cargo test -p voltex_cli
 
