@@ -1,9 +1,9 @@
 //! BasicRenderer — mesh_colored.wgsl(Blinn-Phong) 기반 ECS-driven 렌더러.
 //!
 //! pipeline + per-entity dynamic UBO + light buffer + 1×1 default texture
-//! 를 모두 owning. `render(...)` 한 메서드로 World 를 그린다.
+//! 를 모두 owning. `render_frame(...)` 한 메서드로 World 를 그린다.
 //!
-//! 한 프레임의 패스 순서 (`render`):
+//! 한 프레임의 패스 순서 (`render_frame`):
 //! 1. 그림자 깊이 전처리 (`shadow.rs`, 켜졌을 때만)
 //! 2. 메시 패스 — Blinn-Phong (`blinn_phong.rs`) 또는 PBR (`pbr.rs`). 타깃을 지운다.
 //! 3. 스킨드 메시 (`skinned.rs`)
@@ -26,6 +26,7 @@ use shadow::ShadowResources;
 use skinned::SkinnedResources;
 
 use crate::assets::RenderAssets;
+use crate::frame::{FrameTarget, FrameView};
 use crate::items::collect_render_items;
 
 /// Max skinned entities drawn per frame. Each needs an 8 KB bone-palette slot,
@@ -111,13 +112,19 @@ impl BasicRenderer {
         let pbr_skinned =
             PbrSkinnedResources::new(device, target_format, alignment, &pbr, &skinned.palettes);
 
-        let tilemap_pass =
-            crate::tilemap_pass::TilemapPass::new(device, queue, target_format, &texture_layout);
+        let tilemap_pass = crate::tilemap_pass::TilemapPass::new(
+            device,
+            queue,
+            target_format,
+            &texture_layout,
+            &default_texture,
+        );
         let sprite_pass = crate::sprite_pass::SpritePass::new(
             device,
             queue,
             target_format,
             &texture_layout,
+            &default_texture,
             alignment,
         );
         let debug_line_pass = crate::debug_line_pass::DebugLinePass::new(device, target_format);
@@ -176,14 +183,61 @@ impl BasicRenderer {
     /// Set the immediate-mode debug line segments for the next frame. `verts`
     /// is a flat list of endpoints (2 per segment); excess beyond
     /// `MAX_DEBUG_LINE_VERTICES` is dropped. Pass an empty slice to clear.
-    /// Call once per frame before [`render`](Self::render) (cheap uniform/vertex
+    /// Call once per frame before [`render_frame`](Self::render_frame) (cheap uniform/vertex
     /// write).
     pub fn set_debug_lines(&self, queue: &wgpu::Queue, verts: &[LineVertex]) {
         self.debug_line_pass.set_lines(queue, verts);
     }
 
-    /// World 의 모든 MeshHandle 엔티티를 dynamic-offset draw 로 렌더링한다.
-    /// 호출자는 encoder + target_view + depth_view 만 넘긴다 (내부에서 begin_render_pass).
+    /// World 의 모든 MeshHandle 엔티티(+ 스킨드·타일맵·스프라이트·디버그 라인)를
+    /// `target` 에 그린다. 렌더 패스는 내부에서 연다 — 호출자는 encoder 만 넘긴다.
+    pub fn render_frame(
+        &self,
+        queue: &wgpu::Queue,
+        encoder: &mut wgpu::CommandEncoder,
+        target: FrameTarget<'_>,
+        world: &mut World,
+        assets: &RenderAssets,
+        view: &FrameView,
+    ) {
+        let mut items = collect_render_items(world, assets);
+        // Frustum culling: drop entities whose world bounding sphere is fully
+        // outside the camera frustum. Entities without `Bounds` are always
+        // kept (can't cull conservatively).
+        let frustum = voltex_renderer::extract_frustum(&view.view_proj);
+        items.retain(|it| match world.get::<voltex_ecs::Bounds>(it.entity) {
+            Some(b) => {
+                let (center, radius) = world_bounding_sphere(it.model, b.0);
+                voltex_renderer::sphere_vs_frustum(center, radius, &frustum)
+            }
+            None => true,
+        });
+        warn_overflow_once(&self.mesh_overflow_warned, "mesh entities", items.len(), self.max_entities);
+        items.truncate(self.max_entities);
+
+        self.shadow_prepass(queue, encoder, world, assets, &items, view.light);
+
+        if self.pbr_enabled {
+            self.pbr_mesh_pass(queue, encoder, &target, view, &items, assets);
+        } else {
+            self.blinn_phong_mesh_pass(queue, encoder, &target, view, &items, assets);
+        }
+
+        self.render_skinned(queue, encoder, &target, view, world, assets);
+        self.tilemap_pass.render(queue, encoder, &target, view, world, assets);
+        self.sprite_pass.render(queue, encoder, &target, view, world, assets);
+        self.debug_line_pass.render(
+            queue,
+            encoder,
+            target.color_view,
+            target.depth_view,
+            view.view_proj,
+        );
+    }
+
+    /// 옛 인자 나열형. [`Self::render_frame`] 을 쓴다.
+    #[deprecated(note = "use `render_frame` with `FrameTarget` + `FrameView`")]
+    // reason: 역호환용 옛 시그니처를 그대로 둔다.
     #[allow(clippy::too_many_arguments)]
     pub fn render(
         &self,
@@ -198,44 +252,22 @@ impl BasicRenderer {
         cam_pos: Vec3,
         light: LightUniform,
     ) {
-        let mut items = collect_render_items(world, assets);
-        // Frustum culling: drop entities whose world bounding sphere is fully
-        // outside the camera frustum. Entities without `Bounds` are always
-        // kept (can't cull conservatively).
-        let frustum = voltex_renderer::extract_frustum(&view_proj);
-        items.retain(|it| match world.get::<voltex_ecs::Bounds>(it.entity) {
-            Some(b) => {
-                let (center, radius) = world_bounding_sphere(it.model, b.0);
-                voltex_renderer::sphere_vs_frustum(center, radius, &frustum)
-            }
-            None => true,
-        });
-        warn_overflow_once(&self.mesh_overflow_warned, "mesh entities", items.len(), self.max_entities);
-        items.truncate(self.max_entities);
-
-        self.shadow_prepass(queue, encoder, world, assets, &items, light);
-
-        if self.pbr_enabled {
-            self.pbr_mesh_pass(
-                queue, encoder, target_view, depth_view, clear_color, &items, view_proj,
-                cam_pos, light, assets,
-            );
-        } else {
-            self.blinn_phong_mesh_pass(
-                queue, encoder, target_view, depth_view, clear_color, &items, view_proj,
-                cam_pos, light, assets,
-            );
-        }
-
-        self.render_skinned(queue, encoder, target_view, depth_view, world, assets, view_proj, cam_pos);
-        self.tilemap_pass.render(
-            queue, encoder, target_view, depth_view, world, assets, &self.default_texture, view_proj,
+        self.render_frame(
+            queue,
+            encoder,
+            FrameTarget {
+                color_view: target_view,
+                depth_view,
+                clear_color,
+            },
+            world,
+            assets,
+            &FrameView {
+                view_proj,
+                camera_pos: cam_pos,
+                light,
+            },
         );
-        self.sprite_pass.render(
-            queue, encoder, target_view, depth_view, world, assets, &self.default_texture,
-            view_proj, cam_pos,
-        );
-        self.debug_line_pass.render(queue, encoder, target_view, depth_view, view_proj);
     }
 }
 

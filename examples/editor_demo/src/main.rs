@@ -7,7 +7,9 @@ use winit::{
 };
 use voltex_platform::{VoltexWindow, WindowConfig, InputState, GameTimer};
 use voltex_renderer::{GpuContext, LightUniform, MaterialUniform, Mesh, MeshVertex};
-use voltex_renderer_ecs::{BasicRenderer, MeshPath, RenderAssets, TextureHandle, TexturePath};
+use voltex_renderer_ecs::{
+    BasicRenderer, FrameTarget, FrameView, MeshPath, RenderAssets, TextureHandle, TexturePath,
+};
 use voltex_asset::FileWatcher;
 use voltex_audio::{AudioClip, AudioSource, AudioSystem};
 use std::collections::HashMap;
@@ -1177,17 +1179,21 @@ impl ApplicationHandler for EditorDemoApp {
                         ambient_strength: 0.15,
                     };
 
-                    state.basic_renderer.render(
+                    state.basic_renderer.render_frame(
                         &state.gpu.queue,
                         &mut encoder,
-                        &state.viewport_tex.color_view,
-                        &state.viewport_tex.depth_view,
-                        wgpu::Color { r: 0.15, g: 0.15, b: 0.2, a: 1.0 },
+                        FrameTarget {
+                            color_view: &state.viewport_tex.color_view,
+                            depth_view: &state.viewport_tex.depth_view,
+                            clear_color: wgpu::Color { r: 0.15, g: 0.15, b: 0.2, a: 1.0 },
+                        },
                         &mut state.session.world,
                         &state.render_assets,
-                        vp,
-                        cam_pos,
-                        light,
+                        &FrameView {
+                            view_proj: vp,
+                            camera_pos: cam_pos,
+                            light,
+                        },
                     );
 
                     // Gizmo overlay (depth-off, always on top of the scene).

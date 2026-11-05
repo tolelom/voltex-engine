@@ -90,7 +90,7 @@ pub(crate) struct FrameSpec<'a> {
     pub light: LightUniform,
 }
 
-/// Record one `BasicRenderer::render` into a fresh encoder, submit it and read
+/// Record one `BasicRenderer::render_frame` into a fresh encoder, submit it and read
 /// the target back as RGBA8 (the shared tail of the scene functions below).
 pub(crate) fn draw_and_read(
     gpu: &HeadlessGpu,
@@ -111,17 +111,21 @@ pub(crate) fn draw_and_read(
     let mut encoder = gpu
         .device
         .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some(label) });
-    renderer.render(
+    renderer.render_frame(
         &gpu.queue,
         &mut encoder,
-        &target.color_view,
-        &target.depth_view,
-        clear_color,
+        voltex_renderer_ecs::FrameTarget {
+            color_view: &target.color_view,
+            depth_view: &target.depth_view,
+            clear_color,
+        },
         world,
         assets,
-        view_proj,
-        cam_pos,
-        light,
+        &voltex_renderer_ecs::FrameView {
+            view_proj,
+            camera_pos: cam_pos,
+            light,
+        },
     );
     gpu.queue.submit(Some(encoder.finish()));
     target.read_rgba8(&gpu.device, &gpu.queue)

@@ -5,7 +5,6 @@
 //! Bind groups: 0 = camera (dynamic) + light, 1 = albedo texture,
 //! 2 = point lights, 3 = shadow map (`ShadowResources`).
 
-use voltex_math::{Mat4, Vec3};
 use voltex_renderer::{
     pipeline::create_colored_mesh_pipeline, ColoredCameraUniform, LightUniform,
     PointLightsUniform,
@@ -14,6 +13,7 @@ use voltex_renderer::{
 use super::{single_buffer_bind_group, BasicRenderer};
 use crate::assets::RenderAssets;
 use crate::dynamic_uniform::DynamicUniformBuffer;
+use crate::frame::{FrameTarget, FrameView};
 use crate::items::RenderItem;
 use crate::scene_pass::begin_clearing_pass;
 
@@ -27,7 +27,6 @@ pub(super) struct BlinnPhongResources {
 }
 
 impl BlinnPhongResources {
-    #[allow(clippy::too_many_arguments)]
     pub(super) fn new(
         device: &wgpu::Device,
         queue: &wgpu::Queue,
@@ -105,29 +104,25 @@ impl BlinnPhongResources {
 }
 
 impl BasicRenderer {
-    /// The default Blinn-Phong mesh pass (clears the frame). `render` picks it
+    /// The default Blinn-Phong mesh pass (clears the frame). `render_frame` picks it
     /// or [`Self::pbr_mesh_pass`].
-    #[allow(clippy::too_many_arguments)]
     pub(super) fn blinn_phong_mesh_pass(
         &self,
         queue: &wgpu::Queue,
         encoder: &mut wgpu::CommandEncoder,
-        target_view: &wgpu::TextureView,
-        depth_view: &wgpu::TextureView,
-        clear_color: wgpu::Color,
+        target: &FrameTarget<'_>,
+        view: &FrameView,
         items: &[RenderItem],
-        view_proj: Mat4,
-        cam_pos: Vec3,
-        light: LightUniform,
         assets: &RenderAssets,
     ) {
+        let FrameView { view_proj, camera_pos, light } = *view;
         let res = &self.blinn_phong;
         let cameras: Vec<ColoredCameraUniform> = items
             .iter()
             .map(|item| ColoredCameraUniform {
                 view_proj: view_proj.cols,
                 model: item.model.cols,
-                camera_pos: [cam_pos.x, cam_pos.y, cam_pos.z],
+                camera_pos: [camera_pos.x, camera_pos.y, camera_pos.z],
                 _padding: 0.0,
                 base_color: item.material.base_color,
             })
@@ -138,9 +133,9 @@ impl BasicRenderer {
         let mut pass = begin_clearing_pass(
             encoder,
             "BasicRenderer Pass",
-            target_view,
-            depth_view,
-            clear_color,
+            target.color_view,
+            target.depth_view,
+            target.clear_color,
         );
         pass.set_pipeline(&res.pipeline);
         pass.set_bind_group(2, &res.point_lights_bind_group, &[]);

@@ -5,13 +5,13 @@
 use std::cell::Cell;
 
 use voltex_ecs::{World, WorldTransform};
-use voltex_math::Mat4;
 use voltex_renderer::{
     create_tilemap_pipeline, tilemap_quad_indices, tilemap_uniform_bind_group_layout,
     GpuTexture, TilemapUniform, TilemapVertex,
 };
 
 use crate::assets::{RenderAssets, TextureHandle};
+use crate::frame::{FrameTarget, FrameView};
 use crate::tilemap::{tilemap_vertices, Tilemap};
 
 /// Max tile quads drawn per frame across all tilemaps (fixed-size buffers —
@@ -75,6 +75,8 @@ pub(crate) struct TilemapPass {
     vertex_buffer: wgpu::Buffer,
     index_buffer: wgpu::Buffer,
     overflow_warned: Cell<bool>,
+    /// 텍스처 없는 항목에 바인딩하는 `BasicRenderer` 의 흰색 1×1 (같은 GPU 리소스를 공유).
+    default_texture_bind_group: wgpu::BindGroup,
 }
 
 impl TilemapPass {
@@ -83,6 +85,7 @@ impl TilemapPass {
         queue: &wgpu::Queue,
         format: wgpu::TextureFormat,
         texture_layout: &wgpu::BindGroupLayout,
+        default_texture: &GpuTexture,
     ) -> Self {
         let uniform_layout = tilemap_uniform_bind_group_layout(device);
         let pipeline = create_tilemap_pipeline(device, format, &uniform_layout, texture_layout);
@@ -123,20 +126,20 @@ impl TilemapPass {
             vertex_buffer,
             index_buffer,
             overflow_warned: Cell::new(false),
+            default_texture_bind_group: default_texture.bind_group.clone(),
         }
     }
 
-    #[allow(clippy::too_many_arguments)]
+    /// 보이는 `Tilemap` 을 텍스처별 배치로 묶어 `target` 위에 그린다
+    /// (텍스처 없는 맵은 흰색 1×1).
     pub(crate) fn render(
         &self,
         queue: &wgpu::Queue,
         encoder: &mut wgpu::CommandEncoder,
-        target_view: &wgpu::TextureView,
-        depth_view: &wgpu::TextureView,
+        target: &FrameTarget<'_>,
+        view: &FrameView,
         world: &World,
         assets: &RenderAssets,
-        default_texture: &GpuTexture,
-        view_proj: Mat4,
     ) {
         let maps: Vec<(Option<TextureHandle>, Vec<TilemapVertex>)> = world
             .query2::<WorldTransform, Tilemap>()
@@ -163,15 +166,15 @@ impl TilemapPass {
         queue.write_buffer(
             &self.uniform_buffer,
             0,
-            bytemuck::bytes_of(&TilemapUniform { view_proj: view_proj.cols }),
+            bytemuck::bytes_of(&TilemapUniform { view_proj: view.view_proj.cols }),
         );
         queue.write_buffer(&self.vertex_buffer, 0, bytemuck::cast_slice(&vertices));
 
         let mut pass = crate::scene_pass::begin_overlay_pass(
             encoder,
             "BasicRenderer Tilemap Pass",
-            target_view,
-            depth_view,
+            target.color_view,
+            target.depth_view,
         );
         pass.set_pipeline(&self.pipeline);
         pass.set_bind_group(0, &self.uniform_bind_group, &[]);
@@ -182,7 +185,7 @@ impl TilemapPass {
                 .texture
                 .and_then(|h| assets.texture(h))
                 .map(|t| &t.bind_group)
-                .unwrap_or(&default_texture.bind_group);
+                .unwrap_or(&self.default_texture_bind_group);
             pass.set_bind_group(1, texture_bind_group, &[]);
             let first_index = batch.first_quad * INDICES_PER_QUAD;
             pass.draw_indexed(first_index..first_index + batch.quad_count * INDICES_PER_QUAD, 0, 0..1);

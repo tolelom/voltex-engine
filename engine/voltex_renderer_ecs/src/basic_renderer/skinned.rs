@@ -3,7 +3,7 @@
 //! pass, the shadow casters and the PBR skinned group 0.
 
 use voltex_ecs::{MaterialHandle, World, WorldTransform};
-use voltex_math::{Mat4, Vec3};
+use voltex_math::Mat4;
 use voltex_renderer::{
     create_skinned_shadow_pipeline, pipeline::create_skinned_mesh_pipeline, BonePalette,
     MaterialUniform, SkinnedCameraUniform,
@@ -15,6 +15,7 @@ use super::{
 };
 use crate::assets::{PbrTextures, RenderAssets, TextureHandle};
 use crate::dynamic_uniform::DynamicUniformBuffer;
+use crate::frame::{FrameTarget, FrameView};
 use crate::items::Hidden;
 use crate::scene_pass::begin_overlay_pass;
 use crate::skinned::{SkinnedMeshHandle, SkinnedPose};
@@ -164,17 +165,14 @@ impl BasicRenderer {
     /// [`SkinnedMeshHandle`] and a [`SkinnedPose`]. Draws over the 3D scene
     /// with `LoadOp::Load` (color + depth), so it composes with the
     /// non-skinned pass. Capped at [`MAX_SKINNED`] entities per frame.
-    #[allow(clippy::too_many_arguments)]
     pub(super) fn render_skinned(
         &self,
         queue: &wgpu::Queue,
         encoder: &mut wgpu::CommandEncoder,
-        target_view: &wgpu::TextureView,
-        depth_view: &wgpu::TextureView,
+        target: &FrameTarget<'_>,
+        view: &FrameView,
         world: &mut World,
         assets: &RenderAssets,
-        view_proj: Mat4,
-        cam_pos: Vec3,
     ) {
         let mut items = self.collect_skinned_items(world, assets);
         warn_overflow_once(&self.skinned_overflow_warned, "skinned meshes", items.len(), MAX_SKINNED);
@@ -189,21 +187,29 @@ impl BasicRenderer {
 
         if self.pbr_enabled {
             let maps_bind_groups =
-                self.prepare_skinned_pbr(queue, assets, &items, view_proj, cam_pos);
-            let mut pass =
-                begin_overlay_pass(encoder, "BasicRenderer Skinned Pass", target_view, depth_view);
+                self.prepare_skinned_pbr(queue, assets, &items, view.view_proj, view.camera_pos);
+            let mut pass = begin_overlay_pass(
+                encoder,
+                "BasicRenderer Skinned Pass",
+                target.color_view,
+                target.depth_view,
+            );
             self.draw_skinned_pbr(&mut pass, assets, &items, &maps_bind_groups);
         } else {
             let cameras: Vec<SkinnedCameraUniform> = items
                 .iter()
                 .map(|it| SkinnedCameraUniform {
-                    view_proj: view_proj.cols,
+                    view_proj: view.view_proj.cols,
                     model: it.model.cols,
                 })
                 .collect();
             self.skinned.cameras.upload(queue, &cameras);
-            let mut pass =
-                begin_overlay_pass(encoder, "BasicRenderer Skinned Pass", target_view, depth_view);
+            let mut pass = begin_overlay_pass(
+                encoder,
+                "BasicRenderer Skinned Pass",
+                target.color_view,
+                target.depth_view,
+            );
             self.draw_skinned_blinn_phong(&mut pass, assets, &items);
         }
     }

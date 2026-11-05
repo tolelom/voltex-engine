@@ -18,6 +18,7 @@ use super::{
 };
 use crate::assets::{PbrTextures, RenderAssets, TextureHandle};
 use crate::dynamic_uniform::DynamicUniformBuffer;
+use crate::frame::{FrameTarget, FrameView};
 use crate::items::RenderItem;
 use crate::scene_pass::begin_clearing_pass;
 
@@ -62,6 +63,8 @@ pub(super) struct PbrResources {
 }
 
 impl PbrResources {
+    // reason: BasicRenderer::new 가 만든 공유 자원(포맷·정렬·용량·레이아웃·기본 텍스처·그림자 맵)을
+    // 하나씩 받는 private 생성자 — 묶으면 호출부만 한 단계 더 멀어진다.
     #[allow(clippy::too_many_arguments)]
     pub(super) fn new(
         device: &wgpu::Device,
@@ -263,20 +266,16 @@ impl BasicRenderer {
     /// the point lights into a multi-light `LightsUniform`, stages per-entity
     /// `CameraUniform`/`MaterialUniform`, builds a 4-map texture bind group per
     /// entity (defaults for absent slots), and draws.
-    #[allow(clippy::too_many_arguments)]
     pub(super) fn pbr_mesh_pass(
         &self,
         queue: &wgpu::Queue,
         encoder: &mut wgpu::CommandEncoder,
-        target_view: &wgpu::TextureView,
-        depth_view: &wgpu::TextureView,
-        clear_color: wgpu::Color,
+        target: &FrameTarget<'_>,
+        view: &FrameView,
         items: &[RenderItem],
-        view_proj: Mat4,
-        cam_pos: Vec3,
-        light: LightUniform,
         assets: &RenderAssets,
     ) {
+        let FrameView { view_proj, camera_pos, light } = *view;
         // Shadow group: full ShadowUniform (also carries the sky direction +
         // zeroed SH → shader falls back to procedural ambient).
         let shadow_map_size = if self.shadows_enabled { SHADOW_MAP_SIZE as f32 } else { 0.0 };
@@ -292,7 +291,7 @@ impl BasicRenderer {
         queue.write_buffer(&self.pbr.lights_buffer, 0, bytemuck::bytes_of(&lights));
 
         let cameras: Vec<CameraUniform> =
-            items.iter().map(|item| pbr_camera(view_proj, item.model, cam_pos)).collect();
+            items.iter().map(|item| pbr_camera(view_proj, item.model, camera_pos)).collect();
         let materials: Vec<MaterialUniform> = items.iter().map(|item| item.material).collect();
         self.pbr.cameras.upload(queue, &cameras);
         self.pbr.materials.upload(queue, &materials);
@@ -305,9 +304,9 @@ impl BasicRenderer {
         let mut pass = begin_clearing_pass(
             encoder,
             "BasicRenderer PBR Pass",
-            target_view,
-            depth_view,
-            clear_color,
+            target.color_view,
+            target.depth_view,
+            target.clear_color,
         );
         pass.set_pipeline(&self.pbr.pipeline);
         pass.set_bind_group(3, &self.pbr.shadow_bind_group, &[]);

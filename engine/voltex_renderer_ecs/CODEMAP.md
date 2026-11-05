@@ -18,7 +18,7 @@ ECS World ↔ voltex_renderer 브릿지. C0a 의 `MeshHandle` / `MaterialHandle`
 | `RenderItem { entity, model, mesh, material, texture }` | `items.rs` | per-frame 데이터 단위 (texture: Option<TextureHandle>) |
 | `collect_render_items(&mut World, &RenderAssets) -> Vec<RenderItem>` | `items.rs` | `propagate_transforms` 자동 호출 |
 | `BasicRenderer::new(device, queue, target_format, max_entities)` | `basic_renderer/mod.rs` | Blinn-Phong(mesh_colored.wgsl) + PBR + 스킨드 + 그림자 pipeline 소유 |
-| `BasicRenderer::render(queue, encoder, target_view, depth_view, clear_color, &mut World, &RenderAssets, view_proj, cam_pos, light)` | `basic_renderer/mod.rs` | 메시 패스(colored Blinn-Phong 또는 `set_pbr_enabled` 시 PBR) + 스킨드 패스(colored 또는 PBR) + 스프라이트/파티클/디버그 라인 패스. PBR 시 메시·스킨드 모두 Cook-Torrance |
+| `BasicRenderer::render_frame(queue, encoder, FrameTarget { color_view, depth_view, clear_color }, &mut World, &RenderAssets, &FrameView { view_proj, camera_pos, light })` | `basic_renderer/mod.rs`, `frame.rs` | 구 10인자 `render(...)` 는 deprecated 래퍼. 메시 패스(colored Blinn-Phong 또는 `set_pbr_enabled` 시 PBR) + 스킨드 패스(colored 또는 PBR) + 스프라이트/파티클/디버그 라인 패스. PBR 시 메시·스킨드 모두 Cook-Torrance |
 | `BasicRenderer::set_point_lights(&queue, &[PointLight])` / `set_shadows(bool)` / `set_debug_lines(&queue, &[LineVertex])` | `basic_renderer/mod.rs` | 매 프레임 호출(`&self`). 디버그 라인은 `LineList` depth-tested 마지막 패스 (MAX 8192 verts, 초과 drop) |
 | `Sprite { texture, size, color, uv_rect, flip_x, roll_from_transform }` + `Sprite::solid` / `textured` / `with_uv_rect(rect)` / `with_roll_from_transform()` / `set_sheet_frame(cols,rows,index)` / `effective_uv_rect()` | `sprite.rs` | 카메라-facing 빌보드 컴포넌트. `WorldTransform`+`Sprite` 엔티티를 mesh 패스 후 alpha-blended·depth-tested(no write) 빌보드로 렌더. `uv_rect`로 스프라이트시트/아틀라스 프레임 선택, `flip_x`는 렌더 시점 u-스왑(표시 전용 — 애니 시스템과 충돌 없음, 렌더러는 `effective_uv_rect()` 사용). 카메라 right/up은 inverse VP에서 복원. `roll_from_transform`(기본 false)이면 엔티티 로컬 X축의 화면 투영 각도만큼 화면 평면에서 회전(`SpriteUniform.size.z`). 카메라 거리 기준 back-to-front 정렬(투명도 합성 순서 무관). MAX 256/frame |
 | `Particle { velocity, acceleration, age, lifetime, start/end_size, start/end_alpha }` + `Particle::new(vel,lifetime,size)` / `spawn_particle(world,pos,color,particle)` / `update_particles(&mut World, dt)` | `particle.rs` | CPU 파티클(=Transform+Sprite+Particle 엔티티). update가 이동·크기/알파 보간·수명 만료 despawn. RuntimeApp tick이 `update_particles` 자동 호출 |
@@ -58,6 +58,7 @@ src/
 │   ├── shadow.rs       # ShadowResources + 그림자 깊이 전처리(shadow_prepass)
 │   ├── skinned.rs      # SkinnedResources + render_skinned / gather_skinned_shadow
 │   └── pbr.rs          # PbrResources / PbrSkinnedResources + pbr_mesh_pass / 스킨드 PBR draw
+├── frame.rs            # FrameTarget(그릴 곳) / FrameView(카메라 + 방향광) — render_frame 인자
 ├── dynamic_uniform.rs  # DynamicUniformBuffer<T> — 엔티티별 dynamic-offset UBO (stride·upload·offset)
 ├── scene_pass.rs       # begin_clearing_pass / begin_overlay_pass — 컬러+깊이 렌더 패스 시작
 ├── debug_line_pass.rs  # BasicRenderer 디버그 라인 패스 (DebugLinePass)

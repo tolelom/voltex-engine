@@ -51,22 +51,26 @@ fn render_with_mode(gpu: &HeadlessGpu, width: u32, height: u32, mode: GizmoMode)
         label: Some("gizmo capture"),
     });
     // Base pass: cube (clears color + depth).
-    renderer.render(
+    renderer.render_frame(
         queue,
         &mut encoder,
-        &target.color_view,
-        &target.depth_view,
-        wgpu::Color {
-            r: 0.08,
-            g: 0.09,
-            b: 0.12,
-            a: 1.0,
+        voltex_renderer_ecs::FrameTarget {
+            color_view: &target.color_view,
+            depth_view: &target.depth_view,
+            clear_color: wgpu::Color {
+                r: 0.08,
+                g: 0.09,
+                b: 0.12,
+                a: 1.0,
+            },
         },
         &mut world,
         &assets,
-        view_proj,
-        camera.position,
-        LightUniform::new(),
+        &voltex_renderer_ecs::FrameView {
+            view_proj,
+            camera_pos: camera.position,
+            light: LightUniform::new(),
+        },
     );
     // Overlay: gizmo handles at the cube origin (loads color + depth).
     gizmo.render(

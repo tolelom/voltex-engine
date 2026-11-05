@@ -59,12 +59,12 @@
 
 `Time` 외 `Timer`/`TimerMode`(src/time.rs): `Timer::once`/`repeating(dur)` + `tick(dt)` → `just_finished`/`finished`/`fraction`/`reset`. 쿨다운·스폰 간격·능력 재충전용 순수 카운트다운. 0/음수 duration 즉시 발사, 반복은 dt>period 시 wrap. `Tween`(src/time.rs): Timer+easing+lerp 묶음 — `new(from,to,dur,easing)`/`linear` + `tick(dt)->f32`/`value`/`value_normalized`(Vec lerp용)/`finished`/`reset`.
 
-매 프레임 `run()` 의 winit handler 가 `tick_systems_only` 호출 → `materialize_renderables`(이번 프레임에 스폰된 `PrimitiveMesh`/`MaterialDesc` 엔티티를 GPU 메시/머티리얼로, device 필요해 handler 에서 실행) → `BasicRenderer::render` (+ enable_hud 시 UI 오버레이) 로 화면 출력. materialize 는 idempotent + pending 없으면 저렴.
+매 프레임 `run()` 의 winit handler 가 `tick_systems_only` 호출 → `materialize_renderables`(이번 프레임에 스폰된 `PrimitiveMesh`/`MaterialDesc` 엔티티를 GPU 메시/머티리얼로, device 필요해 handler 에서 실행) → `BasicRenderer::render_frame` (+ enable_hud 시 UI 오버레이) 로 화면 출력. materialize 는 idempotent + pending 없으면 저렴.
 
 ## 변경 시 주의점
 - **Drop 순서**: `RuntimeApp` 의 필드 선언 순서가 곧 drop 순서. `gpu_window` (GPU) → `user_systems` → `file_watcher`/`frame_timer`/`input`/`physics_config` → `script_pool` (LuaState 의 `__voltex_world` light userdata 가 World 보다 먼저 drop) → `assets`/`registry`/`world` → `config`. 이 순서는 LuaState use-after-free 회피용. 필드 추가/순서 변경 시 LuaState 가 World 보다 먼저 drop 됨을 유지.
 - **GPU init lazy**: `RuntimeApp::new` 는 window/GPU 를 만들지 않는다. `with_gpu_init` 콜백이 첫 `resumed` 에서 한 번만 실행. 헤드리스 단위 테스트에서는 `tick_systems_only` 만 호출 가능.
-- **BasicRenderer 시그너처**: handler.rs 의 `redraw` 가 직접 호출. `voltex_renderer_ecs::BasicRenderer::render` 인자가 바뀌면 함께 갱신.
+- **BasicRenderer 시그너처**: handler.rs 의 `redraw` 가 직접 호출. `voltex_renderer_ecs::BasicRenderer::render_frame` 인자(`FrameTarget`/`FrameView`)가 바뀌면 함께 갱신.
 - **카메라**: 초기 위치/방향은 `RuntimeConfig::with_camera(pos, yaw, pitch)` / `with_camera_fov` (기본 `(0,10,20)`, yaw 0, pitch -0.4, 45°). 매 프레임 추적(follow/orbit)은 `RuntimeApp::set_camera_fn(\|cam, world, dt\| ...)` — tick 직후 실행되며 기본 RMB fly-camera를 override. 2D/탑다운은 `RuntimeConfig::with_orthographic(height)` → `Camera::ortho_height=Some` (parallel 투영, near/far -100..100, 깊이 무관 footprint). 캡처 회귀 `orthographic_footprint_is_depth_independent`. **주의**: 기본 카메라가 멀어서(z=20) 1-unit 오브젝트는 화면에서 ~15px 점으로 보임 — 게임은 거의 항상 with_camera/set_camera_fn로 프레이밍해야 함 (voltex_capture `camera_framing_controls_visible_object_size` 회귀가 가드).
 - **씬 저장/로드**: `RuntimeApp::save_scene_json(path)` (registry 등록 컴포넌트만 직렬화) / `load_scene(path)` (World clear 후 binary→JSON, Vfs 우선). `with_initial_scene` 는 부팅 시 로드.
 - **충돌/트리거 이벤트**: `RuntimeApp::set_collision_fn(\|contacts, &mut world, dt\| ...)` — 매 프레임 `detect_collisions`(Collider+Transform 엔티티) 결과를 game에 전달. `enable_physics` 무관하게 실행 → 강체 없이 트리거 존으로도 사용. physics_step 직후 실행.

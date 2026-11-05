@@ -6,7 +6,7 @@
 //!   pipeline 을 쓰는 호출자가 평행 Vec 대신 사용.
 //! - [`BasicRenderer`] : mesh_colored.wgsl(Blinn-Phong, 선택적으로 PBR) 기반 pipeline +
 //!   per-entity dynamic UBO 를 소유.
-//!   `render(...)` 한 메서드로 World 를 그린다.
+//!   `render_frame(...)` 한 메서드로 World 를 그린다.
 
 #![warn(missing_docs)]
 
@@ -16,6 +16,7 @@ pub mod items;
 pub mod basic_renderer;
 mod debug_line_pass;
 mod dynamic_uniform;
+pub mod frame;
 mod scene_pass;
 mod sprite_pass;
 pub mod particle;
@@ -29,6 +30,7 @@ pub use error::{RendererEcsError, Result};
 pub use assets::{MeshPath, PbrTextures, RenderAssets, TextureHandle, TexturePath};
 pub use items::{collect_render_items, Hidden, RenderItem};
 pub use basic_renderer::BasicRenderer;
+pub use frame::{FrameTarget, FrameView};
 pub use skinned::{
     animation_duration, load_skinned_gltf, update_skinned_poses, SkinnedMeshHandle, SkinnedPose,
 };

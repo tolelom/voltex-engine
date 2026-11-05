@@ -111,17 +111,21 @@ pub fn render_demo_frame_mode(
     let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
         label: Some("demo playthrough frame"),
     });
-    renderer.render(
+    renderer.render_frame(
         queue,
         &mut encoder,
-        &target.color_view,
-        &target.depth_view,
-        wgpu::Color { r: 0.02, g: 0.02, b: 0.05, a: 1.0 },
+        voltex_renderer_ecs::FrameTarget {
+            color_view: &target.color_view,
+            depth_view: &target.depth_view,
+            clear_color: wgpu::Color { r: 0.02, g: 0.02, b: 0.05, a: 1.0 },
+        },
         &mut world,
         &assets,
-        camera.view_projection(),
-        camera.position,
-        sun,
+        &voltex_renderer_ecs::FrameView {
+            view_proj: camera.view_projection(),
+            camera_pos: camera.position,
+            light: sun,
+        },
     );
     queue.submit(Some(encoder.finish()));
     target.read_rgba8(device, queue)
