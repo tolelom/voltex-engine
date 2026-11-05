@@ -73,21 +73,21 @@
 - ~~**OGG/Vorbis 디코더**~~ ✅ OGG 컨테이너 + Vorbis 디코더 완료.
 - ~~**24-bit/32-bit WAV**~~ ✅ 완료.
 - ~~**ECS 통합**~~ ✅ AudioSource 컴포넌트 완료. ~~audio_sync_system 미구현~~ ✅ 2026-06-03 — `voltex_runtime::audio_sync_system` 가 AudioSource→AudioSystem 브릿지 (playing 엣지에서 play/play_3d/stop, listener Transform 동기화). 한계: SpatialParams min/max 고정. ~~씬 직렬화 미등록 — v1.1.~~ ✅ 2026-06-03 (v1.0.61) — `voltex_runtime::audio_sync::register_audio_source` 가 `register_raw` escape hatch 로 AudioSource 직렬화 등록 (clip_id+volume+spatial/looping/playing 11바이트; transient played_once/active 는 미저장). RuntimeApp 이 `register_defaults()` 직후 자동 등록. JSON/binary 씬 round-trip.
-- ~~**비동기 로딩**~~ ✅ AsyncAudioLoader (스레드 기반) 완료.
+- ~~**비동기 로딩**~~ ✅ AsyncAudioLoader (스레드 기반) 완료. 현재 `voltex_audio::experimental::async_loader` (엔진 미사용).
 
 ## Phase 6-2
 
 - ~~**도플러 효과**~~ ✅ doppler_shift 완료.
-- ~~**HRTF**~~ ✅ ITD/ILD 기반 간소화 HRTF 완료.
-- ~~**Reverb/Echo**~~ ✅ Schroeder reverb (4 comb + 2 allpass) + Echo delay line 완료.
-- ~~**Occlusion**~~ ✅ 레이 기반 차폐 + 로우패스 필터 완료.
+- ~~**HRTF**~~ ✅ ITD/ILD 기반 간소화 HRTF 완료. 현재 `voltex_audio::experimental::hrtf` (엔진 미사용).
+- ~~**Reverb/Echo**~~ ✅ Schroeder reverb (4 comb + 2 allpass) + Echo delay line 완료. 현재 `voltex_audio::experimental::reverb` (엔진 미사용).
+- ~~**Occlusion**~~ ✅ 차폐 계수 → 볼륨·로우패스 컷오프 + 로우패스 필터 완료 (레이캐스트는 호출부 몫). 현재 `voltex_audio::experimental::occlusion` (엔진 미사용).
 
 ## Phase 6-3
 
-- ~~**동적 그룹 생성**~~ ✅ MixGroupManager 동적 생성/삭제 완료.
-- ~~**그룹 간 라우팅/버스**~~ ✅ AudioBus 믹싱 완료.
-- ~~**이펙트 체인**~~ ✅ EffectChain (trait 기반 파이프라인) 완료.
-- ~~**비선형 페이드 커브**~~ ✅ Exponential/Logarithmic/SCurve 완료.
+- ~~**동적 그룹 생성**~~ ✅ MixGroupManager 동적 생성/삭제 완료. 현재 `voltex_audio::experimental::dynamic_groups` (엔진 미사용).
+- ~~**그룹 간 라우팅/버스**~~ ✅ AudioBus 믹싱 완료. 현재 `voltex_audio::experimental::audio_bus` (엔진 미사용).
+- ~~**이펙트 체인**~~ ✅ EffectChain (trait 기반 파이프라인) 완료. 현재 `voltex_audio::experimental::effect_chain` (엔진 미사용).
+- ~~**비선형 페이드 커브**~~ ✅ Exponential/Logarithmic/SCurve 완료. 현재 `voltex_audio::experimental::fade_curves` (엔진 미사용).
 
 ## Phase 7-1
 
