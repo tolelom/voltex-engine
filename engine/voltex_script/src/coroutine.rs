@@ -15,62 +15,76 @@ pub enum CoroutineStatus {
 }
 
 /// A Lua coroutine backed by a lua_newthread.
-pub struct LuaCoroutine {
+///
+/// Borrows the [`LuaState`](crate::state::LuaState) it was created from, so it
+/// can't outlive it. The thread is kept alive by a registry reference that is
+/// released when the coroutine is dropped.
+pub struct LuaCoroutine<'lua> {
     /// The coroutine thread state.
     state: *mut ffi::lua_State,
+    /// The state that owns the thread (where the registry reference lives).
+    parent: *mut ffi::lua_State,
+    /// `luaL_ref` handle that keeps the thread from being garbage-collected.
+    thread_ref: std::os::raw::c_int,
     /// Whether the coroutine has finished execution.
     finished: bool,
+    _lua: std::marker::PhantomData<&'lua crate::state::LuaState>,
 }
 
 impl crate::state::LuaState {
     /// Create a coroutine from a global Lua function name.
     /// The function must already be defined in the Lua state.
-    pub fn create_coroutine(&self, func_name: &str) -> crate::Result<LuaCoroutine> {
-        // SAFETY: `self.raw()` is the live state owned by `self`, and `c_name`
-        // outlives `lua_getglobal`. The returned `LuaCoroutine` keeps the raw
-        // thread pointer, which assumes the thread stays alive and that the
-        // parent `LuaState` outlives it — neither is enforced: `lua_newthread`
-        // anchors the thread only on the main stack (lstate.c), so after the
-        // pop below a GC cycle may free it, and no lifetime ties the two.
+    pub fn create_coroutine(&self, func_name: &str) -> crate::Result<LuaCoroutine<'_>> {
+        let c_name = CString::new(func_name).map_err(|e| crate::ScriptError::from(e.to_string()))?;
+        // SAFETY: `self.raw()` is the live state owned by `self`. `lua_newthread`
+        // leaves the new thread on the main stack, which is its only anchor;
+        // `luaL_ref` pops it into the registry so the GC keeps it alive until
+        // `LuaCoroutine::drop` unrefs it. The `'lua` borrow keeps `self` (and so
+        // both pointers) alive for the coroutine's whole life. `c_name` outlives
+        // `lua_getglobal`.
         unsafe {
-            let co_state = ffi::lua_newthread(self.raw());
+            let parent = self.raw();
+            let co_state = ffi::lua_newthread(parent);
             if co_state.is_null() {
                 return Err("failed to create Lua thread".into());
             }
-            // Pop the thread from the main stack (it's anchored in the registry)
-            // Actually, we need to keep the thread referenced. lua_newthread pushes it
-            // onto the main stack. We'll leave it there (Lua GC won't collect it while
-            // it's on the stack). For simplicity, pop it — Lua keeps a reference in the
-            // registry as long as the coroutine is alive.
-            // Note: lua_newthread creates a thread that is anchored by the registry
-            // automatically in Lua 5.4, so we can pop it from the main stack.
-            ffi::lua_pop(self.raw(), 1);
+            let thread_ref = ffi::luaL_ref(parent, ffi::LUA_REGISTRYINDEX);
+            let coroutine = LuaCoroutine {
+                state: co_state,
+                parent,
+                thread_ref,
+                finished: false,
+                _lua: std::marker::PhantomData,
+            };
 
             // Push the function onto the coroutine stack
-            let c_name = CString::new(func_name).map_err(|e| crate::ScriptError::from(e.to_string()))?;
             let ty = ffi::lua_getglobal(co_state, c_name.as_ptr());
             if ty != ffi::LUA_TFUNCTION {
                 ffi::lua_pop(co_state, 1);
                 return Err(format!("'{}' is not a Lua function", func_name).into());
             }
-
-            Ok(LuaCoroutine {
-                state: co_state,
-                finished: false,
-            })
+            Ok(coroutine)
         }
     }
 }
 
-impl LuaCoroutine {
+impl Drop for LuaCoroutine<'_> {
+    fn drop(&mut self) {
+        // SAFETY: `parent` is alive (the `'lua` borrow) and `thread_ref` was
+        // returned by `luaL_ref` on its registry and is released exactly once.
+        unsafe { ffi::luaL_unref(self.parent, ffi::LUA_REGISTRYINDEX, self.thread_ref) };
+    }
+}
+
+impl LuaCoroutine<'_> {
     /// Resume the coroutine. Returns Yielded if the coroutine yielded,
     /// or Finished if it completed.
     pub fn resume(&mut self) -> crate::Result<CoroutineStatus> {
         if self.finished {
             return Err("coroutine already finished".into());
         }
-        // SAFETY: assumes `self.state` still points at a live Lua thread (see
-        // `create_coroutine`). `lua_resume` reports `nresults` values on the
+        // SAFETY: `self.state` is a live Lua thread: the registry reference
+        // taken in `create_coroutine` keeps it alive. `lua_resume` reports `nresults` values on the
         // thread's stack, which are popped; on error the message on top is
         // copied before it is popped.
         unsafe {
@@ -200,4 +214,38 @@ mod tests {
         let result = lua.create_coroutine("nonexistent");
         assert!(result.is_err());
     }
+
+    #[test]
+    fn coroutine_survives_a_full_garbage_collection() {
+        let lua = LuaState::new();
+        lua.exec("
+            function counter()
+                for i = 1, 3 do
+                    count = i
+                    coroutine.yield()
+                end
+            end
+        ").unwrap();
+        let mut co = lua.create_coroutine("counter").unwrap();
+        assert_eq!(co.resume().unwrap(), CoroutineStatus::Yielded);
+        // Before the fix the thread had no anchor once popped, so a full
+        // collection could free it while `co` still pointed at it.
+        lua.exec("collectgarbage('collect'); collectgarbage('collect')").unwrap();
+        assert_eq!(co.resume().unwrap(), CoroutineStatus::Yielded);
+        assert_eq!(lua.get_global_number("count"), Some(2.0));
+    }
+
+    #[test]
+    fn dropping_a_coroutine_releases_its_registry_reference() {
+        let lua = LuaState::new();
+        lua.exec("function noop() end").unwrap();
+        // Many short-lived coroutines must not grow the registry without bound:
+        // luaL_unref puts each slot on the free list and the next ref reuses it.
+        let first_ref = lua.create_coroutine("noop").unwrap().thread_ref;
+        for _ in 0..100 {
+            let co = lua.create_coroutine("noop").unwrap();
+            assert_eq!(co.thread_ref, first_ref, "registry slot should be reused after drop");
+        }
+    }
 }
+

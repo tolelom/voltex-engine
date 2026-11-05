@@ -21,10 +21,15 @@ pub const LUA_TSTRING: c_int = 4;
 pub const LUA_TTABLE: c_int = 5;
 pub const LUA_TFUNCTION: c_int = 6;
 pub const LUA_MULTRET: c_int = -1;
+/// Pseudo-index of the registry table: `-LUAI_MAXSTACK - 1000` with the
+/// vendored luaconf.h (`LUAI_MAXSTACK` = 1_000_000 for 32-bit `int`).
+pub const LUA_REGISTRYINDEX: c_int = -1_000_000 - 1000;
 
 extern "C" {
     pub fn luaL_newstate() -> *mut lua_State;
     pub fn luaL_openlibs(L: *mut lua_State);
+    pub fn luaL_ref(L: *mut lua_State, t: c_int) -> c_int;
+    pub fn luaL_unref(L: *mut lua_State, t: c_int, r: c_int);
     pub fn lua_close(L: *mut lua_State);
 
     // Execute
