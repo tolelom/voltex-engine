@@ -13,13 +13,45 @@ use std::ffi::CString;
 use voltex_ecs::{Entity, ScriptComponent, World};
 
 use crate::ffi;
+use crate::instance::ScriptInstance;
 use crate::pool::ScriptInstancePool;
 use crate::state::LuaState;
 
+/// A Lua error raised inside a script callback.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ScriptCallbackError {
+    /// Entity whose callback failed.
+    pub entity: Entity,
+    /// `"on_start"` or `"on_update"`.
+    pub callback: &'static str,
+    /// Path of the script that raised the error.
+    pub script_path: String,
+    /// Lua error message.
+    pub message: String,
+}
+
+/// Runs one callback and returns its error only if it differs from the last
+/// error this instance reported (so a script failing every frame is reported once).
+fn run_callback(
+    inst: &mut ScriptInstance,
+    callback: &'static str,
+    entity: Entity,
+    dt: Option<f32>,
+) -> Option<ScriptCallbackError> {
+    let message = invoke_callback(&inst.lua, callback, entity, dt).err()?;
+    if inst.last_error.as_deref() == Some(message.as_str()) {
+        return None;
+    }
+    inst.last_error = Some(message.clone());
+    Some(ScriptCallbackError { entity, callback, script_path: inst.path.clone(), message })
+}
+
 /// Resolve every ScriptComponent to a live `ScriptInstance` (creating one if
 /// necessary), then fire `on_start(id, gen)` for any instance that has not
-/// yet been started.
-pub fn script_start_all(world: &mut World, pool: &mut ScriptInstancePool) {
+/// yet been started. Returns the Lua errors raised this call (each distinct
+/// error once; see [`ScriptCallbackError`]).
+pub fn script_start_all(world: &mut World, pool: &mut ScriptInstancePool) -> Vec<ScriptCallbackError> {
+    let mut errors = Vec::new();
     let world_ptr = world as *mut World;
     let entries: Vec<(Entity, String, u32)> = world
         .query::<ScriptComponent>()
@@ -41,15 +73,22 @@ pub fn script_start_all(world: &mut World, pool: &mut ScriptInstancePool) {
         if inst.started {
             continue;
         }
-        invoke_callback(&inst.lua, "on_start", entity, None);
+        errors.extend(run_callback(inst, "on_start", entity, None));
         inst.started = true;
     }
+    errors
 }
 
 /// Fire `on_update(id, gen, dt)` for every ScriptComponent whose backing
 /// instance is `started`. Unstarted instances are skipped — call
-/// `script_start_all` first.
-pub fn script_update_all(world: &mut World, pool: &mut ScriptInstancePool, dt: f32) {
+/// `script_start_all` first. Returns the Lua errors raised this call (each
+/// distinct error once; see [`ScriptCallbackError`]).
+pub fn script_update_all(
+    world: &mut World,
+    pool: &mut ScriptInstancePool,
+    dt: f32,
+) -> Vec<ScriptCallbackError> {
+    let mut errors = Vec::new();
     let entries: Vec<(Entity, u32)> = world
         .query::<ScriptComponent>()
         .map(|(e, s)| (e, s.instance_id))
@@ -60,26 +99,33 @@ pub fn script_update_all(world: &mut World, pool: &mut ScriptInstancePool, dt: f
         if !inst.started {
             continue;
         }
-        invoke_callback(&inst.lua, "on_update", entity, Some(dt));
+        errors.extend(run_callback(inst, "on_update", entity, Some(dt)));
     }
+    errors
 }
 
 /// Call the global Lua function `fn_name(id, gen[, dt])` if the script defines
-/// one. A missing function is a no-op; a Lua error is popped and dropped.
-fn invoke_callback(lua: &LuaState, fn_name: &str, entity: Entity, dt: Option<f32>) {
+/// one. A missing function is a no-op; a Lua error is returned as its message.
+fn invoke_callback(
+    lua: &LuaState,
+    fn_name: &str,
+    entity: Entity,
+    dt: Option<f32>,
+) -> Result<(), String> {
     // SAFETY: `lua.raw()` is the live state owned by `lua`; `fn_name_c`
     // outlives the getglobal call; every push is balanced by the pcall (which
-    // pops function + args) or by the explicit pops below.
+    // pops function + args) or by the explicit pops below. The error string
+    // returned by `lua_tostring` is copied before its stack slot is popped.
     unsafe {
         let L = lua.raw();
         let fn_name_c = match CString::new(fn_name) {
             Ok(c) => c,
-            Err(_) => return,
+            Err(_) => return Ok(()),
         };
         let ty = ffi::lua_getglobal(L, fn_name_c.as_ptr());
         if ty != ffi::LUA_TFUNCTION {
             ffi::lua_pop(L, 1);
-            return;
+            return Ok(());
         }
         ffi::lua_pushnumber(L, entity.id as f64);
         ffi::lua_pushnumber(L, entity.generation as f64);
@@ -90,10 +136,18 @@ fn invoke_callback(lua: &LuaState, fn_name: &str, entity: Entity, dt: Option<f32
             2
         };
         let rc = ffi::lua_pcall(L, nargs, 0, 0);
-        if rc != ffi::LUA_OK {
-            // best-effort: pop the error message left on the stack
-            ffi::lua_pop(L, 1);
+        if rc == ffi::LUA_OK {
+            return Ok(());
         }
+        // pcall left the error value on the stack: copy it out, then pop it.
+        let message_ptr = ffi::lua_tostring(L, -1);
+        let message = if message_ptr.is_null() {
+            "(non-string Lua error)".to_string()
+        } else {
+            std::ffi::CStr::from_ptr(message_ptr).to_string_lossy().into_owned()
+        };
+        ffi::lua_pop(L, 1);
+        Err(message)
     }
 }
 
@@ -252,5 +306,52 @@ mod tests {
         let inst = pool.get(s.instance_id).unwrap();
         assert!(inst.started);
         assert_eq!(inst.lua.get_global_number("globals_only"), Some(42.0));
+    }
+
+    #[test]
+    fn lua_error_in_on_update_is_returned_once() {
+        let path = write_tmp_lua(
+            "update_error.lua",
+            "
+            function on_update(id, gen, dt)
+                error('boom in update')
+            end
+            ",
+        );
+        let mut world = World::new();
+        let e = world.spawn();
+        world.add(e, ScriptComponent::new(path.to_str().unwrap().to_string()));
+        let mut pool = ScriptInstancePool::new();
+
+        assert!(script_start_all(&mut world, &mut pool).is_empty());
+        let first = script_update_all(&mut world, &mut pool, 0.016);
+        assert_eq!(first.len(), 1);
+        assert_eq!(first[0].entity, e);
+        assert_eq!(first[0].callback, "on_update");
+        assert!(first[0].message.contains("boom in update"), "{}", first[0].message);
+
+        // Same error next frame is not reported again.
+        assert!(script_update_all(&mut world, &mut pool, 0.016).is_empty());
+    }
+
+    #[test]
+    fn lua_error_in_on_start_is_returned() {
+        let path = write_tmp_lua(
+            "start_error.lua",
+            "
+            function on_start(id, gen)
+                error('boom in start')
+            end
+            ",
+        );
+        let mut world = World::new();
+        let e = world.spawn();
+        world.add(e, ScriptComponent::new(path.to_str().unwrap().to_string()));
+        let mut pool = ScriptInstancePool::new();
+
+        let errors = script_start_all(&mut world, &mut pool);
+        assert_eq!(errors.len(), 1);
+        assert_eq!(errors[0].callback, "on_start");
+        assert!(errors[0].message.contains("boom in start"));
     }
 }

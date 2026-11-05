@@ -37,4 +37,4 @@ pub use engine_api::register_engine_api;
 pub use engine_input::{register_engine_input, set_current_input, ScriptInput};
 pub use instance::ScriptInstance;
 pub use pool::ScriptInstancePool;
-pub use system::{script_start_all, script_update_all};
+pub use system::{script_start_all, script_update_all, ScriptCallbackError};

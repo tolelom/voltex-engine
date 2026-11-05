@@ -15,4 +15,8 @@ pub struct ScriptInstance {
     /// `false` until the first `script_start_all` pass invokes `on_start`,
     /// then `true`. Hot reload resets this back to `false`.
     pub started: bool,
+    /// Last Lua error raised by `on_start` / `on_update`, so a callback that
+    /// fails every frame is reported once instead of 60 times a second.
+    /// Cleared when the script is reloaded.
+    pub last_error: Option<String>,
 }
