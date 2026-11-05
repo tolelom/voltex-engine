@@ -7,7 +7,7 @@ Immediate-mode UI 에디터 — 도킹/플로팅/뷰포트/인스펙터/에셋 �
 
 ### 코어 UI
 - `UiContext` — IMGUI 컨텍스트 (src/ui_context.rs)
-- `UiRenderer` — wgpu UI 렌더러 (src/ui_renderer.rs; 옛 경로 `voltex_editor::renderer` 는 deprecated 재export)
+- `UiRenderer` — wgpu UI 렌더러, `render_to(device, queue, encoder, &ScreenTarget{view,width,height}, &draw_list)` (src/ui_renderer.rs; 옛 경로 `voltex_editor::renderer` 는 deprecated 재export, 옛 `render(.., screen_w, screen_h)` 는 deprecated)
 - `DrawList`, `DrawVertex`, `DrawCommand` (src/draw_list.rs) — 비트맵 글자 그리기는 모두 `DrawList::add_text` 한 곳
 - `FontAtlas` + `UvRect` (`glyph_uv_rect`) — 8x12 비트맵 ASCII (src/bitmap_font.rs; 옛 경로 `voltex_editor::font`·`glyph_uv` 는 deprecated)
 - `LayoutState` — 레이아웃 (src/layout.rs). `record_last_widget` 가 same_line 용 직전 위젯 위치 기록 (옛 이름 `record` deprecated)
@@ -22,8 +22,8 @@ Immediate-mode UI 에디터 — 도킹/플로팅/뷰포트/인스펙터/에셋 �
 ### 3D 뷰포트
 - `OrbitCamera` (src/orbit_camera.rs) — `forward()`는 yaw/pitch만으로 계산해 `distance` 0에서도 유한 (v1.0.126)
 - `ViewportTexture`, `VIEWPORT_COLOR_FORMAT`, `VIEWPORT_DEPTH_FORMAT` (src/viewport_texture.rs)
-- `ViewportRenderer` (src/viewport_renderer.rs)
-- `picking::pick_entity` + helpers (ndc_from_viewport / ray_from_ndc / ray_vs_aabb / ray_vs_sphere_t) — 좌클릭 → ray → 가장 가까운 entity. `Bounds`+`WorldTransform` 이 있으면 world AABB, 없으면 sphere(반경 default × max(scale)). 카메라를 품은 AABB 는 다른 히트가 없을 때만 선택. (src/picking.rs)
+- `ViewportRenderer::render_to(.., &ScreenTarget, color_view, Rect)` (src/viewport_renderer.rs; 옛 `render(.., x,y,w,h)` 는 deprecated)
+- `picking::pick_entity_at(world, &ViewportCursor{view_proj, cam_pos, viewport: Rect, mouse}, radius)` + helpers (ndc_from_viewport / ray_from_ndc / ray_vs_aabb / ray_vs_sphere_t) — 좌클릭 → ray → 가장 가까운 entity. `Bounds`+`WorldTransform` 이 있으면 world AABB, 없으면 sphere(반경 default × max(scale)). 카메라를 품은 AABB 는 다른 히트가 없을 때만 선택. 옛 `pick_entity`(인자 10개)는 deprecated. 기즈모 드래그도 같은 `ViewportCursor` 사용: `GizmoState::begin_drag` / `drag_to` (옛 `try_begin_drag` / `update_drag` deprecated), 그리기는 `GizmoRenderer::render_to(.., &GizmoDraw)`. (src/picking.rs)
 
 ### Panels (통합 완료, 단일 경로)
 - `panels::hierarchy::hierarchy_panel` — 트리 뷰, click 으로 `session.selected` 설정 (src/panels/hierarchy.rs)
@@ -84,4 +84,4 @@ Immediate-mode UI 에디터 — 도킹/플로팅/뷰포트/인스펙터/에셋 �
 - 단위 테스트: src/**/*.rs `#[cfg(test)]`
 - 실행: `cargo test -p voltex_editor --lib`
 - 현재 테스트 개수: 182개 (AssetBrowser AssetKind/활성화 +6 포함)
-- `UiContext::progress_bar(x,y,w,h,fraction,fg,bg)` / `draw_rect` — HUD 체력/진행 바 헬퍼 (runtime `set_hud_fn` 에서 사용)
+- `UiContext::progress_bar_in(rect, fraction, fg, bg)` (옛 `progress_bar(x,y,w,h,..)` deprecated) / `draw_rect` — HUD 체력/진행 바 헬퍼 (runtime `set_hud_fn` 에서 사용)

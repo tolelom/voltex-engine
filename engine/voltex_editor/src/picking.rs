@@ -7,8 +7,11 @@
 //!   2. `ray_from_ndc` — NDC + inverse view-projection + camera pos → world ray.
 //!   3. `ray_vs_sphere_t` — analytical sphere intersection, returns smallest
 //!      non-negative `t` (or None).
-//!   4. `pick_entity` — composes the above against `world.query::<Transform>()`
+//!   4. `pick_entity_at` — composes the above against `world.query::<Transform>()`
 //!      using a default-radius sphere per entity, scaled by max(transform.scale).
+//!
+//! [`ViewportCursor`] bundles the inputs of steps 1–2 (camera, viewport rect,
+//! mouse) so picking and gizmo dragging cast the ray the same way.
 //!
 //! v1 limitation: we don't store per-entity mesh bounds in ECS yet, so picking
 //! uses a unit-sphere approximation (radius * max(scale)). This is fine for the
@@ -17,6 +20,45 @@
 
 use voltex_ecs::{Entity, Transform, World};
 use voltex_math::{Mat4, Ray, Vec3, Vec4, AABB};
+
+use crate::dock::Rect;
+
+/// A mouse position over the 3D viewport together with the camera that
+/// viewport renders with — everything needed to cast a picking ray.
+#[derive(Debug, Clone, Copy)]
+pub struct ViewportCursor {
+    /// Camera view-projection matrix.
+    pub view_proj: Mat4,
+    /// Camera world position (the ray origin).
+    pub cam_pos: Vec3,
+    /// Viewport rectangle in window pixels.
+    pub viewport: Rect,
+    /// Mouse position in window pixels.
+    pub mouse: (f32, f32),
+}
+
+impl ViewportCursor {
+    /// Bundles the camera, viewport rect and mouse position.
+    pub fn new(view_proj: Mat4, cam_pos: Vec3, viewport: Rect, mouse: (f32, f32)) -> Self {
+        Self { view_proj, cam_pos, viewport, mouse }
+    }
+
+    /// `true` if the mouse lies outside the viewport rect.
+    pub fn is_outside_viewport(&self) -> bool {
+        let (mouse_x, mouse_y) = self.mouse;
+        let Rect { x, y, w, h } = self.viewport;
+        mouse_x < x || mouse_x >= x + w || mouse_y < y || mouse_y >= y + h
+    }
+
+    /// World-space ray from the camera through the mouse position, or `None`
+    /// if the view-projection matrix is singular.
+    pub fn world_ray(&self) -> Option<Ray> {
+        let inv = self.view_proj.inverse()?;
+        let Rect { x, y, w, h } = self.viewport;
+        let ndc = ndc_from_viewport(self.mouse.0, self.mouse.1, x, y, w, h);
+        Some(ray_from_ndc(&inv, self.cam_pos, ndc))
+    }
+}
 
 /// Convert a pixel mouse position to NDC space within a viewport rect.
 ///
@@ -140,15 +182,10 @@ pub(crate) fn world_aabb_from_local(local: &AABB, world: &Mat4) -> AABB {
     AABB::new(min, max)
 }
 
-/// Walk every entity that has a `Transform` and return the closest one the
-/// mouse ray hits. Entities with `Bounds` + `WorldTransform` are tested as a
-/// world-space AABB; others fall back to a sphere at `Transform.position` with
-/// radius `default_radius * max(scale.x, scale.y, scale.z)`. An AABB that
-/// contains the camera only wins when nothing else is hit.
-///
-/// Returns `None` if the mouse is outside the viewport rect, the matrix is
-/// singular, or no entity is hit.
-#[allow(clippy::too_many_arguments)] // Viewport rect + mouse + camera args are intrinsic to picking.
+/// Old form of [`pick_entity_at`] with the camera, viewport rect and mouse
+/// spelled out as separate arguments.
+#[deprecated(note = "use `pick_entity_at` with a `ViewportCursor`")]
+#[allow(clippy::too_many_arguments)] // reason: legacy signature kept for compatibility
 pub fn pick_entity(
     world: &mut World,
     view_proj: &Mat4,
@@ -161,16 +198,25 @@ pub fn pick_entity(
     mouse_y: f32,
     default_radius: f32,
 ) -> Option<Entity> {
-    if mouse_x < rect_x
-        || mouse_x >= rect_x + rect_w
-        || mouse_y < rect_y
-        || mouse_y >= rect_y + rect_h
-    {
+    let viewport = Rect { x: rect_x, y: rect_y, w: rect_w, h: rect_h };
+    let cursor = ViewportCursor::new(*view_proj, cam_pos, viewport, (mouse_x, mouse_y));
+    pick_entity_at(world, &cursor, default_radius)
+}
+
+/// Walk every entity that has a `Transform` and return the closest one the
+/// mouse ray hits. Entities with `Bounds` + `WorldTransform` are tested as a
+/// world-space AABB; others fall back to a sphere at `Transform.position` with
+/// radius `default_radius * max(scale.x, scale.y, scale.z)`. An AABB that
+/// contains the camera only wins when nothing else is hit.
+///
+/// Returns `None` if the mouse is outside the viewport rect, the matrix is
+/// singular, or no entity is hit.
+pub fn pick_entity_at(world: &mut World, cursor: &ViewportCursor, default_radius: f32) -> Option<Entity> {
+    if cursor.is_outside_viewport() {
         return None;
     }
-    let inv = view_proj.inverse()?;
-    let ndc = ndc_from_viewport(mouse_x, mouse_y, rect_x, rect_y, rect_w, rect_h);
-    let ray = ray_from_ndc(&inv, cam_pos, ndc);
+    let ray = cursor.world_ray()?;
+    let cam_pos = cursor.cam_pos;
 
     // E1: propagate transforms so WorldTransform reflects current state.
     // Caller may have just dispatched a SetTransform that hasn't been propagated.
@@ -314,10 +360,9 @@ mod tests {
     fn pick_returns_none_when_mouse_outside_rect() {
         let mut world = World::new();
         let vp = Mat4::IDENTITY;
-        let result = pick_entity(
-            &mut world, &vp, Vec3::ZERO,
-            10.0, 10.0, 100.0, 100.0,
-            5.0, 5.0,   // mouse to upper-left of the rect
+        let result = pick_entity_at(
+            &mut world,
+            &ViewportCursor::new(vp, Vec3::ZERO, Rect { x: 10.0, y: 10.0, w: 100.0, h: 100.0 }, (5.0, 5.0)), // mouse to upper-left of the rect
             1.0,
         );
         assert!(result.is_none());
@@ -329,10 +374,9 @@ mod tests {
         let cam = OrbitCamera::new();
         let vp = cam.view_projection(1.0);
         // Click dead-centre, but world has no entities.
-        let result = pick_entity(
-            &mut world, &vp, cam.position(),
-            0.0, 0.0, 800.0, 600.0,
-            400.0, 300.0,
+        let result = pick_entity_at(
+            &mut world,
+            &ViewportCursor::new(vp, cam.position(), Rect { x: 0.0, y: 0.0, w: 800.0, h: 600.0 }, (400.0, 300.0)),
             1.0,
         );
         assert!(result.is_none());
@@ -349,10 +393,9 @@ mod tests {
 
         let cam = OrbitCamera::new();
         let vp = cam.view_projection(1.0);
-        let result = pick_entity(
-            &mut world, &vp, cam.position(),
-            0.0, 0.0, 800.0, 800.0,
-            400.0, 400.0,   // centre
+        let result = pick_entity_at(
+            &mut world,
+            &ViewportCursor::new(vp, cam.position(), Rect { x: 0.0, y: 0.0, w: 800.0, h: 800.0 }, (400.0, 400.0)), // centre
             1.0,
         );
         assert_eq!(result, Some(e));
@@ -380,20 +423,18 @@ mod tests {
         world.add(inner, Transform::from_position(Vec3::ZERO));
 
         let vp = cam.view_projection(1.0);
-        let result = pick_entity(
-            &mut world, &vp, cam.position(),
-            0.0, 0.0, 800.0, 800.0,
-            400.0, 400.0,
+        let result = pick_entity_at(
+            &mut world,
+            &ViewportCursor::new(vp, cam.position(), Rect { x: 0.0, y: 0.0, w: 800.0, h: 800.0 }, (400.0, 400.0)),
             1.0,
         );
         assert_eq!(result, Some(inner), "내부 엔티티가 우선");
 
         // 내부 엔티티가 없으면 감싸는 엔티티라도 선택된다 (no-hit 아님).
         world.despawn(inner);
-        let result = pick_entity(
-            &mut world, &vp, cam.position(),
-            0.0, 0.0, 800.0, 800.0,
-            400.0, 400.0,
+        let result = pick_entity_at(
+            &mut world,
+            &ViewportCursor::new(vp, cam.position(), Rect { x: 0.0, y: 0.0, w: 800.0, h: 800.0 }, (400.0, 400.0)),
             1.0,
         );
         assert_eq!(result, Some(room), "fallback으로는 선택 가능");
@@ -417,10 +458,9 @@ mod tests {
         world.add(far_e, Transform::from_position(far_pos));
 
         let vp = cam.view_projection(1.0);
-        let result = pick_entity(
-            &mut world, &vp, cam.position(),
-            0.0, 0.0, 800.0, 800.0,
-            400.0, 400.0,
+        let result = pick_entity_at(
+            &mut world,
+            &ViewportCursor::new(vp, cam.position(), Rect { x: 0.0, y: 0.0, w: 800.0, h: 800.0 }, (400.0, 400.0)),
             1.0,
         );
         assert_eq!(result, Some(near_e));
@@ -436,10 +476,9 @@ mod tests {
 
         let cam = OrbitCamera::new();
         let vp = cam.view_projection(1.0);
-        let result = pick_entity(
-            &mut world, &vp, cam.position(),
-            0.0, 0.0, 800.0, 800.0,
-            400.0, 400.0,
+        let result = pick_entity_at(
+            &mut world,
+            &ViewportCursor::new(vp, cam.position(), Rect { x: 0.0, y: 0.0, w: 800.0, h: 800.0 }, (400.0, 400.0)),
             0.5,   // small radius
         );
         assert_ne!(result, Some(e));
@@ -499,10 +538,9 @@ mod tests {
 
         let cam = OrbitCamera::new();
         let vp = cam.view_projection(1.0);
-        let result = pick_entity(
-            &mut world, &vp, cam.position(),
-            0.0, 0.0, 800.0, 800.0,
-            400.0, 400.0,    // dead-centre
+        let result = pick_entity_at(
+            &mut world,
+            &ViewportCursor::new(vp, cam.position(), Rect { x: 0.0, y: 0.0, w: 800.0, h: 800.0 }, (400.0, 400.0)), // dead-centre
             0.1,             // sphere fallback radius too small to hit — must rely on AABB
         );
         assert_eq!(result, Some(e));
@@ -516,10 +554,9 @@ mod tests {
         // No Bounds — sphere with default_radius must hit centred entity.
         let cam = OrbitCamera::new();
         let vp = cam.view_projection(1.0);
-        let result = pick_entity(
-            &mut world, &vp, cam.position(),
-            0.0, 0.0, 800.0, 800.0,
-            400.0, 400.0,
+        let result = pick_entity_at(
+            &mut world,
+            &ViewportCursor::new(vp, cam.position(), Rect { x: 0.0, y: 0.0, w: 800.0, h: 800.0 }, (400.0, 400.0)),
             1.0,
         );
         assert_eq!(result, Some(e));
@@ -542,10 +579,9 @@ mod tests {
         world.add(far_e, Bounds(AABB::new(Vec3::new(-1.0, -1.0, -1.0), Vec3::new(1.0, 1.0, 1.0))));
 
         let vp = cam.view_projection(1.0);
-        let result = pick_entity(
-            &mut world, &vp, cam.position(),
-            0.0, 0.0, 800.0, 800.0,
-            400.0, 400.0,
+        let result = pick_entity_at(
+            &mut world,
+            &ViewportCursor::new(vp, cam.position(), Rect { x: 0.0, y: 0.0, w: 800.0, h: 800.0 }, (400.0, 400.0)),
             1.0,
         );
         assert_eq!(result, Some(near_e));

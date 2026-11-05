@@ -724,14 +724,13 @@ impl ApplicationHandler for SurvivorApp {
 
                     state.ui.end_frame();
 
-                    state.ui_renderer.render(
+                    let screen = voltex::editor::ScreenTarget { view: &color_view, width: screen_w, height: screen_h };
+                    state.ui_renderer.render_to(
                         &state.gpu.device,
                         &state.gpu.queue,
                         &mut encoder,
-                        &color_view,
+                        &screen,
                         &state.ui.draw_list,
-                        screen_w,
-                        screen_h,
                     );
                 }
 

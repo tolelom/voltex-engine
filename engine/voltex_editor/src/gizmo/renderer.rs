@@ -43,6 +43,20 @@ struct CameraUniform {
 
 const MAX_VERTS: usize = 2048;
 
+/// What one gizmo draw shows: `mode` handles at `origin`, seen through
+/// `view_proj`, with `active_axis` highlighted.
+#[derive(Debug, Clone, Copy)]
+pub struct GizmoDraw {
+    /// Camera view-projection matrix.
+    pub view_proj: Mat4,
+    /// World position of the gizmo centre.
+    pub origin: Vec3,
+    /// Which handles to draw.
+    pub mode: GizmoMode,
+    /// Axis being dragged (drawn in the highlight colour), if any.
+    pub active_axis: Option<GizmoAxis>,
+}
+
 /// wgpu pipeline that draws the translate/rotate/scale gizmo handles.
 pub struct GizmoRenderer {
     pipeline: wgpu::RenderPipeline,
@@ -153,8 +167,9 @@ impl GizmoRenderer {
         Self { pipeline, camera_buffer, bind_group, vertex_buffer }
     }
 
-    /// Renders the gizmo handles into `target_view` for the given state.
-    #[allow(clippy::too_many_arguments)]
+    /// Old form of [`Self::render_to`] with the draw parameters spelled out.
+    #[deprecated(note = "use `render_to` with a `GizmoDraw`")]
+    #[allow(clippy::too_many_arguments)] // reason: legacy signature kept for compatibility
     pub fn render(
         &self,
         queue: &wgpu::Queue,
@@ -166,6 +181,21 @@ impl GizmoRenderer {
         mode: GizmoMode,
         active_axis: Option<GizmoAxis>,
     ) {
+        let draw = GizmoDraw { view_proj, origin, mode, active_axis };
+        self.render_to(queue, encoder, target_view, depth_view, &draw);
+    }
+
+    /// Renders the gizmo handles described by `draw` into `target_view`
+    /// (loading, not clearing, the existing color and depth).
+    pub fn render_to(
+        &self,
+        queue: &wgpu::Queue,
+        encoder: &mut wgpu::CommandEncoder,
+        target_view: &wgpu::TextureView,
+        depth_view: &wgpu::TextureView,
+        draw: &GizmoDraw,
+    ) {
+        let GizmoDraw { view_proj, origin, mode, active_axis } = *draw;
         let mut verts: Vec<LineVertex> = Vec::with_capacity(64);
         match mode {
             GizmoMode::Translate => build_translate(&mut verts, origin, active_axis),

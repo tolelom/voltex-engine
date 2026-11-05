@@ -21,8 +21,8 @@ use voltex_editor::{
     hierarchy_panel, inspector_panel, InspectorState,
     AssetBrowser, asset_browser_panel,
     EditorSession, EditorCommand,
-    pick_entity,
-    GizmoMode, GizmoRenderer, GizmoState,
+    pick_entity_at, ViewportCursor, ScreenTarget,
+    GizmoDraw, GizmoMode, GizmoRenderer, GizmoState,
     EditorMode, LifecycleEvent,
 };
 use voltex_ecs::entity::Entity;
@@ -1093,33 +1093,18 @@ impl ApplicationHandler for EditorDemoApp {
                     let aspect = vr.w / vr.h.max(1.0);
                     let vp = state.orbit_cam.view_projection(aspect);
                     let cam_pos = state.orbit_cam.position();
-                    let rect_tuple = (vr.x, vr.y, vr.w, vr.h);
-                    let mouse = (mx, my);
+                    let cursor = ViewportCursor::new(vp, cam_pos, vr, (mx, my));
 
                     if !in_play
                         && state.left_dragging
                         && !state.gizmo_dragging
                         && state.left_down_pos.map(|p| (p.0 - mx).abs() + (p.1 - my).abs() < 8.0).unwrap_or(false)
                         && vr.contains(mx, my)
-                        && state.gizmo_state.try_begin_drag(
-                            &mut state.session.world,
-                            sel,
-                            &vp,
-                            cam_pos,
-                            rect_tuple,
-                            mouse,
-                        ) {
+                        && state.gizmo_state.begin_drag(&mut state.session.world, sel, &cursor) {
                             state.gizmo_dragging = true;
                         }
                     if state.gizmo_dragging && !in_play {
-                        state.gizmo_state.update_drag(
-                            &mut state.session.world,
-                            sel,
-                            &vp,
-                            cam_pos,
-                            rect_tuple,
-                            mouse,
-                        );
+                        state.gizmo_state.drag_to(&mut state.session.world, sel, &cursor);
                     }
                 }
 
@@ -1129,14 +1114,8 @@ impl ApplicationHandler for EditorDemoApp {
                         let aspect = vr.w / vr.h.max(1.0);
                         let vp = state.orbit_cam.view_projection(aspect);
                         let cam_pos = state.orbit_cam.position();
-                        let hit = pick_entity(
-                            &mut state.session.world,
-                            &vp,
-                            cam_pos,
-                            vr.x, vr.y, vr.w, vr.h,
-                            click.0, click.1,
-                            0.7,
-                        );
+                        let cursor = ViewportCursor::new(vp, cam_pos, vr, click);
+                        let hit = pick_entity_at(&mut state.session.world, &cursor, 0.7);
                         state.session.selected = hit;
                     }
                 }
@@ -1201,15 +1180,18 @@ impl ApplicationHandler for EditorDemoApp {
                     if state.session.mode == EditorMode::Edit {
                         if let Some(sel) = state.session.selected {
                             if let Some(origin) = GizmoState::gizmo_origin(&state.session.world, sel) {
-                                state.gizmo_renderer.render(
+                                let draw = GizmoDraw {
+                                    view_proj: vp,
+                                    origin,
+                                    mode: state.gizmo_state.mode,
+                                    active_axis: state.gizmo_state.active_axis(),
+                                };
+                                state.gizmo_renderer.render_to(
                                     &state.gpu.queue,
                                     &mut encoder,
                                     &state.viewport_tex.color_view,
                                     &state.viewport_tex.depth_view,
-                                    vp,
-                                    origin,
-                                    state.gizmo_state.mode,
-                                    state.gizmo_state.active_axis(),
+                                    &draw,
                                 );
                             }
                         }
@@ -1237,19 +1219,19 @@ impl ApplicationHandler for EditorDemoApp {
                 }
 
                 // Blit viewport texture to surface
-                if let Some(vr) = &viewport_rect {
-                    state.viewport_renderer.render(
-                        &state.gpu.device, &state.gpu.queue, &mut encoder, &view,
+                let screen = ScreenTarget { view: &view, width: screen_w, height: screen_h };
+                if let Some(vr) = viewport_rect {
+                    state.viewport_renderer.render_to(
+                        &state.gpu.device, &state.gpu.queue, &mut encoder, &screen,
                         &state.viewport_tex.color_view,
-                        screen_w, screen_h,
-                        vr.x, vr.y, vr.w, vr.h,
+                        vr,
                     );
                 }
 
                 // Render UI overlay
-                state.ui_renderer.render(
-                    &state.gpu.device, &state.gpu.queue, &mut encoder, &view,
-                    &state.ui.draw_list, screen_w, screen_h,
+                state.ui_renderer.render_to(
+                    &state.gpu.device, &state.gpu.queue, &mut encoder, &screen,
+                    &state.ui.draw_list,
                 );
 
                 state.gpu.queue.submit(std::iter::once(encoder.finish()));

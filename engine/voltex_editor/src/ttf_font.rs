@@ -4,7 +4,7 @@
 
 use crate::ttf_parser::TtfParser;
 use crate::rasterizer::rasterize;
-use crate::glyph_cache::{GlyphCache, GlyphInfo, ATLAS_SIZE};
+use crate::glyph_cache::{GlyphBitmap, GlyphCache, GlyphInfo, GlyphPlacement, ATLAS_SIZE};
 
 pub struct TtfFont {
     parser: TtfParser,
@@ -59,19 +59,13 @@ impl TtfFont {
                 // So: glyph_y = text_y + ascender - bearing_y
                 let bearing_y = o.y_max as f32 * self.scale;
 
-                self.cache.insert(
-                    ch,
-                    &result.bitmap,
-                    result.width,
-                    result.height,
-                    advance,
-                    bearing_x,
-                    bearing_y,
-                );
+                let bitmap = GlyphBitmap { pixels: &result.bitmap, width: result.width, height: result.height };
+                self.cache.insert_glyph(ch, bitmap, GlyphPlacement { advance, bearing_x, bearing_y });
             }
             _ => {
                 // No outline (space, etc.) — insert empty glyph
-                self.cache.insert(ch, &[], 0, 0, advance, 0.0, 0.0);
+                let placement = GlyphPlacement { advance, bearing_x: 0.0, bearing_y: 0.0 };
+                self.cache.insert_glyph(ch, GlyphBitmap::EMPTY, placement);
             }
         }
 

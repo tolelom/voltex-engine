@@ -26,47 +26,52 @@ pub fn count_entity_nodes(world: &World, entity: Entity) -> usize {
     count
 }
 
-#[allow(clippy::too_many_arguments)] // Recursive draw — packing into a struct would only add noise.
-fn draw_entity_node(
-    ui: &mut UiContext,
-    world: &World,
-    entity: Entity,
-    depth: usize,
-    selected: &mut Option<Entity>,
-    selection_changed: &mut bool,
+/// One hierarchy draw pass: the world being shown, the selection it edits,
+/// and the horizontal span (`base_x`, `row_w`) every row covers.
+struct EntityTree<'a> {
+    world: &'a World,
+    selected: &'a mut Option<Entity>,
+    selection_changed: bool,
     base_x: f32,
     row_w: f32,
-) {
-    let y = ui.layout.cursor_y;
-    let x = base_x + PADDING + depth as f32 * INDENT;
+}
 
-    if *selected == Some(entity) {
-        ui.draw_list.add_rect(base_x, y, row_w, LINE_HEIGHT, COLOR_SELECTED);
-    }
+impl EntityTree<'_> {
+    /// Draws `entity`'s row at the layout cursor, then its children one
+    /// level deeper.
+    fn draw_node(&mut self, ui: &mut UiContext, entity: Entity, depth: usize) {
+        let (world, base_x, row_w) = (self.world, self.base_x, self.row_w);
+        let y = ui.layout.cursor_y;
+        let x = base_x + PADDING + depth as f32 * INDENT;
 
-    if ui.mouse_clicked && ui.mouse_in_rect(base_x, y, row_w, LINE_HEIGHT) {
-        *selected = Some(entity);
-        *selection_changed = true;
-    }
+        if *self.selected == Some(entity) {
+            ui.draw_list.add_rect(base_x, y, row_w, LINE_HEIGHT, COLOR_SELECTED);
+        }
 
-    let has_children = world.get::<Children>(entity).is_some_and(|c| !c.0.is_empty());
-    let prefix = if has_children { "> " } else { "  " };
-    let name = if let Some(tag) = world.get::<Tag>(entity) {
-        format!("{}{}", prefix, tag.0)
-    } else {
-        format!("{}Entity({})", prefix, entity.id)
-    };
+        if ui.mouse_clicked && ui.mouse_in_rect(base_x, y, row_w, LINE_HEIGHT) {
+            *self.selected = Some(entity);
+            self.selection_changed = true;
+        }
 
-    let gh = ui.font.glyph_height as f32;
-    let text_y = y + (LINE_HEIGHT - gh) * 0.5;
-    ui.draw_list.add_text(&ui.font, &name, x, text_y, COLOR_TEXT);
+        let has_children = world.get::<Children>(entity).is_some_and(|c| !c.0.is_empty());
+        let prefix = if has_children { "> " } else { "  " };
+        let name = if let Some(tag) = world.get::<Tag>(entity) {
+            format!("{}{}", prefix, tag.0)
+        } else {
+            format!("{}Entity({})", prefix, entity.id)
+        };
 
-    ui.layout.cursor_y += LINE_HEIGHT;
+        let gh = ui.font.glyph_height as f32;
+        let text_y = y + (LINE_HEIGHT - gh) * 0.5;
+        ui.draw_list.add_text(&ui.font, &name, x, text_y, COLOR_TEXT);
 
-    if let Some(children) = world.get::<Children>(entity) {
-        let child_list: Vec<Entity> = children.0.clone();
-        for child in child_list {
-            draw_entity_node(ui, world, child, depth + 1, selected, selection_changed, base_x, row_w);
+        ui.layout.cursor_y += LINE_HEIGHT;
+
+        if let Some(children) = world.get::<Children>(entity) {
+            let child_list: Vec<Entity> = children.0.clone();
+            for child in child_list {
+                self.draw_node(ui, child, depth + 1);
+            }
         }
     }
 }
@@ -87,19 +92,17 @@ pub fn hierarchy_panel(
     // begin_panel already positioned layout.cursor_y just under the title bar.
     // Use that y as the start of the tree rows.
     let root_entities = roots(&session.world);
-    let mut selection_changed = false;
+    let mut tree = EntityTree {
+        world: &session.world,
+        selected: &mut session.selected,
+        selection_changed: false,
+        base_x: x,
+        row_w: w,
+    };
     for entity in root_entities {
-        draw_entity_node(
-            ui,
-            &session.world,
-            entity,
-            0,
-            &mut session.selected,
-            &mut selection_changed,
-            x,
-            w,
-        );
+        tree.draw_node(ui, entity, 0);
     }
+    let selection_changed = tree.selection_changed;
 
     ui.end_panel();
     let _ = (y, h); // currently unused (no scrolling); reserved for future

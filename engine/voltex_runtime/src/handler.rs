@@ -390,14 +390,7 @@ fn draw_hud_overlay(
         ui.begin_frame(mouse_x as f32, mouse_y as f32, mouse_down);
         hud_fn(ui, world);
         ui.end_frame();
-        ui_renderer.render(
-            &gpu_window.gpu.device,
-            &gpu_window.gpu.queue,
-            encoder,
-            view,
-            &ui.draw_list,
-            surface_width,
-            surface_height,
-        );
+        let screen = voltex_editor::ScreenTarget { view, width: surface_width, height: surface_height };
+        ui_renderer.render_to(&gpu_window.gpu.device, &gpu_window.gpu.queue, encoder, &screen, &ui.draw_list);
     }
 }

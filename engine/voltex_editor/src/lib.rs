@@ -7,7 +7,7 @@
 //!   primitives.
 //! - Layout: [`DockTree`] binary-split layout.
 //! - 3D scene: [`OrbitCamera`], [`ViewportRenderer`] + [`ViewportTexture`],
-//!   [`pick_entity`] ray picking (Bounds AABB, sphere fallback), [`gizmo`]
+//!   [`pick_entity_at`] ray picking (Bounds AABB, sphere fallback), [`gizmo`]
 //!   translate/rotate/scale handles.
 //! - Fonts: [`FontAtlas`] ([`bitmap_font`]), [`TtfFont`] + [`ttf_parser`] + [`rasterizer`]
 //!   + [`glyph_cache`] for TrueType.
@@ -34,7 +34,7 @@ pub use error::{EditorError, Result};
 pub use bitmap_font::{FontAtlas, UvRect};
 pub use draw_list::{DrawVertex, DrawCommand, DrawList};
 pub use layout::LayoutState;
-pub use ui_renderer::UiRenderer;
+pub use ui_renderer::{ScreenTarget, UiRenderer};
 
 /// Old path of [`bitmap_font`].
 #[deprecated(note = "use `voltex_editor::bitmap_font`")]
@@ -55,10 +55,12 @@ pub use panels::inspector::{
     InspectorState,
 };
 pub use orbit_camera::OrbitCamera;
+#[allow(deprecated)]
 pub use picking::pick_entity;
+pub use picking::{pick_entity_at, ViewportCursor};
 
 pub mod gizmo;
-pub use gizmo::{DragResult, GizmoAxis, GizmoMode, GizmoRenderer, GizmoState};
+pub use gizmo::{DragResult, GizmoAxis, GizmoDraw, GizmoMode, GizmoRenderer, GizmoState};
 
 pub mod lifecycle;
 pub use lifecycle::{LifecycleCallback, LifecycleEvent};

@@ -4,6 +4,9 @@
 
 use bytemuck::{Pod, Zeroable};
 
+use crate::dock::Rect;
+use crate::ui_renderer::ScreenTarget;
+
 #[repr(C)]
 #[derive(Copy, Clone, Pod, Zeroable)]
 struct RectUniform {
@@ -116,7 +119,10 @@ impl ViewportRenderer {
         }
     }
 
-    #[allow(clippy::too_many_arguments)]
+    /// Old form of [`Self::render_to`] with the screen size and viewport
+    /// rect spelled out.
+    #[deprecated(note = "use `render_to` with a `ScreenTarget` and a `Rect`")]
+    #[allow(clippy::too_many_arguments)] // reason: legacy signature kept for compatibility
     pub fn render(
         &self,
         device: &wgpu::Device,
@@ -131,6 +137,23 @@ impl ViewportRenderer {
         rect_w: f32,
         rect_h: f32,
     ) {
+        let target = ScreenTarget { view: target_view, width: screen_w, height: screen_h };
+        let rect = Rect { x: rect_x, y: rect_y, w: rect_w, h: rect_h };
+        self.render_to(device, queue, encoder, &target, viewport_color_view, rect);
+    }
+
+    /// Blits `viewport_color_view` into `rect` (screen pixels) of `target`.
+    pub fn render_to(
+        &self,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        encoder: &mut wgpu::CommandEncoder,
+        target: &ScreenTarget,
+        viewport_color_view: &wgpu::TextureView,
+        rect: Rect,
+    ) {
+        let ScreenTarget { view: target_view, width: screen_w, height: screen_h } = *target;
+        let Rect { x: rect_x, y: rect_y, w: rect_w, h: rect_h } = rect;
         let uniform = RectUniform {
             rect: [rect_x, rect_y, rect_w, rect_h],
             screen: [screen_w, screen_h],

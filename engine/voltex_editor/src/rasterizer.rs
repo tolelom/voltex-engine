@@ -16,14 +16,15 @@ pub struct RasterResult {
     pub offset_y: f32,
 }
 
-/// Recursively flatten a quadratic bezier into line segments.
+/// Recursively flatten a quadratic bezier (`start`, `control`, `end`) into
+/// line segments.
 pub(crate) fn flatten_quad(
-    x0: f32, y0: f32,
-    cx: f32, cy: f32,
-    x1: f32, y1: f32,
+    start: [f32; 2],
+    control: [f32; 2],
+    end: [f32; 2],
     edges: &mut Vec<(f32, f32, f32, f32)>,
 ) {
-    flatten_quad_depth(x0, y0, cx, cy, x1, y1, edges, 0);
+    flatten_quad_depth(start, control, end, edges, 0);
 }
 
 /// Subdivision depth cap: 2^16 segments is far beyond any real glyph, and it
@@ -31,11 +32,10 @@ pub(crate) fn flatten_quad(
 /// (the flatness test never passes for NaN).
 const MAX_FLATTEN_DEPTH: u32 = 16;
 
-#[allow(clippy::too_many_arguments)]
 fn flatten_quad_depth(
-    x0: f32, y0: f32,
-    cx: f32, cy: f32,
-    x1: f32, y1: f32,
+    [x0, y0]: [f32; 2],
+    [cx, cy]: [f32; 2],
+    [x1, y1]: [f32; 2],
     edges: &mut Vec<(f32, f32, f32, f32)>,
     depth: u32,
 ) {
@@ -56,8 +56,8 @@ fn flatten_quad_depth(
         let m12y = (cy + y1) / 2.0;
         let midx = (m01x + m12x) / 2.0;
         let midy = (m01y + m12y) / 2.0;
-        flatten_quad_depth(x0, y0, m01x, m01y, midx, midy, edges, depth + 1);
-        flatten_quad_depth(midx, midy, m12x, m12y, x1, y1, edges, depth + 1);
+        flatten_quad_depth([x0, y0], [m01x, m01y], [midx, midy], edges, depth + 1);
+        flatten_quad_depth([midx, midy], [m12x, m12y], [x1, y1], edges, depth + 1);
     }
 }
 
@@ -121,7 +121,7 @@ pub(crate) fn rasterize(outline: &GlyphOutline, scale: f32) -> RasterResult {
                 let (px0, py0) = transform(p0.x, p0.y);
                 let (cx, cy) = transform(p1.x, p1.y);
                 let (px1, py1) = transform(p2.x, p2.y);
-                flatten_quad(px0, py0, cx, cy, px1, py1, &mut edges);
+                flatten_quad([px0, py0], [cx, cy], [px1, py1], &mut edges);
                 i += 2;
             } else {
                 // Skip unexpected off-curve start
@@ -228,7 +228,7 @@ mod tests {
     #[test]
     fn test_flatten_quad_produces_edges() {
         let mut edges = Vec::new();
-        flatten_quad(0.0, 0.0, 5.0, 10.0, 10.0, 0.0, &mut edges);
+        flatten_quad([0.0, 0.0], [5.0, 10.0], [10.0, 0.0], &mut edges);
         assert!(
             edges.len() >= 2,
             "bezier should flatten to multiple segments"

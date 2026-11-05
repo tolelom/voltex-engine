@@ -4,7 +4,7 @@
 //! editor workflow and have never been visually verified.
 
 use voltex_ecs::{MaterialHandle, MeshHandle, Transform, World};
-use voltex_editor::{GizmoMode, GizmoRenderer};
+use voltex_editor::{GizmoDraw, GizmoMode, GizmoRenderer};
 use voltex_math::Vec3;
 use voltex_renderer::{Camera, LightUniform, MaterialUniform};
 use voltex_renderer_ecs::{BasicRenderer, RenderAssets};
@@ -73,16 +73,8 @@ fn render_with_mode(gpu: &HeadlessGpu, width: u32, height: u32, mode: GizmoMode)
         },
     );
     // Overlay: gizmo handles at the cube origin (loads color + depth).
-    gizmo.render(
-        queue,
-        &mut encoder,
-        &target.color_view,
-        &target.depth_view,
-        view_proj,
-        Vec3::ZERO,
-        mode,
-        None,
-    );
+    let draw = GizmoDraw { view_proj, origin: Vec3::ZERO, mode, active_axis: None };
+    gizmo.render_to(queue, &mut encoder, &target.color_view, &target.depth_view, &draw);
     queue.submit(Some(encoder.finish()));
 
     target.read_rgba8(device, queue)
