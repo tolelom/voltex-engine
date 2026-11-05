@@ -101,8 +101,8 @@ pub struct RuntimeApp {
     /// Optional per-frame point/spot-light updater (see [`Self::set_point_lights_fn`]).
     pub(crate) point_lights_fn: Option<PointLightsFn>,
     /// Watcher the script pool drains every frame (`poll_reload`) for Lua hot
-    /// reload. The runtime registers no paths on it — call
-    /// `app.file_watcher.watch(path)` for each script that should reload.
+    /// reload. The runtime registers every script file it loads from disk;
+    /// scripts seeded from the Vfs (`.vpkg`) are not files and aren't watched.
     pub file_watcher: FileWatcher,
     /// Wallclock frame timer. The runtime calls `tick()` once per redraw and
     /// feeds its `frame_dt()` (clamped to 250 ms) to the systems, unless
@@ -349,6 +349,10 @@ impl RuntimeApp {
         fill_script_input(&mut self.script_input, &self.input);
         voltex_script::set_current_input(&self.script_input as *const _);
         let mut errors = voltex_script::script_start_all(&mut self.world, &mut self.script_pool);
+        // Hot reload: watch every script file the pool just read from disk.
+        for path in self.script_pool.take_paths_to_watch() {
+            self.file_watcher.watch(path.into());
+        }
         errors.extend(voltex_script::script_update_all(&mut self.world, &mut self.script_pool, dt));
         voltex_script::set_current_input(std::ptr::null());
         for error in errors {

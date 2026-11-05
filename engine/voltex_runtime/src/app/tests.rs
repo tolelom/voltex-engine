@@ -465,6 +465,41 @@ fn fill_script_input_maps_keys_and_buttons() {
 }
 
 #[test]
+fn scripts_loaded_from_disk_are_hot_reloaded() {
+    use voltex_ecs::{ScriptComponent, Transform};
+    use voltex_math::Vec3;
+    let dir = std::env::temp_dir().join("voltex_runtime_hot_reload_test");
+    let _ = std::fs::create_dir_all(&dir);
+    let path = dir.join("mover.lua");
+    let script = |z: f32| {
+        format!("function on_start(id, gen) set_position(id, gen, 0.0, 0.0, {z:.1}) end")
+    };
+    std::fs::write(&path, script(1.0)).unwrap();
+
+    let cfg = RuntimeConfig::new().disable_physics().disable_crash_log();
+    let mut app = RuntimeApp::new(cfg).unwrap();
+    app.file_watcher = voltex_asset::FileWatcher::new(std::time::Duration::ZERO);
+    let e = app.world.spawn();
+    app.world.add(e, Transform::from_position(Vec3::ZERO));
+    app.world.add(e, ScriptComponent::new(path.to_str().unwrap().to_string()));
+
+    app.tick_systems_only(0.016);
+    assert_eq!(app.file_watcher.watched_count(), 1, "the loaded script is watched");
+    assert!((app.world.get::<Transform>(e).unwrap().position.z - 1.0).abs() < 1e-6);
+
+    // Edit the file (bump mtime explicitly: filesystems can have coarse mtimes).
+    std::fs::write(&path, script(2.0)).unwrap();
+    let later = std::time::SystemTime::now() + std::time::Duration::from_secs(5);
+    std::fs::File::options().write(true).open(&path).unwrap().set_modified(later).unwrap();
+
+    // Next tick sees the change and reloads; on_start re-runs the tick after.
+    app.tick_systems_only(0.016);
+    app.tick_systems_only(0.016);
+    let z = app.world.get::<Transform>(e).unwrap().position.z;
+    assert!((z - 2.0).abs() < 1e-6, "edited script should have re-run on_start, got z={z}");
+}
+
+#[test]
 fn script_reads_live_input_through_tick() {
     use voltex_ecs::{ScriptComponent, Transform};
     use voltex_math::Vec3;
