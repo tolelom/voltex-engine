@@ -182,7 +182,7 @@ fn copy_assets_root_glob_does_not_copy_dist_into_itself() {
 /// audio_path payloads, using the same registry round-trip the editor uses.
 fn make_scene_json(tex: &str, mesh: &str, audio: &str) -> String {
     fn ser_tex(world: &voltex_ecs::World, e: voltex_ecs::Entity) -> Option<Vec<u8>> {
-        world.get::<TexPathRef>(e).map(|p| p.0.as_bytes().to_vec())
+        world.get::<TexturePathRef>(e).map(|p| p.0.as_bytes().to_vec())
     }
     fn ser_mesh(world: &voltex_ecs::World, e: voltex_ecs::Entity) -> Option<Vec<u8>> {
         world.get::<MeshPathRef>(e).map(|p| p.0.as_bytes().to_vec())
@@ -192,15 +192,15 @@ fn make_scene_json(tex: &str, mesh: &str, audio: &str) -> String {
     }
     let mut registry = voltex_ecs::ComponentRegistry::new();
     registry.register::<voltex_ecs::Transform>();
-    registry.register_raw("texture_path", ser_tex, deser_tex);
-    registry.register_raw("mesh_path", ser_mesh, deser_mesh);
-    registry.register_raw("audio_path", ser_audio, deser_audio);
+    registry.register_raw("texture_path", ser_tex, deserialize_texture_path);
+    registry.register_raw("mesh_path", ser_mesh, deserialize_mesh_path);
+    registry.register_raw("audio_path", ser_audio, deserialize_audio_path);
 
     let mut world = voltex_ecs::World::new();
     let e = world.spawn();
     // Transform anchors the entity in the serialized scene.
     world.add(e, voltex_ecs::Transform::default());
-    world.add(e, TexPathRef(tex.to_string()));
+    world.add(e, TexturePathRef(tex.to_string()));
     world.add(e, MeshPathRef(mesh.to_string()));
     world.add(e, AudioPathRef(audio.to_string()));
     voltex_ecs::serialize_scene_json(&world, &registry)
@@ -343,7 +343,7 @@ fn copy_license_files_partial_only_copies_present() {
 fn copy_license_files_resolves_against_actual_repo() {
     // The repo this test runs in IS the engine. THIRD-PARTY-LICENSES.md
     // was created in v1.0.7 — assert that helper finds it when given the
-    // workspace root, so the build flow we just wired into build_target
+    // workspace root, so the build flow we just wired into build_project
     // works end-to-end (without invoking cargo).
     let workspace_root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .parent()
@@ -380,33 +380,33 @@ fn wrapper_manifest_isolates_from_ancestor_workspaces() {
 }
 
 #[test]
-fn validate_target_accepts_host_match_via_arg() {
+fn resolve_build_target_accepts_host_match_via_arg() {
     let mut m = dummy("X", 100, 100);
     m.build.targets = vec!["windows-x64".into(), "linux-x64".into()];
-    let t = validate_target(&m, Some("windows-x64"), "windows-x64").unwrap();
+    let t = resolve_build_target(&m, Some("windows-x64"), "windows-x64").unwrap();
     assert_eq!(t, "windows-x64");
 }
 
 #[test]
-fn validate_target_accepts_host_from_manifest_when_arg_absent() {
+fn resolve_build_target_accepts_host_from_manifest_when_arg_absent() {
     let mut m = dummy("X", 100, 100);
     m.build.targets = vec!["windows-x64".into(), "linux-x64".into()];
-    let t = validate_target(&m, None, "linux-x64").unwrap();
+    let t = resolve_build_target(&m, None, "linux-x64").unwrap();
     assert_eq!(t, "linux-x64");
 }
 
 #[test]
-fn validate_target_falls_back_to_host_when_manifest_empty() {
+fn resolve_build_target_falls_back_to_host_when_manifest_empty() {
     let mut m = dummy("X", 100, 100);
     m.build.targets = vec![];
-    let t = validate_target(&m, None, "macos-arm64").unwrap();
+    let t = resolve_build_target(&m, None, "macos-arm64").unwrap();
     assert_eq!(t, "macos-arm64");
 }
 
 #[test]
-fn validate_target_rejects_cross_compile_via_arg() {
+fn resolve_build_target_rejects_cross_compile_via_arg() {
     let m = dummy("X", 100, 100);
-    let err = validate_target(&m, Some("macos-arm64"), "windows-x64").unwrap_err();
+    let err = resolve_build_target(&m, Some("macos-arm64"), "windows-x64").unwrap_err();
     match err {
         CliError::CrossCompileNotSupported { host, requested } => {
             assert_eq!(host, "windows-x64");
@@ -417,10 +417,10 @@ fn validate_target_rejects_cross_compile_via_arg() {
 }
 
 #[test]
-fn validate_target_rejects_host_missing_from_manifest_list() {
+fn resolve_build_target_rejects_host_missing_from_manifest_list() {
     let mut m = dummy("X", 100, 100);
     m.build.targets = vec!["windows-x64".into(), "macos-arm64".into()];
-    let err = validate_target(&m, None, "linux-x64").unwrap_err();
+    let err = resolve_build_target(&m, None, "linux-x64").unwrap_err();
     match err {
         CliError::HostNotInManifestTargets { host, listed } => {
             assert_eq!(host, "linux-x64");
@@ -476,7 +476,7 @@ fn rust_kind_build_ships_game_exe_and_loose_assets() {
         .unwrap()
         .to_path_buf();
 
-    build_target(&root, Some(&engine), &m, host_triple()).expect("rust-kind build succeeds");
+    build_project(&root, Some(&engine), &m, host_triple()).expect("rust-kind build succeeds");
 
     let exe = root.join("dist").join(if cfg!(windows) {
         "mini_game.exe"

@@ -23,9 +23,9 @@ fn main() -> ExitCode {
     }
 
     let result = match args.get(1).map(|s| s.as_str()) {
-        Some("new") => maybe_subhelp(&args, "new", help::NEW, new::cmd),
-        Some("build") => maybe_subhelp(&args, "build", help::BUILD, build::cmd),
-        Some("run") => maybe_subhelp(&args, "run", help::RUN, run::cmd),
+        Some("new") => run_subcommand(&args, help::NEW, new::cmd),
+        Some("build") => run_subcommand(&args, help::BUILD, build::cmd),
+        Some("run") => run_subcommand(&args, help::RUN, run::cmd),
         Some("--help") | Some("-h") | None => {
             print!("{}", help::TOP);
             return ExitCode::SUCCESS;
@@ -47,9 +47,8 @@ fn main() -> ExitCode {
 
 /// If the subcommand args contain `--help` / `-h`, print the per-subcommand
 /// help text and return success. Otherwise dispatch to the real handler.
-fn maybe_subhelp(
+fn run_subcommand(
     args: &[String],
-    _name: &str,
     sub_help: &str,
     handler: impl FnOnce(&[String]) -> error::Result<()>,
 ) -> error::Result<()> {

@@ -35,9 +35,9 @@ pub fn cmd(args: &[String]) -> Result<()> {
     if !skip_path_validation {
         manifest.validate_paths(&manifest_dir)?;
     }
-    let target = validate_target(&manifest, target_arg.as_deref(), host_triple())?;
+    let target = resolve_build_target(&manifest, target_arg.as_deref(), host_triple())?;
 
-    build_target(&manifest_dir, engine_path.as_deref(), &manifest, &target)
+    build_project(&manifest_dir, engine_path.as_deref(), &manifest, &target)
 }
 
 /// Pick the build target and reject impossible requests up front (B3).
@@ -52,7 +52,7 @@ pub fn cmd(args: &[String]) -> Result<()> {
 /// 2. Otherwise, if the manifest lists targets, the host triple must be in
 ///    that list.
 /// 3. Otherwise, fall back to `host`.
-pub fn validate_target(
+pub fn resolve_build_target(
     manifest: &Manifest,
     target_arg: Option<&str>,
     host: &str,
@@ -117,7 +117,11 @@ fn resolve_engine_path(args: &[String]) -> Result<PathBuf> {
     Ok(PathBuf::from(env))
 }
 
-pub fn build_target(
+/// Build the project into `<manifest_dir>/dist/`, branching on
+/// `[build] kind`: `rust` builds the game crate itself, `scene` generates and
+/// builds a wrapper binary around the packed scene. `target` is only logged —
+/// it was already checked against the host by [`resolve_build_target`].
+pub fn build_project(
     manifest_dir: &Path,
     engine_path: Option<&Path>,
     manifest: &Manifest,
@@ -134,9 +138,20 @@ pub fn build_target(
         target
     );
 
-    if manifest.build.kind == BuildKind::Rust {
-        return build_rust_target(&manifest_dir, engine_path.as_deref(), manifest);
+    match manifest.build.kind {
+        BuildKind::Rust => build_rust_target(&manifest_dir, engine_path.as_deref(), manifest),
+        BuildKind::Scene => build_scene_target(&manifest_dir, engine_path.as_deref(), manifest),
     }
+}
+
+/// `kind = "scene"` build path: pack the scene/scripts/assets into a `.vpkg`,
+/// generate a wrapper crate that embeds it, `cargo build --release` the
+/// wrapper, and copy the binary, loose assets and license files into `dist/`.
+fn build_scene_target(
+    manifest_dir: &Path,
+    engine_path: Option<&Path>,
+    manifest: &Manifest,
+) -> Result<()> {
     // scene kind의 wrapper 코드젠은 엔진 경로가 필수.
     let engine_path = engine_path.ok_or_else(|| {
         CliError::Io("engine path required for scene builds — set VOLTEX_REPO or --engine-path".into())
@@ -149,9 +164,9 @@ pub fn build_target(
     // Build the .vpkg archive *before* writing wrapper main.rs so the
     // codegen can reference it via include_bytes!.
     let archive_path = wrapper_dir.join("voltex_archive.vpkg");
-    pack_archive(&manifest_dir, manifest, &archive_path)?;
+    pack_archive(manifest_dir, manifest, &archive_path)?;
 
-    write_wrapper_manifest(&wrapper_dir, &engine_path)?;
+    write_wrapper_manifest(&wrapper_dir, engine_path)?;
     write_wrapper_main(&wrapper_dir, manifest)?;
 
     let cargo = which_cargo()?;
@@ -181,9 +196,9 @@ pub fn build_target(
     std::fs::copy(&exe_src, &exe_dst)?;
     eprintln!("voltex build: wrote {}", exe_dst.display());
 
-    copy_assets(&manifest_dir, &dist_dir, manifest)?;
+    copy_assets(manifest_dir, &dist_dir, manifest)?;
 
-    let licenses = copy_license_files(&engine_path, &dist_dir)?;
+    let licenses = copy_license_files(engine_path, &dist_dir)?;
     if !licenses.is_empty() {
         eprintln!("voltex build: bundled {} license file(s)", licenses.len());
     }
@@ -379,6 +394,10 @@ pub fn copy_license_files(engine_path: &Path, dist_dir: &Path) -> Result<Vec<Pat
     Ok(copied)
 }
 
+/// One `.vpkg` entry: (forward-slash key relative to the manifest dir, file
+/// bytes) — the tuple shape `voltex_asset::write_vpkg` takes.
+type ArchiveEntry = (String, Vec<u8>);
+
 /// Walk the manifest's scene + scripts + assets dirs and write a `.vpkg`.
 /// Paths inside the archive use forward slashes and are relative to the
 /// manifest directory (so `with_initial_scene("scene.vscn")` works).
@@ -389,7 +408,7 @@ pub fn copy_license_files(engine_path: &Path, dist_dir: &Path) -> Result<Vec<Pat
 /// references missing from disk produce a warning (the build continues — the
 /// runtime falls back to the white default texture / skips the mesh).
 pub fn pack_archive(manifest_dir: &Path, manifest: &Manifest, out_path: &Path) -> Result<()> {
-    let mut entries: Vec<(String, Vec<u8>)> = Vec::new();
+    let mut entries: Vec<ArchiveEntry> = Vec::new();
 
     // 1. scene
     let scene_path = manifest_dir.join(&manifest.build.scene);
@@ -403,17 +422,17 @@ pub fn pack_archive(manifest_dir: &Path, manifest: &Manifest, out_path: &Path) -
     // 2. scripts
     let skip = build_output_dirs(manifest_dir);
     for dir in manifest.resolved_script_dirs(manifest_dir) {
-        collect_into_entries(&dir, manifest_dir, &skip, &mut entries)?;
+        collect_archive_entries(&dir, manifest_dir, &skip, &mut entries)?;
     }
     // 3. assets
     for dir in manifest.resolved_assets_dirs(manifest_dir) {
-        collect_into_entries(&dir, manifest_dir, &skip, &mut entries)?;
+        collect_archive_entries(&dir, manifest_dir, &skip, &mut entries)?;
     }
 
     // 4. scene-referenced assets not covered by the declared dirs.
     if let Some(bytes) = scene_bytes {
         for path in scan_scene_asset_paths(&bytes) {
-            // 아카이브 키는 forward-slash 규약 (collect_into_entries / 런타임
+            // 아카이브 키는 forward-slash 규약 (collect_archive_entries / 런타임
             // read_asset과 동일) — 백슬래시 표기 씬 경로도 같은 키로 정규화.
             let key = path.replace('\\', "/");
             if entries.iter().any(|(k, _)| *k == key) {
@@ -448,11 +467,11 @@ pub fn pack_archive(manifest_dir: &Path, manifest: &Manifest, out_path: &Path) -
 /// Marker components the raw deserializers below attach so the scan can
 /// collect paths through a `World` query (`register_raw` takes plain fn
 /// pointers — no closure capture).
-struct TexPathRef(String);
+struct TexturePathRef(String);
 struct MeshPathRef(String);
 struct AudioPathRef(String);
 
-fn deser_path_ref<T: 'static>(
+fn deserialize_path_ref<T: 'static>(
     make: fn(String) -> T,
 ) -> impl Fn(&mut voltex_ecs::World, voltex_ecs::Entity, &[u8]) -> voltex_ecs::Result<()> {
     move |world, entity, data| {
@@ -464,28 +483,28 @@ fn deser_path_ref<T: 'static>(
     }
 }
 
-fn deser_tex(
+fn deserialize_texture_path(
     world: &mut voltex_ecs::World,
     entity: voltex_ecs::Entity,
     data: &[u8],
 ) -> voltex_ecs::Result<()> {
-    deser_path_ref(TexPathRef)(world, entity, data)
+    deserialize_path_ref(TexturePathRef)(world, entity, data)
 }
 
-fn deser_mesh(
+fn deserialize_mesh_path(
     world: &mut voltex_ecs::World,
     entity: voltex_ecs::Entity,
     data: &[u8],
 ) -> voltex_ecs::Result<()> {
-    deser_path_ref(MeshPathRef)(world, entity, data)
+    deserialize_path_ref(MeshPathRef)(world, entity, data)
 }
 
-fn deser_audio(
+fn deserialize_audio_path(
     world: &mut voltex_ecs::World,
     entity: voltex_ecs::Entity,
     data: &[u8],
 ) -> voltex_ecs::Result<()> {
-    deser_path_ref(AudioPathRef)(world, entity, data)
+    deserialize_path_ref(AudioPathRef)(world, entity, data)
 }
 
 /// Extract the `texture_path` / `mesh_path` / `audio_path` component payloads
@@ -498,9 +517,9 @@ fn deser_audio(
 /// already fails at runtime with a clearer error).
 pub fn scan_scene_asset_paths(scene_bytes: &[u8]) -> Vec<String> {
     let mut registry = voltex_ecs::ComponentRegistry::new();
-    registry.register_raw("texture_path", |_, _| None, deser_tex);
-    registry.register_raw("mesh_path", |_, _| None, deser_mesh);
-    registry.register_raw("audio_path", |_, _| None, deser_audio);
+    registry.register_raw("texture_path", |_, _| None, deserialize_texture_path);
+    registry.register_raw("mesh_path", |_, _| None, deserialize_mesh_path);
+    registry.register_raw("audio_path", |_, _| None, deserialize_audio_path);
 
     let mut world = voltex_ecs::World::new();
     if scene_bytes.starts_with(b"VSCN") {
@@ -513,7 +532,7 @@ pub fn scan_scene_asset_paths(scene_bytes: &[u8]) -> Vec<String> {
     }
 
     let mut paths: Vec<String> = world
-        .query::<TexPathRef>()
+        .query::<TexturePathRef>()
         .map(|(_, p)| p.0.clone())
         .chain(world.query::<MeshPathRef>().map(|(_, p)| p.0.clone()))
         .chain(world.query::<AudioPathRef>().map(|(_, p)| p.0.clone()))
@@ -531,25 +550,27 @@ fn build_output_dirs(manifest_dir: &Path) -> Vec<PathBuf> {
     vec![manifest_dir.join("dist"), manifest_dir.join("target")]
 }
 
-fn collect_into_entries(
+/// Recursively add every file under `dir` to `out`, keyed by its path
+/// relative to `relative_to`. Directories in `skip` are not descended into.
+fn collect_archive_entries(
     dir: &Path,
     relative_to: &Path,
     skip: &[PathBuf],
-    out: &mut Vec<(String, Vec<u8>)>,
+    out: &mut Vec<ArchiveEntry>,
 ) -> Result<()> {
     if !dir.exists() {
         return Ok(());
     }
     for entry in std::fs::read_dir(dir)? {
         let entry = entry?;
-        let ty = entry.file_type()?;
+        let file_type = entry.file_type()?;
         let path = entry.path();
-        if ty.is_dir() {
+        if file_type.is_dir() {
             if skip.contains(&path) {
                 continue;
             }
-            collect_into_entries(&path, relative_to, skip, out)?;
-        } else if ty.is_file() {
+            collect_archive_entries(&path, relative_to, skip, out)?;
+        } else if file_type.is_file() {
             let rel = path
                 .strip_prefix(relative_to)
                 .map_err(|e| CliError::Io(format!("strip_prefix: {}", e)))?;

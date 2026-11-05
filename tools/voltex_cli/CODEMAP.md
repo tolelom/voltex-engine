@@ -43,7 +43,7 @@ src/
 ├── util.rs       # copy_optional_file/dir, escape_for_rust_string
 ├── new.rs        # scaffold (디렉토리 + 매니페스트 + 샘플 lua)
 ├── build/
-│   ├── mod.rs    # build_target, cargo invocation, pack_archive, 씬 에셋 참조 스캔
+│   ├── mod.rs    # build_project (kind 분기 → build_rust_target / build_scene_target), resolve_build_target, pack_archive, 씬 에셋 참조 스캔
 │   ├── wrapper.rs # render_wrapper_main 등 래퍼 크레이트 템플릿 (Cargo.toml, main.rs)
 │   └── tests.rs  # 단위 테스트
 └── run.rs        # build 후 exe 실행
