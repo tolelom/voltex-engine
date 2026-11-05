@@ -86,18 +86,37 @@ pub enum Packet {
     },
 }
 
+/// Largest payload one packet can carry: the header stores its length in 2 bytes.
+pub const MAX_PAYLOAD_LEN: usize = u16::MAX as usize;
+
 impl Packet {
     /// Serialize the packet into bytes: [type_id(1), payload_len(2 LE), reserved(1), payload...]
+    ///
+    /// # Panics
+    /// If the payload is longer than [`MAX_PAYLOAD_LEN`]; the length would not
+    /// fit the header. Use [`Self::try_to_bytes`] when the size isn't known to fit.
     pub fn to_bytes(&self) -> Vec<u8> {
+        self.try_to_bytes().unwrap_or_else(|e| panic!("{e}"))
+    }
+
+    /// Like [`Self::to_bytes`], but returns an error instead of panicking when
+    /// the payload is longer than [`MAX_PAYLOAD_LEN`].
+    pub fn try_to_bytes(&self) -> crate::Result<Vec<u8>> {
         let payload = self.encode_payload();
-        let payload_len = payload.len() as u16;
+        let payload_len = u16::try_from(payload.len()).map_err(|_| {
+            format!(
+                "packet payload is {} bytes; at most {} fit the header",
+                payload.len(),
+                MAX_PAYLOAD_LEN
+            )
+        })?;
 
         let mut buf = Vec::with_capacity(HEADER_SIZE + payload.len());
         buf.push(self.type_id());
         buf.extend_from_slice(&payload_len.to_le_bytes());
         buf.push(0u8); // reserved
         buf.extend_from_slice(&payload);
-        buf
+        Ok(buf)
     }
 
     /// Deserialize a packet from bytes.
@@ -334,5 +353,22 @@ mod tests {
         let bytes = vec![99u8, 0, 0, 0]; // type=99, payload_len=0, reserved=0
         let result = Packet::from_bytes(&bytes);
         assert!(result.is_err(), "Expected error for unknown type_id");
+    }
+
+    #[test]
+    fn try_to_bytes_accepts_the_largest_payload_and_rejects_one_more_byte() {
+        // UserData payload = client_id (4 bytes) + data.
+        let largest = Packet::UserData { client_id: 1, data: vec![7; MAX_PAYLOAD_LEN - 4] };
+        let bytes = largest.try_to_bytes().expect("fits");
+        assert_eq!(Packet::from_bytes(&bytes).unwrap(), largest);
+
+        let too_big = Packet::UserData { client_id: 1, data: vec![7; MAX_PAYLOAD_LEN - 3] };
+        assert!(too_big.try_to_bytes().is_err());
+    }
+
+    #[test]
+    #[should_panic(expected = "at most")]
+    fn to_bytes_panics_instead_of_wrapping_the_length() {
+        Packet::UserData { client_id: 1, data: vec![0; MAX_PAYLOAD_LEN] }.to_bytes();
     }
 }

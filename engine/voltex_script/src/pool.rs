@@ -27,6 +27,9 @@ pub struct ScriptInstancePool {
     sources: HashMap<String, String>,
     /// 로드에 실패한 경로 — 프레임마다 재시도/재로그하지 않기 위한 캐시.
     failed: std::collections::HashSet<String>,
+    /// Script files read from disk (loaded or failed) that no watcher knows
+    /// about yet; drained by [`Self::take_paths_to_watch`].
+    unwatched_disk_paths: Vec<String>,
     next_id: u32,
 }
 
@@ -38,6 +41,7 @@ impl ScriptInstancePool {
             path_to_id: HashMap::new(),
             sources: HashMap::new(),
             failed: std::collections::HashSet::new(),
+            unwatched_disk_paths: Vec::new(),
             next_id: 0,
         }
     }
@@ -82,7 +86,11 @@ impl ScriptInstancePool {
         // 시드된 소스(Vfs) 우선, 없으면 파일시스템.
         let loaded = match self.sources.get(&key) {
             Some(src) => lua.exec(src),
-            None => lua.exec_file(path),
+            None => {
+                // Watch the file even if it fails to load, so fixing it retries.
+                self.unwatched_disk_paths.push(path.to_string());
+                lua.exec_file(path)
+            }
         };
         if let Err(e) = loaded {
             // 1회 로깅 + 실패 캐시 — 이전엔 호출부(system.rs)가 조용히
@@ -147,24 +155,38 @@ impl ScriptInstancePool {
         Ok(true)
     }
 
-    /// Drop every instance. Used by the editor's PlayStop lifecycle and by
-    /// `RuntimeApp` shutdown.
+    /// Drop every instance and forget earlier load failures, so the next
+    /// `get_or_create` loads every script fresh. Used by the editor's PlayStop
+    /// lifecycle and by `RuntimeApp` shutdown.
     pub fn clear(&mut self) {
         self.instances.clear();
         self.path_to_id.clear();
+        self.failed.clear();
         self.next_id = 0;
     }
 
+    /// Script files read from disk since the last call — loaded or failed —
+    /// for the caller to register with its [`voltex_asset::FileWatcher`].
+    /// Scripts seeded from memory ([`Self::seed_source`]) are never listed.
+    pub fn take_paths_to_watch(&mut self) -> Vec<String> {
+        std::mem::take(&mut self.unwatched_disk_paths)
+    }
+
     /// Poll a `FileWatcher` and reload any tracked script whose mtime changed.
-    /// Silent on per-path errors — the watcher entry is consumed regardless,
-    /// matching the watcher's "report once per change" semantics. Returns the
-    /// list of paths that were successfully reloaded.
+    /// A changed script that had failed to load is un-marked so the next
+    /// `get_or_create` tries it again. Reload errors are logged; the watcher
+    /// entry is consumed regardless ("report once per change"). Returns the
+    /// paths that were successfully reloaded.
     pub fn poll_reload(&mut self, watcher: &mut voltex_asset::FileWatcher) -> Vec<String> {
         let mut reloaded = Vec::new();
         for path in watcher.poll_changes() {
             let p = path.to_string_lossy().to_string();
-            if matches!(self.reload(&p), Ok(true)) {
-                reloaded.push(p);
+            match self.reload(&p) {
+                Ok(true) => reloaded.push(p),
+                Ok(false) => {
+                    self.failed.remove(&voltex_asset::vfs_key(&p));
+                }
+                Err(e) => eprintln!("voltex_script: failed to reload `{p}`: {e}"),
             }
         }
         reloaded
@@ -314,4 +336,53 @@ mod tests {
         assert!(pool.is_empty());
         assert!(pool.find_by_path(path.to_str().unwrap()).is_none());
     }
+
+    #[test]
+    fn clear_forgets_load_failures_so_scripts_are_retried() {
+        let path = write_tmp_lua("retry_after_clear.lua", "this is not lua");
+        let p = path.to_str().unwrap();
+        let mut world = World::new();
+        let mut pool = ScriptInstancePool::new();
+        assert!(pool.get_or_create(p, &mut world).is_err());
+
+        std::fs::write(&path, "x = 1").unwrap();
+        assert!(pool.get_or_create(p, &mut world).is_err(), "failure is cached until cleared");
+        pool.clear();
+        assert!(pool.get_or_create(p, &mut world).is_ok());
+    }
+
+    #[test]
+    fn disk_scripts_are_listed_for_watching_but_seeded_ones_are_not() {
+        let path = write_tmp_lua("watch_me.lua", "x = 1");
+        let p = path.to_str().unwrap();
+        let mut world = World::new();
+        let mut pool = ScriptInstancePool::new();
+        pool.seed_source("seeded.lua", "y = 2");
+        pool.get_or_create(p, &mut world).unwrap();
+        pool.get_or_create("seeded.lua", &mut world).unwrap();
+
+        assert_eq!(pool.take_paths_to_watch(), vec![p.to_string()]);
+        assert!(pool.take_paths_to_watch().is_empty(), "drained");
+    }
+
+    #[test]
+    fn editing_a_script_that_failed_to_load_makes_it_load_again() {
+        let path = write_tmp_lua("fix_me.lua", "this is not lua");
+        let p = path.to_str().unwrap();
+        let mut world = World::new();
+        let mut pool = ScriptInstancePool::new();
+        let mut watcher = voltex_asset::FileWatcher::new(std::time::Duration::ZERO);
+        assert!(pool.get_or_create(p, &mut world).is_err());
+        for watched in pool.take_paths_to_watch() {
+            watcher.watch(watched.into());
+        }
+        assert!(pool.poll_reload(&mut watcher).is_empty()); // baseline mtime
+
+        std::fs::write(&path, "x = 1").unwrap();
+        let later = std::time::SystemTime::now() + std::time::Duration::from_secs(5);
+        std::fs::File::options().write(true).open(&path).unwrap().set_modified(later).unwrap();
+        pool.poll_reload(&mut watcher);
+        assert!(pool.get_or_create(p, &mut world).is_ok());
+    }
 }
+

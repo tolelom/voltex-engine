@@ -19,7 +19,6 @@
 | 항목 | 현상 | 선택지 |
 |---|---|---|
 | glTF 머티리얼 텍스처 | 텍스처를 무시하고 색 계수만 로드 ([DEFERRED](DEFERRED.md) "2026-10-12 밤샘 점검") | baseColor·normal부터 임포트 / 실제 glTF 에셋을 쓸 때까지 보류 |
-| `Packet::to_bytes` 길이 | 64 KiB 넘는 페이로드에서 u16 길이가 wrap (`crates/voltex_net/src/packet.rs`). UDP에선 OS가 먼저 막아 도달하지 않음 | `try_to_bytes() -> Result` 추가 / 다른 전송 계층을 붙일 때까지 보류 |
 
 ## 3. 설계가 필요한 것
 
