@@ -10,8 +10,8 @@
 
 ## Phase 3a
 
-- **Archetype 기반 스토리지** → SparseSet 사용 중. 대규모 씬에서 성능 이슈 시 전환.
-- ~~**시스템 스케줄러**~~ ✅ 순서 기반 Scheduler 완료.
+- **Archetype 기반 스토리지** → SparseSet 사용 중. 대규모 씬에서 성능 이슈 시 전환. (`ArchetypeRegistry` 시험 구현은 `voltex_ecs::experimental::archetype`, World 와 연결 안 됨.)
+- ~~**시스템 스케줄러**~~ ✅ 순서 기반 Scheduler 완료. 현재 `voltex_ecs::experimental::scheduler` (엔진 미사용 — RuntimeApp 은 자체 시스템 목록을 돈다).
 - ~~**쿼리 필터**~~ ✅ With/Without 완료.
 - ~~**query3+**~~ ✅ query3, query4 완료.
 - ~~**Changed 필터**~~ ✅ tick 기반 변경 감지, query_changed, clear_changed 완료.

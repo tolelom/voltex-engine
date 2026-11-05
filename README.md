@@ -99,7 +99,7 @@ voltex              facade. 하위 crate 재노출과 prelude
 ├── voltex_platform   창·입력·타이머
 ├── voltex_asset      핸들, 에셋 저장소, 파일 감시, .vpkg
 ├── voltex_image      이미지·메시 디코더, PNG 인코더
-├── voltex_ecs        World·Entity·Component·Scheduler·씬
+├── voltex_ecs        World·Entity·Component·계층·씬
 ├── voltex_audio      디코더, 믹서, OS별 백엔드
 ├── voltex_ai         NavMesh, 경로 탐색, steering
 ├── voltex_net        UDP, 신뢰 채널, 스냅샷, 보간
