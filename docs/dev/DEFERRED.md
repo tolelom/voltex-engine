@@ -152,7 +152,7 @@
 - ~~**에셋 브라우저**~~ ✅ 파일 목록 + 디렉토리 탐색 완료. 에셋 로딩/프리뷰 미구현.
 - ~~**텍스트 입력**~~ ✅ text_input 위젯 완료.
 - ~~**스크롤, 드래그앤드롭**~~ ✅ scroll_panel + drag/drop 완료.
-- ~~**도킹, 탭**~~ ✅ DockTree + ~~**플로팅 윈도우**~~ ✅ FloatingPanelManager 완료. 탭 드래그 이동 미구현.
+- ~~**도킹, 탭**~~ ✅ DockTree + ~~**플로팅 윈도우**~~ ✅ FloatingPanelManager 완료. 탭 드래그 이동 미구현. 현재 `voltex_editor::experimental::floating_panel` (엔진 미사용).
 - ~~**TTF 폰트**~~ ✅ 자체 TTF 파서 + 래스터라이저 + 온디맨드 캐시 + 렌더러 아틀라스 교체 완료.
 
 ## 렌더링 한계

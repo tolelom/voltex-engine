@@ -18,7 +18,6 @@ Immediate-mode UI 에디터 — 도킹/플로팅/뷰포트/인스펙터/에셋 �
 
 ### Layout
 - `DockTree`, `DockNode`, `Axis`, `Rect`, `LeafLayout` — 도킹 (src/dock.rs, 558줄)
-- `FloatingPanel`, `FloatingPanelManager` (src/floating_panel.rs)
 
 ### 3D 뷰포트
 - `OrbitCamera` (src/orbit_camera.rs) — `forward()`는 yaw/pitch만으로 계산해 `distance` 0에서도 유한 (v1.0.126)
@@ -59,11 +58,14 @@ Immediate-mode UI 에디터 — 도킹/플로팅/뷰포트/인스펙터/에셋 �
 ## 모듈 구조
 - 코어: ui_context, ui_renderer, draw_list, bitmap_font, layout, ttf_* (parser, font, rasterizer, glyph_cache)
 - 위젯: widgets/ (controls, containers, text_input, drag)
-- 레이아웃: dock, floating_panel
+- 레이아웃: dock
 - 뷰포트: orbit_camera, viewport_texture, viewport_renderer, picking, gizmo/
 - 패널: panels/{hierarchy, inspector}, asset_browser
 - 커맨드/세션: command, session, lifecycle
 - 셰이더: ui_shader.wgsl, gizmo/shader.wgsl, viewport_shader.wgsl
+- experimental — 구현·단위 테스트는 되어 있지만 에디터(editor_demo)가 쓰지 않는 모듈. API가 바뀌거나 없어질 수 있다 (src/experimental/)
+  - `floating_panel` — `FloatingPanel`, `FloatingPanelManager` (도킹 트리에서 떼어 낸 드래그·리사이즈 패널. 에디터는 DockTree 만 쓴다)
+  - 옛 경로(`voltex_editor::FloatingPanel`, `voltex_editor::floating_panel`)는 src/deprecated_paths.rs 의 deprecated 별칭
 
 ## 의존성
 - voltex crate: voltex_math, voltex_ecs, voltex_renderer
