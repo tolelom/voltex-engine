@@ -8,8 +8,6 @@ use crate::mixing::VoiceId;
 use crate::AudioClip;
 use crate::spatial::SpatialParams;
 use crate::mix_group::MixGroup;
-// Only the Windows audio thread applies commands (see `apply_command`).
-#[cfg(target_os = "windows")]
 use crate::{PlayingSound, spatial::Listener, mix_group::MixerState};
 
 // ---------------------------------------------------------------------------
@@ -17,10 +15,6 @@ use crate::{PlayingSound, spatial::Listener, mix_group::MixerState};
 // ---------------------------------------------------------------------------
 
 /// Commands sent to the audio thread.
-#[cfg_attr(
-    not(target_os = "windows"),
-    expect(dead_code, reason = "the silent non-Windows thread drops playback payloads")
-)]
 pub(crate) enum AudioCommand {
     /// Start playing a clip.
     Play {
@@ -138,7 +132,8 @@ impl AudioSystem {
     /// Create an AudioSystem with the given pre-loaded clips.
     ///
     /// Spawns a background audio thread that owns the clips and drives the
-    /// WASAPI device (on Windows) or runs in silent mode (other platforms).
+    /// output device: WASAPI on Windows, ALSA on Linux, CoreAudio on macOS.
+    /// Without a usable device (headless, CI) it runs silently.
     pub fn new(clips: Vec<AudioClip>) -> crate::Result<Self> {
         let clip_count = clips.len();
         let (tx, rx) = mpsc::channel::<AudioCommand>();
@@ -252,7 +247,6 @@ impl Drop for AudioSystem {
 /// Apply one [`AudioCommand`] to the audio thread's state. Returns `true` for
 /// `Shutdown` (the caller should exit its loop). Extracted from the thread
 /// loop so the command semantics are unit-testable without a device.
-#[cfg(target_os = "windows")]
 pub(crate) fn apply_command(
     cmd: AudioCommand,
     playing: &mut Vec<PlayingSound>,
@@ -311,15 +305,88 @@ pub(crate) fn apply_command(
 
 /// Main audio thread function.
 ///
-/// On Windows, initializes `wasapi_ffi::WasapiDevice` and drives playback
-/// (the `backend` module / `make_backend()` are not used here).
-/// On other platforms, runs in a silent "null" mode (processes commands only).
+/// On Windows, initializes `wasapi_ffi::WasapiDevice` and drives playback.
+/// Elsewhere it opens the OS device through [`crate::backend::open_device_backend`]
+/// (ALSA / CoreAudio). Without a device it runs in a silent "null" mode that
+/// only processes commands.
 fn audio_thread(rx: mpsc::Receiver<AudioCommand>, clips: Vec<AudioClip>) {
     #[cfg(target_os = "windows")]
     audio_thread_windows(rx, clips);
 
     #[cfg(not(target_os = "windows"))]
-    audio_thread_null(rx, clips);
+    match crate::backend::open_device_backend() {
+        Some(backend) => audio_thread_backend(rx, clips, backend),
+        None => audio_thread_null(rx, clips),
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Linux / macOS implementation (ALSA / CoreAudio through `AudioBackend`)
+// ---------------------------------------------------------------------------
+
+/// Mixes one device buffer per iteration and pushes it to `backend`. The
+/// backend's `write` blocks until the device has room, so it paces the loop;
+/// nothing else sleeps. Silence is written while nothing plays to keep the
+/// device fed.
+#[cfg(not(target_os = "windows"))]
+fn audio_thread_backend(
+    rx: mpsc::Receiver<AudioCommand>,
+    mut clips: Vec<AudioClip>,
+    mut backend: Box<dyn crate::backend::AudioBackend>,
+) {
+    use crate::mix_sounds;
+
+    let sample_rate = backend.sample_rate();
+    let channels = backend.channels();
+    let buffer_frames = backend.buffer_frames() as usize;
+    let buffer_duration = std::time::Duration::from_secs_f64(buffer_frames as f64 / sample_rate as f64);
+
+    let mut playing: Vec<PlayingSound> = Vec::new();
+    let mut output: Vec<f32> = Vec::new();
+    let mut listener = Listener::default();
+    let mut mixer = MixerState::new();
+    let mut write_failing = false;
+
+    loop {
+        // Advance mixer fades by the length of one buffer.
+        mixer.tick(buffer_duration.as_secs_f32());
+
+        loop {
+            match rx.try_recv() {
+                Ok(cmd) => {
+                    if apply_command(cmd, &mut playing, &mut clips, &mut listener, &mut mixer) {
+                        return;
+                    }
+                }
+                Err(mpsc::TryRecvError::Empty) => break,
+                Err(mpsc::TryRecvError::Disconnected) => return,
+            }
+        }
+
+        // `mix_sounds` always fills exactly one buffer (zeros when idle).
+        mix_sounds(
+            &mut output,
+            &mut playing,
+            &clips,
+            sample_rate,
+            channels,
+            buffer_frames,
+            &listener,
+            &mixer,
+        );
+        match backend.write(&output) {
+            Ok(_) => write_failing = false,
+            Err(e) => {
+                // Log once per failure streak; wait one buffer instead of
+                // spinning while the device is gone.
+                if !write_failing {
+                    eprintln!("[voltex_audio] audio write failed: {}", e);
+                    write_failing = true;
+                }
+                thread::sleep(buffer_duration);
+            }
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -399,7 +466,7 @@ fn audio_thread_windows(rx: mpsc::Receiver<AudioCommand>, mut clips: Vec<AudioCl
 }
 
 // ---------------------------------------------------------------------------
-// Null (non-Windows) implementation
+// Null (no output device) implementation
 // ---------------------------------------------------------------------------
 
 #[cfg(not(target_os = "windows"))]
@@ -498,8 +565,6 @@ mod tests {
         sys.stop_voice(a); // fire-and-forget, must not panic
     }
 
-    // Windows-only: the non-Windows thread never applies Play/StopVoice.
-    #[cfg(target_os = "windows")]
     #[test]
     fn apply_command_stop_voice_removes_only_that_voice() {
         let mut playing: Vec<PlayingSound> = Vec::new();

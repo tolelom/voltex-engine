@@ -5,10 +5,10 @@
 //! at runtime, with a hard fallback to `NullBackend` whenever device init
 //! fails.
 //!
-//! **Not wired into [`AudioSystem`](crate::AudioSystem) yet**: its audio thread
-//! drives `crate::wasapi_ffi::WasapiDevice` directly on Windows and runs
-//! silent (commands only, no output) on every other OS. Nothing in the engine
-//! calls `make_backend()` today.
+//! [`AudioSystem`](crate::AudioSystem) plays through ALSA (Linux) and CoreAudio
+//! (macOS) via [`open_device_backend`]. On Windows its audio thread still drives
+//! `crate::wasapi_ffi::WasapiDevice` directly; `WasapiBackend` is the same
+//! device behind this trait.
 
 use std::fmt;
 
@@ -71,28 +71,34 @@ pub use coreaudio::CoreAudioBackend;
 /// Pick the best backend the OS offers, or fall back to `NullBackend` so the
 /// audio thread can keep running silently in headless or device-less envs.
 pub fn make_backend() -> Box<dyn AudioBackend> {
+    open_device_backend().unwrap_or_else(|| Box::new(NullBackend::new()))
+}
+
+/// Open the OS audio device, or `None` when there is none (headless, CI, no
+/// sound card, or an OS without a backend). Init failures are logged.
+pub fn open_device_backend() -> Option<Box<dyn AudioBackend>> {
     #[cfg(target_os = "windows")]
     {
         match WasapiBackend::new() {
-            Ok(b) => return Box::new(b),
-            Err(e) => eprintln!("[voltex_audio] WASAPI init failed: {} — falling back to null", e),
+            Ok(b) => return Some(Box::new(b)),
+            Err(e) => eprintln!("[voltex_audio] WASAPI init failed: {} — running silent", e),
         }
     }
     #[cfg(target_os = "linux")]
     {
         match AlsaBackend::new() {
-            Ok(b) => return Box::new(b),
-            Err(e) => eprintln!("[voltex_audio] ALSA init failed: {} — falling back to null", e),
+            Ok(b) => return Some(Box::new(b)),
+            Err(e) => eprintln!("[voltex_audio] ALSA init failed: {} — running silent", e),
         }
     }
     #[cfg(target_os = "macos")]
     {
         match CoreAudioBackend::new() {
-            Ok(b) => return Box::new(b),
-            Err(e) => eprintln!("[voltex_audio] CoreAudio init failed: {} — falling back to null", e),
+            Ok(b) => return Some(Box::new(b)),
+            Err(e) => eprintln!("[voltex_audio] CoreAudio init failed: {} — running silent", e),
         }
     }
-    Box::new(NullBackend::new())
+    None
 }
 
 #[cfg(test)]
