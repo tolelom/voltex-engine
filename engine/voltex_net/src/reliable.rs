@@ -17,7 +17,8 @@ const DEDUP_WINDOW: usize = 1024;
 /// and retransmits unacknowledged packets after 2x RTT.
 pub struct ReliableChannel {
     next_sequence: u16,
-    pending_acks: HashMap<u16, (Instant, Vec<u8>)>,
+    /// Sent packets still waiting for an ACK: sequence → (last send time, wrapped data).
+    unacked_sends: HashMap<u16, (Instant, Vec<u8>)>,
     /// Sliding de-dup window: slot `seq % DEDUP_WINDOW` holds the sequence that
     /// currently occupies it. A packet is a duplicate iff its slot already
     /// holds its own sequence. Replaces an unbounded `HashSet<u16>` that grew
@@ -39,7 +40,7 @@ impl ReliableChannel {
     pub fn new() -> Self {
         ReliableChannel {
             next_sequence: 0,
-            pending_acks: HashMap::new(),
+            unacked_sends: HashMap::new(),
             recv_window: vec![None; DEDUP_WINDOW],
             rtt: Duration::from_millis(100), // initial estimate
             outgoing_acks: Vec::new(),
@@ -53,7 +54,7 @@ impl ReliableChannel {
 
     /// Returns the number of packets awaiting acknowledgement.
     pub fn pending_count(&self) -> usize {
-        self.pending_acks.len()
+        self.unacked_sends.len()
     }
 
     /// Prepare a reliable send. Returns (sequence_number, wrapped_data).
@@ -67,7 +68,7 @@ impl ReliableChannel {
         buf.extend_from_slice(&seq.to_le_bytes());
         buf.extend_from_slice(data);
 
-        self.pending_acks.insert(seq, (Instant::now(), buf.clone()));
+        self.unacked_sends.insert(seq, (Instant::now(), buf.clone()));
 
         (seq, buf)
     }
@@ -89,7 +90,7 @@ impl ReliableChannel {
 
     /// Process an incoming ACK for a sequence we sent.
     pub fn process_ack(&mut self, sequence: u16) {
-        if let Some((send_time, _)) = self.pending_acks.remove(&sequence) {
+        if let Some((send_time, _)) = self.unacked_sends.remove(&sequence) {
             let sample = send_time.elapsed();
             // Exponential moving average: rtt = 0.875 * rtt + 0.125 * sample
             self.rtt = Duration::from_secs_f64(
@@ -103,14 +104,14 @@ impl ReliableChannel {
         std::mem::take(&mut self.outgoing_acks)
     }
 
-    /// Check for timed-out packets and return their data for retransmission.
-    /// Resets the send_time for retransmitted packets.
-    pub fn update(&mut self) -> Vec<Vec<u8>> {
+    /// Collect the packets whose ACK has not arrived within 2×RTT and return
+    /// their data for the caller to send again. Resets their send time.
+    pub fn collect_retransmits(&mut self) -> Vec<Vec<u8>> {
         let timeout = self.rtt * 2;
         let now = Instant::now();
         let mut retransmits = Vec::new();
 
-        for (send_time, data) in self.pending_acks.values_mut() {
+        for (send_time, data) in self.unacked_sends.values_mut() {
             if now.duration_since(*send_time) >= timeout {
                 retransmits.push(data.clone());
                 *send_time = now;
@@ -119,13 +120,20 @@ impl ReliableChannel {
 
         retransmits
     }
+
+    /// Old name of [`ReliableChannel::collect_retransmits`].
+    #[deprecated(note = "use `collect_retransmits`")]
+    pub fn update(&mut self) -> Vec<Vec<u8>> {
+        self.collect_retransmits()
+    }
 }
 
 /// A channel that delivers packets in order, built on top of ReliableChannel.
 pub struct OrderedChannel {
     reliable: ReliableChannel,
     next_deliver: u16,
-    buffer: HashMap<u16, Vec<u8>>,
+    /// Received packets ahead of `next_deliver`, held until the gap fills.
+    out_of_order: HashMap<u16, Vec<u8>>,
 }
 
 impl Default for OrderedChannel {
@@ -140,11 +148,11 @@ impl OrderedChannel {
         OrderedChannel {
             reliable: ReliableChannel::new(),
             next_deliver: 0,
-            buffer: HashMap::new(),
+            out_of_order: HashMap::new(),
         }
     }
 
-    /// Access the underlying reliable channel (e.g., for send_reliable, process_ack, update).
+    /// Access the underlying reliable channel (e.g., for send_reliable, process_ack, collect_retransmits).
     pub fn reliable(&self) -> &ReliableChannel {
         &self.reliable
     }
@@ -170,12 +178,12 @@ impl OrderedChannel {
         // delivered one u16 wrap later in place of the real message.
         let ahead = sequence.wrapping_sub(self.next_deliver) < 0x8000;
         if let Some(payload) = payload.filter(|_| ahead) {
-            self.buffer.insert(sequence, payload);
+            self.out_of_order.insert(sequence, payload);
         }
 
         // Deliver as many consecutive packets as possible
         let mut delivered = Vec::new();
-        while let Some(data) = self.buffer.remove(&self.next_deliver) {
+        while let Some(data) = self.out_of_order.remove(&self.next_deliver) {
             delivered.push(data);
             self.next_deliver = self.next_deliver.wrapping_add(1);
         }
@@ -255,7 +263,7 @@ mod tests {
         // Wait for timeout
         std::thread::sleep(Duration::from_millis(10));
 
-        let retransmits = channel.update();
+        let retransmits = channel.collect_retransmits();
         assert_eq!(retransmits.len(), 1, "Should retransmit 1 packet");
         // Packet is still pending (not acked)
         assert_eq!(channel.pending_count(), 1);
@@ -268,7 +276,7 @@ mod tests {
         let (_seq, _buf) = channel.send_reliable(b"data");
 
         // Immediately check — should not retransmit
-        let retransmits = channel.update();
+        let retransmits = channel.collect_retransmits();
         assert!(retransmits.is_empty());
     }
 

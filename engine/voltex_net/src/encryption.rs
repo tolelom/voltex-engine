@@ -17,7 +17,7 @@ impl PacketCipher {
         PacketCipher { key: key.to_vec(), send_counter: 0, recv_counter: 0 }
     }
 
-    /// Encrypt data in-place. Prepends 8-byte sequence number.
+    /// Encrypt `plaintext` into a new buffer: 8-byte sequence number + XORed bytes.
     pub fn encrypt(&mut self, plaintext: &[u8]) -> Vec<u8> {
         let mut output = Vec::with_capacity(8 + plaintext.len());
         // Prepend sequence counter

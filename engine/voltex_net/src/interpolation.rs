@@ -4,7 +4,11 @@
 use std::collections::VecDeque;
 
 use crate::snapshot::{EntityState, Snapshot};
+use voltex_math::easing::lerp;
 use voltex_math::Quat;
+
+/// Buffer capacity used by [`InterpolationBuffer::new`].
+const DEFAULT_MAX_SNAPSHOTS: usize = 32;
 
 /// Buffers recent snapshots and interpolates between them for smooth rendering.
 pub struct InterpolationBuffer {
@@ -21,7 +25,7 @@ impl InterpolationBuffer {
         InterpolationBuffer {
             snapshots: VecDeque::new(),
             interp_delay,
-            max_snapshots: 32,
+            max_snapshots: DEFAULT_MAX_SNAPSHOTS,
         }
     }
 
@@ -90,10 +94,6 @@ impl InterpolationBuffer {
     }
 }
 
-fn lerp(a: f32, b: f32, t: f32) -> f32 {
-    a + (b - a) * t
-}
-
 fn lerp_f32x3(a: &[f32; 3], b: &[f32; 3], t: f32) -> [f32; 3] {
     [lerp(a[0], b[0], t), lerp(a[1], b[1], t), lerp(a[2], b[2], t)]
 }
@@ -101,10 +101,7 @@ fn lerp_f32x3(a: &[f32; 3], b: &[f32; 3], t: f32) -> [f32; 3] {
 /// Spherical linear interpolation between two unit-quaternion wire reps.
 /// Picks the shorter arc and stays NaN-safe via `Quat::slerp`.
 fn slerp_quat_wire(a: &[f32; 4], b: &[f32; 4], t: f32) -> [f32; 4] {
-    let qa = Quat::new(a[0], a[1], a[2], a[3]);
-    let qb = Quat::new(b[0], b[1], b[2], b[3]);
-    let r = Quat::slerp(qa, qb, t);
-    [r.x, r.y, r.z, r.w]
+    Quat::slerp(Quat::from_array(*a), Quat::from_array(*b), t).to_array()
 }
 
 fn lerp_entity(a: &EntityState, b: &EntityState, t: f32) -> EntityState {

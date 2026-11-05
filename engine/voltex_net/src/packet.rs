@@ -2,6 +2,8 @@
 //! and its `to_bytes` / `from_bytes` serialisers. Each packet begins with a
 //! 4-byte header: `type_id(1) | payload_len(2 LE) | reserved(1)`.
 
+use crate::wire::{read_u16, read_u32, read_u64};
+
 /// Packet type IDs
 const TYPE_CONNECT: u8 = 1;
 const TYPE_ACCEPT: u8 = 2;
@@ -108,7 +110,7 @@ impl Packet {
         }
 
         let type_id = data[0];
-        let payload_len = u16::from_le_bytes([data[1], data[2]]) as usize;
+        let payload_len = read_u16(data, 1) as usize;
         // data[3] is reserved, ignored
 
         if data.len() < HEADER_SIZE + payload_len {
@@ -120,13 +122,23 @@ impl Packet {
         }
 
         let payload = &data[HEADER_SIZE..HEADER_SIZE + payload_len];
+        Self::decode_payload(type_id, payload)
+    }
 
+    /// Decodes the payload of a packet whose header said `type_id`.
+    fn decode_payload(type_id: u8, payload: &[u8]) -> crate::Result<Packet> {
+        // Every variant checks its fixed-size prefix before reading it.
+        let require = |min_len: usize, what: &str| -> crate::Result<()> {
+            if payload.len() < min_len {
+                Err(format!("{what} payload too short").into())
+            } else {
+                Ok(())
+            }
+        };
         match type_id {
             TYPE_CONNECT => {
-                if payload.len() < 2 {
-                    return Err("Connect payload too short".into());
-                }
-                let name_len = u16::from_le_bytes([payload[0], payload[1]]) as usize;
+                require(2, "Connect")?;
+                let name_len = read_u16(payload, 0) as usize;
                 if payload.len() < 2 + name_len {
                     return Err("Connect name bytes too short".into());
                 }
@@ -135,78 +147,44 @@ impl Packet {
                 Ok(Packet::Connect { client_name })
             }
             TYPE_ACCEPT => {
-                if payload.len() < 4 {
-                    return Err("Accept payload too short".into());
-                }
-                let client_id = u32::from_le_bytes([payload[0], payload[1], payload[2], payload[3]]);
-                Ok(Packet::Accept { client_id })
+                require(4, "Accept")?;
+                Ok(Packet::Accept { client_id: read_u32(payload, 0) })
             }
             TYPE_DISCONNECT => {
-                if payload.len() < 4 {
-                    return Err("Disconnect payload too short".into());
-                }
-                let client_id = u32::from_le_bytes([payload[0], payload[1], payload[2], payload[3]]);
-                Ok(Packet::Disconnect { client_id })
+                require(4, "Disconnect")?;
+                Ok(Packet::Disconnect { client_id: read_u32(payload, 0) })
             }
             TYPE_PING => {
-                if payload.len() < 8 {
-                    return Err("Ping payload too short".into());
-                }
-                let timestamp = u64::from_le_bytes([
-                    payload[0], payload[1], payload[2], payload[3],
-                    payload[4], payload[5], payload[6], payload[7],
-                ]);
-                Ok(Packet::Ping { timestamp })
+                require(8, "Ping")?;
+                Ok(Packet::Ping { timestamp: read_u64(payload, 0) })
             }
             TYPE_PONG => {
-                if payload.len() < 8 {
-                    return Err("Pong payload too short".into());
-                }
-                let timestamp = u64::from_le_bytes([
-                    payload[0], payload[1], payload[2], payload[3],
-                    payload[4], payload[5], payload[6], payload[7],
-                ]);
-                Ok(Packet::Pong { timestamp })
+                require(8, "Pong")?;
+                Ok(Packet::Pong { timestamp: read_u64(payload, 0) })
             }
             TYPE_USER_DATA => {
-                if payload.len() < 4 {
-                    return Err("UserData payload too short".into());
-                }
-                let client_id = u32::from_le_bytes([payload[0], payload[1], payload[2], payload[3]]);
-                let data = payload[4..].to_vec();
-                Ok(Packet::UserData { client_id, data })
+                require(4, "UserData")?;
+                Ok(Packet::UserData { client_id: read_u32(payload, 0), data: payload[4..].to_vec() })
             }
             TYPE_RELIABLE => {
-                if payload.len() < 2 {
-                    return Err("Reliable payload too short".into());
-                }
-                let sequence = u16::from_le_bytes([payload[0], payload[1]]);
-                let data = payload[2..].to_vec();
-                Ok(Packet::Reliable { sequence, data })
+                require(2, "Reliable")?;
+                Ok(Packet::Reliable { sequence: read_u16(payload, 0), data: payload[2..].to_vec() })
             }
             TYPE_ACK => {
-                if payload.len() < 2 {
-                    return Err("Ack payload too short".into());
-                }
-                let sequence = u16::from_le_bytes([payload[0], payload[1]]);
-                Ok(Packet::Ack { sequence })
+                require(2, "Ack")?;
+                Ok(Packet::Ack { sequence: read_u16(payload, 0) })
             }
             TYPE_SNAPSHOT => {
-                if payload.len() < 4 {
-                    return Err("Snapshot payload too short".into());
-                }
-                let tick = u32::from_le_bytes([payload[0], payload[1], payload[2], payload[3]]);
-                let data = payload[4..].to_vec();
-                Ok(Packet::Snapshot { tick, data })
+                require(4, "Snapshot")?;
+                Ok(Packet::Snapshot { tick: read_u32(payload, 0), data: payload[4..].to_vec() })
             }
             TYPE_SNAPSHOT_DELTA => {
-                if payload.len() < 8 {
-                    return Err("SnapshotDelta payload too short".into());
-                }
-                let base_tick = u32::from_le_bytes([payload[0], payload[1], payload[2], payload[3]]);
-                let tick = u32::from_le_bytes([payload[4], payload[5], payload[6], payload[7]]);
-                let data = payload[8..].to_vec();
-                Ok(Packet::SnapshotDelta { base_tick, tick, data })
+                require(8, "SnapshotDelta")?;
+                Ok(Packet::SnapshotDelta {
+                    base_tick: read_u32(payload, 0),
+                    tick: read_u32(payload, 4),
+                    data: payload[8..].to_vec(),
+                })
             }
             _ => Err(format!("Unknown packet type_id: {}", type_id).into()),
         }

@@ -4,6 +4,9 @@
 
 use std::collections::VecDeque;
 
+/// History entries closer together than this (seconds) are not interpolated.
+const MIN_TIMESTAMP_GAP: f32 = 1e-6;
+
 /// A timestamped snapshot of entity positions for lag compensation.
 #[derive(Debug, Clone)]
 pub struct HistoryEntry {
@@ -73,28 +76,28 @@ impl LagCompensation {
         }
 
         match (before, after) {
-            (Some(b), Some(a)) => {
-                let t = if (a.timestamp - b.timestamp).abs() > 1e-6 {
-                    (timestamp - b.timestamp) / (a.timestamp - b.timestamp)
+            (Some(before), Some(after)) => {
+                let t = if (after.timestamp - before.timestamp).abs() > MIN_TIMESTAMP_GAP {
+                    (timestamp - before.timestamp) / (after.timestamp - before.timestamp)
                 } else { 0.0 };
                 // Pair entities by id — list order changes whenever something
                 // spawns or despawns between ticks. An entity missing from the
                 // later tick keeps its earlier position.
                 let later: std::collections::HashMap<u32, [f32; 3]> =
-                    a.positions.iter().map(|(p, id)| (*id, *p)).collect();
-                let result = b
+                    after.positions.iter().map(|(position, id)| (*id, *position)).collect();
+                let result = before
                     .positions
                     .iter()
-                    .map(|(pos_b, id)| match later.get(id) {
-                        Some(pos_a) => (
+                    .map(|(pos_before, id)| match later.get(id) {
+                        Some(pos_after) => (
                             [
-                                pos_b[0] + (pos_a[0] - pos_b[0]) * t,
-                                pos_b[1] + (pos_a[1] - pos_b[1]) * t,
-                                pos_b[2] + (pos_a[2] - pos_b[2]) * t,
+                                pos_before[0] + (pos_after[0] - pos_before[0]) * t,
+                                pos_before[1] + (pos_after[1] - pos_before[1]) * t,
+                                pos_before[2] + (pos_after[2] - pos_before[2]) * t,
                             ],
                             *id,
                         ),
-                        None => (*pos_b, *id),
+                        None => (*pos_before, *id),
                     })
                     .collect();
                 Some(result)
