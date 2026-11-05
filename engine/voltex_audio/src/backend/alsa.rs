@@ -160,9 +160,12 @@ impl AudioBackend for AlsaBackend {
         if frames == 0 {
             return Ok(0);
         }
-        // SAFETY: relies on self.pcm being the handle opened in `new` — calling
-        // `write` after `shutdown` (pcm = NULL) is not guarded here. `samples`
-        // holds at least `frames * channels` interleaved f32 values.
+        if self.pcm.is_null() {
+            return Err(BackendError::WriteFailed("ALSA backend is shut down".into()));
+        }
+        // SAFETY: `self.pcm` is non-null (checked above), so it is the handle
+        // opened in `new`; only `shutdown` closes it, and it nulls the pointer.
+        // `samples` holds at least `frames * channels` interleaved f32 values.
         unsafe {
             let written = snd_pcm_writei(self.pcm, samples.as_ptr(), frames);
             if written >= 0 {
@@ -224,6 +227,18 @@ mod tests {
     #[test]
     fn alsa_module_compiles_on_linux() {
         let _ = super::SND_PCM_STREAM_PLAYBACK;
+    }
+
+    #[test]
+    fn write_after_shutdown_is_an_error_not_a_null_handle_call() {
+        // A backend whose device is already closed (pcm = NULL), as after shutdown().
+        let mut backend = AlsaBackend {
+            pcm: std::ptr::null_mut(),
+            sample_rate: 48_000,
+            channels: 2,
+            buffer_frames: 1024,
+        };
+        assert!(backend.write(&[0.0; 128]).is_err());
     }
 
     /// Real-hardware smoke test (F6). Opens the default ALSA device, pushes

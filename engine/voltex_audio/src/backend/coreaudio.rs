@@ -286,8 +286,11 @@ impl AudioBackend for CoreAudioBackend {
         if samples.is_empty() {
             return Ok(0);
         }
-        // SAFETY: `self.free` was leaked in new() and remains valid until
-        // shutdown(), which we have not yet entered (we own &mut self).
+        if self.free.is_null() || self.queue.is_null() {
+            return Err(BackendError::WriteFailed("CoreAudio backend is shut down".into()));
+        }
+        // SAFETY: `self.free` is non-null (checked above), so it is the Arc
+        // leaked in new(); only shutdown() frees it, and it nulls the pointer.
         let arc = unsafe { &*self.free };
         let mut guard = arc
             .inner
