@@ -16,7 +16,7 @@ pub struct VoiceId(pub u64);
 
 /// Represents a sound currently being played back.
 pub struct PlayingSound {
-    /// Index into the clips slice passed to `mix_sounds`.
+    /// Index into the clips slice passed to `mix_buffer`.
     pub clip_index: usize,
     /// Current playback position in frames (not samples).
     pub position: usize,
@@ -66,18 +66,30 @@ impl PlayingSound {
     }
 }
 
+/// Shape of one output buffer the mixer fills: device rate, channel count
+/// and how many frames to render.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct OutputFormat {
+    /// Output device sample rate in Hz.
+    pub sample_rate: u32,
+    /// Output device channel count (1 or 2).
+    pub channels: u16,
+    /// Number of output frames to fill.
+    pub frames: usize,
+}
+
+impl OutputFormat {
+    /// Bundles the three output parameters.
+    pub fn new(sample_rate: u32, channels: u16, frames: usize) -> Self {
+        Self { sample_rate, channels, frames }
+    }
+}
+
 /// Mix all active sounds in `playing` into `output`.
 ///
-/// # Parameters
-/// - `output`: interleaved output buffer (len = frames * device_channels).
-/// - `playing`: mutable list of active sounds; finished non-looping sounds are removed.
-/// - `clips`: the audio clip assets.
-/// - `device_sample_rate`: output device sample rate.
-/// - `device_channels`: output device channel count (1 or 2).
-/// - `frames`: number of output frames to fill.
-/// - `listener`: the listener for 3D spatialization.
-/// - `mixer`: the global mixer state providing per-group and master volumes.
-#[allow(clippy::too_many_arguments)]
+/// Deprecated form of [`mix_buffer`] with the output format spelled out.
+#[deprecated(note = "use `mix_buffer` with an `OutputFormat`")]
+#[allow(clippy::too_many_arguments)] // reason: legacy signature kept for compatibility
 pub fn mix_sounds(
     output: &mut Vec<f32>,
     playing: &mut Vec<PlayingSound>,
@@ -88,6 +100,29 @@ pub fn mix_sounds(
     listener: &Listener,
     mixer: &MixerState,
 ) {
+    let format = OutputFormat::new(device_sample_rate, device_channels, frames);
+    mix_buffer(output, playing, clips, format, listener, mixer);
+}
+
+/// Mix all active sounds in `playing` into `output`.
+///
+/// # Parameters
+/// - `output`: interleaved output buffer, resized to `format.frames * format.channels`.
+/// - `playing`: mutable list of active sounds; finished non-looping sounds are removed.
+/// - `clips`: the audio clip assets.
+/// - `format`: output device rate / channel count and the frames to render.
+/// - `listener`: the listener for 3D spatialization.
+/// - `mixer`: the global mixer state providing per-group and master volumes.
+pub fn mix_buffer(
+    output: &mut Vec<f32>,
+    playing: &mut Vec<PlayingSound>,
+    clips: &[AudioClip],
+    format: OutputFormat,
+    listener: &Listener,
+    mixer: &MixerState,
+) {
+    let OutputFormat { sample_rate: device_sample_rate, channels: device_channels, frames } = format;
+
     // Ensure output buffer is sized correctly and zeroed.
     let output_len = frames * device_channels as usize;
     output.clear();
@@ -220,7 +255,7 @@ mod tests {
         let mut playing = vec![PlayingSound::new(0, 0.5, false)];
         let mut output = Vec::new();
 
-        mix_sounds(&mut output, &mut playing, &clips, 44100, 1, 10, &Listener::default(), &MixerState::new());
+        mix_buffer(&mut output, &mut playing, &clips, OutputFormat::new(44100, 1, 10), &Listener::default(), &MixerState::new());
 
         // All output frames should be 0.5 (1.0 * 0.5 volume)
         assert_eq!(output.len(), 10);
@@ -236,14 +271,14 @@ mod tests {
         let clips = vec![make_mono_clip(1.0, 100, 44100), make_mono_clip(0.25, 100, 44100)];
         let mut playing = vec![PlayingSound::new(0, f32::NAN, false), PlayingSound::new(1, 1.0, false)];
         let mut output = Vec::new();
-        mix_sounds(&mut output, &mut playing, &clips, 44100, 2, 10, &Listener::default(), &MixerState::new());
+        mix_buffer(&mut output, &mut playing, &clips, OutputFormat::new(44100, 2, 10), &Listener::default(), &MixerState::new());
         assert!(output.iter().all(|s| s.is_finite()), "{:?}", &output[..4]);
         // The healthy sound is still heard instead of being wiped out too.
         assert!(output.iter().all(|s| (s - 0.25).abs() < 1e-6), "{:?}", &output[..4]);
 
         let mut inf = vec![PlayingSound::new(0, f32::INFINITY, false)];
         let mut output = Vec::new();
-        mix_sounds(&mut output, &mut inf, &clips, 44100, 1, 4, &Listener::default(), &MixerState::new());
+        mix_buffer(&mut output, &mut inf, &clips, OutputFormat::new(44100, 1, 4), &Listener::default(), &MixerState::new());
         assert!(output.iter().all(|s| s.is_finite() && s.abs() <= 1.0), "{output:?}");
     }
 
@@ -258,7 +293,7 @@ mod tests {
         let mut playing = vec![sound];
         let mut output = Vec::new();
 
-        mix_sounds(&mut output, &mut playing, &clips, 44100, 1, 10, &Listener::default(), &MixerState::new());
+        mix_buffer(&mut output, &mut playing, &clips, OutputFormat::new(44100, 1, 10), &Listener::default(), &MixerState::new());
 
         assert!(playing.is_empty(), "exhausted sound must be removed");
         assert!(output.iter().all(|&s| s == 0.0), "no samples past clip end");
@@ -273,7 +308,7 @@ mod tests {
         let mut playing = vec![sound];
         let mut output = Vec::new();
 
-        mix_sounds(&mut output, &mut playing, &clips, 44100, 1, 10, &Listener::default(), &MixerState::new());
+        mix_buffer(&mut output, &mut playing, &clips, OutputFormat::new(44100, 1, 10), &Listener::default(), &MixerState::new());
 
         assert_eq!(playing.len(), 1, "looping sound must survive");
         assert_eq!(playing[0].position, 0, "looping sound rewinds to start");
@@ -292,7 +327,7 @@ mod tests {
         ];
         let mut output = Vec::new();
 
-        mix_sounds(&mut output, &mut playing, &clips, 44100, 1, 10, &Listener::default(), &MixerState::new());
+        mix_buffer(&mut output, &mut playing, &clips, OutputFormat::new(44100, 1, 10), &Listener::default(), &MixerState::new());
 
         assert_eq!(output.len(), 10);
         for &s in &output {
@@ -313,7 +348,7 @@ mod tests {
         ];
         let mut output = Vec::new();
 
-        mix_sounds(&mut output, &mut playing, &clips, 44100, 1, 10, &Listener::default(), &MixerState::new());
+        mix_buffer(&mut output, &mut playing, &clips, OutputFormat::new(44100, 1, 10), &Listener::default(), &MixerState::new());
 
         for &s in &output {
             assert!(s <= 1.0, "output {} exceeds 1.0 (clamp failed)", s);
@@ -328,7 +363,7 @@ mod tests {
         let mut playing = vec![PlayingSound::new(0, 1.0, false)];
         let mut output = Vec::new();
 
-        mix_sounds(&mut output, &mut playing, &clips, 44100, 1, 20, &Listener::default(), &MixerState::new());
+        mix_buffer(&mut output, &mut playing, &clips, OutputFormat::new(44100, 1, 20), &Listener::default(), &MixerState::new());
 
         // Sound should have been removed
         assert!(playing.is_empty(), "non-looping sound was not removed");
@@ -341,7 +376,7 @@ mod tests {
         let mut playing = vec![PlayingSound::new(0, 1.0, true)];
         let mut output = Vec::new();
 
-        mix_sounds(&mut output, &mut playing, &clips, 44100, 1, 20, &Listener::default(), &MixerState::new());
+        mix_buffer(&mut output, &mut playing, &clips, OutputFormat::new(44100, 1, 20), &Listener::default(), &MixerState::new());
 
         // Sound should still be in the list
         assert_eq!(playing.len(), 1, "looping sound was incorrectly removed");
@@ -356,7 +391,7 @@ mod tests {
         let mut playing = vec![PlayingSound::new(0, 1.0, false)];
         let mut output = Vec::new();
 
-        mix_sounds(&mut output, &mut playing, &clips, 44100, 2, 10, &Listener::default(), &MixerState::new());
+        mix_buffer(&mut output, &mut playing, &clips, OutputFormat::new(44100, 2, 10), &Listener::default(), &MixerState::new());
 
         // output length = 10 frames * 2 channels = 20
         assert_eq!(output.len(), 20);
@@ -379,7 +414,7 @@ mod tests {
         let mut playing = vec![PlayingSound::new(0, 0.5, false)];
         let mut output = Vec::new();
 
-        mix_sounds(&mut output, &mut playing, &clips, 44100, 1, 10, &Listener::default(), &MixerState::new());
+        mix_buffer(&mut output, &mut playing, &clips, OutputFormat::new(44100, 1, 10), &Listener::default(), &MixerState::new());
 
         assert_eq!(output.len(), 10);
         for &s in &output {
@@ -395,7 +430,7 @@ mod tests {
         let mut playing = vec![PlayingSound::new_3d(0, 1.0, false, spatial)];
         let mut output = Vec::new();
 
-        mix_sounds(&mut output, &mut playing, &clips, 44100, 2, 10, &Listener::default(), &MixerState::new());
+        mix_buffer(&mut output, &mut playing, &clips, OutputFormat::new(44100, 2, 10), &Listener::default(), &MixerState::new());
 
         assert_eq!(output.len(), 20);
         for &s in &output {
@@ -412,7 +447,7 @@ mod tests {
         let mut playing = vec![PlayingSound::new_3d(0, 1.0, false, spatial)];
         let mut output = Vec::new();
 
-        mix_sounds(&mut output, &mut playing, &clips, 44100, 2, 10, &Listener::default(), &MixerState::new());
+        mix_buffer(&mut output, &mut playing, &clips, OutputFormat::new(44100, 2, 10), &Listener::default(), &MixerState::new());
 
         assert_eq!(output.len(), 20);
         // Check first frame: left=output[0], right=output[1]
@@ -431,7 +466,7 @@ mod tests {
         let mut mixer = MixerState::new();
         mixer.set_volume(MixGroup::Sfx, 0.5);
 
-        mix_sounds(&mut output, &mut playing, &clips, 44100, 1, 10, &Listener::default(), &mixer);
+        mix_buffer(&mut output, &mut playing, &clips, OutputFormat::new(44100, 1, 10), &Listener::default(), &mixer);
 
         assert_eq!(output.len(), 10);
         for &s in &output {
@@ -449,7 +484,7 @@ mod tests {
         let mut mixer = MixerState::new();
         mixer.set_volume(MixGroup::Master, 0.0);
 
-        mix_sounds(&mut output, &mut playing, &clips, 44100, 1, 10, &Listener::default(), &mixer);
+        mix_buffer(&mut output, &mut playing, &clips, OutputFormat::new(44100, 1, 10), &Listener::default(), &mixer);
 
         assert_eq!(output.len(), 10);
         for &s in &output {
@@ -469,7 +504,7 @@ mod tests {
         ];
         let mut output = Vec::new();
 
-        mix_sounds(&mut output, &mut playing, &clips, 44100, 1, 10, &Listener::default(), &MixerState::new());
+        mix_buffer(&mut output, &mut playing, &clips, OutputFormat::new(44100, 1, 10), &Listener::default(), &MixerState::new());
 
         // The invalid sound was dropped, the valid one is still playing.
         assert_eq!(playing.len(), 1);

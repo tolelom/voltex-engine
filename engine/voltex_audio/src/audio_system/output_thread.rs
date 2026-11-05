@@ -43,7 +43,7 @@ fn audio_thread_backend(
     mut clips: Vec<AudioClip>,
     mut backend: Box<dyn crate::backend::AudioBackend>,
 ) {
-    use crate::mix_sounds;
+    use crate::mixing::{OutputFormat, mix_buffer};
 
     let sample_rate = backend.sample_rate();
     let channels = backend.channels();
@@ -72,17 +72,9 @@ fn audio_thread_backend(
             }
         }
 
-        // `mix_sounds` always fills exactly one buffer (zeros when idle).
-        mix_sounds(
-            &mut output,
-            &mut playing,
-            &clips,
-            sample_rate,
-            channels,
-            buffer_frames,
-            &listener,
-            &mixer,
-        );
+        // `mix_buffer` always fills exactly one buffer (zeros when idle).
+        let format = OutputFormat::new(sample_rate, channels, buffer_frames);
+        mix_buffer(&mut output, &mut playing, &clips, format, &listener, &mixer);
         match backend.write(&output) {
             Ok(_) => write_failing = false,
             Err(e) => {
@@ -109,7 +101,7 @@ const MIX_TICK: std::time::Duration = std::time::Duration::from_millis(5);
 
 #[cfg(target_os = "windows")]
 fn audio_thread_windows(rx: mpsc::Receiver<AudioCommand>, mut clips: Vec<AudioClip>) {
-    use crate::mix_sounds;
+    use crate::mixing::{OutputFormat, mix_buffer};
     use crate::wasapi_ffi::WasapiDevice;
 
     let device = match WasapiDevice::new() {
@@ -149,16 +141,8 @@ fn audio_thread_windows(rx: mpsc::Receiver<AudioCommand>, mut clips: Vec<AudioCl
 
         // Mix and write audio
         if !playing.is_empty() || !output.is_empty() {
-            mix_sounds(
-                &mut output,
-                &mut playing,
-                &clips,
-                device_sample_rate,
-                device_channels,
-                buffer_frames,
-                &listener,
-                &mixer,
-            );
+            let format = OutputFormat::new(device_sample_rate, device_channels, buffer_frames);
+            mix_buffer(&mut output, &mut playing, &clips, format, &listener, &mixer);
 
             if let Err(e) = device.write_samples(&output) {
                 eprintln!("[voltex_audio] write_samples error: {}", e);

@@ -8,7 +8,7 @@
 
 use super::bit_reader::{ilog, BitReader};
 use super::floor::decode_floor1_packet;
-use super::headers::{VorbisIdHeader, VorbisSetup};
+use super::headers::{Mapping, VorbisIdHeader, VorbisSetup};
 use super::imdct::{imdct, vorbis_window};
 use super::residue::decode_residue;
 
@@ -52,7 +52,46 @@ pub(super) fn decode_audio_packet(
     let mapping = &setup.mappings[mode.mapping as usize];
     let ch = id.channels as usize;
 
-    // Decode floors for each channel
+    let (floors, no_residue) = decode_channel_floors(&mut reader, setup, mapping, ch, n_half);
+    let residue_data = decode_submap_residues(&mut reader, setup, mapping, &no_residue, n_half);
+
+    // Coupling (simplified: skip angle/magnitude decoupling)
+    // In a full implementation we'd do the inverse coupling here.
+
+    let pcm_channels = synthesize_channels(&floors, &residue_data, n);
+
+    // Overlap-add with previous window
+    let prev_n = if let Some(pf) = *prev_block_flag {
+        if pf { id.blocksize_1 as usize } else { id.blocksize_0 as usize }
+    } else {
+        0
+    };
+
+    let output_samples = if prev_window.is_empty() || prev_n == 0 {
+        // First frame: no overlap, just store for next frame
+        *prev_window = pcm_channels;
+        *prev_block_flag = Some(block_flag);
+        return Ok(Vec::new()); // No output for first frame
+    } else {
+        overlap_add(prev_window, prev_n, &pcm_channels, n)
+    };
+
+    *prev_window = pcm_channels;
+    *prev_block_flag = Some(block_flag);
+
+    Ok(output_samples)
+}
+
+/// Floor curve decode (spec § 4.3.2): one floor per channel, `None` when the
+/// channel is unused or its floor fails to decode. The second vector marks
+/// channels whose residue must not be decoded.
+fn decode_channel_floors(
+    reader: &mut BitReader,
+    setup: &VorbisSetup,
+    mapping: &Mapping,
+    ch: usize,
+    n_half: usize,
+) -> (Vec<Option<Vec<f32>>>, Vec<bool>) {
     let mut floors: Vec<Option<Vec<f32>>> = Vec::with_capacity(ch);
     let mut no_residue = vec![false; ch];
 
@@ -61,7 +100,7 @@ pub(super) fn decode_audio_packet(
         let floor_idx = mapping.submap_floor[submap_idx] as usize;
         let floor = &setup.floors[floor_idx];
 
-        match decode_floor1_packet(&mut reader, floor, &setup.codebooks, n_half) {
+        match decode_floor1_packet(reader, floor, &setup.codebooks, n_half) {
             Ok(Some(f)) => floors.push(Some(f)),
             Ok(None) => {
                 floors.push(None);
@@ -75,7 +114,19 @@ pub(super) fn decode_audio_packet(
         }
     }
 
-    // Decode residues for each submap
+    (floors, no_residue)
+}
+
+/// Residue decode (spec § 4.3.4): each submap decodes the residues of the
+/// channels mapped to it. A failed decode leaves those channels at zero.
+fn decode_submap_residues(
+    reader: &mut BitReader,
+    setup: &VorbisSetup,
+    mapping: &Mapping,
+    no_residue: &[bool],
+    n_half: usize,
+) -> Vec<Vec<f32>> {
+    let ch = no_residue.len();
     let mut residue_data = vec![vec![0.0f32; n_half]; ch];
 
     for submap_idx in 0..mapping.submaps as usize {
@@ -94,7 +145,7 @@ pub(super) fn decode_audio_packet(
 
         if !submap_channels.is_empty() {
             match decode_residue(
-                &mut reader,
+                reader,
                 residue_config,
                 &setup.codebooks,
                 n_half,
@@ -113,8 +164,14 @@ pub(super) fn decode_audio_packet(
         }
     }
 
-    // Coupling (simplified: skip angle/magnitude decoupling)
-    // In a full implementation we'd do the inverse coupling here.
+    residue_data
+}
+
+/// Floor × residue → inverse MDCT → window, per channel. Returns `n` windowed
+/// samples per channel; channels without a floor stay silent.
+fn synthesize_channels(floors: &[Option<Vec<f32>>], residue_data: &[Vec<f32>], n: usize) -> Vec<Vec<f32>> {
+    let ch = floors.len();
+    let n_half = n / 2;
 
     // Multiply floor * residue to get MDCT coefficients
     let mut mdct_input = vec![vec![0.0f32; n_half]; ch];
@@ -141,58 +198,44 @@ pub(super) fn decode_audio_packet(
         }
     }
 
-    // Overlap-add with previous window
-    let prev_n = if let Some(pf) = *prev_block_flag {
-        if pf { id.blocksize_1 as usize } else { id.blocksize_0 as usize }
-    } else {
-        0
-    };
+    pcm_channels
+}
 
-    let overlap = if prev_n > 0 { prev_n.min(n) / 2 } else { 0 };
+/// Overlap-adds the right half of the previous block (`prev_n` samples) with
+/// the left half of the current one (`n` samples); returns interleaved PCM.
+fn overlap_add(prev_window: &[Vec<f32>], prev_n: usize, pcm_channels: &[Vec<f32>], n: usize) -> Vec<f32> {
+    let ch = pcm_channels.len();
+    let overlap = prev_n.min(n) / 2;
+    let prev_right_start = prev_n / 2;
 
-    let output_samples = if prev_window.is_empty() || prev_n == 0 {
-        // First frame: no overlap, just store for next frame
-        *prev_window = pcm_channels;
-        *prev_block_flag = Some(block_flag);
-        return Ok(Vec::new()); // No output for first frame
-    } else {
-        // Overlap-add
-        let prev_right_start = prev_n / 2;
+    // Simplified: output the overlapped portion as interleaved samples
+    let mut frame_output = Vec::new();
 
-        // Simplified: output the overlapped portion as interleaved samples
-        let mut frame_output = Vec::new();
+    // The "return" portion from the previous block:
+    // previous block right half = prev_window[c][prev_n/2..]
+    // current block left half = pcm_channels[c][..n/2]
+    // overlap region = last `overlap` samples of prev right + first `overlap` of cur left
 
-        // The "return" portion from the previous block:
-        // previous block right half = prev_window[c][prev_n/2..]
-        // current block left half = pcm_channels[c][..n/2]
-        // overlap region = last `overlap` samples of prev right + first `overlap` of cur left
+    // Output: overlap region as interleaved samples
+    for i in 0..overlap {
+        for c in 0..ch {
+            let prev_idx = prev_right_start + i;
+            let cur_idx = (n / 2 - overlap) + i;
 
-        // Output: overlap region as interleaved samples
-        for i in 0..overlap {
-            for c in 0..ch {
-                let prev_idx = prev_right_start + i;
-                let cur_idx = (n / 2 - overlap) + i;
+            let prev_val = if prev_idx < prev_window[c].len() {
+                prev_window[c][prev_idx]
+            } else {
+                0.0
+            };
+            let cur_val = if cur_idx < pcm_channels[c].len() {
+                pcm_channels[c][cur_idx]
+            } else {
+                0.0
+            };
 
-                let prev_val = if prev_idx < prev_window[c].len() {
-                    prev_window[c][prev_idx]
-                } else {
-                    0.0
-                };
-                let cur_val = if cur_idx < pcm_channels[c].len() {
-                    pcm_channels[c][cur_idx]
-                } else {
-                    0.0
-                };
-
-                frame_output.push(prev_val + cur_val);
-            }
+            frame_output.push(prev_val + cur_val);
         }
+    }
 
-        frame_output
-    };
-
-    *prev_window = pcm_channels;
-    *prev_block_flag = Some(block_flag);
-
-    Ok(output_samples)
+    frame_output
 }
