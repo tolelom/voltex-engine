@@ -14,6 +14,21 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ### Refactor
 
+- **가독성 정리 3차 (동작 변화 없음)**: 인자가 많아 `#[allow(clippy::too_many_arguments)]`로 경고를 끄던 함수와
+  100줄 넘는 함수를 정리했다.
+  - **인자를 의미 있는 타입으로 묶음**: 렌더러 컴퓨트 패스 9개 `dispatch` → `encode(&mut ComputeContext, …, ScreenOutput, …)`,
+    PBR 4맵 → `PbrTextureSet`(`create_pbr_texture_set_bind_group`), `BasicRenderer::render` → `render_frame(…, FrameTarget, …,
+    &FrameView)`. 에디터 `DrawList::add_quad(Rect, UvRect, …)`, `ViewportCursor`(`pick_entity_at`, `GizmoState::begin_drag`/
+    `drag_to`), `GizmoDraw`, `ScreenTarget`(`UiRenderer`·`ViewportRenderer::render_to`), `UiContext::progress_bar_in(Rect, …)`,
+    `GlyphCache::insert_glyph`. 오디오 `mix_buffer(…, OutputFormat, …)`. 이미지 디코더 내부 `JpegTables`·`McuSampling`·`RgbImage`.
+    수학 `det3([[f32; 3]; 3])`. capture `FrameSpec`·`CameraPose`·`Projection`(`render_world_from`)·`DemoMoment`.
+  - **바꾼 공개 함수의 옛 형태는 `#[deprecated]`로 남김**: 컴퓨트 패스 `dispatch` 9개, `create_pbr_full_texture_bind_group`,
+    `BasicRenderer::render`, `mix_sounds`, `pick_entity`, `DrawList::add_rect_uv`, `UiContext::progress_bar`, `GlyphCache::insert`,
+    `GizmoRenderer::render`, `UiRenderer::render`, `ViewportRenderer::render`, `GizmoState::try_begin_drag`/`update_drag`.
+    경고 끄기는 이 옛 형태 래퍼(옛 시그니처 유지용)와 이유를 적은 두 곳(`PbrResources::new`, capture `render_world_ortho`)에만 남았다.
+  - **긴 함수를 단계로 나눔**: `decode_jpg`, `parse_obj`, Vorbis `decode_codebook`·`decode_audio_packet`·`decode_residue`(스펙 절
+    이름으로), `UiRenderer::new`, TTF `glyph_outline`, capture `render_shadow_scene`. `CliError` 표시는 인라인 포맷 인자로 줄였다
+    (출력 문구 동일).
 - **가독성 정리 2차 (동작 변화 없음)**
   - **엔진이 쓰지 않는 공개 코드를 `experimental`로**: 구현·테스트는 있지만 엔진 런타임·렌더러가 쓰지 않는 코드를
     crate마다 `experimental` 모듈로 옮겼다. 옛 경로는 `#[deprecated]` 별칭(타입 alias·전달 함수·모듈 shim)으로 남겨
