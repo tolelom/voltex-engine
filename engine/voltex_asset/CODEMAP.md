@@ -1,13 +1,12 @@
 # voltex_asset
 
 ## 책임 (한 줄)
-에셋 핸들 + 저장소 + 비동기 로더 + 핫 리로드 + `.vpkg` 아카이브 + Vfs 추상 (B2).
+에셋 핸들 + 저장소 + 핫 리로드 + `.vpkg` 아카이브 + Vfs 추상 (B2). 엔진이 쓰지 않는 비동기 로더는 `experimental`.
 
 ## 공개 API 진입점
 - `Handle<T>` — generation 기반 에셋 핸들; `id()`, `generation()`, `from_raw_parts()` 공개 (src/handle.rs)
 - `AssetStorage<T>` — 타입별 저장소 (ref counting) (src/storage.rs)
 - `Assets` — type-erased 다중 저장소 (src/assets.rs)
-- `AssetLoader` — 워커 스레드 비동기 로딩 (src/loader.rs)
 - `FileWatcher` — mtime 폴링 변경 감지. 디렉토리도 감시 가능: 파일 추가/삭제/이름변경 시 보고 (내용 수정은 미감지 — 개별 파일 감시 사용) (src/watcher.rs)
 - `VpkgReader`, `write_vpkg`, `VpkgEntry`, `VPKG_MAGIC`, `VPKG_VERSION` — `.vpkg` 아카이브 (src/vpkg.rs)
 - `Vfs`, `StaticVpkgReader` (구 `VpkgReaderOwned`, deprecated alias) — Filesystem / Archive 백엔드 통합 read API (src/vfs.rs)
@@ -17,10 +16,12 @@
 - `handle` — Handle<T> 정의 (src/handle.rs)
 - `storage` — 단일 타입 저장소 (src/storage.rs)
 - `assets` — 다중 타입 저장소 (src/assets.rs)
-- `loader` — 비동기 로더 (src/loader.rs)
 - `watcher` — 파일 변경 감지 (src/watcher.rs)
 - `vpkg` — `.vpkg` writer/reader (B2 신규)
 - `vfs` — Vfs 추상 (Filesystem | Archive) (B2 신규)
+- `experimental` — 구현·단위 테스트는 되어 있지만 엔진 런타임이 쓰지 않는 모듈. API가 바뀌거나 없어질 수 있다 (src/experimental/)
+  - `loader` — `AssetLoader`(워커 스레드에서 파일 read + parse, `process_loaded` 로 `Assets` 에 삽입, `resolved_handle(ticket)`) + `LoadState`. 런타임은 Vfs 동기 read 를 쓴다
+  - 옛 경로(`voltex_asset::AssetLoader`, `voltex_asset::loader` 등)는 src/deprecated_paths.rs 의 deprecated 별칭
 
 ## `.vpkg` 포맷
 ```

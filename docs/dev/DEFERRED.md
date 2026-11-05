@@ -25,7 +25,7 @@
 
 ## Phase 3c
 
-- ~~**비동기 로딩**~~ ✅ AssetLoader (워커 스레드) 완료. **v1.0.55 버그 fix**: `load()` 가 반환하는 handle 은 전역 load 카운터 기반 *ticket* 인데 `Assets::insert` 의 per-type 슬롯과 달라, real≠ticket (다른 타입 로드 / 기존 에셋 존재) 시 `process_loaded` 의 remap 이 ticket 키를 지워 `state(ticket)` 이 Loading 오보 + caller 의 handle 이 엉뚱한 슬롯을 가리킴 (fresh 단일-로드에서만 우연히 동작). remap 제거 (handle_to_load 를 안정적 ticket 키로 유지) + `resolved_handle(ticket)` 추가 — Ready 후 실제 `Handle<T>` 반환. +1 회귀 테스트.
+- ~~**비동기 로딩**~~ ✅ AssetLoader (워커 스레드) 완료. **v1.0.55 버그 fix**: `load()` 가 반환하는 handle 은 전역 load 카운터 기반 *ticket* 인데 `Assets::insert` 의 per-type 슬롯과 달라, real≠ticket (다른 타입 로드 / 기존 에셋 존재) 시 `process_loaded` 의 remap 이 ticket 키를 지워 `state(ticket)` 이 Loading 오보 + caller 의 handle 이 엉뚱한 슬롯을 가리킴 (fresh 단일-로드에서만 우연히 동작). remap 제거 (handle_to_load 를 안정적 ticket 키로 유지) + `resolved_handle(ticket)` 추가 — Ready 후 실제 `Handle<T>` 반환. +1 회귀 테스트. 현재 `voltex_asset::experimental::loader` (엔진 미사용).
 - ~~**핫 리로드**~~ ✅ FileWatcher (mtime 폴링) + replace_in_place 완료.
 
 ## Phase 4a
