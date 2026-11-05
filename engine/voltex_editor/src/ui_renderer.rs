@@ -5,7 +5,7 @@
 use wgpu::util::DeviceExt;
 
 use crate::draw_list::{DrawList, DrawVertex};
-use crate::font::FontAtlas;
+use crate::bitmap_font::FontAtlas;
 
 /// Vertex buffer layout for DrawVertex: position(Float32x2), uv(Float32x2), color(Unorm8x4).
 const VERTEX_LAYOUT: wgpu::VertexBufferLayout<'static> = wgpu::VertexBufferLayout {

@@ -140,9 +140,11 @@ pub(crate) fn world_aabb_from_local(local: &AABB, world: &Mat4) -> AABB {
     AABB::new(min, max)
 }
 
-/// Walk every entity that has a `Transform` and return the closest hit using
-/// a sphere approximation. `default_radius` is the unit sphere size; each
-/// entity's effective radius is `default_radius * max(scale.x, scale.y, scale.z)`.
+/// Walk every entity that has a `Transform` and return the closest one the
+/// mouse ray hits. Entities with `Bounds` + `WorldTransform` are tested as a
+/// world-space AABB; others fall back to a sphere at `Transform.position` with
+/// radius `default_radius * max(scale.x, scale.y, scale.z)`. An AABB that
+/// contains the camera only wins when nothing else is hit.
 ///
 /// Returns `None` if the mouse is outside the viewport rect, the matrix is
 /// singular, or no entity is hit.
@@ -190,7 +192,7 @@ pub fn pick_entity(
             if world_aabb.contains_point(cam_pos) {
                 if let Some(t) = ray_vs_aabb(&ray, &world_aabb) {
                     best_enclosing = match best_enclosing {
-                        Some((_, bt)) if bt <= t => best_enclosing,
+                        Some((_, best_t)) if best_t <= t => best_enclosing,
                         _ => Some((entity, t)),
                     };
                 }
@@ -203,13 +205,13 @@ pub fn pick_entity(
                 Some(t) => t,
                 None => continue,
             };
-            let s = t.scale.x.max(t.scale.y).max(t.scale.z).max(1e-6);
-            let r = default_radius * s;
-            ray_vs_sphere_t(&ray, t.position, r)
+            let max_scale = t.scale.x.max(t.scale.y).max(t.scale.z).max(1e-6);
+            let radius = default_radius * max_scale;
+            ray_vs_sphere_t(&ray, t.position, radius)
         };
         if let Some(t) = hit_t {
             best = match best {
-                Some((_, bt)) if bt <= t => best,
+                Some((_, best_t)) if best_t <= t => best,
                 _ => Some((entity, t)),
             };
         }

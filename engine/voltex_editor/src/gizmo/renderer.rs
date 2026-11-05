@@ -5,7 +5,7 @@ use bytemuck::{Pod, Zeroable};
 use std::mem;
 use voltex_math::{Mat4, Vec3};
 
-use super::{GizmoAxis, GizmoMode};
+use super::{ortho_basis, GizmoAxis, GizmoMode};
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug, Pod, Zeroable)]
@@ -297,11 +297,4 @@ fn build_scale(verts: &mut Vec<LineVertex>, o: Vec3, active: Option<GizmoAxis>) 
         push_line(verts, p110, p111, color);
         push_line(verts, p010, p011, color);
     }
-}
-
-fn ortho_basis(axis: Vec3) -> (Vec3, Vec3) {
-    let helper = if axis.y.abs() < 0.9 { Vec3::new(0.0, 1.0, 0.0) } else { Vec3::new(1.0, 0.0, 0.0) };
-    let u = axis.cross(helper).normalize();
-    let v = axis.cross(u).normalize();
-    (u, v)
 }

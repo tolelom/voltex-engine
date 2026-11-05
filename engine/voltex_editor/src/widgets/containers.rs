@@ -21,14 +21,8 @@ impl UiContext {
         self.draw_list.add_rect(x, y, w, title_bar_h, COLOR_BG);
 
         // Draw title text
-        let gw = self.font.glyph_width as f32;
-        let mut cx = x + padding;
         let ty = y + padding;
-        for ch in title.chars() {
-            let (u0, v0, u1, v1) = self.font.glyph_uv(ch);
-            self.draw_list.add_rect_uv(cx, ty, gw, gh, u0, v0, u1, v1, COLOR_TEXT);
-            cx += gw;
-        }
+        self.draw_list.add_text(&self.font, title, x + padding, ty, COLOR_TEXT);
 
         // Set cursor to inside the panel (below title bar)
         self.layout = crate::layout::LayoutState::new(x + padding, y + title_bar_h + padding);

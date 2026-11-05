@@ -7,8 +7,9 @@
 //!   primitives.
 //! - Layout: [`DockTree`] binary-split layout + [`FloatingPanel`].
 //! - 3D scene: [`OrbitCamera`], [`ViewportRenderer`] + [`ViewportTexture`],
-//!   [`pick_entity`] sphere picking, [`gizmo`] translate/rotate/scale handles.
-//! - Fonts: [`FontAtlas`] (bitmap), [`TtfFont`] + [`ttf_parser`] + [`rasterizer`]
+//!   [`pick_entity`] ray picking (Bounds AABB, sphere fallback), [`gizmo`]
+//!   translate/rotate/scale handles.
+//! - Fonts: [`FontAtlas`] ([`bitmap_font`]), [`TtfFont`] + [`ttf_parser`] + [`rasterizer`]
 //!   + [`glyph_cache`] for TrueType.
 //! - Editor sessions: [`EditorSession`] + [`EditorCommand`] + Undo/Redo +
 //!   jsonl autosave.
@@ -16,10 +17,10 @@
 #![warn(missing_docs)]
 
 pub mod error;
-pub mod font;
+pub mod bitmap_font;
 pub mod draw_list;
 pub mod layout;
-pub mod renderer;
+pub mod ui_renderer;
 pub mod ui_context;
 pub mod widgets;
 pub mod dock;
@@ -30,10 +31,22 @@ pub mod session;
 pub mod panels;
 
 pub use error::{EditorError, Result};
-pub use font::FontAtlas;
+pub use bitmap_font::{FontAtlas, UvRect};
 pub use draw_list::{DrawVertex, DrawCommand, DrawList};
 pub use layout::LayoutState;
-pub use renderer::UiRenderer;
+pub use ui_renderer::UiRenderer;
+
+/// Old path of [`bitmap_font`].
+#[deprecated(note = "use `voltex_editor::bitmap_font`")]
+pub mod font {
+    pub use crate::bitmap_font::*;
+}
+
+/// Old path of [`ui_renderer`].
+#[deprecated(note = "use `voltex_editor::ui_renderer`")]
+pub mod renderer {
+    pub use crate::ui_renderer::*;
+}
 pub use ui_context::UiContext;
 pub use dock::{DockTree, DockNode, Axis, Rect, LeafLayout};
 pub use panels::hierarchy::{hierarchy_panel, count_entity_nodes};

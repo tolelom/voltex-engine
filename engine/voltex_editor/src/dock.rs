@@ -310,15 +310,9 @@ impl DockTree {
                 let tab_w = name.len() as f32 * glyph_w + TAB_PADDING;
                 let bg = if i == active { COLOR_TAB_ACTIVE } else { COLOR_TAB_INACTIVE };
                 ui.draw_list.add_rect(tx, bar.y, tab_w, bar.h, bg);
-                // Inline text rendering (avoids borrow conflict with ui.font + ui.draw_list)
                 let text_x = tx + TAB_PADDING * 0.5;
                 let text_y = bar.y + (bar.h - glyph_h) * 0.5;
-                let mut cx = text_x;
-                for ch in name.chars() {
-                    let (u0, v0, u1, v1) = ui.font.glyph_uv(ch);
-                    ui.draw_list.add_rect_uv(cx, text_y, glyph_w, glyph_h, u0, v0, u1, v1, COLOR_TEXT);
-                    cx += glyph_w;
-                }
+                ui.draw_list.add_text(&ui.font, name, text_x, text_y, COLOR_TEXT);
                 tx += tab_w;
             }
             // Tab bar bottom separator

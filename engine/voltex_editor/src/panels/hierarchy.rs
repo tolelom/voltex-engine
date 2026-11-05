@@ -57,15 +57,9 @@ fn draw_entity_node(
         format!("{}Entity({})", prefix, entity.id)
     };
 
-    let gw = ui.font.glyph_width as f32;
     let gh = ui.font.glyph_height as f32;
     let text_y = y + (LINE_HEIGHT - gh) * 0.5;
-    let mut cx = x;
-    for ch in name.chars() {
-        let (u0, v0, u1, v1) = ui.font.glyph_uv(ch);
-        ui.draw_list.add_rect_uv(cx, text_y, gw, gh, u0, v0, u1, v1, COLOR_TEXT);
-        cx += gw;
-    }
+    ui.draw_list.add_text(&ui.font, &name, x, text_y, COLOR_TEXT);
 
     ui.layout.cursor_y += LINE_HEIGHT;
 

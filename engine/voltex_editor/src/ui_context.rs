@@ -8,7 +8,7 @@
 
 use std::collections::HashMap;
 use crate::draw_list::DrawList;
-use crate::font::FontAtlas;
+use crate::bitmap_font::FontAtlas;
 use crate::layout::LayoutState;
 
 /// Key events the UI system understands.
@@ -180,14 +180,7 @@ impl UiContext {
             }
         } else {
             // Bitmap font fallback
-            let gw = self.font.glyph_width as f32;
-            let gh = self.font.glyph_height as f32;
-            let mut cx = x;
-            for ch in text.chars() {
-                let (u0, v0, u1, v1) = self.font.glyph_uv(ch);
-                self.draw_list.add_rect_uv(cx, y, gw, gh, u0, v0, u1, v1, color);
-                cx += gw;
-            }
+            self.draw_list.add_text(&self.font, text, x, y, color);
         }
     }
 

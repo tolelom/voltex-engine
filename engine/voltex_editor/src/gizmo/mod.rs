@@ -13,6 +13,20 @@ use voltex_math::{Mat4, Vec3};
 
 pub use renderer::GizmoRenderer;
 
+/// Two unit vectors `(u, v)` perpendicular to `axis` and to each other
+/// (`u = axis × helper`, `v = axis × u`). Spans the plane a rotate ring or
+/// cone base lies in.
+fn ortho_basis(axis: Vec3) -> (Vec3, Vec3) {
+    let helper = if axis.y.abs() < 0.9 {
+        Vec3::new(0.0, 1.0, 0.0)
+    } else {
+        Vec3::new(1.0, 0.0, 0.0)
+    };
+    let u = axis.cross(helper).normalize();
+    let v = axis.cross(u).normalize();
+    (u, v)
+}
+
 /// Which kind of manipulation the gizmo performs.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum GizmoMode {

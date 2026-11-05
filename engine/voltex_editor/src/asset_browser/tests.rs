@@ -36,7 +36,7 @@ fn browser_view_defaults_to_list_and_persists_across_refresh() {
 fn grid_click_at(
     mx: f32,
     my: f32,
-    entries: &[(String, bool, AssetKind)],
+    entries: &[EntryRow],
     thumbs: Option<&std::collections::HashMap<String, u32>>,
     browser: &mut AssetBrowser,
 ) -> (Option<String>, crate::draw_list::DrawList) {
@@ -59,8 +59,8 @@ fn grid_cell_click_selects_file_and_navigates_dir() {
     let dir = make_temp_dir("grid_click");
     let mut browser = AssetBrowser::new(dir.clone());
     let entries = vec![
-        ("sub".to_string(), true, AssetKind::Other),
-        ("a.png".to_string(), false, AssetKind::Texture),
+        EntryRow { name: "sub".to_string(), is_dir: true, kind: AssetKind::Other },
+        EntryRow { name: "a.png".to_string(), is_dir: false, kind: AssetKind::Texture },
     ];
     // rect.w=300 → 4 columns; cell 0 at x=4, cell 1 at x=72 (origin_y=50).
     // Click inside cell 1 (the file).
@@ -80,8 +80,8 @@ fn grid_uses_thumb_slot_when_registered_and_placeholder_otherwise() {
     let dir = make_temp_dir("grid_thumbs");
     let mut browser = AssetBrowser::new(dir.clone());
     let entries = vec![
-        ("a.png".to_string(), false, AssetKind::Texture),
-        ("b.png".to_string(), false, AssetKind::Texture),
+        EntryRow { name: "a.png".to_string(), is_dir: false, kind: AssetKind::Texture },
+        EntryRow { name: "b.png".to_string(), is_dir: false, kind: AssetKind::Texture },
     ];
     let thumbs: std::collections::HashMap<String, u32> =
         [("a.png".to_string(), 7u32)].into_iter().collect();

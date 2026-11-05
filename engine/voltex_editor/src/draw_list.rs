@@ -7,7 +7,7 @@
 #![allow(missing_docs)]
 
 use bytemuck::{Pod, Zeroable};
-use crate::font::FontAtlas;
+use crate::bitmap_font::FontAtlas;
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug, Pod, Zeroable)]
@@ -136,8 +136,8 @@ impl DrawList {
         let gh = font.glyph_height as f32;
         let mut cx = x;
         for ch in text.chars() {
-            let (u0, v0, u1, v1) = font.glyph_uv(ch);
-            self.add_rect_uv(cx, y, gw, gh, u0, v0, u1, v1, color);
+            let uv = font.glyph_uv_rect(ch);
+            self.add_rect_uv(cx, y, gw, gh, uv.u0, uv.v0, uv.u1, uv.v1, color);
             cx += gw;
         }
     }
@@ -146,7 +146,7 @@ impl DrawList {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::font::FontAtlas;
+    use crate::bitmap_font::FontAtlas;
 
     #[test]
     fn test_add_rect_vertex_index_count() {

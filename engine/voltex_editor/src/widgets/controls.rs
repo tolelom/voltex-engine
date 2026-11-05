@@ -15,20 +15,11 @@ impl UiContext {
     pub fn text(&mut self, text: &str) {
         let x = self.layout.cursor_x;
         let y = self.layout.cursor_y;
-        // We need to clone font info for the borrow checker
         let gw = self.font.glyph_width as f32;
-        let gh = self.font.glyph_height as f32;
-
-        // Draw each character
-        let mut cx = x;
-        for ch in text.chars() {
-            let (u0, v0, u1, v1) = self.font.glyph_uv(ch);
-            self.draw_list.add_rect_uv(cx, y, gw, gh, u0, v0, u1, v1, COLOR_TEXT);
-            cx += gw;
-        }
+        self.draw_list.add_text(&self.font, text, x, y, COLOR_TEXT);
 
         let text_w = text.chars().count() as f32 * gw;
-        self.layout.record(x, y, text_w);
+        self.layout.record_last_widget(x, y, text_w);
         self.layout.advance_line();
     }
 
@@ -70,14 +61,9 @@ impl UiContext {
         // Draw text centered inside button
         let text_x = x + padding;
         let text_y = y + padding;
-        let mut cx = text_x;
-        for ch in label.chars() {
-            let (u0, v0, u1, v1) = self.font.glyph_uv(ch);
-            self.draw_list.add_rect_uv(cx, text_y, gw, gh, u0, v0, u1, v1, COLOR_TEXT);
-            cx += gw;
-        }
+        self.draw_list.add_text(&self.font, label, text_x, text_y, COLOR_TEXT);
 
-        self.layout.record(x, y, btn_w);
+        self.layout.record_last_widget(x, y, btn_w);
         self.layout.advance_line();
 
         // Return true if mouse was released over this button while it was active
@@ -97,7 +83,7 @@ impl UiContext {
         let x = self.layout.cursor_x;
         let y = self.layout.cursor_y;
         self.draw_list.add_image(x, y, w, h, texture_slot);
-        self.layout.record(x, y, w);
+        self.layout.record_last_widget(x, y, w);
         self.layout.cursor_y = y + h + self.layout.padding;
         self.layout.cursor_x = self.layout.indent;
     }
@@ -152,15 +138,10 @@ impl UiContext {
         // Draw label to the right of the slider
         let label_x = x + slider_w + padding;
         let label_y = y + padding;
-        let mut cx = label_x;
-        for ch in label.chars() {
-            let (u0, v0, u1, v1) = self.font.glyph_uv(ch);
-            self.draw_list.add_rect_uv(cx, label_y, gw, gh, u0, v0, u1, v1, COLOR_TEXT);
-            cx += gw;
-        }
+        self.draw_list.add_text(&self.font, label, label_x, label_y, COLOR_TEXT);
 
         let total_w = slider_w + padding + label.chars().count() as f32 * gw;
-        self.layout.record(x, y, total_w);
+        self.layout.record_last_widget(x, y, total_w);
         self.layout.advance_line();
 
         new_value
@@ -206,15 +187,10 @@ impl UiContext {
         // Draw label
         let label_x = x + box_size + padding;
         let label_y = y;
-        let mut cx = label_x;
-        for ch in label.chars() {
-            let (u0, v0, u1, v1) = self.font.glyph_uv(ch);
-            self.draw_list.add_rect_uv(cx, label_y, gw, gh, u0, v0, u1, v1, COLOR_TEXT);
-            cx += gw;
-        }
+        self.draw_list.add_text(&self.font, label, label_x, label_y, COLOR_TEXT);
 
         let total_w = box_size + padding + label.chars().count() as f32 * gw;
-        self.layout.record(x, y, total_w);
+        self.layout.record_last_widget(x, y, total_w);
         self.layout.advance_line();
 
         new_checked
