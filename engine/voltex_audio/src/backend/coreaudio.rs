@@ -99,6 +99,8 @@ struct FreeQueue {
 // the AudioQueue callback and are only dereferenced inside write() while the
 // queue is alive. We never share them across processes.
 unsafe impl Send for FreeQueue {}
+// SAFETY: shared access only goes through `inner` (Mutex) and `cv`; the
+// buffer pointers are just stored and handed back, never dereferenced here.
 unsafe impl Sync for FreeQueue {}
 
 extern "C" fn output_callback(
@@ -168,6 +170,8 @@ impl CoreAudioBackend {
         let free_ptr: *mut Arc<FreeQueue> = Box::into_raw(Box::new(free.clone()));
 
         let mut queue: AudioQueueRef = std::ptr::null_mut();
+        // SAFETY: `format` and `queue` are live locals for the call; `free_ptr` is a
+        // leaked Box that stays valid until `shutdown` disposes the queue first.
         let rc = unsafe {
             AudioQueueNewOutput(
                 &format,
@@ -195,6 +199,7 @@ impl CoreAudioBackend {
         let mut buffers: Vec<AudioQueueBufferRef> = Vec::with_capacity(n_buffers as usize);
         for _ in 0..n_buffers {
             let mut buf: AudioQueueBufferRef = std::ptr::null_mut();
+            // SAFETY: `queue` was created successfully above and `buf` is a live local.
             let rc = unsafe { AudioQueueAllocateBuffer(queue, buffer_byte_size, &mut buf) };
             if rc != 0 {
                 // SAFETY: queue is alive; immediate dispose halts callbacks
@@ -243,6 +248,7 @@ impl CoreAudioBackend {
             }
         }
 
+        // SAFETY: `queue` is a live queue created above; NULL start time = "now".
         let rc = unsafe { AudioQueueStart(queue, std::ptr::null()) };
         if rc != 0 {
             // SAFETY: same rationale as above.
@@ -313,6 +319,9 @@ impl AudioBackend for CoreAudioBackend {
         let bytes_in = std::mem::size_of_val(samples);
         let copy_bytes = bytes_in.min(cap_bytes);
         let frames = copy_bytes / (self.channels as usize * std::mem::size_of::<f32>());
+        // SAFETY: `buffer` was popped from the free queue, so the OS is not using
+        // it until it is enqueued below. `copy_bytes` <= both the buffer capacity
+        // and the byte length of `samples`, so the copy stays in bounds.
         unsafe {
             std::ptr::copy_nonoverlapping(
                 samples.as_ptr() as *const u8,
@@ -338,6 +347,8 @@ impl AudioBackend for CoreAudioBackend {
         if !self.queue.is_null() {
             // immediate=1 ensures no further callbacks fire after this
             // returns, which is required before we free the leaked Arc.
+            // SAFETY: `self.queue` is non-null, so it is the live queue from `new`; it
+            // is nulled right after, so stop/dispose run at most once.
             unsafe {
                 AudioQueueStop(self.queue, 1);
                 AudioQueueDispose(self.queue, 1);

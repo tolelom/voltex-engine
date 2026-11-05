@@ -57,6 +57,9 @@ impl LuaState {
     /// Execute a Lua code string.
     pub fn exec(&self, code: &str) -> crate::Result<()> {
         let c_code = CString::new(code).map_err(|e| crate::ScriptError::from(e.to_string()))?;
+        // SAFETY: `self.state` is valid (see impl comment) and `c_code` outlives the
+        // call. A failed load/pcall leaves exactly one error value on top, which
+        // `pop_error` requires.
         unsafe {
             let result = ffi::luaL_loadstring(self.state, c_code.as_ptr());
             if result != ffi::LUA_OK {
@@ -75,6 +78,8 @@ impl LuaState {
     /// Execute a Lua file.
     pub fn exec_file(&self, path: &str) -> crate::Result<()> {
         let c_path = CString::new(path).map_err(|e| crate::ScriptError::from(e.to_string()))?;
+        // SAFETY: as in `exec` — valid state, `c_path` outlives the call, and the
+        // error value is on top whenever `pop_error` runs. A NULL `mode` means "bt".
         unsafe {
             let result = ffi::luaL_loadfilex(self.state, c_path.as_ptr(), std::ptr::null());
             if result != ffi::LUA_OK {
@@ -93,6 +98,8 @@ impl LuaState {
     /// Register a Rust function as a global Lua function.
     pub fn register_fn(&self, name: &str, f: ffi::lua_CFunction) {
         let c_name = CString::new(name).unwrap();
+        // SAFETY: valid state; `c_name` outlives the call. Lua may later call `f`
+        // with this state, so `f` itself must follow the Lua C-function protocol.
         unsafe {
             ffi::lua_pushcclosure(self.state, f, 0);
             ffi::lua_setglobal(self.state, c_name.as_ptr());
@@ -102,6 +109,8 @@ impl LuaState {
     /// Reads a global Lua number, or `None` if `name` is unset / non-numeric.
     pub fn get_global_number(&self, name: &str) -> Option<f64> {
         let c_name = CString::new(name).ok()?;
+        // SAFETY: valid state; `c_name` outlives the call. Each branch pops the one
+        // value `lua_getglobal` pushed, keeping the stack balanced.
         unsafe {
             let ty = ffi::lua_getglobal(self.state, c_name.as_ptr());
             if ty != ffi::LUA_TNUMBER {
@@ -118,6 +127,8 @@ impl LuaState {
     /// Reads a global Lua string, or `None` if `name` is unset / non-string.
     pub fn get_global_string(&self, name: &str) -> Option<String> {
         let c_name = CString::new(name).ok()?;
+        // SAFETY: valid state; `c_name` outlives the call. The string returned by
+        // `lua_tostring` is copied before its value is popped.
         unsafe {
             let ty = ffi::lua_getglobal(self.state, c_name.as_ptr());
             if ty != ffi::LUA_TSTRING {
@@ -134,6 +145,8 @@ impl LuaState {
     /// Writes a global Lua number.
     pub fn set_global_number(&self, name: &str, value: f64) {
         let c_name = CString::new(name).unwrap();
+        // SAFETY: valid state; `c_name` outlives the call. `lua_setglobal` pops the
+        // pushed number.
         unsafe {
             ffi::lua_pushnumber(self.state, value);
             ffi::lua_setglobal(self.state, c_name.as_ptr());
@@ -144,6 +157,8 @@ impl LuaState {
     pub fn set_global_string(&self, name: &str, value: &str) {
         let c_name = CString::new(name).unwrap();
         let c_value = CString::new(value).unwrap();
+        // SAFETY: valid state; `c_name`/`c_value` outlive the call (Lua copies the
+        // string on push), and `lua_setglobal` pops the pushed value.
         unsafe {
             ffi::lua_pushstring(self.state, c_value.as_ptr());
             ffi::lua_setglobal(self.state, c_name.as_ptr());
@@ -152,6 +167,9 @@ impl LuaState {
 
     /// Push a LuaValue onto the Lua stack.
     pub fn push_value(&self, value: &LuaValue) {
+        // SAFETY: valid state; each arm pushes exactly one value, and the temporary
+        // `CString` lives until after `lua_pushstring` copies it. Relies on the Lua
+        // stack having room (no `lua_checkstack` call).
         unsafe {
             match value {
                 LuaValue::Nil => ffi::lua_pushnil(self.state),
@@ -173,6 +191,9 @@ impl LuaState {
 
     /// Push a Rust slice of key-value pairs as a Lua table onto the stack.
     pub fn push_table(&self, pairs: &[(&str, LuaValue)]) {
+        // SAFETY: valid state; the new table stays at -2 while each value is pushed
+        // on top and `lua_setfield` pops it. Nested tables recurse without
+        // `lua_checkstack`, so very deep nesting relies on spare stack slots.
         unsafe {
             ffi::lua_createtable(self.state, 0, pairs.len() as i32);
             for (key, val) in pairs {
@@ -185,6 +206,10 @@ impl LuaState {
 
     /// Read a Lua table at the given stack index into key-value pairs.
     pub fn read_table(&self, index: i32) -> crate::Result<Vec<(String, LuaValue)>> {
+        // SAFETY: valid state; `index` is made absolute before `lua_next` pushes, and
+        // each iteration pops only the value so the key stays for the next
+        // `lua_next`. Number keys are read with `lua_tonumberx`, never
+        // `lua_tostring`, so the key is not converted in place.
         unsafe {
             if ffi::lua_type(self.state, index) != ffi::LUA_TTABLE {
                 return Err("expected table".into());
@@ -221,6 +246,9 @@ impl LuaState {
     /// or `{[1]=, [2]=, [3]=}` array-style fields (escape the brackets to keep
     /// rustdoc happy).
     pub fn read_vec3(&self, index: i32) -> crate::Result<[f32; 3]> {
+        // SAFETY: valid state; the table index is made absolute before any push, every
+        // `lua_getfield`/`lua_rawgeti` result is popped before the next read or an
+        // early return, and the field-name `CString`s outlive the calls.
         unsafe {
             if ffi::lua_type(self.state, index) != ffi::LUA_TTABLE {
                 return Err("expected table for vec3".into());
@@ -279,6 +307,8 @@ impl LuaState {
 
     /// Read a value from the Lua stack at the given index.
     pub fn read_stack_value(&self, index: i32) -> LuaValue {
+        // SAFETY: valid state; reads at `index` push nothing (`read_table` restores
+        // the stack itself), and string data is copied before returning.
         unsafe {
             match ffi::lua_type(self.state, index) {
                 ffi::LUA_TNIL => LuaValue::Nil,
@@ -309,6 +339,8 @@ impl LuaState {
 
     /// Read the stack value at index as a string key (for table iteration).
     fn read_stack_as_string(&self, index: i32) -> String {
+        // SAFETY: valid state; only reads the value at `index`. Strings are copied
+        // immediately and numbers use `lua_tonumberx`, which does not modify the key.
         unsafe {
             match ffi::lua_type(self.state, index) {
                 ffi::LUA_TSTRING => {

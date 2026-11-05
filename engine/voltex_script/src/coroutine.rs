@@ -26,6 +26,12 @@ impl crate::state::LuaState {
     /// Create a coroutine from a global Lua function name.
     /// The function must already be defined in the Lua state.
     pub fn create_coroutine(&self, func_name: &str) -> crate::Result<LuaCoroutine> {
+        // SAFETY: `self.raw()` is the live state owned by `self`, and `c_name`
+        // outlives `lua_getglobal`. The returned `LuaCoroutine` keeps the raw
+        // thread pointer, which assumes the thread stays alive and that the
+        // parent `LuaState` outlives it — neither is enforced: `lua_newthread`
+        // anchors the thread only on the main stack (lstate.c), so after the
+        // pop below a GC cycle may free it, and no lifetime ties the two.
         unsafe {
             let co_state = ffi::lua_newthread(self.raw());
             if co_state.is_null() {
@@ -63,6 +69,10 @@ impl LuaCoroutine {
         if self.finished {
             return Err("coroutine already finished".into());
         }
+        // SAFETY: assumes `self.state` still points at a live Lua thread (see
+        // `create_coroutine`). `lua_resume` reports `nresults` values on the
+        // thread's stack, which are popped; on error the message on top is
+        // copied before it is popped.
         unsafe {
             let mut nresults: std::os::raw::c_int = 0;
             let status = ffi::lua_resume(self.state, std::ptr::null_mut(), 0, &mut nresults);
