@@ -12,7 +12,7 @@
 #![cfg(target_os = "linux")]
 #![allow(non_camel_case_types, non_snake_case)]
 
-use std::ffi::{c_int, c_uint, c_void, CString};
+use std::ffi::{c_int, c_long, c_uint, c_ulong, c_void, CString};
 
 use super::{AudioBackend, BackendError};
 
@@ -44,7 +44,9 @@ unsafe extern "C" {
         soft_resample: c_int,
         latency_us: c_uint,
     ) -> c_int;
-    fn snd_pcm_writei(pcm: *mut snd_pcm_t, buffer: *const f32, size: c_int) -> isize;
+    // `size` is `snd_pcm_uframes_t` (unsigned long) and the result is
+    // `snd_pcm_sframes_t` (long) in <alsa/pcm.h>.
+    fn snd_pcm_writei(pcm: *mut snd_pcm_t, buffer: *const f32, size: c_ulong) -> c_long;
     fn snd_pcm_prepare(pcm: *mut snd_pcm_t) -> c_int;
     fn snd_pcm_drop(pcm: *mut snd_pcm_t) -> c_int;
     fn snd_pcm_close(pcm: *mut snd_pcm_t) -> c_int;
@@ -154,7 +156,7 @@ impl AudioBackend for AlsaBackend {
         self.buffer_frames
     }
     fn write(&mut self, samples: &[f32]) -> Result<usize, BackendError> {
-        let frames = (samples.len() / self.channels as usize) as c_int;
+        let frames = (samples.len() / self.channels as usize) as c_ulong;
         if frames == 0 {
             return Ok(0);
         }

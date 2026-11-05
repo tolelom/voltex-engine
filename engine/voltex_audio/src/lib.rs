@@ -14,9 +14,9 @@
 //! - Effects: [`Reverb`] / [`Echo`] / [`DelayLine`] / [`EffectChain`] /
 //!   [`LowPassFilter`] occlusion / fade curves.
 //! - Backends: [`AudioBackend`] trait with [`NullBackend`] always available
-//!   plus WASAPI / ALSA / CoreAudio impls and [`make_backend`]. Note that
-//!   [`AudioSystem`]'s thread does not go through this trait yet: it drives
-//!   `wasapi_ffi::WasapiDevice` directly on Windows and is silent elsewhere.
+//!   plus WASAPI / ALSA / CoreAudio impls and [`make_backend`]. [`AudioSystem`]
+//!   plays through ALSA / CoreAudio via this trait; on Windows it drives
+//!   `wasapi_ffi::WasapiDevice` directly. Without a device it runs silently.
 
 #![warn(missing_docs)]
 

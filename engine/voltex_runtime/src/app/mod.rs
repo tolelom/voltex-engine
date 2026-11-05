@@ -348,9 +348,18 @@ impl RuntimeApp {
         // moved) and clear it after, mirroring the `__voltex_world` rule.
         fill_script_input(&mut self.script_input, &self.input);
         voltex_script::set_current_input(&self.script_input as *const _);
-        voltex_script::script_start_all(&mut self.world, &mut self.script_pool);
-        voltex_script::script_update_all(&mut self.world, &mut self.script_pool, dt);
+        let mut errors = voltex_script::script_start_all(&mut self.world, &mut self.script_pool);
+        errors.extend(voltex_script::script_update_all(&mut self.world, &mut self.script_pool, dt));
         voltex_script::set_current_input(std::ptr::null());
+        for error in errors {
+            crate::log_error!(
+                "voltex_runtime: Lua {} failed in `{}` (entity {}): {}",
+                error.callback,
+                error.script_path,
+                error.entity.id,
+                error.message
+            );
+        }
         let _ = self.script_pool.poll_reload(&mut self.file_watcher);
     }
 
