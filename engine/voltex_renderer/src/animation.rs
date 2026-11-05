@@ -165,11 +165,12 @@ pub fn build_trs(translation: &[f32], rotation: &[f32], scale: &[f32]) -> [[f32;
         (1.0, 1.0, 1.0)
     };
 
-    // TRS = T * R * S
+    // TRS = T * R * S. Column-major (`m[column][row]`): R·S scales each
+    // column of R by that axis' scale factor.
     [
-        [rot[0][0] * sx, rot[0][1] * sy, rot[0][2] * sz, 0.0],
-        [rot[1][0] * sx, rot[1][1] * sy, rot[1][2] * sz, 0.0],
-        [rot[2][0] * sx, rot[2][1] * sy, rot[2][2] * sz, 0.0],
+        [rot[0][0] * sx, rot[0][1] * sx, rot[0][2] * sx, 0.0],
+        [rot[1][0] * sy, rot[1][1] * sy, rot[1][2] * sy, 0.0],
+        [rot[2][0] * sz, rot[2][1] * sz, rot[2][2] * sz, 0.0],
         [tx, ty, tz, 1.0],
     ]
 }
@@ -265,6 +266,19 @@ mod tests {
         assert!(
             (o[0] - 1.0).abs() < 1e-5 && (o[1] - 2.0).abs() < 1e-5 && (o[2] - 3.0).abs() < 1e-5
         );
+    }
+
+    #[test]
+    fn test_build_trs_scales_before_rotating() {
+        // 90° about +Z (x→y), non-uniform scale (2, 3, 1).
+        let half = std::f32::consts::FRAC_PI_4;
+        let m = build_trs(&[0.0, 0.0, 0.0], &[0.0, 0.0, half.sin(), half.cos()], &[2.0, 3.0, 1.0]);
+        // T·R·S: (1,0,0) is scaled to (2,0,0) first, then rotated to (0,2,0).
+        let p = transform_point(&m, [1.0, 0.0, 0.0]);
+        assert!(p[0].abs() < 1e-5 && (p[1] - 2.0).abs() < 1e-5, "got {p:?}");
+        // (0,1,0) → (0,3,0) → (-3,0,0).
+        let q = transform_point(&m, [0.0, 1.0, 0.0]);
+        assert!((q[0] + 3.0).abs() < 1e-5 && q[1].abs() < 1e-5, "got {q:?}");
     }
 
     #[test]
