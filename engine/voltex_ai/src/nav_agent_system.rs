@@ -18,6 +18,14 @@ use crate::{find_path, follow_path, NavAgent, NavMesh, SteeringAgent};
 use voltex_ecs::{Entity, Transform, World};
 use voltex_math::Vec3;
 
+/// Smallest waypoint acceptance radius, so a stationary or very slow agent
+/// can still reach a waypoint.
+const MIN_WAYPOINT_RADIUS: f32 = 0.05;
+/// Steering force limit as a multiple of the agent's speed.
+const MAX_FORCE_PER_SPEED: f32 = 8.0;
+/// Steering forces with a squared length below this count as zero.
+const MIN_FORCE_LENGTH_SQ: f32 = 1e-12;
+
 /// Advance all [`NavAgent`] entities by `dt` seconds over `navmesh`.
 ///
 /// No-op when `dt <= 0.0`.
@@ -25,19 +33,23 @@ pub fn nav_agent_system(world: &mut World, navmesh: &NavMesh, dt: f32) {
     if dt <= 0.0 {
         return;
     }
+    replan_paths(world, navmesh);
+    advance_agents(world, dt);
+}
 
-    // Pass 1: (re)compute a path for agents whose target is new or has changed.
-    // `planned_target` records what `path` was computed for, so a direct
-    // `agent.target = Some(..)` assignment is picked up like `set_target`.
+/// Pass 1: (re)compute a path for agents whose target is new or has changed.
+/// `planned_target` records what `path` was computed for, so a direct
+/// `agent.target = Some(..)` assignment is picked up like `set_target`.
+fn replan_paths(world: &mut World, navmesh: &NavMesh) {
     let need_path: Vec<(Entity, Vec3, Vec3, bool)> = world
         .query2::<NavAgent, Transform>()
-        .filter(|(_, a, _)| {
-            a.target.is_some()
-                && (a.target != a.planned_target || (a.path.is_empty() && !a.reached))
+        .filter(|(_, agent, _)| {
+            agent.target.is_some()
+                && (agent.target != agent.planned_target || (agent.path.is_empty() && !agent.reached))
         })
-        .map(|(e, a, t)| {
-            let goal = a.target.expect("target is_some checked above");
-            (e, t.position, goal, !a.path.is_empty())
+        .map(|(entity, agent, transform)| {
+            let goal = agent.target.expect("target is_some checked above");
+            (entity, transform.position, goal, !agent.path.is_empty())
         })
         .collect();
     for (entity, start, goal, has_path) in need_path {
@@ -47,16 +59,16 @@ pub fn nav_agent_system(world: &mut World, navmesh: &NavMesh, dt: f32) {
         if has_path {
             let endpoint = world
                 .get::<NavAgent>(entity)
-                .and_then(|a| a.path.last().copied())
+                .and_then(|agent| agent.path.last().copied())
                 .expect("has_path implies non-empty path");
             if let (Some(goal_tri), Some(end_tri)) =
                 (navmesh.find_triangle(goal), navmesh.find_triangle(endpoint))
             {
                 if goal_tri == end_tri {
-                    if let Some(a) = world.get_mut::<NavAgent>(entity) {
-                        *a.path.last_mut().expect("non-empty path") = goal;
-                        a.reached = false;
-                        a.planned_target = a.target;
+                    if let Some(agent) = world.get_mut::<NavAgent>(entity) {
+                        *agent.path.last_mut().expect("non-empty path") = goal;
+                        agent.reached = false;
+                        agent.planned_target = agent.target;
                     }
                     continue;
                 }
@@ -64,24 +76,26 @@ pub fn nav_agent_system(world: &mut World, navmesh: &NavMesh, dt: f32) {
         }
         match find_path(navmesh, start, goal) {
             Some(path) => {
-                if let Some(a) = world.get_mut::<NavAgent>(entity) {
-                    a.path = path;
-                    a.current_waypoint = 0;
-                    a.reached = false;
-                    a.planned_target = a.target;
+                if let Some(agent) = world.get_mut::<NavAgent>(entity) {
+                    agent.path = path;
+                    agent.current_waypoint = 0;
+                    agent.reached = false;
+                    agent.planned_target = agent.target;
                 }
             }
             None => {
                 // Goal is unreachable / off-mesh: drop the target so the agent
                 // goes idle instead of recomputing a failing path every frame.
-                if let Some(a) = world.get_mut::<NavAgent>(entity) {
-                    a.clear_target();
+                if let Some(agent) = world.get_mut::<NavAgent>(entity) {
+                    agent.clear_target();
                 }
             }
         }
     }
+}
 
-    // Pass 2: steer active agents toward their current waypoint and integrate.
+/// Pass 2: steer active agents toward their current waypoint and integrate.
+fn advance_agents(world: &mut World, dt: f32) {
     struct Step {
         entity: Entity,
         position: Vec3,
@@ -90,20 +104,19 @@ pub fn nav_agent_system(world: &mut World, navmesh: &NavMesh, dt: f32) {
     }
     let steps: Vec<Step> = world
         .query2::<NavAgent, Transform>()
-        .filter(|(_, a, _)| !a.path.is_empty() && !a.reached)
-        .map(|(entity, a, t)| {
-            // A waypoint is "reached" within one frame of travel (clamped so a
-            // stationary / very slow agent still has a non-zero acceptance radius).
-            let radius = (a.speed * dt).max(0.05);
-            let steer = SteeringAgent::new(t.position, a.speed, a.speed * 8.0);
-            let (force, waypoint) = follow_path(&steer, &a.path, a.current_waypoint, radius);
-            let dir = if force.length_squared() > 1e-12 {
+        .filter(|(_, agent, _)| !agent.path.is_empty() && !agent.reached)
+        .map(|(entity, agent, transform)| {
+            // A waypoint is "reached" within one frame of travel.
+            let radius = (agent.speed * dt).max(MIN_WAYPOINT_RADIUS);
+            let steering = SteeringAgent::new(transform.position, agent.speed, agent.speed * MAX_FORCE_PER_SPEED);
+            let (force, waypoint) = follow_path(&steering, &agent.path, agent.current_waypoint, radius);
+            let dir = if force.length_squared() > MIN_FORCE_LENGTH_SQ {
                 force.normalize()
             } else {
                 Vec3::ZERO
             };
-            let candidate = t.position + dir * a.speed * dt;
-            let goal = *a.path.last().expect("path non-empty checked above");
+            let candidate = transform.position + dir * agent.speed * dt;
+            let goal = *agent.path.last().expect("path non-empty checked above");
             // Arrival is judged in XZ (navmesh navigation is planar) and the
             // snap keeps the agent's gameplay y — waypoints may sit on the
             // navmesh plane at a different height.
@@ -116,14 +129,14 @@ pub fn nav_agent_system(world: &mut World, navmesh: &NavMesh, dt: f32) {
             }
         })
         .collect();
-    for s in steps {
-        if let Some(t) = world.get_mut::<Transform>(s.entity) {
-            t.position = s.position;
+    for step in steps {
+        if let Some(transform) = world.get_mut::<Transform>(step.entity) {
+            transform.position = step.position;
         }
-        if let Some(a) = world.get_mut::<NavAgent>(s.entity) {
-            a.current_waypoint = s.waypoint;
-            if s.reached {
-                a.reached = true;
+        if let Some(agent) = world.get_mut::<NavAgent>(step.entity) {
+            agent.current_waypoint = step.waypoint;
+            if step.reached {
+                agent.reached = true;
             }
         }
     }

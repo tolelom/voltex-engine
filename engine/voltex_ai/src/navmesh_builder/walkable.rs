@@ -1,23 +1,19 @@
-use super::{Heightfield, NavMeshBuilder, WalkableMap};
+use super::{Heightfield, NavMeshBuilder, WalkableMap, FOUR_NEIGHBORS};
 
 impl NavMeshBuilder {
-    /// Step 2: Mark walkable cells based on slope and agent height clearance.
-    pub(crate) fn mark_walkable(&self, hf: &Heightfield) -> WalkableMap {
+    /// Step 2: Mark walkable cells by slope, then erode by the agent radius.
+    /// Height clearance (`agent_height`) is not checked yet.
+    pub(crate) fn mark_walkable(&self, heightfield: &Heightfield) -> WalkableMap {
+        let grid = heightfield.grid;
         let max_slope_cos = (self.max_slope * std::f32::consts::PI / 180.0).cos();
-        let n = hf.width * hf.depth;
-        let mut walkable = vec![false; n];
-        let mut heights = vec![0.0f32; n];
+        let mut walkable = vec![false; grid.cell_count()];
+        let mut heights = vec![0.0f32; grid.cell_count()];
 
-        for z in 0..hf.depth {
-            for x in 0..hf.width {
-                let idx = z * hf.width + x;
-                if let Some((_lo, hi)) = hf.cells[idx] {
-                    // Check slope by comparing height differences with neighbors
-                    let slope_ok = self.check_slope(hf, x, z, max_slope_cos);
-
-                    // Check clearance: for simplicity, if cell has geometry, assume clearance
-                    // unless there's a cell above within agent_height (not implemented for simple case)
-                    if slope_ok {
+        for z in 0..grid.depth {
+            for x in 0..grid.width {
+                let idx = grid.index(x, z);
+                if let Some((_lo, hi)) = heightfield.cells[idx] {
+                    if self.is_slope_walkable(heightfield, x, z, max_slope_cos) {
                         walkable[idx] = true;
                         heights[idx] = hi;
                     }
@@ -26,97 +22,39 @@ impl NavMeshBuilder {
         }
 
         // Erode by agent radius: remove walkable cells too close to non-walkable
-        let erosion_cells = (self.agent_radius / hf.cell_size).ceil() as usize;
+        let erosion_cells = (self.agent_radius / grid.cell_size).ceil() as usize;
         if erosion_cells > 0 {
             let mut eroded = walkable.clone();
-            for z in 0..hf.depth {
-                for x in 0..hf.width {
-                    let idx = z * hf.width + x;
-                    if !walkable[idx] {
-                        continue;
-                    }
-                    // Check if near boundary of walkable area
-                    let mut near_edge = false;
-                    for dz in 0..=erosion_cells {
-                        for dx in 0..=erosion_cells {
-                            if dx == 0 && dz == 0 {
-                                continue;
-                            }
-                            // Check all 4 quadrants
-                            let checks: [(isize, isize); 4] = [
-                                (dx as isize, dz as isize),
-                                (-(dx as isize), dz as isize),
-                                (dx as isize, -(dz as isize)),
-                                (-(dx as isize), -(dz as isize)),
-                            ];
-                            for (ddx, ddz) in checks {
-                                let nx = x as isize + ddx;
-                                let nz = z as isize + ddz;
-                                if nx < 0 || nz < 0 || nx >= hf.width as isize || nz >= hf.depth as isize {
-                                    near_edge = true;
-                                    break;
-                                }
-                                let ni = nz as usize * hf.width + nx as usize;
-                                if !walkable[ni] {
-                                    near_edge = true;
-                                    break;
-                                }
-                            }
-                            if near_edge {
-                                break;
-                            }
-                        }
-                        if near_edge {
-                            break;
-                        }
-                    }
-                    if near_edge {
+            for z in 0..grid.depth {
+                for x in 0..grid.width {
+                    let idx = grid.index(x, z);
+                    if walkable[idx] && is_near_unwalkable(heightfield, &walkable, x, z, erosion_cells) {
                         eroded[idx] = false;
                     }
                 }
             }
-            return WalkableMap {
-                width: hf.width,
-                depth: hf.depth,
-                min_x: hf.min_x,
-                min_z: hf.min_z,
-                cell_size: hf.cell_size,
-                walkable: eroded,
-                heights,
-            };
+            walkable = eroded;
         }
 
-        WalkableMap {
-            width: hf.width,
-            depth: hf.depth,
-            min_x: hf.min_x,
-            min_z: hf.min_z,
-            cell_size: hf.cell_size,
-            walkable,
-            heights,
-        }
+        WalkableMap { grid, walkable, heights }
     }
 
-    /// Check if the slope at cell (x, z) is walkable.
-    fn check_slope(&self, hf: &Heightfield, x: usize, z: usize, max_slope_cos: f32) -> bool {
-        let idx = z * hf.width + x;
-        let h = match hf.cells[idx] {
+    /// `true` if the height step to every existing 4-neighbour of cell
+    /// (x, z) is within `max_slope` (given as its cosine).
+    fn is_slope_walkable(&self, heightfield: &Heightfield, x: usize, z: usize, max_slope_cos: f32) -> bool {
+        let grid = heightfield.grid;
+        let h = match heightfield.cells[grid.index(x, z)] {
             Some((_, hi)) => hi,
             None => return false,
         };
 
-        // Compare with direct neighbors to estimate slope
-        let neighbors: [(isize, isize); 4] = [(1, 0), (-1, 0), (0, 1), (0, -1)];
-        for (dx, dz) in neighbors {
-            let nx = x as isize + dx;
-            let nz = z as isize + dz;
-            if nx < 0 || nz < 0 || nx >= hf.width as isize || nz >= hf.depth as isize {
+        for (dx, dz) in FOUR_NEIGHBORS {
+            let Some((nx, nz)) = grid.offset_cell(x, z, dx, dz) else {
                 continue;
-            }
-            let ni = nz as usize * hf.width + nx as usize;
-            if let Some((_, nh)) = hf.cells[ni] {
-                let dy = (nh - h).abs();
-                let dist = hf.cell_size;
+            };
+            if let Some((_, neighbor_h)) = heightfield.cells[grid.index(nx, nz)] {
+                let dy = (neighbor_h - h).abs();
+                let dist = grid.cell_size;
                 // slope angle: atan(dy/dist), check cos of that angle
                 let slope_len = (dy * dy + dist * dist).sqrt();
                 let cos_angle = dist / slope_len;
@@ -127,4 +65,26 @@ impl NavMeshBuilder {
         }
         true
     }
+}
+
+/// `true` if any cell within `radius` cells (square neighbourhood, Chebyshev
+/// distance) of (x, z) is unwalkable or outside the grid.
+fn is_near_unwalkable(heightfield: &Heightfield, walkable: &[bool], x: usize, z: usize, radius: usize) -> bool {
+    let grid = heightfield.grid;
+    for dz in 0..=radius as isize {
+        for dx in 0..=radius as isize {
+            if dx == 0 && dz == 0 {
+                continue;
+            }
+            // All 4 quadrants
+            for (offset_x, offset_z) in [(dx, dz), (-dx, dz), (dx, -dz), (-dx, -dz)] {
+                match grid.offset_cell(x, z, offset_x, offset_z) {
+                    None => return true,
+                    Some((nx, nz)) if !walkable[grid.index(nx, nz)] => return true,
+                    Some(_) => {}
+                }
+            }
+        }
+    }
+    false
 }

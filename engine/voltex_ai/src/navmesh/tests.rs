@@ -81,8 +81,8 @@ fn test_shared_edge_not_adjacent() {
 #[test]
 fn test_serialize_roundtrip() {
     let nm = make_simple_navmesh();
-    let data = serialize_navmesh(&nm);
-    let nm2 = deserialize_navmesh(&data).expect("should deserialize");
+    let data = serialize_navmesh_headerless(&nm);
+    let nm2 = deserialize_navmesh_headerless(&data).expect("should deserialize");
     assert_eq!(nm2.vertices.len(), nm.vertices.len());
     assert_eq!(nm2.triangles.len(), nm.triangles.len());
     for (a, b) in nm.vertices.iter().zip(nm2.vertices.iter()) {
@@ -98,15 +98,15 @@ fn test_serialize_roundtrip() {
 
 #[test]
 fn test_deserialize_empty_data() {
-    let result = deserialize_navmesh(&[]);
+    let result = deserialize_navmesh_headerless(&[]);
     assert!(result.is_err());
 }
 
 #[test]
 fn test_method_serialize_deserialize_roundtrip() {
     let nm = make_simple_navmesh();
-    let data = nm.serialize();
-    let restored = NavMesh::deserialize(&data).expect("should deserialize");
+    let data = nm.to_vnav_bytes();
+    let restored = NavMesh::from_vnav_bytes(&data).expect("should deserialize");
     assert_eq!(nm.vertices.len(), restored.vertices.len());
     assert_eq!(nm.triangles.len(), restored.triangles.len());
     for (a, b) in nm.vertices.iter().zip(restored.vertices.iter()) {
@@ -123,20 +123,20 @@ fn test_method_serialize_deserialize_roundtrip() {
 #[test]
 fn test_deserialize_invalid_magic() {
     let data = b"XXXX\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00";
-    assert!(NavMesh::deserialize(data).is_err());
+    assert!(NavMesh::from_vnav_bytes(data).is_err());
 }
 
 #[test]
 fn test_deserialize_too_short() {
     let data = b"VNA";
-    assert!(NavMesh::deserialize(data).is_err());
+    assert!(NavMesh::from_vnav_bytes(data).is_err());
 }
 
 #[test]
 fn test_serialize_empty_navmesh() {
     let nm = NavMesh::new(vec![], vec![]);
-    let data = nm.serialize();
-    let restored = NavMesh::deserialize(&data).expect("should deserialize empty");
+    let data = nm.to_vnav_bytes();
+    let restored = NavMesh::from_vnav_bytes(&data).expect("should deserialize empty");
     assert!(restored.vertices.is_empty());
     assert!(restored.triangles.is_empty());
 }
@@ -144,7 +144,7 @@ fn test_serialize_empty_navmesh() {
 #[test]
 fn test_serialize_header_format() {
     let nm = NavMesh::new(vec![], vec![]);
-    let data = nm.serialize();
+    let data = nm.to_vnav_bytes();
     // Check magic
     assert_eq!(&data[0..4], b"VNAV");
     // Check version = 1
@@ -159,21 +159,21 @@ fn test_deserialize_unsupported_version() {
     data.extend_from_slice(&99u32.to_le_bytes());
     data.extend_from_slice(&0u32.to_le_bytes());
     data.extend_from_slice(&0u32.to_le_bytes());
-    assert!(NavMesh::deserialize(&data).is_err());
+    assert!(NavMesh::from_vnav_bytes(&data).is_err());
 }
 
 #[test]
-fn deserialize_navmesh_rejects_huge_vertex_count() {
+fn deserialize_navmesh_headerless_rejects_huge_vertex_count() {
     // Adversarial vertex count u32::MAX. Without the cap this drove a
     // multi-GB `Vec::with_capacity` allocation.
     let mut data = Vec::new();
     data.extend_from_slice(&u32::MAX.to_le_bytes());
-    let err = deserialize_navmesh(&data).err().expect("expected error").to_string();
+    let err = deserialize_navmesh_headerless(&data).err().expect("expected error").to_string();
     assert!(err.contains("vertex count"), "unexpected error: {err}");
 }
 
 #[test]
-fn deserialize_navmesh_rejects_triangle_vertex_index_oob() {
+fn deserialize_navmesh_headerless_rejects_triangle_vertex_index_oob() {
     // One vertex declared, triangle references vertex 5 → out of range.
     // Without the check this allowed building a NavMesh whose
     // `shared_edge` / `point_in_triangle_xz` would panic on
@@ -192,12 +192,12 @@ fn deserialize_navmesh_rejects_triangle_vertex_index_oob() {
     data.extend_from_slice(&(-1i32).to_le_bytes());
     data.extend_from_slice(&(-1i32).to_le_bytes());
     data.extend_from_slice(&(-1i32).to_le_bytes());
-    let err = deserialize_navmesh(&data).err().expect("expected error").to_string();
+    let err = deserialize_navmesh_headerless(&data).err().expect("expected error").to_string();
     assert!(err.contains("vertex index out of range"), "unexpected error: {err}");
 }
 
 #[test]
-fn deserialize_navmesh_rejects_neighbour_index_oob() {
+fn deserialize_navmesh_headerless_rejects_neighbour_index_oob() {
     // One valid triangle but neighbour index = 5 (only 1 triangle exists).
     let mut data = Vec::new();
     // vertex_count = 3, simple triangle vertices
@@ -213,6 +213,6 @@ fn deserialize_navmesh_rejects_neighbour_index_oob() {
     data.extend_from_slice(&5i32.to_le_bytes());
     data.extend_from_slice(&(-1i32).to_le_bytes());
     data.extend_from_slice(&(-1i32).to_le_bytes());
-    let err = deserialize_navmesh(&data).err().expect("expected error").to_string();
+    let err = deserialize_navmesh_headerless(&data).err().expect("expected error").to_string();
     assert!(err.contains("neighbour triangle index"), "unexpected error: {err}");
 }

@@ -31,24 +31,24 @@ pub fn avoid_obstacles(
     }
 
     let forward = agent_vel * (1.0 / speed);
-    let mut nearest_t = f32::INFINITY;
+    let mut nearest_distance = f32::INFINITY;
     let mut avoidance = Vec3::ZERO;
 
-    for obs in obstacles {
-        let to_obs = obs.position - agent_pos;
-        let combined_radius = agent_radius + obs.radius;
+    for obstacle in obstacles {
+        let to_obstacle = obstacle.position - agent_pos;
+        let combined_radius = agent_radius + obstacle.radius;
 
         // Project obstacle center onto the velocity ray
-        let proj = to_obs.dot(forward);
+        let distance_ahead = to_obstacle.dot(forward);
 
         // Obstacle is behind or too far ahead
-        if proj < 0.0 || proj > look_ahead {
+        if distance_ahead < 0.0 || distance_ahead > look_ahead {
             continue;
         }
 
         // Lateral distance from the velocity ray to obstacle center (XZ only for ground agents)
-        let closest_on_ray = agent_pos + forward * proj;
-        let diff = obs.position - closest_on_ray;
+        let closest_on_ray = agent_pos + forward * distance_ahead;
+        let diff = obstacle.position - closest_on_ray;
         let lateral_dist_sq = diff.x * diff.x + diff.z * diff.z;
         let combined_sq = combined_radius * combined_radius;
 
@@ -57,8 +57,8 @@ pub fn avoid_obstacles(
         }
 
         // This obstacle threatens the agent — check if it's the nearest
-        if proj < nearest_t {
-            nearest_t = proj;
+        if distance_ahead < nearest_distance {
+            nearest_distance = distance_ahead;
 
             // Avoidance direction: perpendicular to approach, away from obstacle
             // Use XZ plane lateral vector
@@ -68,7 +68,7 @@ pub fn avoid_obstacles(
                 // Steer away from obstacle (opposite direction of lateral offset)
                 let steer_dir = lateral * (-1.0 / lat_len);
                 // Strength inversely proportional to distance (closer = stronger)
-                let strength = 1.0 - (proj / look_ahead);
+                let strength = 1.0 - (distance_ahead / look_ahead);
                 avoidance = steer_dir * strength * speed;
             } else {
                 // Agent heading straight at obstacle center — pick perpendicular

@@ -1,32 +1,32 @@
 use super::{NavMeshBuilder, RegionMap};
-use crate::navmesh::{NavMesh, NavTriangle};
+use crate::navmesh::{barycentric_xz, NavMesh, NavTriangle};
 use voltex_math::Vec3;
 
 impl NavMeshBuilder {
     /// Steps 4-5 combined: Convert walkable grid cells directly into a NavMesh.
     /// Each walkable cell becomes a quad (2 triangles), with adjacency computed.
-    pub(crate) fn triangulate(&self, rm: &RegionMap) -> NavMesh {
+    pub(crate) fn triangulate(&self, region_map: &RegionMap) -> NavMesh {
         let mut vertices = Vec::new();
         let mut triangles = Vec::new();
 
         // For each walkable cell, create 4 vertices and 2 triangles.
         // Map from cell (x,z) -> (tri_a_idx, tri_b_idx) for adjacency lookup.
-        let n = rm.width * rm.depth;
+        let n = region_map.grid.cell_count();
         // cell_tri_map[cell_idx] = Some((tri_a_idx, tri_b_idx)) or None
         let mut cell_tri_map: Vec<Option<(usize, usize)>> = vec![None; n];
 
-        for z in 0..rm.depth {
-            for x in 0..rm.width {
-                let idx = z * rm.width + x;
-                if rm.regions[idx] == 0 {
+        for z in 0..region_map.grid.depth {
+            for x in 0..region_map.grid.width {
+                let idx = region_map.grid.index(x, z);
+                if region_map.regions[idx] == 0 {
                     continue;
                 }
 
-                let h = rm.heights[idx];
-                let x0 = rm.min_x + x as f32 * rm.cell_size;
-                let x1 = x0 + rm.cell_size;
-                let z0 = rm.min_z + z as f32 * rm.cell_size;
-                let z1 = z0 + rm.cell_size;
+                let h = region_map.heights[idx];
+                let x0 = region_map.grid.min_x + x as f32 * region_map.grid.cell_size;
+                let x1 = x0 + region_map.grid.cell_size;
+                let z0 = region_map.grid.min_z + z as f32 * region_map.grid.cell_size;
+                let z1 = z0 + region_map.grid.cell_size;
 
                 let vi = vertices.len();
                 vertices.push(Vec3::new(x0, h, z0)); // vi+0: bottom-left
@@ -67,9 +67,9 @@ impl NavMeshBuilder {
         //     edge 1: TR->TL (top edge, connects to cell above z+1)
         //     edge 2: TL->BL (left edge, connects to cell at x-1)
 
-        for z in 0..rm.depth {
-            for x in 0..rm.width {
-                let idx = z * rm.width + x;
+        for z in 0..region_map.grid.depth {
+            for x in 0..region_map.grid.width {
+                let idx = region_map.grid.index(x, z);
                 if cell_tri_map[idx].is_none() {
                     continue;
                 }
@@ -77,7 +77,7 @@ impl NavMeshBuilder {
 
                 // Bottom neighbor (z-1): A's edge 0 connects to neighbor's B edge 1 (TR->TL = top)
                 if z > 0 {
-                    let ni = (z - 1) * rm.width + x;
+                    let ni = (z - 1) * region_map.grid.width + x;
                     if let Some((_, nb_tb)) = cell_tri_map[ni] {
                         triangles[ta].neighbors[0] = Some(nb_tb);
                         triangles[nb_tb].neighbors[1] = Some(ta);
@@ -85,8 +85,8 @@ impl NavMeshBuilder {
                 }
 
                 // Right neighbor (x+1): A's edge 1 connects to neighbor's B edge 2 (TL->BL = left)
-                if x + 1 < rm.width {
-                    let ni = z * rm.width + (x + 1);
+                if x + 1 < region_map.grid.width {
+                    let ni = z * region_map.grid.width + (x + 1);
                     if let Some((_, nb_tb)) = cell_tri_map[ni] {
                         triangles[ta].neighbors[1] = Some(nb_tb);
                         triangles[nb_tb].neighbors[2] = Some(ta);
@@ -100,32 +100,20 @@ impl NavMeshBuilder {
 }
 
 /// Loose point-in-triangle test on XZ plane, with a tolerance margin.
+/// Degenerate triangles never contain a point.
 pub(super) fn point_in_triangle_xz_loose(point: Vec3, a: Vec3, b: Vec3, c: Vec3, margin: f32) -> bool {
-    let px = point.x;
-    let pz = point.z;
-
-    let denom = (b.z - c.z) * (a.x - c.x) + (c.x - b.x) * (a.z - c.z);
-    if denom.abs() < f32::EPSILON {
-        // Degenerate: check if point is near the line segment
+    let Some((u, v, w)) = barycentric_xz(point.x, point.z, a, b, c) else {
         return false;
-    }
-
-    let u = ((b.z - c.z) * (px - c.x) + (c.x - b.x) * (pz - c.z)) / denom;
-    let v = ((c.z - a.z) * (px - c.x) + (a.x - c.x) * (pz - c.z)) / denom;
-    let w = 1.0 - u - v;
-
-    let e = margin / ((a - b).length().max((b - c).length()).max((c - a).length()).max(0.001));
-    u >= -e && v >= -e && w >= -e
+    };
+    let longest_edge = (a - b).length().max((b - c).length()).max((c - a).length()).max(0.001);
+    let tolerance = margin / longest_edge;
+    u >= -tolerance && v >= -tolerance && w >= -tolerance
 }
 
 /// Interpolate Y height at (px, pz) on the plane defined by triangle (a, b, c).
 pub(super) fn interpolate_y(a: Vec3, b: Vec3, c: Vec3, px: f32, pz: f32) -> f32 {
-    let denom = (b.z - c.z) * (a.x - c.x) + (c.x - b.x) * (a.z - c.z);
-    if denom.abs() < f32::EPSILON {
-        return (a.y + b.y + c.y) / 3.0;
+    match barycentric_xz(px, pz, a, b, c) {
+        Some((u, v, w)) => u * a.y + v * b.y + w * c.y,
+        None => (a.y + b.y + c.y) / 3.0,
     }
-    let u = ((b.z - c.z) * (px - c.x) + (c.x - b.x) * (pz - c.z)) / denom;
-    let v = ((c.z - a.z) * (px - c.x) + (a.x - c.x) * (pz - c.z)) / denom;
-    let w = 1.0 - u - v;
-    u * a.y + v * b.y + w * c.y
 }

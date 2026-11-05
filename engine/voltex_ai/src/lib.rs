@@ -29,7 +29,9 @@ pub use obstacle::{avoid_obstacles, DynamicObstacle};
 pub use flocking::{alignment, cohesion, flocking_system, separation, Boid, BoidParams};
 pub use nav_agent::NavAgent;
 pub use nav_agent_system::nav_agent_system;
-pub use navmesh::{deserialize_navmesh, serialize_navmesh, NavMesh, NavTriangle};
+pub use navmesh::{deserialize_navmesh_headerless, serialize_navmesh_headerless, NavMesh, NavTriangle};
+#[allow(deprecated)]
+pub use navmesh::{deserialize_navmesh, serialize_navmesh};
 pub use navmesh_builder::NavMeshBuilder;
 pub use pathfinding::find_path;
 pub use steering::{SteeringAgent, seek, flee, arrive, wander, follow_path};
