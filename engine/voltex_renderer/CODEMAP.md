@@ -16,7 +16,7 @@ wgpu 기반 렌더링 — 메시/PBR/그림자/IBL/디퍼드/RT/post-process. �
 - `ColoredCameraUniform`, `create_colored_mesh_pipeline` — per-entity base_color 틴트 Blinn-Phong (BasicRenderer 전용, src/light.rs, src/mesh_colored.wgsl)
 - `Mesh` — 메시 데이터 + `Mesh::from_obj(device, source)` / `Mesh::from_gltf(device, bytes)` 모델 로더 (src/mesh.rs)
 - `Camera`, `FpsController` — 카메라 (src/camera.rs)
-- `GpuTexture` (`white_1x1`/`black_1x1`/`flat_normal_map_1x1` 기본 맵; 구 `flat_normal_1x1` 튜플 반환은 deprecated), `pbr_texture_bind_group_layout` 등 — GPU 텍스처 + PBR 바인딩 (src/texture/mod.rs). `texture::parse_bmp`/`BmpImage` 는 `voltex_image::bmp` 래퍼
+- `GpuTexture` (`white_1x1`/`black_1x1`/`flat_normal_map_1x1` 기본 맵; 구 `flat_normal_1x1` 튜플 반환은 deprecated), `pbr_texture_bind_group_layout` 등 — GPU 텍스처 + PBR 바인딩 (src/texture/mod.rs). 4맵 바인드 그룹은 `create_pbr_texture_set_bind_group(device, layout, PbrTextureSet { albedo, normal, orm, emissive })` (구 view·sampler 8개 나열형 `create_pbr_full_texture_bind_group` 은 deprecated). `texture::parse_bmp`/`BmpImage` 는 `voltex_image::bmp` 래퍼
 
 ### Image / Model (voltex_image 재export)
 - `decode_png`, `decode_jpg`, `DecodedImage`, `parse_gltf`, `GltfData`, `GltfMesh`, `GltfMaterial`, `MeshVertex` 등 — `voltex_image` crate로 이동; `pub use voltex_image::{...}` 역호환 재export 유지 (src/lib.rs). deprecated `parse_png`/`parse_jpg` 도 재export
@@ -52,6 +52,9 @@ wgpu 기반 렌더링 — 메시/PBR/그림자/IBL/디퍼드/RT/post-process. �
 - `GBuffer` (src/gbuffer.rs)
 - `FullscreenVertex`, `create_fullscreen_vertex_buffer` (src/fullscreen_quad.rs)
 - `create_gbuffer_pipeline`, `create_lighting_pipeline` 등 (src/deferred_pipeline/: `*_pipeline.rs` — gbuffer, lighting, ssgi, rt_shadow, bloom, tonemap. 같은 이름의 최상위 리소스 모듈과 구분하려고 접미사)
+
+### 화면 공간 compute 패스 공통 인자 (src/compute.rs)
+- `ComputeContext { device, queue, encoder }` + `ScreenOutput { view, width, height }` — `RtAo`/`RtPointShadow`/`RtReflections`/`Ssr`/`Taa`/`MotionBlur`/`DepthOfField`/`experimental::{TemporalAccumulation, BilateralBlur}` 의 `encode(&mut ctx, 입력 뷰…, output, params)` 가 받는다 (BilateralBlur 는 queue 가 필요 없어 device·encoder 를 직접 받음). `RtReflections` 의 입력 네 개는 `RtReflectionInputs { position, normal, material, color }`. 구 `dispatch(device, queue, encoder, …, width, height)` 나열형은 deprecated 래퍼
 
 ### RT (Ray Tracing)
 - `RtAccel`, `RtInstance`, `BlasMeshData` (src/rt_accel.rs)

@@ -384,7 +384,33 @@ pub fn pbr_full_texture_bind_group_layout(device: &wgpu::Device) -> wgpu::BindGr
     })
 }
 
+/// [`pbr_full_texture_bind_group_layout`] 의 네 슬롯에 바인딩할 텍스처.
+/// 각 텍스처의 view 와 sampler 가 함께 바인딩된다.
+#[derive(Clone, Copy)]
+pub struct PbrTextureSet<'a> {
+    pub albedo: &'a GpuTexture,
+    pub normal: &'a GpuTexture,
+    /// occlusion / roughness / metallic.
+    pub orm: &'a GpuTexture,
+    pub emissive: &'a GpuTexture,
+}
+
 /// Create a bind group for full PBR textures (albedo + normal + ORM + emissive).
+pub fn create_pbr_texture_set_bind_group(
+    device: &wgpu::Device,
+    layout: &wgpu::BindGroupLayout,
+    set: PbrTextureSet<'_>,
+) -> wgpu::BindGroup {
+    pbr_full_bind_group(
+        device,
+        layout,
+        [set.albedo, set.normal, set.orm, set.emissive].map(|t| (&t.view, &t.sampler)),
+    )
+}
+
+/// 옛 view·sampler 나열형. [`create_pbr_texture_set_bind_group`] 을 쓴다.
+#[deprecated(note = "use `create_pbr_texture_set_bind_group` with `PbrTextureSet`")]
+// reason: 역호환용 옛 시그니처를 그대로 둔다.
 #[allow(clippy::too_many_arguments)]
 pub fn create_pbr_full_texture_bind_group(
     device: &wgpu::Device,
@@ -398,6 +424,30 @@ pub fn create_pbr_full_texture_bind_group(
     emissive_view: &wgpu::TextureView,
     emissive_sampler: &wgpu::Sampler,
 ) -> wgpu::BindGroup {
+    pbr_full_bind_group(
+        device,
+        layout,
+        [
+            (albedo_view, albedo_sampler),
+            (normal_view, normal_sampler),
+            (orm_view, orm_sampler),
+            (emissive_view, emissive_sampler),
+        ],
+    )
+}
+
+/// (view, sampler) 네 쌍을 albedo → normal → ORM → emissive 순서로 binding 0‥7 에 놓는다.
+fn pbr_full_bind_group(
+    device: &wgpu::Device,
+    layout: &wgpu::BindGroupLayout,
+    slots: [(&wgpu::TextureView, &wgpu::Sampler); 4],
+) -> wgpu::BindGroup {
+    let [
+        (albedo_view, albedo_sampler),
+        (normal_view, normal_sampler),
+        (orm_view, orm_sampler),
+        (emissive_view, emissive_sampler),
+    ] = slots;
     device.create_bind_group(&wgpu::BindGroupDescriptor {
         label: Some("PBR Full Texture Bind Group"),
         layout,

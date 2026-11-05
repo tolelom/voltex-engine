@@ -2,6 +2,8 @@
 //! weighted).
 #![allow(missing_docs)]
 
+use crate::compute::ScreenOutput;
+
 pub struct BilateralBlur {
     pipeline: wgpu::ComputePipeline,
     bind_group_layout: wgpu::BindGroupLayout,
@@ -81,17 +83,15 @@ impl BilateralBlur {
         }
     }
 
-    #[allow(clippy::too_many_arguments)]
-    pub fn dispatch(
+    /// 입력 텍스처를 읽어 `output` 에 결과를 쓰는 compute 패스를 기록한다.
+    pub fn encode(
         &self,
         device: &wgpu::Device,
         encoder: &mut wgpu::CommandEncoder,
         input_view: &wgpu::TextureView,
         depth_view: &wgpu::TextureView,
         normal_view: &wgpu::TextureView,
-        output_view: &wgpu::TextureView,
-        width: u32,
-        height: u32,
+        output: ScreenOutput<'_>,
     ) {
         let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("Bilateral Blur BG"),
@@ -111,7 +111,7 @@ impl BilateralBlur {
                 },
                 wgpu::BindGroupEntry {
                     binding: 3,
-                    resource: wgpu::BindingResource::TextureView(output_view),
+                    resource: wgpu::BindingResource::TextureView(output.view),
                 },
             ],
         });
@@ -122,7 +122,36 @@ impl BilateralBlur {
         });
         cpass.set_pipeline(&self.pipeline);
         cpass.set_bind_group(0, &bind_group, &[]);
-        crate::compute::dispatch_screen(&mut cpass, width, height);
+        crate::compute::dispatch_screen(&mut cpass, output.width, output.height);
+    }
+
+    /// 옛 인자 나열형. [`Self::encode`] 를 쓴다.
+    #[deprecated(note = "use `encode` (ComputeContext + ScreenOutput)")]
+    // reason: 역호환용 옛 시그니처를 그대로 둔다.
+    #[allow(clippy::too_many_arguments)]
+    pub fn dispatch(
+        &self,
+        device: &wgpu::Device,
+        encoder: &mut wgpu::CommandEncoder,
+        input_view: &wgpu::TextureView,
+        depth_view: &wgpu::TextureView,
+        normal_view: &wgpu::TextureView,
+        output_view: &wgpu::TextureView,
+        width: u32,
+        height: u32,
+    ) {
+        self.encode(
+            device,
+            encoder,
+            input_view,
+            depth_view,
+            normal_view,
+            ScreenOutput {
+                view: output_view,
+                width,
+                height,
+            },
+        );
     }
 }
 

@@ -7,10 +7,10 @@
 
 use voltex_math::{Mat4, Vec3};
 use voltex_renderer::{
-    create_pbr_full_texture_bind_group, create_pbr_pipeline, create_pbr_skinned_pipeline,
+    create_pbr_pipeline, create_pbr_skinned_pipeline, create_pbr_texture_set_bind_group,
     pbr_full_texture_bind_group_layout, BonePalette, CameraUniform, GpuTexture, IblResources,
-    LightData, LightUniform, LightsUniform, MaterialUniform, PointLight, ShadowMap,
-    ShadowUniform, SHADOW_MAP_SIZE,
+    LightData, LightUniform, LightsUniform, MaterialUniform, PbrTextureSet, PointLight,
+    ShadowMap, ShadowUniform, SHADOW_MAP_SIZE,
 };
 
 use super::{
@@ -132,13 +132,15 @@ impl PbrResources {
         // Group 1 defaults: white albedo, flat normal, white ORM, black emissive.
         let flat_normal = GpuTexture::flat_normal_map_1x1(device, queue, texture_layout);
         let black = GpuTexture::black_1x1(device, queue, texture_layout);
-        let default_maps_bind_group = pbr_maps_bind_group(
+        let default_maps_bind_group = create_pbr_texture_set_bind_group(
             device,
             &maps_layout,
-            default_texture,
-            &flat_normal,
-            default_texture,
-            &black,
+            PbrTextureSet {
+                albedo: default_texture,
+                normal: &flat_normal,
+                orm: default_texture,
+                emissive: &black,
+            },
         );
 
         // Group 3: depth map + comparison sampler + ShadowUniform + BRDF LUT.
@@ -393,13 +395,15 @@ impl BasicRenderer {
         let texture_or = |handle: Option<TextureHandle>, fallback| {
             handle.and_then(|h| assets.texture(h)).unwrap_or(fallback)
         };
-        Some(pbr_maps_bind_group(
+        Some(create_pbr_texture_set_bind_group(
             &self.device,
             &self.pbr.texture_layout,
-            texture_or(albedo, &self.default_texture),
-            texture_or(maps.and_then(|m| m.normal), &self.pbr.flat_normal),
-            texture_or(maps.and_then(|m| m.orm), &self.default_texture),
-            texture_or(maps.and_then(|m| m.emissive), &self.pbr.black),
+            PbrTextureSet {
+                albedo: texture_or(albedo, &self.default_texture),
+                normal: texture_or(maps.and_then(|m| m.normal), &self.pbr.flat_normal),
+                orm: texture_or(maps.and_then(|m| m.orm), &self.default_texture),
+                emissive: texture_or(maps.and_then(|m| m.emissive), &self.pbr.black),
+            },
         ))
     }
 }
@@ -436,29 +440,6 @@ fn pbr_lights_uniform(sun: LightUniform, point_lights: &[PointLight]) -> LightsU
         sun.color[2] * sun.ambient_strength,
     ];
     lights
-}
-
-/// Group-1 bind group from four textures (albedo, normal, ORM, emissive).
-fn pbr_maps_bind_group(
-    device: &wgpu::Device,
-    layout: &wgpu::BindGroupLayout,
-    albedo: &GpuTexture,
-    normal: &GpuTexture,
-    orm: &GpuTexture,
-    emissive: &GpuTexture,
-) -> wgpu::BindGroup {
-    create_pbr_full_texture_bind_group(
-        device,
-        layout,
-        &albedo.view,
-        &albedo.sampler,
-        &normal.view,
-        &normal.sampler,
-        &orm.view,
-        &orm.sampler,
-        &emissive.view,
-        &emissive.sampler,
-    )
 }
 
 /// PBR group-0 layout: dynamic-offset `CameraUniform` (binding 0, vertex +

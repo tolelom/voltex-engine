@@ -100,9 +100,11 @@ pub use primitives::{generate_cube_mesh, generate_plane_mesh, generate_quad_mesh
 #[allow(deprecated)]
 pub use sphere::generate_sphere;
 pub use sphere::generate_sphere_mesh;
+#[allow(deprecated)]
+pub use texture::create_pbr_full_texture_bind_group;
 pub use texture::{
-    create_pbr_full_texture_bind_group, create_pbr_texture_bind_group,
-    pbr_full_texture_bind_group_layout, pbr_texture_bind_group_layout, GpuTexture,
+    create_pbr_texture_bind_group, create_pbr_texture_set_bind_group,
+    pbr_full_texture_bind_group_layout, pbr_texture_bind_group_layout, GpuTexture, PbrTextureSet,
 };
 #[allow(deprecated)]
 pub use vertex::Vertex;
@@ -176,11 +178,12 @@ pub use gbuffer::GBuffer;
 pub use rt_accel::{mat4_to_tlas_transform, BlasMeshData, RtAccel, RtInstance};
 pub use rt_ao::RtAo;
 pub use rt_point_shadow::RtPointShadow;
-pub use rt_reflections::RtReflections;
+pub use rt_reflections::{RtReflectionInputs, RtReflections};
 pub use rt_shadow::{RtShadowResources, RtShadowUniform, RT_SHADOW_FORMAT};
 
 // 화면 공간 효과 / 포스트 프로세스
 pub use auto_exposure::AutoExposure;
+pub use compute::{ComputeContext, ScreenOutput};
 pub use bloom::{mip_sizes, BloomResources, BloomUniform, BLOOM_MIP_COUNT};
 pub use dof::DepthOfField;
 pub use hdr::{HdrTarget, HDR_FORMAT};

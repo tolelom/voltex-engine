@@ -2,6 +2,8 @@
 //! world space against the G-buffer (no acceleration structure).
 #![allow(missing_docs)]
 
+use crate::compute::{ComputeContext, ScreenOutput};
+
 use bytemuck::{Pod, Zeroable};
 
 /// Uniform parameters for the RT reflections compute pass.
@@ -39,6 +41,19 @@ impl RtReflParams {
 }
 
 /// RT Reflections compute pipeline.
+/// [`RtReflections::encode`] 가 읽는 입력 텍스처.
+#[derive(Clone, Copy)]
+pub struct RtReflectionInputs<'a> {
+    /// G-buffer 월드 위치.
+    pub position: &'a wgpu::TextureView,
+    /// G-buffer 노멀.
+    pub normal: &'a wgpu::TextureView,
+    /// G-buffer 머티리얼(metallic/roughness).
+    pub material: &'a wgpu::TextureView,
+    /// 반사로 샘플링할 조명된 장면 색.
+    pub color: &'a wgpu::TextureView,
+}
+
 pub struct RtReflections {
     pipeline: wgpu::ComputePipeline,
     bind_group_layout: wgpu::BindGroupLayout,
@@ -155,6 +170,59 @@ impl RtReflections {
         }
     }
 
+    /// 입력 텍스처를 읽어 `output` 에 결과를 쓰는 compute 패스를 기록한다.
+    pub fn encode(
+        &self,
+        gpu: &mut ComputeContext<'_>,
+        inputs: RtReflectionInputs<'_>,
+        output: ScreenOutput<'_>,
+        params: &RtReflParams,
+    ) {
+        gpu.queue.write_buffer(&self.params_buffer, 0, bytemuck::cast_slice(&[*params]));
+
+        let bind_group = gpu.device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("RT Reflections BG"),
+            layout: &self.bind_group_layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: wgpu::BindingResource::TextureView(inputs.position),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::TextureView(inputs.normal),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 2,
+                    resource: wgpu::BindingResource::TextureView(inputs.material),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 3,
+                    resource: wgpu::BindingResource::TextureView(inputs.color),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 4,
+                    resource: wgpu::BindingResource::TextureView(output.view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 5,
+                    resource: self.params_buffer.as_entire_binding(),
+                },
+            ],
+        });
+
+        let mut cpass = gpu.encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
+            label: Some("RT Reflections Pass"),
+            timestamp_writes: None,
+        });
+        cpass.set_pipeline(&self.pipeline);
+        cpass.set_bind_group(0, &bind_group, &[]);
+        crate::compute::dispatch_screen(&mut cpass, output.width, output.height);
+    }
+
+    /// 옛 인자 나열형. [`Self::encode`] 를 쓴다.
+    #[deprecated(note = "use `encode` (ComputeContext + ScreenOutput)")]
+    // reason: 역호환용 옛 시그니처를 그대로 둔다.
     #[allow(clippy::too_many_arguments)]
     pub fn dispatch(
         &self,
@@ -170,46 +238,25 @@ impl RtReflections {
         width: u32,
         height: u32,
     ) {
-        queue.write_buffer(&self.params_buffer, 0, bytemuck::cast_slice(&[*params]));
-
-        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("RT Reflections BG"),
-            layout: &self.bind_group_layout,
-            entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: wgpu::BindingResource::TextureView(position_view),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 1,
-                    resource: wgpu::BindingResource::TextureView(normal_view),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 2,
-                    resource: wgpu::BindingResource::TextureView(material_view),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 3,
-                    resource: wgpu::BindingResource::TextureView(color_view),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 4,
-                    resource: wgpu::BindingResource::TextureView(output_view),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 5,
-                    resource: self.params_buffer.as_entire_binding(),
-                },
-            ],
-        });
-
-        let mut cpass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
-            label: Some("RT Reflections Pass"),
-            timestamp_writes: None,
-        });
-        cpass.set_pipeline(&self.pipeline);
-        cpass.set_bind_group(0, &bind_group, &[]);
-        crate::compute::dispatch_screen(&mut cpass, width, height);
+        self.encode(
+            &mut ComputeContext {
+                device,
+                queue,
+                encoder,
+            },
+            RtReflectionInputs {
+                position: position_view,
+                normal: normal_view,
+                material: material_view,
+                color: color_view,
+            },
+            ScreenOutput {
+                view: output_view,
+                width,
+                height,
+            },
+            params,
+        );
     }
 }
 

@@ -2,6 +2,8 @@
 //! using Halton-sequence sub-pixel jitter (`jitter_offset`).
 #![allow(missing_docs)]
 
+use crate::compute::{ComputeContext, ScreenOutput};
+
 use bytemuck::{Pod, Zeroable};
 
 #[repr(C)]
@@ -136,31 +138,27 @@ impl Taa {
         jitter_offset(self.jitter_index)
     }
 
-    #[allow(clippy::too_many_arguments)]
-    pub fn dispatch(
+    /// 입력 텍스처를 읽어 `output` 에 결과를 쓰는 compute 패스를 기록한다.
+    pub fn encode(
         &self,
-        device: &wgpu::Device,
-        queue: &wgpu::Queue,
-        encoder: &mut wgpu::CommandEncoder,
+        gpu: &mut ComputeContext<'_>,
         current_view: &wgpu::TextureView,
         history_view: &wgpu::TextureView,
-        output_view: &wgpu::TextureView,
+        output: ScreenOutput<'_>,
         jitter: [f32; 2],
-        width: u32,
-        height: u32,
     ) {
         let params = TaaParams {
-            jitter: [jitter[0] / width as f32, jitter[1] / height as f32],
+            jitter: [jitter[0] / output.width as f32, jitter[1] / output.height as f32],
             prev_jitter: [
-                self.prev_jitter[0] / width as f32,
-                self.prev_jitter[1] / height as f32,
+                self.prev_jitter[0] / output.width as f32,
+                self.prev_jitter[1] / output.height as f32,
             ],
             blend_factor: self.blend_factor,
             _pad: [0.0; 3],
         };
-        queue.write_buffer(&self.params_buffer, 0, bytemuck::cast_slice(&[params]));
+        gpu.queue.write_buffer(&self.params_buffer, 0, bytemuck::cast_slice(&[params]));
 
-        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+        let bind_group = gpu.device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("TAA BG"),
             layout: &self.bind_group_layout,
             entries: &[
@@ -174,7 +172,7 @@ impl Taa {
                 },
                 wgpu::BindGroupEntry {
                     binding: 2,
-                    resource: wgpu::BindingResource::TextureView(output_view),
+                    resource: wgpu::BindingResource::TextureView(output.view),
                 },
                 wgpu::BindGroupEntry {
                     binding: 3,
@@ -183,13 +181,46 @@ impl Taa {
             ],
         });
 
-        let mut cpass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
+        let mut cpass = gpu.encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
             label: Some("TAA Pass"),
             timestamp_writes: None,
         });
         cpass.set_pipeline(&self.pipeline);
         cpass.set_bind_group(0, &bind_group, &[]);
-        crate::compute::dispatch_screen(&mut cpass, width, height);
+        crate::compute::dispatch_screen(&mut cpass, output.width, output.height);
+    }
+
+    /// 옛 인자 나열형. [`Self::encode`] 를 쓴다.
+    #[deprecated(note = "use `encode` (ComputeContext + ScreenOutput)")]
+    // reason: 역호환용 옛 시그니처를 그대로 둔다.
+    #[allow(clippy::too_many_arguments)]
+    pub fn dispatch(
+        &self,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        encoder: &mut wgpu::CommandEncoder,
+        current_view: &wgpu::TextureView,
+        history_view: &wgpu::TextureView,
+        output_view: &wgpu::TextureView,
+        jitter: [f32; 2],
+        width: u32,
+        height: u32,
+    ) {
+        self.encode(
+            &mut ComputeContext {
+                device,
+                queue,
+                encoder,
+            },
+            current_view,
+            history_view,
+            ScreenOutput {
+                view: output_view,
+                width,
+                height,
+            },
+            jitter,
+        );
     }
 }
 
