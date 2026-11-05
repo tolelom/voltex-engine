@@ -113,7 +113,7 @@ fn hidden_component_skips_rendering() {
 #[test]
 #[ignore = "requires a GPU adapter"]
 fn sphere_front_hemisphere_is_lit() {
-    // Regression for generate_sphere winding: with a front directional
+    // Regression for generate_sphere_mesh winding: with a front directional
     // light the camera-facing hemisphere must be lit (bright center). When
     // the winding was reversed the near hemisphere was culled and the far
     // (unlit) inside showed through → a uniformly dark sphere.

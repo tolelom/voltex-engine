@@ -35,8 +35,10 @@ wgpu 기반 렌더링 — 메시/PBR/그림자/IBL/디퍼드/RT/post-process. �
 - `PointShadowMap`, `SpotShadowMap` (src/point_shadow.rs, src/spot_shadow.rs)
 - `Plane`, `Frustum`, `extract_frustum`, `cull_lights` (src/frustum.rs)
 - `create_pbr_pipeline`, `create_shadow_pipeline` (src/pbr_pipeline.rs, src/shadow_pipeline.rs)
-- `generate_sphere` — UV sphere generator (src/sphere.rs)
-- `generate_cube` / `generate_plane` / `generate_quad` — primitive mesh generators → `(Vec<MeshVertex>, Vec<u32>)` for `Mesh::new` (src/primitives.rs). 올바른 per-face normal/UV/tangent (PBR 노멀맵 호환)
+- `MeshData { vertices, indices }` — CPU 메시 데이터, `upload(device) -> Mesh` (src/primitives.rs)
+- `generate_sphere_mesh` — UV sphere generator → `MeshData` (src/sphere.rs)
+- `generate_cube_mesh` / `generate_plane_mesh` / `generate_quad_mesh` — primitive mesh generators → `MeshData` (src/primitives.rs). 올바른 per-face normal/UV/tangent (PBR 노멀맵 호환)
+- `generate_sphere` / `generate_cube` / `generate_plane` / `generate_quad` — deprecated: `(vertices, indices)` 튜플을 반환하는 구 API
 
 ### IBL
 - `IblResources` (src/ibl.rs)

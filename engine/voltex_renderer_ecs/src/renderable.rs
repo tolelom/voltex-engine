@@ -27,9 +27,9 @@ use std::collections::HashMap;
 use voltex_ecs::{Bounds, Component, Entity, MaterialHandle, MeshHandle, World};
 use voltex_math::{Vec3, AABB};
 use voltex_renderer::material::MaterialUniform;
-use voltex_renderer::mesh::Mesh;
 use voltex_renderer::{
-    generate_cube, generate_plane, generate_quad, generate_sphere, MeshVertex,
+    generate_cube_mesh, generate_plane_mesh, generate_quad_mesh, generate_sphere_mesh, MeshData,
+    MeshVertex,
 };
 
 use crate::assets::RenderAssets;
@@ -122,17 +122,25 @@ impl PrimitiveMesh {
 
     /// CPU geometry (vertices + indices) for this primitive, via the built-in
     /// generators in `voltex_renderer`.
-    pub fn geometry(&self) -> (Vec<MeshVertex>, Vec<u32>) {
+    pub fn mesh_data(&self) -> MeshData {
         match *self {
-            PrimitiveMesh::Cube { size } => generate_cube(size),
-            PrimitiveMesh::Plane { size } => generate_plane(size),
-            PrimitiveMesh::Quad { width, height } => generate_quad(width, height),
+            PrimitiveMesh::Cube { size } => generate_cube_mesh(size),
+            PrimitiveMesh::Plane { size } => generate_plane_mesh(size),
+            PrimitiveMesh::Quad { width, height } => generate_quad_mesh(width, height),
             PrimitiveMesh::Sphere {
                 radius,
                 sectors,
                 stacks,
-            } => generate_sphere(radius, sectors, stacks),
+            } => generate_sphere_mesh(radius, sectors, stacks),
         }
+    }
+
+    /// Old form of [`Self::mesh_data`] that returns an unnamed
+    /// `(vertices, indices)` tuple.
+    #[deprecated(note = "use `PrimitiveMesh::mesh_data`, which returns a named `MeshData`")]
+    pub fn geometry(&self) -> (Vec<MeshVertex>, Vec<u32>) {
+        let m = self.mesh_data();
+        (m.vertices, m.indices)
     }
 
     /// A hashable, exact key for deduplication. Two primitives that would
@@ -352,8 +360,7 @@ pub fn materialize_renderables(world: &mut World, assets: &mut RenderAssets, dev
     let mut mesh_cache: HashMap<PrimitiveKey, MeshHandle> = HashMap::new();
     for (entity, prim) in pending_meshes {
         let handle = *mesh_cache.entry(prim.dedup_key()).or_insert_with(|| {
-            let (verts, indices) = prim.geometry();
-            assets.add_mesh(Mesh::new(device, &verts, &indices))
+            assets.add_mesh(prim.mesh_data().upload(device))
         });
         world.add(entity, handle);
         world.add(entity, Bounds(prim.aabb()));
@@ -406,16 +413,16 @@ mod tests {
 
     #[test]
     fn cube_geometry_has_24_vertices() {
-        let (verts, indices) = PrimitiveMesh::cube(1.0).geometry();
-        assert_eq!(verts.len(), 24);
-        assert_eq!(indices.len(), 36);
+        let cube = PrimitiveMesh::cube(1.0).mesh_data();
+        assert_eq!(cube.vertices.len(), 24);
+        assert_eq!(cube.indices.len(), 36);
     }
 
     #[test]
     fn sphere_geometry_is_nonempty() {
-        let (verts, indices) = PrimitiveMesh::sphere_default(1.0).geometry();
-        assert!(!verts.is_empty());
-        assert!(!indices.is_empty());
+        let sphere = PrimitiveMesh::sphere_default(1.0).mesh_data();
+        assert!(!sphere.vertices.is_empty());
+        assert!(!sphere.indices.is_empty());
     }
 
     #[test]

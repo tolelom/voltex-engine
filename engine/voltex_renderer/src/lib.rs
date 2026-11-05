@@ -100,8 +100,12 @@ pub use pipeline::{
     bone_palette_bind_group_layout, create_colored_mesh_pipeline, create_skinned_mesh_pipeline,
     create_skinned_shadow_pipeline, skinned_camera_bind_group_layout,
 };
+#[allow(deprecated)]
 pub use primitives::{generate_cube, generate_plane, generate_quad};
+pub use primitives::{generate_cube_mesh, generate_plane_mesh, generate_quad_mesh, MeshData};
+#[allow(deprecated)]
 pub use sphere::generate_sphere;
+pub use sphere::generate_sphere_mesh;
 pub use texture::{
     create_pbr_full_texture_bind_group, create_pbr_texture_bind_group,
     pbr_full_texture_bind_group_layout, pbr_texture_bind_group_layout, GpuTexture,

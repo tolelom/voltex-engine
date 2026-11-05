@@ -53,31 +53,27 @@ impl Mesh {
     }
 
     /// An axis-aligned cube of edge length `size`, centered at the origin.
-    /// One-call convenience over [`generate_cube`](crate::generate_cube).
+    /// One-call convenience over [`generate_cube_mesh`](crate::generate_cube_mesh).
     pub fn cube(device: &wgpu::Device, size: f32) -> Self {
-        let (v, i) = crate::generate_cube(size);
-        Mesh::new(device, &v, &i)
+        crate::generate_cube_mesh(size).upload(device)
     }
 
     /// A flat `size`×`size` ground quad on the XZ plane (`+Y` normal). One-call
-    /// convenience over [`generate_plane`](crate::generate_plane).
+    /// convenience over [`generate_plane_mesh`](crate::generate_plane_mesh).
     pub fn plane(device: &wgpu::Device, size: f32) -> Self {
-        let (v, i) = crate::generate_plane(size);
-        Mesh::new(device, &v, &i)
+        crate::generate_plane_mesh(size).upload(device)
     }
 
     /// A `width`×`height` quad on the XY plane facing `+Z`. One-call convenience
-    /// over [`generate_quad`](crate::generate_quad).
+    /// over [`generate_quad_mesh`](crate::generate_quad_mesh).
     pub fn quad(device: &wgpu::Device, width: f32, height: f32) -> Self {
-        let (v, i) = crate::generate_quad(width, height);
-        Mesh::new(device, &v, &i)
+        crate::generate_quad_mesh(width, height).upload(device)
     }
 
     /// A UV sphere of `radius` with `sectors`×`stacks` tessellation. One-call
-    /// convenience over [`generate_sphere`](crate::generate_sphere).
+    /// convenience over [`generate_sphere_mesh`](crate::generate_sphere_mesh).
     pub fn sphere(device: &wgpu::Device, radius: f32, sectors: u32, stacks: u32) -> Self {
-        let (v, i) = crate::generate_sphere(radius, sectors, stacks);
-        Mesh::new(device, &v, &i)
+        crate::generate_sphere_mesh(radius, sectors, stacks).upload(device)
     }
 
     /// Create a mesh with additional buffer usage flags (e.g. `BLAS_INPUT` for ray tracing).

@@ -4,9 +4,7 @@
 //! neutral ground + spheres (correct per-light contribution + attenuation).
 
 use voltex_math::{Mat4, Vec3};
-use voltex_renderer::{
-    generate_sphere, Camera, LightData, LightsUniform, MaterialUniform, Mesh,
-};
+use voltex_renderer::{generate_sphere_mesh, Camera, LightData, LightsUniform, MaterialUniform};
 
 use super::{
     begin_color_pass, draw_mesh, shadow_uniform, RawPbrObject, RawPbrResources, SceneMeshes,
@@ -41,10 +39,9 @@ pub fn render_multi_light(gpu: &HeadlessGpu, width: u32, height: u32) -> Vec<u8>
     let queue = &gpu.queue;
     let target = OffscreenTarget::new(device, width, height);
 
-    let (sphere_vertices, sphere_indices) = generate_sphere(0.5, 32, 16);
     let meshes = SceneMeshes {
         cube: unit_cube(device),
-        sphere: Mesh::new(device, &sphere_vertices, &sphere_indices),
+        sphere: generate_sphere_mesh(0.5, 32, 16).upload(device),
     };
 
     let mut camera = Camera::new(Vec3::new(0.0, 5.0, 12.0), width as f32 / height as f32);

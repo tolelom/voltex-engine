@@ -9,7 +9,7 @@ use voltex_math::{Vec3, Mat4};
 use voltex_platform::{VoltexWindow, WindowConfig, InputState, GameTimer};
 use voltex_renderer::{
     align_up, GpuContext, Camera, FpsController, CameraUniform, LightsUniform, LightData,
-    Mesh, GpuTexture, MaterialUniform, generate_sphere, create_pbr_pipeline, obj,
+    Mesh, GpuTexture, MaterialUniform, generate_sphere_mesh, create_pbr_pipeline, obj,
     ShadowMap, ShadowUniform, ShadowPassUniform, SHADOW_MAP_SIZE,
     create_shadow_pipeline, shadow_pass_bind_group_layout,
     IblResources, pbr_full_texture_bind_group_layout, create_pbr_full_texture_bind_group,
@@ -138,8 +138,7 @@ impl ApplicationHandler for ShadowDemoApp {
         let shadow_pass_aligned_size = align_up(std::mem::size_of::<ShadowPassUniform>() as u32, alignment);
 
         // Meshes
-        let (sphere_verts, sphere_idx) = generate_sphere(0.5, 32, 16);
-        let sphere_mesh = Mesh::new(&gpu.device, &sphere_verts, &sphere_idx);
+        let sphere_mesh = generate_sphere_mesh(0.5, 32, 16).upload(&gpu.device);
 
         let obj_src = include_str!("../../../assets/cube.obj");
         let obj_data = obj::parse_obj(obj_src);

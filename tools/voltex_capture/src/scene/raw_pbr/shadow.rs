@@ -6,8 +6,8 @@
 
 use voltex_math::{Mat4, Vec3};
 use voltex_renderer::{
-    create_shadow_pipeline, generate_sphere, shadow_pass_bind_group_layout, Camera, LightData,
-    LightsUniform, MaterialUniform, Mesh, ShadowPassUniform, SHADOW_MAP_SIZE,
+    create_shadow_pipeline, generate_sphere_mesh, shadow_pass_bind_group_layout, Camera, LightData,
+    LightsUniform, MaterialUniform, ShadowPassUniform, SHADOW_MAP_SIZE,
 };
 
 use super::{
@@ -61,10 +61,9 @@ pub fn render_shadow_scene(gpu: &HeadlessGpu, width: u32, height: u32) -> Vec<u8
     let queue = &gpu.queue;
     let target = OffscreenTarget::new(device, width, height);
 
-    let (sphere_vertices, sphere_indices) = generate_sphere(0.5, 32, 16);
     let meshes = SceneMeshes {
         cube: unit_cube(device),
-        sphere: Mesh::new(device, &sphere_vertices, &sphere_indices),
+        sphere: generate_sphere_mesh(0.5, 32, 16).upload(device),
     };
 
     // Camera at (8,8,12) looking at origin.

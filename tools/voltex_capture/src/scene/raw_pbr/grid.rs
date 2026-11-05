@@ -2,7 +2,7 @@
 //! roughness.
 
 use voltex_math::{Mat4, Vec3};
-use voltex_renderer::{generate_sphere, Camera, LightData, LightsUniform, MaterialUniform, Mesh};
+use voltex_renderer::{generate_sphere_mesh, Camera, LightData, LightsUniform, MaterialUniform};
 
 use super::{begin_color_pass, draw_mesh, shadow_uniform, RawPbrObject, RawPbrResources};
 use crate::headless::HeadlessGpu;
@@ -21,8 +21,7 @@ pub fn render_pbr_grid(gpu: &HeadlessGpu, width: u32, height: u32) -> Vec<u8> {
     let queue = &gpu.queue;
     let target = OffscreenTarget::new(device, width, height);
 
-    let (sphere_vertices, sphere_indices) = generate_sphere(0.4, 32, 16);
-    let mesh = Mesh::new(device, &sphere_vertices, &sphere_indices);
+    let mesh = generate_sphere_mesh(0.4, 32, 16).upload(device);
 
     let camera = Camera::new(Vec3::new(0.0, 0.0, 12.0), width as f32 / height as f32);
     let view_proj = camera.view_projection();

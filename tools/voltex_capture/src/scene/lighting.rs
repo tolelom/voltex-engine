@@ -74,12 +74,7 @@ pub fn render_sphere_point_lit(
     let mut assets = RenderAssets::new();
     // Sphere — radial outward normals, so the hemisphere facing a light has an
     // unambiguous positive N·L (no winding/normal quirks).
-    let (sphere_vertices, sphere_indices) = voltex_renderer::generate_sphere(1.0, 32, 16);
-    let mesh_h = assets.add_mesh(voltex_renderer::Mesh::new(
-        &gpu.device,
-        &sphere_vertices,
-        &sphere_indices,
-    ));
+    let mesh_h = assets.add_mesh(voltex_renderer::generate_sphere_mesh(1.0, 32, 16).upload(&gpu.device));
     let mat_h = assets.add_material(MaterialUniform::new());
 
     let mut world = World::new();
