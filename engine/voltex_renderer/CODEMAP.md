@@ -120,4 +120,4 @@ wgpu 기반 렌더링 — 메시/PBR/그림자/IBL/디퍼드/RT/post-process. �
 ## 테스트
 - 단위 테스트: src/**/*.rs `#[cfg(test)]`
 - 실행: `cargo test -p voltex_renderer --lib`
-- 현재 테스트 개수: 180개 (skeleton +6). 스킨드 GPU 시각 검증은 voltex_capture::scene_skinned (#[ignore] GPU-gated)
+- 현재 테스트 개수: 180개 (skeleton +6). 스킨드 GPU 시각 검증은 voltex_capture::scene::skinned (#[ignore] GPU-gated)
