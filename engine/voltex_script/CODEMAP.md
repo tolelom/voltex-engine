@@ -4,7 +4,7 @@
 Lua 5.4 내장 + 엔진 API 바인딩 + 샌드박싱 + 핫 리로드 + per-entity ScriptComponent 통합 (S1).
 
 ## 공개 API 진입점
-- `LuaState` — Lua 인터프리터 (src/state.rs)
+- `LuaState` — Lua 인터프리터 (src/state/mod.rs)
 - `LuaCoroutine` / `CoroutineStatus` — 코루틴 (create_coroutine/resume/is_finished) (src/coroutine.rs). M3 이후 미배선(침묵하는 죽은 코드)이었다가 module_wiring 가드 도입 시 배선
 - `create_sandbox(&LuaState)` — os/io/require/package/debug 등 위험 글로벌 제거(`package`는 v1.0.141 — `package.loaded.os` 우회와 `loadlib` 차단). **자동 적용 아님** — 신뢰할 수 없는 스크립트 실행 전 명시 호출 (src/sandbox.rs). 동일하게 미배선이었다가 배선 (coroutine+sandbox 테스트 +17 부활)
 - engine_api — spawn/position/rotation/scale/destroy/tag/find/hierarchy/iter/find_in_radius (18 fns) (src/engine_api/)
@@ -17,7 +17,7 @@ Lua 5.4 내장 + 엔진 API 바인딩 + 샌드박싱 + 핫 리로드 + per-entit
 - `ScriptError`, `Result` — thiserror 기반 에러 (Generic/Io) (src/error.rs)
 
 ## 모듈 구조
-- `state` — LuaState + push/read table/vec3, register_fn, exec (src/state.rs, 505줄)
+- `state` — LuaState + push/read table/vec3, register_fn, exec (src/state/mod.rs, 테스트는 src/state/tests.rs)
 - `coroutine` — LuaCoroutine (src/coroutine.rs)
 - `sandbox` — 샌드박싱 (src/sandbox.rs)
 - `engine_api` — Rust ↔ Lua 엔진 API (src/engine_api/)
@@ -44,7 +44,7 @@ Lua 5.4 내장 + 엔진 API 바인딩 + 샌드박싱 + 핫 리로드 + per-entit
 - **Lua nav/audio API**: `nav_set_target(id,gen,x,y,z)` / `nav_clear_target` / `nav_reached(id,gen)->bool` (NavAgent), `audio_play(id,gen)` / `audio_stop` (AudioSource). 모두 stale handle/컴포넌트 없음/비숫자 인자에 silent no-op. engine_api가 voltex_ai/voltex_audio 의존 — Transform/Tag처럼 엔진 컴포넌트를 아는 스크립팅 표면이라 의도적.
 - **Lua input API**: `input` 전역 테이블 (is_key_pressed/is_key_just_pressed/mouse_position/mouse_delta/is_mouse_button_pressed/scroll). 키는 **문자열 이름**("W","Space",...) — 이름↔keycode 매핑은 winit 의존을 피하려 `voltex_runtime`(SCRIPT_KEY_NAMES)이 소유. `voltex_script`는 winit 무의존, POD `ScriptInput` 스냅샷만 안다. 런타임이 매 프레임 `set_current_input(&snapshot)` 발행(thread-local), 실행 후 null 로 클리어. 스냅샷 미발행 시 모든 input 함수는 false/0 반환.
 - **Drop 순서**: ScriptInstancePool 이 World 보다 먼저 drop 되어야 LuaState 내부의 `__voltex_world` light userdata 가 dangling 안 됨 (실질적 use-after-free 는 발생 안 하지만 정책적 정렬).
-- state.rs는 505줄 (spec 만족, 분리 대상 아님)
+- `state/mod.rs`는 SAFETY 주석 추가로 600줄을 넘어 테스트를 `state/tests.rs`로 분리했다.
 - Lua 5.4는 cc로 내장 빌드 — Windows MSVC 환경 의존
 
 ## 테스트

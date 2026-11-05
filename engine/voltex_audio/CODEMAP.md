@@ -4,7 +4,7 @@
 오디오 — WAV/OGG 디코더, AudioBackend (WASAPI/ALSA/CoreAudio/Null), 3D 사운드(거리 감쇠 + 스테레오 팬), 믹스 그룹. 엔진이 쓰지 않는 로더·버스·이펙트·HRTF·차폐는 `experimental`.
 
 ## 공개 API 진입점
-- `AudioSystem` — 메인 오디오 시스템. `add_clip(&mut, AudioClip) -> usize`(런타임 핫로드, FIFO 로 인덱스 lockstep) / `replace_clip(idx, AudioClip)`(핫리로드, out-of-range 는 무시) / `play`/`play_3d` → `VoiceId` 반환(AtomicU64 발급) + `stop_voice(VoiceId)` 로 해당 인스턴스만 정지 — clip-index `stop` 은 그 클립의 전 인스턴스 정지 (src/audio_system.rs)
+- `AudioSystem` — 메인 오디오 시스템. `add_clip(&mut, AudioClip) -> usize`(런타임 핫로드, FIFO 로 인덱스 lockstep) / `replace_clip(idx, AudioClip)`(핫리로드, out-of-range 는 무시) / `play`/`play_3d` → `VoiceId` 반환(AtomicU64 발급) + `stop_voice(VoiceId)` 로 해당 인스턴스만 정지 — clip-index `stop` 은 그 클립의 전 인스턴스 정지 (src/audio_system/mod.rs)
 - `VoiceId(u64)` — 재생 인스턴스(voice) 핸들, `VoiceId(0)` = 익명 기본값 (src/mixing.rs)
 - `AudioClip` — PCM 데이터 (src/audio_clip.rs)
 - `AudioSource` / `ClipId` — per-entity 재생 디스크립터 + 타입화된 clip 식별자. ECS 컴포넌트로 등록 가능하나 audio crate 자체는 ECS 무의존 (src/audio_source.rs)
@@ -18,7 +18,7 @@
 - `AudioError`, `Result` — thiserror 기반 에러 (Generic/Io) (src/error.rs)
 
 ## 모듈 구조
-- `audio_system` — 메인 시스템 (src/audio_system.rs)
+- `audio_system` — 메인 시스템 (src/audio_system/mod.rs: 명령·`AudioSystem`·`apply_command`, src/audio_system/output_thread.rs: OS별 재생 스레드 루프)
 - `audio_clip`, `audio_source` — 데이터 + 컴포넌트 (src/audio_clip.rs, src/audio_source.rs)
 - `wav`, `ogg`, `vorbis` — 디코더 (src/wav.rs, src/ogg.rs, src/vorbis/)
 - `mixing`, `mix_group` — 믹서 (src/mixing.rs, src/mix_group.rs)
