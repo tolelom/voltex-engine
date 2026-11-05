@@ -94,10 +94,20 @@ impl NetServer {
                     events.push(ServerEvent::ClientConnected { client_id: id, name });
                 }
                 Packet::Disconnect { client_id } => {
+                    // Only the client itself may end its session: the id in the
+                    // packet must belong to the address that sent it. Otherwise any
+                    // peer could disconnect someone else by guessing their id.
                     let id = *client_id;
-                    if let Some(info) = self.clients.remove(&id) {
-                        self.addr_to_id.remove(&info.addr);
+                    let sent_by_owner = self.clients.get(&id).is_some_and(|info| info.addr == addr);
+                    if sent_by_owner {
+                        self.clients.remove(&id);
+                        self.addr_to_id.remove(&addr);
                         events.push(ServerEvent::ClientDisconnected { client_id: id });
+                    } else if self.clients.contains_key(&id) {
+                        eprintln!(
+                            "[NetServer] Ignored Disconnect for client {} from foreign addr {}",
+                            id, addr
+                        );
                     }
                 }
                 _ => {
@@ -214,5 +224,62 @@ mod tests {
 
         // Cleanup: disconnect
         client.disconnect().expect("disconnect send failed");
+    }
+
+    /// Polls the server a few times so packets sent over loopback UDP arrive.
+    fn poll_server(server: &mut NetServer) -> Vec<ServerEvent> {
+        std::thread::sleep(Duration::from_millis(50));
+        server.poll()
+    }
+
+    fn connect_client(server: &mut NetServer, name: &str) -> (NetClient, u32) {
+        let mut client = NetClient::new("127.0.0.1:0", server.local_addr(), name)
+            .expect("client bind failed");
+        client.connect().expect("connect send failed");
+        let client_id = poll_server(server)
+            .into_iter()
+            .find_map(|event| match event {
+                ServerEvent::ClientConnected { client_id, .. } => Some(client_id),
+                _ => None,
+            })
+            .expect("server did not accept the client");
+        // Let the client read its Accept so it knows its id.
+        std::thread::sleep(Duration::from_millis(50));
+        client.poll();
+        assert_eq!(client.client_id(), Some(client_id));
+        (client, client_id)
+    }
+
+    #[test]
+    fn disconnect_from_another_address_is_ignored() {
+        let mut server = NetServer::new("127.0.0.1:0").expect("server bind failed");
+        let (_victim, victim_id) = connect_client(&mut server, "Victim");
+
+        // A different socket sends a Disconnect carrying the victim's id.
+        let attacker = crate::socket::NetSocket::bind("127.0.0.1:0").expect("attacker bind failed");
+        attacker
+            .send_to(&Packet::Disconnect { client_id: victim_id }, server.local_addr())
+            .expect("attacker send failed");
+
+        let events = poll_server(&mut server);
+        assert!(
+            !events.iter().any(|e| matches!(e, ServerEvent::ClientDisconnected { .. })),
+            "spoofed Disconnect must not remove the client"
+        );
+        assert!(server.clients().any(|c| c.id == victim_id), "victim must stay connected");
+    }
+
+    #[test]
+    fn disconnect_from_the_client_itself_removes_it() {
+        let mut server = NetServer::new("127.0.0.1:0").expect("server bind failed");
+        let (mut client, client_id) = connect_client(&mut server, "Leaver");
+
+        client.disconnect().expect("disconnect send failed");
+
+        let events = poll_server(&mut server);
+        assert!(events
+            .iter()
+            .any(|e| matches!(e, ServerEvent::ClientDisconnected { client_id: id } if *id == client_id)));
+        assert!(!server.clients().any(|c| c.id == client_id));
     }
 }
