@@ -107,12 +107,12 @@ fn raycast_agrees_with_sdf_march_for_primitive_colliders() {
             let ctx = format!("seed {seed:x} case {case}: {collider:?} at {center:?}, ray {ray:?}, max {max_dist}");
             let got = raycast(&world, &ray, max_dist);
             let all = raycast_all(&world, &ray, max_dist);
-            assert_eq!(got.map(|h| h.t), all.first().map(|h| h.t), "{ctx}: raycast vs raycast_all");
+            assert_eq!(got.map(|h| h.distance), all.first().map(|h| h.distance), "{ctx}: raycast vs raycast_all");
 
             match (got, marched_entry(&collider, center, &ray, max_dist)) {
                 (Some(hit), Some(entry)) => {
                     hits += 1;
-                    assert!((hit.t - entry).abs() < 0.01, "{ctx}: t {} vs marched {entry}", hit.t);
+                    assert!((hit.distance - entry).abs() < 0.01, "{ctx}: t {} vs marched {entry}", hit.distance);
                     assert!(sdf(&collider, center, hit.point).abs() < 1e-3, "{ctx}: hit point off surface");
                     assert!((hit.normal.length() - 1.0).abs() < 1e-3, "{ctx}: normal not unit {:?}", hit.normal);
                     let outward = hit.point + hit.normal * 0.01;
@@ -122,7 +122,7 @@ fn raycast_agrees_with_sdf_march_for_primitive_colliders() {
                 (Some(hit), None) => {
                     // Tangential grazes the march can step over are fine.
                     let depth = sdf(&collider, center, hit.point);
-                    assert!(depth.abs() < 1e-3 && hit.t <= max_dist, "{ctx}: phantom hit at t {}", hit.t);
+                    assert!(depth.abs() < 1e-3 && hit.distance <= max_dist, "{ctx}: phantom hit at t {}", hit.distance);
                     hits += 1;
                 }
                 (None, Some(entry)) => {
@@ -165,8 +165,8 @@ fn raycast_picks_the_nearest_of_many_colliders() {
         let got = raycast(&world, &ray, 30.0);
         match (got, expected) {
             (Some(h), Some((t, e))) => {
-                assert!((h.t - t).abs() < 0.01, "case {case}: t {} vs {t}", h.t);
-                if (h.t - t).abs() < 0.005 && h.entity != e {
+                assert!((h.distance - t).abs() < 0.01, "case {case}: t {} vs {t}", h.distance);
+                if (h.distance - t).abs() < 0.005 && h.entity != e {
                     // Near-tie between two shapes; either is acceptable.
                 } else {
                     assert_eq!(h.entity, e, "case {case}: wrong entity");
@@ -174,12 +174,12 @@ fn raycast_picks_the_nearest_of_many_colliders() {
             }
             (None, None) => {}
             (g, x) => {
-                let graze = g.map(|h| h.t).or(x.map(|x| x.0)).unwrap();
+                let graze = g.map(|h| h.distance).or(x.map(|x| x.0)).unwrap();
                 let near_surface = shapes.iter().any(|(_, c, p)| sdf(c, *p, ray.at(graze)).abs() < 2e-3);
                 assert!(near_surface, "case {case}: raycast {g:?} vs marched {x:?}");
             }
         }
         let all = raycast_all(&world, &ray, 30.0);
-        assert!(all.windows(2).all(|w| w[0].t <= w[1].t), "case {case}: raycast_all not sorted");
+        assert!(all.windows(2).all(|w| w[0].distance <= w[1].distance), "case {case}: raycast_all not sorted");
     }
 }

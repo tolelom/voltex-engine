@@ -2,7 +2,7 @@
 
 use voltex_ecs::Entity;
 use voltex_math::{AABB, Ray};
-use crate::ray::ray_vs_aabb;
+use crate::ray_shapes::ray_vs_aabb;
 
 #[derive(Debug)]
 enum BvhNode {
@@ -10,7 +10,9 @@ enum BvhNode {
     Internal { aabb: AABB, left: usize, right: usize },
 }
 
-/// Binary BVH built bottom-up from a list of `(entity, aabb)` entries.
+/// Binary BVH built top-down from a list of `(entity, aabb)` entries: each
+/// node splits its entries at the median centre along its longest axis.
+/// Children are pushed before their parent, so the root is the last node.
 #[derive(Debug)]
 pub struct BvhTree {
     nodes: Vec<BvhNode>,
@@ -27,6 +29,11 @@ impl BvhTree {
         tree
     }
 
+    /// Index of the root node, or `None` for an empty tree.
+    fn root(&self) -> Option<usize> {
+        self.nodes.len().checked_sub(1)
+    }
+
     fn build_recursive(&mut self, entries: &mut [(Entity, AABB)]) -> usize {
         if entries.len() == 1 {
             let idx = self.nodes.len();
@@ -39,8 +46,8 @@ impl BvhTree {
 
         // Compute bounding AABB
         let mut combined = entries[0].1;
-        for e in entries.iter().skip(1) {
-            combined = combined.merged(&e.1);
+        for (_, aabb) in entries.iter().skip(1) {
+            combined = combined.merged(aabb);
         }
 
         // Find longest axis
@@ -54,12 +61,12 @@ impl BvhTree {
         };
 
         // Sort by axis center
+        let center_on_axis = |aabb: &AABB| {
+            let center = aabb.center();
+            match axis { 0 => center.x, 1 => center.y, _ => center.z }
+        };
         entries.sort_by(|a, b| {
-            let ca = a.1.center();
-            let cb = b.1.center();
-            let va = match axis { 0 => ca.x, 1 => ca.y, _ => ca.z };
-            let vb = match axis { 0 => cb.x, 1 => cb.y, _ => cb.z };
-            va.partial_cmp(&vb).unwrap_or(std::cmp::Ordering::Equal)
+            center_on_axis(&a.1).partial_cmp(&center_on_axis(&b.1)).unwrap_or(std::cmp::Ordering::Equal)
         });
 
         let mid = entries.len() / 2;
@@ -80,11 +87,9 @@ impl BvhTree {
     /// Query all overlapping pairs using recursive tree traversal (replaces N² brute force).
     pub fn query_pairs(&self) -> Vec<(Entity, Entity)> {
         let mut pairs = Vec::new();
-        if self.nodes.is_empty() {
-            return pairs;
+        if let Some(root) = self.root() {
+            self.query_pairs_recursive(root, root, &mut pairs);
         }
-        let root = self.nodes.len() - 1;
-        self.query_pairs_recursive(root, root, &mut pairs);
         pairs
     }
 
@@ -97,11 +102,11 @@ impl BvhTree {
         }
 
         match (&self.nodes[a], &self.nodes[b]) {
-            (BvhNode::Leaf { entity: ea, aabb: aabb_a }, BvhNode::Leaf { entity: eb, aabb: aabb_b }) => {
+            (BvhNode::Leaf { entity: entity_a, aabb: aabb_a }, BvhNode::Leaf { entity: entity_b, aabb: aabb_b }) => {
                 // Each unordered leaf pair is visited exactly once, in spatial
                 // order — so only normalize the order here, never filter on it.
                 if a != b && aabb_a.intersects(aabb_b) {
-                    pairs.push(if ea.id <= eb.id { (*ea, *eb) } else { (*eb, *ea) });
+                    pairs.push(if entity_a.id <= entity_b.id { (*entity_a, *entity_b) } else { (*entity_b, *entity_a) });
                 }
             }
             (BvhNode::Leaf { .. }, BvhNode::Internal { left, right, .. }) => {
@@ -112,23 +117,20 @@ impl BvhTree {
                 self.query_pairs_recursive(*left, b, pairs);
                 self.query_pairs_recursive(*right, b, pairs);
             }
-            (BvhNode::Internal { left: la, right: ra, .. }, BvhNode::Internal { left: lb, right: rb, .. }) => {
+            (
+                &BvhNode::Internal { left: left_a, right: right_a, .. },
+                &BvhNode::Internal { left: left_b, right: right_b, .. },
+            ) => {
                 if a == b {
                     // Same node: check children against each other and themselves
-                    let la = *la;
-                    let ra = *ra;
-                    self.query_pairs_recursive(la, la, pairs);
-                    self.query_pairs_recursive(ra, ra, pairs);
-                    self.query_pairs_recursive(la, ra, pairs);
+                    self.query_pairs_recursive(left_a, left_a, pairs);
+                    self.query_pairs_recursive(right_a, right_a, pairs);
+                    self.query_pairs_recursive(left_a, right_a, pairs);
                 } else {
-                    let la = *la;
-                    let ra = *ra;
-                    let lb = *lb;
-                    let rb = *rb;
-                    self.query_pairs_recursive(la, lb, pairs);
-                    self.query_pairs_recursive(la, rb, pairs);
-                    self.query_pairs_recursive(ra, lb, pairs);
-                    self.query_pairs_recursive(ra, rb, pairs);
+                    self.query_pairs_recursive(left_a, left_b, pairs);
+                    self.query_pairs_recursive(left_a, right_b, pairs);
+                    self.query_pairs_recursive(right_a, left_b, pairs);
+                    self.query_pairs_recursive(right_a, right_b, pairs);
                 }
             }
         }
@@ -141,13 +143,13 @@ impl BvhTree {
         }
     }
 
-    /// Query ray against BVH, returning all (Entity, t) hits sorted by t.
+    /// Query ray against the leaf AABBs, returning all `(entity, distance)`
+    /// hits within `max_t`, sorted by distance.
     pub fn query_ray(&self, ray: &Ray, max_t: f32) -> Vec<(Entity, f32)> {
         let mut hits = Vec::new();
-        if self.nodes.is_empty() {
+        let Some(root) = self.root() else {
             return hits;
-        }
-        let root = self.nodes.len() - 1;
+        };
         self.query_ray_recursive(root, ray, max_t, &mut hits);
         hits.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
         hits
@@ -178,11 +180,9 @@ impl BvhTree {
     /// Refit the BVH: update leaf AABBs and propagate changes to parents.
     /// `updated` maps entity → new AABB. Leaves not in map are unchanged.
     pub fn refit(&mut self, updated: &[(Entity, AABB)]) {
-        if self.nodes.is_empty() {
-            return;
+        if let Some(root) = self.root() {
+            self.refit_recursive(root, updated);
         }
-        let root = self.nodes.len() - 1;
-        self.refit_recursive(root, updated);
     }
 
     fn refit_recursive(&mut self, idx: usize, updated: &[(Entity, AABB)]) -> AABB {

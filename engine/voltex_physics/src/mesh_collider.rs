@@ -2,7 +2,7 @@
 //! ray-vs-mesh queries (closest hit and all hits).
 
 use voltex_math::{Vec3, Ray};
-use crate::ray::ray_vs_triangle;
+use crate::ray_shapes::ray_vs_triangle;
 
 /// A triangle mesh collider defined by vertices and triangle indices.
 #[derive(Debug, Clone)]

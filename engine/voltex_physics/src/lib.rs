@@ -3,8 +3,8 @@
 //! Physics primitives — collision detection + rigid body simulation.
 //!
 //! - Broadphase: [`BvhTree`].
-//! - Colliders: [`Collider`] (Sphere/Box/Capsule/ConvexHull/Mesh) +
-//!   [`ConvexHull`] + [`MeshCollider`].
+//! - Colliders: [`Collider`] (Sphere/Box/Capsule/ConvexHull) +
+//!   [`ConvexHull`]. [`MeshCollider`] answers ray queries only.
 //! - Narrowphase: [`narrow`] + [`gjk`] + [`contact::ContactPoint`].
 //! - Solver: [`physics_step`] / [`resolve_collisions`] (Sequential Impulse).
 //! - Integration: [`integrate`], [`inertia_tensor`], [`inv_inertia`].
@@ -16,7 +16,12 @@
 
 pub mod bvh;
 pub mod grid2d;
-pub mod ray;
+pub mod ray_shapes;
+/// Old name of [`ray_shapes`].
+#[deprecated(note = "use `ray_shapes`")]
+pub mod ray {
+    pub use crate::ray_shapes::{ray_vs_plane, ray_vs_triangle};
+}
 pub mod collider;
 pub mod contact;
 pub mod narrow;
@@ -38,6 +43,6 @@ pub use integrator::{integrate, inertia_tensor, inv_inertia};
 pub use solver::{resolve_collisions, physics_step};
 pub use grid2d::{move_and_collide_2d, MoveResult2D};
 pub use raycast::{RayHit, raycast, raycast_all};
-pub use ray::{ray_vs_triangle, ray_vs_plane};
+pub use ray_shapes::{ray_vs_triangle, ray_vs_plane};
 pub use ccd::swept_sphere_vs_aabb;
 pub use mesh_collider::{MeshCollider, MeshHit, ray_vs_mesh, ray_vs_mesh_all};

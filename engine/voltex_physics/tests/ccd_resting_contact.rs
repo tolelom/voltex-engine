@@ -13,7 +13,7 @@ fn ground_and_ball(velocity: Vec3) -> (World, Entity) {
     let ground = world.spawn();
     world.add(ground, Transform::from_position(Vec3::new(0.0, -0.5, 0.0)));
     world.add(ground, Collider::Box { half_extents: Vec3::new(100.0, 0.5, 100.0) });
-    world.add(ground, RigidBody::statik());
+    world.add(ground, RigidBody::fixed());
     let ball = world.spawn();
     world.add(ball, Transform::from_position(Vec3::new(0.0, 0.5, 0.0)));
     world.add(ball, Collider::Sphere { radius: 0.5 });
@@ -44,7 +44,7 @@ fn fast_ball_still_stops_at_a_wall_ahead() {
     let wall = world.spawn();
     world.add(wall, Transform::from_position(Vec3::new(3.0, 1.0, 0.0)));
     world.add(wall, Collider::Box { half_extents: Vec3::new(0.05, 2.0, 5.0) });
-    world.add(wall, RigidBody::statik());
+    world.add(wall, RigidBody::fixed());
     let config = PhysicsConfig::default();
     for step in 0..30 {
         physics_step(&mut world, &config);

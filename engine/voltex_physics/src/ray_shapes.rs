@@ -1,9 +1,21 @@
 //! Geometric ray-vs-shape primitives (sphere, box, capsule, triangle, plane,
-//! AABB). Used by the broadphase + narrowphase + raycasting layers.
+//! AABB). Used by the BVH, CCD, mesh and world raycasting layers.
+//! The `(f32, Vec3)` results are `(distance along the ray, surface normal)`.
 
 use voltex_math::{Vec3, Ray, AABB};
 
-/// Ray vs AABB (slab method). Returns t of nearest intersection, or None.
+/// A ray direction component (or plane·direction) below this counts as parallel.
+const PARALLEL_EPSILON: f32 = 1e-8;
+/// How close a hit must be to a box face plane to take that face's normal.
+const FACE_MATCH_TOLERANCE: f32 = 1e-4;
+/// Below this squared length a sphere hit has no usable outward direction.
+const MIN_NORMAL_LENGTH_SQ: f32 = 1e-12;
+/// Below this the ray's XZ direction is vertical: no cylinder-side hit.
+const VERTICAL_RAY_XZ_LENGTH_SQ: f32 = 1e-10;
+/// Triangle parallel test, relative to `|edge1|·|edge2|`.
+const TRIANGLE_PARALLEL_RATIO: f32 = 1e-7;
+
+/// Ray vs AABB (slab method). Returns the distance to the nearest intersection, or None.
 /// If ray starts inside AABB, returns Some(0.0).
 pub(crate) fn ray_vs_aabb(ray: &Ray, aabb: &AABB) -> Option<f32> {
     let mut t_min = f32::NEG_INFINITY;
@@ -15,7 +27,7 @@ pub(crate) fn ray_vs_aabb(ray: &Ray, aabb: &AABB) -> Option<f32> {
     let bmax = [aabb.max.x, aabb.max.y, aabb.max.z];
 
     for i in 0..3 {
-        if d[i].abs() < 1e-8 {
+        if d[i].abs() < PARALLEL_EPSILON {
             if o[i] < bmin[i] || o[i] > bmax[i] {
                 return None;
             }
@@ -67,7 +79,7 @@ pub(crate) fn ray_vs_sphere(ray: &Ray, center: Vec3, radius: f32) -> Option<(f32
     // radius 0 hit exactly at the centre has no surface direction — face
     // the ray instead of returning NaN.
     let outward = point - center;
-    let normal = if outward.length_squared() > 1e-12 {
+    let normal = if outward.length_squared() > MIN_NORMAL_LENGTH_SQ {
         outward.normalize()
     } else {
         (-ray.direction).normalize_or_zero()
@@ -112,15 +124,15 @@ pub(crate) fn ray_vs_box(ray: &Ray, center: Vec3, half_extents: Vec3) -> Option<
     let hy = half_extents.y;
     let hz = half_extents.z;
 
-    let normal = if (rel.x - hx).abs() < 1e-4 {
+    let normal = if (rel.x - hx).abs() < FACE_MATCH_TOLERANCE {
         Vec3::X
-    } else if (rel.x + hx).abs() < 1e-4 {
+    } else if (rel.x + hx).abs() < FACE_MATCH_TOLERANCE {
         Vec3::new(-1.0, 0.0, 0.0)
-    } else if (rel.y - hy).abs() < 1e-4 {
+    } else if (rel.y - hy).abs() < FACE_MATCH_TOLERANCE {
         Vec3::Y
-    } else if (rel.y + hy).abs() < 1e-4 {
+    } else if (rel.y + hy).abs() < FACE_MATCH_TOLERANCE {
         Vec3::new(0.0, -1.0, 0.0)
-    } else if (rel.z - hz).abs() < 1e-4 {
+    } else if (rel.z - hz).abs() < FACE_MATCH_TOLERANCE {
         Vec3::Z
     } else {
         Vec3::new(0.0, 0.0, -1.0)
@@ -149,7 +161,7 @@ pub(crate) fn ray_vs_capsule(ray: &Ray, center: Vec3, radius: f32, half_height: 
     let b = 2.0 * (ox * dx + oz * dz);
     let c = ox * ox + oz * oz - radius * radius;
 
-    if a > 1e-10 {
+    if a > VERTICAL_RAY_XZ_LENGTH_SQ {
         let disc = b * b - 4.0 * a * c;
         if disc >= 0.0 {
             let sqrt_d = disc.sqrt();
@@ -202,7 +214,7 @@ pub fn ray_vs_triangle(ray: &Ray, v0: Vec3, v1: Vec3, v2: Vec3) -> Option<(f32, 
     // Parallel test relative to the triangle's size: |a| = |n|·|cos θ| scales
     // with edge length², so a fixed 1e-8 rejected grazing hits on mm-sized
     // triangles while being meaningless for km-sized ones.
-    if a.abs() <= 1e-7 * edge1.length() * edge2.length() {
+    if a.abs() <= TRIANGLE_PARALLEL_RATIO * edge1.length() * edge2.length() {
         return None; // Ray is parallel to triangle (or the triangle is degenerate)
     }
 
@@ -237,7 +249,7 @@ pub fn ray_vs_triangle(ray: &Ray, v0: Vec3, v1: Vec3, v2: Vec3) -> Option<(f32, 
 /// Returns distance t along ray, or None if parallel/behind.
 pub fn ray_vs_plane(ray: &Ray, plane_normal: Vec3, plane_distance: f32) -> Option<f32> {
     let denom = plane_normal.dot(ray.direction);
-    if denom.abs() < 1e-8 { return None; } // parallel
+    if denom.abs() < PARALLEL_EPSILON { return None; }
     let t = (plane_distance - plane_normal.dot(ray.origin)) / denom;
     if t < 0.0 { None } else { Some(t) }
 }

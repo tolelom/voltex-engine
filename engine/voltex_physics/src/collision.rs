@@ -3,82 +3,93 @@
 
 use voltex_ecs::{World, Entity};
 use voltex_ecs::Transform;
-use voltex_math::Vec3;
+use voltex_math::{Vec3, AABB};
 
 use crate::collider::Collider;
-use crate::contact::ContactPoint;
+use crate::contact::{ContactPoint, Penetration};
 use crate::bvh::BvhTree;
 use crate::narrow;
 use crate::gjk;
 
+/// A collider placed in the world.
+pub(crate) struct PlacedCollider {
+    pub entity: Entity,
+    /// World position (the entity's `Transform::position`; rotation is ignored).
+    pub position: Vec3,
+    pub collider: Collider,
+}
+
+/// Every entity with both a [`Transform`] and a [`Collider`].
+pub(crate) fn placed_colliders(world: &World) -> Vec<PlacedCollider> {
+    world
+        .query2::<Transform, Collider>()
+        .map(|(entity, transform, collider)| PlacedCollider {
+            entity,
+            position: transform.position,
+            collider: collider.clone(),
+        })
+        .collect()
+}
+
 /// Runs broadphase + narrowphase on every `(Transform, Collider)` pair in the
 /// world. Returns all generated [`ContactPoint`]s.
 pub fn detect_collisions(world: &World) -> Vec<ContactPoint> {
-    // 1. Gather entities with Transform + Collider
-    let pairs_data: Vec<(Entity, Vec3, Collider)> = world
-        .query2::<Transform, Collider>()
-        .map(|(e, t, c)| (e, t.position, c.clone()))
-        .collect();
-
-    if pairs_data.len() < 2 {
+    let bodies = placed_colliders(world);
+    if bodies.len() < 2 {
         return Vec::new();
     }
 
-    // 2. Build AABBs
-    let entries: Vec<(Entity, voltex_math::AABB)> = pairs_data
+    // Broad phase: BVH over world AABBs
+    let entries: Vec<(Entity, AABB)> = bodies
         .iter()
-        .map(|(e, pos, col)| (*e, col.aabb(*pos)))
+        .map(|body| (body.entity, body.collider.aabb(body.position)))
         .collect();
+    let broad_pairs = BvhTree::build(&entries).query_pairs();
 
-    // 3. Broad phase
-    let bvh = BvhTree::build(&entries);
-    let broad_pairs = bvh.query_pairs();
-
-    // 4. Narrow phase
+    // Narrow phase
+    let find = |entity: Entity| bodies.iter().find(|body| body.entity == entity);
     let mut contacts = Vec::new();
-
-    let lookup = |entity: Entity| -> Option<(Vec3, Collider)> {
-        pairs_data.iter().find(|(e, _, _)| *e == entity).map(|(_, p, c)| (*p, c.clone()))
-    };
-
-    for (ea, eb) in broad_pairs {
-        let (pos_a, col_a) = match lookup(ea) { Some(v) => v, None => continue };
-        let (pos_b, col_b) = match lookup(eb) { Some(v) => v, None => continue };
-
-        let result = match (&col_a, &col_b) {
-            (Collider::Sphere { radius: ra }, Collider::Sphere { radius: rb }) => {
-                narrow::sphere_vs_sphere(pos_a, *ra, pos_b, *rb)
-            }
-            (Collider::Sphere { radius }, Collider::Box { half_extents }) => {
-                narrow::sphere_vs_box(pos_a, *radius, pos_b, *half_extents)
-            }
-            (Collider::Box { half_extents }, Collider::Sphere { radius }) => {
-                narrow::sphere_vs_box(pos_b, *radius, pos_a, *half_extents)
-                    .map(|(n, d, pa, pb)| (-n, d, pb, pa))
-            }
-            (Collider::Box { half_extents: ha }, Collider::Box { half_extents: hb }) => {
-                narrow::box_vs_box(pos_a, *ha, pos_b, *hb)
-            }
-            // Any combination involving Capsule or ConvexHull uses GJK/EPA
-            (Collider::Capsule { .. }, _) | (_, Collider::Capsule { .. })
-            | (Collider::ConvexHull(_), _) | (_, Collider::ConvexHull(_)) => {
-                gjk::gjk_epa(&col_a, pos_a, &col_b, pos_b)
-            }
+    for (entity_a, entity_b) in broad_pairs {
+        let (Some(body_a), Some(body_b)) = (find(entity_a), find(entity_b)) else {
+            continue;
         };
-
-        if let Some((normal, depth, point_on_a, point_on_b)) = result {
+        if let Some(penetration) = penetration_between(body_a, body_b) {
             contacts.push(ContactPoint {
-                entity_a: ea,
-                entity_b: eb,
-                normal,
-                depth,
-                point_on_a,
-                point_on_b,
+                entity_a,
+                entity_b,
+                normal: penetration.normal,
+                depth: penetration.depth,
+                point_on_a: penetration.point_on_a,
+                point_on_b: penetration.point_on_b,
             });
         }
     }
 
     contacts
+}
+
+/// Picks the narrowphase test for the shape pair. Normal points A→B.
+fn penetration_between(a: &PlacedCollider, b: &PlacedCollider) -> Option<Penetration> {
+    let (pos_a, pos_b) = (a.position, b.position);
+    match (&a.collider, &b.collider) {
+        (Collider::Sphere { radius: radius_a }, Collider::Sphere { radius: radius_b }) => {
+            narrow::sphere_vs_sphere(pos_a, *radius_a, pos_b, *radius_b)
+        }
+        (Collider::Sphere { radius }, Collider::Box { half_extents }) => {
+            narrow::sphere_vs_box(pos_a, *radius, pos_b, *half_extents)
+        }
+        (Collider::Box { half_extents }, Collider::Sphere { radius }) => {
+            narrow::sphere_vs_box(pos_b, *radius, pos_a, *half_extents).map(Penetration::flipped)
+        }
+        (Collider::Box { half_extents: half_a }, Collider::Box { half_extents: half_b }) => {
+            narrow::box_vs_box(pos_a, *half_a, pos_b, *half_b)
+        }
+        // Any combination involving Capsule or ConvexHull uses GJK/EPA
+        (Collider::Capsule { .. }, _) | (_, Collider::Capsule { .. })
+        | (Collider::ConvexHull(_), _) | (_, Collider::ConvexHull(_)) => {
+            gjk::gjk_epa(&a.collider, pos_a, &b.collider, pos_b)
+        }
+    }
 }
 
 #[cfg(test)]

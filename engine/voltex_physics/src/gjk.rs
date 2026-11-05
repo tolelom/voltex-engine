@@ -2,13 +2,22 @@
 
 use voltex_math::Vec3;
 use crate::collider::Collider;
+use crate::contact::Penetration;
+
+/// Vector lengths — and, in some checks, squared lengths — below this count as zero.
+const NEAR_ZERO: f32 = 1e-10;
+/// A GJK search direction with squared length below this has collapsed:
+/// the origin lies on the current simplex.
+const COLLAPSED_DIRECTION_SQ: f32 = 1e-20;
+/// Upper bound on GJK refinement steps.
+const GJK_MAX_ITER: usize = 64;
 
 /// Returns the farthest point on a convex collider in a given direction.
 fn support(collider: &Collider, position: Vec3, direction: Vec3) -> Vec3 {
     match collider {
         Collider::Sphere { radius } => {
             let len = direction.length();
-            if len < 1e-10 {
+            if len < NEAR_ZERO {
                 return position;
             }
             position + direction * (*radius / len)
@@ -27,7 +36,7 @@ fn support(collider: &Collider, position: Vec3, direction: Vec3) -> Vec3 {
                 Vec3::new(position.x, position.y - *half_height, position.z)
             };
             let len = direction.length();
-            if len < 1e-10 {
+            if len < NEAR_ZERO {
                 return base;
             }
             base + direction * (*radius / len)
@@ -46,7 +55,7 @@ fn support_minkowski(a: &Collider, pos_a: Vec3, b: &Collider, pos_b: Vec3, dir: 
 /// GJK: returns Some(simplex) if shapes overlap, None if separated.
 pub(crate) fn gjk(a: &Collider, pos_a: Vec3, b: &Collider, pos_b: Vec3) -> Option<Vec<Vec3>> {
     let mut dir = pos_b - pos_a;
-    if dir.length_squared() < 1e-10 {
+    if dir.length_squared() < NEAR_ZERO {
         dir = Vec3::X;
     }
 
@@ -55,8 +64,8 @@ pub(crate) fn gjk(a: &Collider, pos_a: Vec3, b: &Collider, pos_b: Vec3) -> Optio
     simplex.push(s);
     dir = -s;
 
-    for _ in 0..64 {
-        if dir.length_squared() < 1e-20 {
+    for _ in 0..GJK_MAX_ITER {
+        if dir.length_squared() < COLLAPSED_DIRECTION_SQ {
             return build_tetrahedron(&simplex, a, pos_a, b, pos_b);
         }
 
@@ -94,7 +103,7 @@ fn build_tetrahedron(
     for &d in &dirs {
         if pts.len() >= 4 { break; }
         let p = support_minkowski(a, pos_a, b, pos_b, d);
-        if !pts.iter().any(|s| (*s - p).length_squared() < 1e-10) {
+        if !pts.iter().any(|s| (*s - p).length_squared() < NEAR_ZERO) {
             pts.push(p);
         }
     }
@@ -125,7 +134,7 @@ fn process_line(simplex: &mut Vec<Vec3>, dir: &mut Vec3) -> bool {
         // Origin is in the region of the line AB
         // Direction perpendicular to AB toward origin
         let t = ab.cross(ao).cross(ab);
-        if t.length_squared() < 1e-20 {
+        if t.length_squared() < COLLAPSED_DIRECTION_SQ {
             // Origin is on the line — use any perpendicular
             *dir = perpendicular_to(ab);
         } else {
@@ -157,7 +166,7 @@ fn process_triangle(simplex: &mut Vec<Vec3>, dir: &mut Vec3) -> bool {
         if ab.dot(ao) > 0.0 {
             *simplex = vec![b, a];
             *dir = ab.cross(ao).cross(ab);
-            if dir.length_squared() < 1e-20 {
+            if dir.length_squared() < COLLAPSED_DIRECTION_SQ {
                 *dir = perpendicular_to(ab);
             }
         } else {
@@ -174,7 +183,7 @@ fn process_triangle(simplex: &mut Vec<Vec3>, dir: &mut Vec3) -> bool {
         if ac.dot(ao) > 0.0 {
             *simplex = vec![c, a];
             *dir = ac.cross(ao).cross(ac);
-            if dir.length_squared() < 1e-20 {
+            if dir.length_squared() < COLLAPSED_DIRECTION_SQ {
                 *dir = perpendicular_to(ac);
             }
         } else {
@@ -250,6 +259,8 @@ fn perpendicular_to(v: Vec3) -> Vec3 {
 
 const EPA_MAX_ITER: usize = 64;
 const EPA_TOLERANCE: f32 = 0.0001;
+/// Centre distance below which EPA's fallback normal is just `+Y`.
+const COINCIDENT_CENTRES: f32 = 1e-8;
 
 #[derive(Clone)]
 struct EpaFace {
@@ -259,19 +270,18 @@ struct EpaFace {
 }
 
 /// EPA: given a simplex containing the origin, find penetration info.
-/// Returns (normal, depth, point_on_a, point_on_b).
 pub(crate) fn epa(
     a: &Collider, pos_a: Vec3,
     b: &Collider, pos_b: Vec3,
     simplex: &[Vec3],
-) -> (Vec3, f32, Vec3, Vec3) {
+) -> Penetration {
     let mut polytope: Vec<Vec3> = simplex.to_vec();
 
     if polytope.len() < 4 {
         let diff = pos_b - pos_a;
         let len = diff.length();
-        let normal = if len > 1e-8 { diff * (1.0 / len) } else { Vec3::Y };
-        return (normal, 0.0, pos_a, pos_b);
+        let normal = if len > COINCIDENT_CENTRES { diff * (1.0 / len) } else { Vec3::Y };
+        return Penetration { normal, depth: 0.0, point_on_a: pos_a, point_on_b: pos_b };
     }
 
     // Build initial 4 faces of tetrahedron
@@ -291,7 +301,7 @@ pub(crate) fn epa(
     let interior = (polytope[0] + polytope[1] + polytope[2] + polytope[3]) * 0.25;
     for indices in &face_indices {
         let face = make_outward_face(&polytope, *indices, interior);
-        if face.normal.length_squared() > 1e-10 {
+        if face.normal.length_squared() > NEAR_ZERO {
             faces.push(face);
         }
     }
@@ -352,7 +362,7 @@ pub(crate) fn epa(
         // Create new faces from horizon edges
         for edge in &edges {
             let face = make_outward_face(&polytope, [edge[0], edge[1], new_idx], interior);
-            if face.normal.length_squared() > 1e-10 {
+            if face.normal.length_squared() > NEAR_ZERO {
                 faces.push(face);
             }
         }
@@ -364,7 +374,7 @@ pub(crate) fn epa(
     let point_on_a = support(a, pos_a, normal);
     let point_on_b = support(b, pos_b, -normal);
 
-    (normal, depth, point_on_a, point_on_b)
+    Penetration { normal, depth, point_on_a, point_on_b }
 }
 
 fn make_outward_face(polytope: &[Vec3], indices: [usize; 3], interior: Vec3) -> EpaFace {
@@ -386,7 +396,7 @@ fn make_face(polytope: &[Vec3], indices: [usize; 3]) -> EpaFace {
     let ac = c - a;
     let mut normal = ab.cross(ac);
     let len = normal.length();
-    if len > 1e-10 {
+    if len > NEAR_ZERO {
         normal = normal * (1.0 / len);
     } else {
         normal = Vec3::Y;
@@ -401,11 +411,11 @@ fn make_face(polytope: &[Vec3], indices: [usize; 3]) -> EpaFace {
     }
 }
 
-/// Combined GJK + EPA: returns (normal, depth, point_on_a, point_on_b) or None.
+/// Combined GJK + EPA: the penetration of two overlapping shapes, or `None`.
 pub(crate) fn gjk_epa(
     a: &Collider, pos_a: Vec3,
     b: &Collider, pos_b: Vec3,
-) -> Option<(Vec3, f32, Vec3, Vec3)> {
+) -> Option<Penetration> {
     let simplex = gjk(a, pos_a, b, pos_b)?;
     Some(epa(a, pos_a, b, pos_b, &simplex))
 }
@@ -427,7 +437,7 @@ mod tests {
 
         let result = gjk_epa(&a, pos_a, &b, pos_b);
         assert!(result.is_some());
-        let (normal, depth, _pa, _pb) = result.unwrap();
+        let Penetration { normal, depth, .. } = result.unwrap();
         assert!(normal.x.abs() > 0.5);
         assert!(approx(depth, 0.5, 0.1));
     }
@@ -468,7 +478,7 @@ mod tests {
 
         let result = gjk_epa(&a, pos_a, &b, pos_b);
         assert!(result.is_some());
-        let (normal, depth, _pa, _pb) = result.unwrap();
+        let Penetration { normal, depth, .. } = result.unwrap();
         // Capsule cylinder radius 0.5 (X-axis), sphere radius 1.0, centers 1.0 apart.
         // Penetration depth = (0.5 + 1.0) - 1.0 = 0.5, separating axis = X.
         assert!(approx(depth, 0.5, 0.05), "expected depth ~0.5, got {depth}");
@@ -509,7 +519,7 @@ mod tests {
 
         let result = gjk_epa(&a, pos_a, &b, pos_b);
         assert!(result.is_some());
-        let (normal, depth, _pa, _pb) = result.unwrap();
+        let Penetration { normal, depth, .. } = result.unwrap();
         // Capsule cylinder radius 0.5 (X-axis), box half_extent.x 1.0, centers 1.0 apart.
         // Penetration depth = (0.5 + 1.0) - 1.0 = 0.5, separating axis = X.
         assert!(approx(depth, 0.5, 0.05), "expected depth ~0.5, got {depth}");
@@ -525,7 +535,7 @@ mod tests {
 
         let result = gjk_epa(&a, pos_a, &b, pos_b);
         assert!(result.is_some());
-        let (normal, depth, _pa, _pb) = result.unwrap();
+        let Penetration { normal, depth, .. } = result.unwrap();
         // Both capsules cylinder radius 0.5 (X-axis), centers 0.5 apart.
         // Penetration depth = (0.5 + 0.5) - 0.5 = 0.5, separating axis = X.
         assert!(approx(depth, 0.5, 0.05), "expected depth ~0.5, got {depth}");
