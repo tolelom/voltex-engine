@@ -217,13 +217,9 @@ impl Mat4 {
         let m = &self.cols;
         let element = |row: usize, col: usize| -> f32 { m[col][row] };
 
-        // Determinant of the 3x3 block given in row-major order.
-        #[allow(clippy::too_many_arguments)]
-        fn det3(
-            m00: f32, m01: f32, m02: f32,
-            m10: f32, m11: f32, m12: f32,
-            m20: f32, m21: f32, m22: f32,
-        ) -> f32 {
+        // Determinant of a 3x3 block given as rows.
+        fn det3(rows: [[f32; 3]; 3]) -> f32 {
+            let [[m00, m01, m02], [m10, m11, m12], [m20, m21, m22]] = rows;
             m00 * (m11 * m22 - m12 * m21) - m01 * (m10 * m22 - m12 * m20)
                 + m02 * (m10 * m21 - m11 * m20)
         }
@@ -242,17 +238,8 @@ impl Mat4 {
             let rows = others(row);
             let cols = others(col);
             let sign = if (row + col).is_multiple_of(2) { 1.0 } else { -1.0 };
-            sign * det3(
-                element(rows[0], cols[0]),
-                element(rows[0], cols[1]),
-                element(rows[0], cols[2]),
-                element(rows[1], cols[0]),
-                element(rows[1], cols[1]),
-                element(rows[1], cols[2]),
-                element(rows[2], cols[0]),
-                element(rows[2], cols[1]),
-                element(rows[2], cols[2]),
-            )
+            let minor = rows.map(|r| cols.map(|c| element(r, c)));
+            sign * det3(minor)
         };
 
         // det(M) = Laplace expansion along row 0.
