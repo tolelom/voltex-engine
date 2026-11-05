@@ -1,3 +1,5 @@
+//! Forward transparency pass: alpha-blended meshes drawn into the HDR target
+//! without depth writes, plus a back-to-front sort helper.
 #![allow(missing_docs)]
 
 use crate::gpu::DEPTH_FORMAT;

@@ -91,26 +91,26 @@
 
 ## Phase 7-1
 
-- ~~**투명 오브젝트**~~ ✅ ForwardPass (알파 블렌딩, HDR 타겟, depth read-only) + back-to-front 정렬 완료. deferred_demo 통합 미완료.
-- ~~**G-Buffer 압축**~~ ✅ 옥타헤드럴 노멀 인코딩 + depth 기반 위치 복원 완료.
-- ~~**Light Volumes**~~ ✅ Sphere/Cone/Fullscreen 볼륨 + contains_point 완료.
-- ~~**Stencil 최적화**~~ ✅ 라이트 볼륨 스텐실 mark/test 완료.
+- ~~**투명 오브젝트**~~ ✅ ForwardPass (알파 블렌딩, HDR 타겟, depth read-only) + back-to-front 정렬 완료. deferred_demo 통합 미완료. 현재 `voltex_renderer::experimental::forward_pass` (엔진 미사용).
+- ~~**G-Buffer 압축**~~ ✅ 옥타헤드럴 노멀 인코딩 + depth 기반 위치 복원 완료. 현재 `voltex_renderer::experimental::gbuffer_compress` (엔진 미사용).
+- ~~**Light Volumes**~~ ✅ Sphere/Cone/Fullscreen 볼륨 + contains_point 완료. 현재 `voltex_renderer::experimental::light_volumes` (엔진 미사용).
+- ~~**Stencil 최적화**~~ ✅ 라이트 볼륨 스텐실 mark/test 완료. 현재 `voltex_renderer::experimental::stencil_opt` (엔진 미사용).
 
 ## Phase 7-2
 
-- ~~**Bilateral Blur**~~ ✅ depth/normal edge-aware 컴퓨트 셰이더 완료.
-- ~~**반해상도 렌더링**~~ ✅ half_resolution + depth-aware 업스케일 완료.
-- ~~**Temporal Accumulation**~~ ✅ 히스토리 블렌딩 컴퓨트 셰이더 완료.
-- ~~**Light Probes**~~ ✅ SH 평가 + LightProbeGrid nearest 완료.
+- ~~**Bilateral Blur**~~ ✅ depth/normal edge-aware 컴퓨트 셰이더 완료. 현재 `voltex_renderer::experimental::bilateral_blur` (엔진 미사용).
+- ~~**반해상도 렌더링**~~ ✅ half_resolution + depth-aware 업스케일 완료. 현재 `voltex_renderer::experimental::half_res_ssgi` (엔진 미사용).
+- ~~**Temporal Accumulation**~~ ✅ 히스토리 블렌딩 컴퓨트 셰이더 완료. 현재 `voltex_renderer::experimental::temporal_accum` (엔진 미사용).
+- ~~**Light Probes**~~ ✅ SH 평가 + LightProbeGrid nearest 완료. 현재 `voltex_renderer::experimental::light_probes` (엔진 미사용).
 
 ## Phase 7-3
 
 - ~~**RT Reflections**~~ ✅ 컴퓨트 셰이더 (G-Buffer 기반 반사 레이 마칭) 완료.
 - ~~**RT AO**~~ ✅ 컴퓨트 셰이더 (코사인 가중 반구 샘플링) 완료.
 - ~~**Point/Spot Light RT shadows**~~ ✅ 인프라 + 컴퓨트 셰이더 완료.
-- ~~**Soft RT shadows**~~ ✅ 멀티 레이 + penumbra 크기 계산 완료.
-- ~~**BLAS 업데이트**~~ ✅ BlasTracker (dirty mesh 추적) 완료.
-- ~~**Fallback**~~ ✅ RtCapabilities + RenderMode 선택 완료.
+- ~~**Soft RT shadows**~~ ✅ 멀티 레이 + penumbra 크기 계산 완료. 현재 `voltex_renderer::experimental::soft_rt_shadow` (엔진 미사용).
+- ~~**BLAS 업데이트**~~ ✅ BlasTracker (dirty mesh 추적) 완료. 현재 `voltex_renderer::experimental::blas_update` (엔진 미사용).
+- ~~**Fallback**~~ ✅ RtCapabilities + RenderMode 선택 완료. 현재 `voltex_renderer::experimental::rt_fallback` (엔진 미사용).
 
 ## Phase 7-4
 
@@ -119,7 +119,7 @@
 - ~~**Motion Blur**~~ ✅ 카메라 속도 기반 컴퓨트 셰이더 완료.
 - ~~**DOF**~~ ✅ Circle-of-confusion 기반 컴퓨트 셰이더 완료.
 - ~~**Auto Exposure**~~ ✅ 컴퓨트 셰이더 luminance + 적응형 노출 계산 완료. deferred_demo 통합 미완료.
-- ~~**Bilateral Bloom Blur**~~ ✅ luminance 기반 bilateral bloom weight 완료.
+- ~~**Bilateral Bloom Blur**~~ ✅ luminance 기반 bilateral bloom weight 완료. 현재 `voltex_renderer::experimental::bilateral_bloom` (엔진 미사용).
 
 ## Phase 8-1
 
@@ -159,7 +159,7 @@
 
 - ~~**런타임 그림자 없음**~~ ✅ 2026-06-03 — BasicRenderer directional shadow mapping (`RuntimeConfig::with_shadows(true)`): shadow depth pre-pass + mesh_colored 3x3 PCF (group 3). 기본 off. 한계: ortho 고정(30), 바닥 접촉 오브젝트 self-occlusion. 캡처 검증 docs/visual/shadow_on.png. ~~스킨드 메시 caster 아님~~ ✅ 2026-06-03 (v1.0.61) — `create_skinned_shadow_pipeline` + `skinned_shadow_shader.wgsl`(depth-only GPU 스키닝, 기존 skinned camera/palette 레이아웃 재사용, light-space cam UBO만 추가). BasicRenderer shadow pre-pass가 정적 메시 후 스킨드 메시도 깊이에 렌더. 캡처 회귀 `skinned_mesh_casts_shadow`(strip이 바닥에 그림자 투사, Hidden 대조군 대비 압도) + docs/visual/skinned_shadow.png.
 
-- ~~**per-entity dynamic UBO**~~ ✅ GPU 인스턴싱 (InstanceData, InstanceBuffer, instanced pipeline) 완료.
+- ~~**per-entity dynamic UBO**~~ ✅ GPU 인스턴싱 (InstanceData, InstanceBuffer, instanced pipeline) 완료. 현재 `voltex_renderer::experimental::instancing` (엔진 미사용).
 - **max_bind_groups=4** — 리소스 합치기로 해결 중.
 - ~~**BasicRenderer 가 머티리얼 색상 무시**~~ ✅ 2026-06-03 — 런타임 Blinn-Phong 경로(BasicRenderer)가 `MaterialUniform.base_color` 를 무시하고 흰색 기본 텍스처만 써 모든 오브젝트가 같은 회색 → 같은 색 바닥에 묻힘("박스 안 보임" 2차 원인). `ColoredCameraUniform`(per-entity base_color) + `mesh_colored.wgsl` + `create_colored_mesh_pipeline` 로 BasicRenderer 만 격리 수정 (shared CameraUniform/mesh_shader/PBR/4개 레거시 예제 무영향). voltex_capture `basic_renderer_applies_material_base_color` 회귀. 한계: 텍스처/노멀맵 등 풀 PBR 머티리얼은 여전히 PBR 파이프라인 전용 — 런타임 PBR 통합은 후속.
 

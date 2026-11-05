@@ -1,3 +1,5 @@
+//! GPU instancing: per-instance data (model matrix + color), an instance
+//! buffer, and an instanced mesh pipeline.
 #![allow(missing_docs)]
 
 use crate::gpu::DEPTH_FORMAT;

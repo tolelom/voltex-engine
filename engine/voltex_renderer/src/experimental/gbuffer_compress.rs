@@ -1,3 +1,5 @@
+//! Compact G-buffer encodings: octahedral normal encode/decode, position
+//! reconstruction from depth, and suggested compressed target formats.
 #![allow(missing_docs)]
 
 /// Octahedral normal encoding: vec3 normal → vec2 (compact).

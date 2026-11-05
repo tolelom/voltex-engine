@@ -1,3 +1,5 @@
+//! Light volume shapes (sphere / cone / fullscreen) for limiting deferred
+//! lighting to the pixels a light can reach.
 #![allow(missing_docs)]
 
 /// Light volume shapes for deferred lighting optimization.
