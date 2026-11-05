@@ -44,7 +44,7 @@ recent on top. v0.x entries are organised by Cycle (see
   - 확인: build·clippy(`-D warnings`)·`cargo test --workspace --tests`·doctest 통과, GPU 캡처 테스트(lavapipe) 통과,
     `capture` PNG 14장이 정리 전과 바이트 단위로 같음, `voltex_audio` Windows 대상 clippy 통과.
   - 남긴 것: 쓰는 곳이 없는 공개 코드(렌더러 실험 모듈 9개, ECS `Archetype`·`Scheduler`, 오디오 DSP·백엔드 등)는 지우지
-    않았다. 메시 생성기·이미지 디코더의 튜플 반환(`parse_png`는 `(pixels, w, h)`, `parse_jpg`는 `(w, h, pixels)`)도 그대로다.
+    않았다. 메시 생성기·이미지 디코더의 튜플 반환도 그대로다(아래 항목에서 구조체로 바꿨다).
 - **폴더 구성 `engine/`·`tools/`**: `crates/`를 엔진 crate 15개(`engine/`)와 엔진을 쓰는 도구(`tools/voltex_cli`,
   `tools/voltex_capture`)로 나눴다. 루트 `Cargo.toml`의 members를 엔진·도구·게임·예제 묶음으로 다시 적었다.
   `voltex build`가 만드는 래퍼 crate는 엔진 경로의 `engine/voltex_runtime`을 가리킨다. 저장소를 도는 테스트
