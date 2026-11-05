@@ -8,13 +8,14 @@ GPU 무의존(L0) asset codecs — PNG/JPG/glTF/OBJ/JSON 디코더 + PNG 인코�
 - `parse_png(data: &[u8]) -> Result<(Vec<u8>, u32, u32)>` — PNG → RGBA8 `(pixels, width, height)`. 그레이/RGB/팔레트/그레이+알파/RGBA 전 비트 깊이 + tRNS, Adam7은 에러 (src/png.rs, src/png_pixels.rs)
 - `parse_jpg(data: &[u8]) -> Result<(u32, u32, Vec<u8>)>` — JPEG Baseline + Progressive → RGBA8 (src/jpg/, src/progressive_jpeg.rs)
 - `parse_gltf(data: &[u8]) -> Result<GltfData>` — glTF 2.0 / GLB 파서 (src/gltf/). 정점 속성은 `bufferView.byteStride`(인터리브, v1.0.132)와 정규화 정수 componentType(v1.0.133, `gltf/component.rs`) 지원. 노드 `matrix`는 TRS로 분해(v1.0.137)
+- `parse_bmp(data: &[u8]) -> Result<BmpImage>` — 무압축 24/32bpp BMP → RGBA8 (`BMP_MAX_DIMENSION`=16384) (src/bmp/, voltex_renderer 에서 이관)
 - `encode_rgba8(w: u32, h: u32, rgba: &[u8]) -> Vec<u8>` — RGBA8 → PNG (zlib stored block, 무압축) (src/png_encode.rs)
 - `GltfData`, `GltfMesh`, `GltfMaterial` — glTF 구조체 (src/gltf/). 머티리얼은 계수만(텍스처 미임포트 — DEFERRED 참고)
 - `MeshVertex` — 위치/법선/UV/탄젠트 정점 POD (bytemuck::Pod + Zeroable) (src/vertex.rs)
 - `ImageError`, `Result` — thiserror 기반 에러 (Generic) (src/error.rs)
 
 ### 모듈 경로 (pub mod)
-`deflate`, `gltf`, `jpg`, `json_parser`, `obj`, `png`, `png_encode`, `progressive_jpeg`, `vertex`, `error`
+`bmp`, `deflate`, `gltf`, `jpg`, `json_parser`, `obj`, `png`, `png_encode`, `progressive_jpeg`, `vertex`, `error`
 
 ## 모듈 구조
 - `error` — `ImageError` enum + `Result<T>` alias (src/error.rs)
@@ -28,7 +29,8 @@ GPU 무의존(L0) asset codecs — PNG/JPG/glTF/OBJ/JSON 디코더 + PNG 인코�
 - `progressive_jpeg` — JPEG Progressive 디코더 (src/progressive_jpeg.rs)
 - `obj` — OBJ 파서: `parse_obj`, `compute_tangents`, `ObjData` (src/obj.rs)
 - `json_parser` — 소형 JSON 파서: `parse_json`, `JsonValue` (src/json_parser.rs)
-- `gltf` — glTF 2.0/GLB 파서: `parse_gltf`, `GltfData`/`GltfMesh`/`GltfMaterial`/`Channel` + 애니메이션 타입 (src/gltf/)
+- `gltf` — glTF 2.0/GLB 파서: `parse_gltf`, `GltfData`/`GltfMesh`/`GltfMaterial`/`Channel` + 애니메이션 타입 (src/gltf/). componentType 숫자는 `gltf/component.rs` 의 상수(`FLOAT`, `UNSIGNED_SHORT` …)로
+- `bmp` — BMP 디코더 `parse_bmp`/`BmpImage` (src/bmp/)
 
 ## 의존성
 - voltex crate: **없음** (L0 — GPU/voltex 의존 0)

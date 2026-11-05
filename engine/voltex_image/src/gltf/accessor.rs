@@ -1,7 +1,7 @@
 use super::material::extract_material;
 use super::node::{parse_animations, parse_nodes, parse_skins};
 use super::types::{GltfData, GltfMesh};
-use super::component::read_accessor_vecn;
+use super::component::{read_accessor_vecn, UNSIGNED_BYTE, UNSIGNED_INT, UNSIGNED_SHORT};
 use crate::json_parser::JsonValue;
 use crate::obj::compute_tangents;
 use crate::vertex::MeshVertex;
@@ -56,156 +56,10 @@ pub(super) fn extract_meshes(json: &JsonValue, buffers: &[Vec<u8>]) -> crate::Re
             .ok_or("Mesh has no primitives")?;
 
         for prim in primitives {
-            let attrs = prim
-                .get("attributes")
-                .and_then(|v| v.as_object())
-                .ok_or("Primitive has no attributes")?;
-
-            // Read position data (required)
-            let pos_idx = attrs
-                .iter()
-                .find(|(k, _)| k == "POSITION")
-                .and_then(|(_, v)| v.as_u32())
-                .ok_or("Missing POSITION attribute")? as usize;
-            let positions = read_accessor_vec3(accessors, buffer_views, buffers, pos_idx)?;
-
-            // Read normals (optional)
-            let normals = if let Some(idx) = attrs
-                .iter()
-                .find(|(k, _)| k == "NORMAL")
-                .and_then(|(_, v)| v.as_u32())
-            {
-                read_accessor_vec3(accessors, buffer_views, buffers, idx as usize)?
-            } else {
-                vec![[0.0, 1.0, 0.0]; positions.len()]
-            };
-
-            // Read UVs (optional)
-            let uvs = if let Some(idx) = attrs
-                .iter()
-                .find(|(k, _)| k == "TEXCOORD_0")
-                .and_then(|(_, v)| v.as_u32())
-            {
-                read_accessor_vec2(accessors, buffer_views, buffers, idx as usize)?
-            } else {
-                vec![[0.0, 0.0]; positions.len()]
-            };
-
-            // Read tangents (optional)
-            let tangents = if let Some(idx) = attrs
-                .iter()
-                .find(|(k, _)| k == "TANGENT")
-                .and_then(|(_, v)| v.as_u32())
-            {
-                Some(read_accessor_vec4(
-                    accessors,
-                    buffer_views,
-                    buffers,
-                    idx as usize,
-                )?)
-            } else {
-                None
-            };
-
-            // Read indices
-            let indices = if let Some(idx) = prim.get("indices").and_then(|v| v.as_u32()) {
-                read_accessor_indices(accessors, buffer_views, buffers, idx as usize)?
-            } else {
-                // No indices — generate sequential
-                (0..positions.len() as u32).collect()
-            };
-
-            // Defend against malformed glTF where attribute accessors disagree
-            // on count. Pre-fix, the loop below could panic with index-out-of-
-            // bounds when reading `normals[i]` / `uvs[i]` / `tangents[i]`.
-            if normals.len() != positions.len()
-                || uvs.len() != positions.len()
-                || tangents
-                    .as_ref()
-                    .is_some_and(|t| t.len() != positions.len())
-            {
-                return Err(format!(
-                    "glTF primitive attribute length mismatch: positions={}, normals={}, uvs={}, tangents={:?}",
-                    positions.len(),
-                    normals.len(),
-                    uvs.len(),
-                    tangents.as_ref().map(|t| t.len()),
-                ).into());
-            }
-
-            // Assemble vertices
-            let mut vertices: Vec<MeshVertex> = Vec::with_capacity(positions.len());
-            for i in 0..positions.len() {
-                vertices.push(MeshVertex {
-                    position: positions[i],
-                    normal: normals[i],
-                    uv: uvs[i],
-                    tangent: tangents.as_ref().map_or([0.0; 4], |t| t[i]),
-                });
-            }
-
-            // Indices come from the file; one past the vertex list would index
-            // out of bounds in tangent generation and on the GPU.
-            if let Some(&bad) = indices.iter().find(|&&ix| ix as usize >= vertices.len()) {
-                return Err(format!(
-                    "glTF index {} out of range for {} vertices",
-                    bad,
-                    vertices.len()
-                )
-                .into());
-            }
-
-            // Read JOINTS_0 (optional)
-            let joints = if let Some(idx) = attrs
-                .iter()
-                .find(|(k, _)| k == "JOINTS_0")
-                .and_then(|(_, v)| v.as_u32())
-            {
-                Some(read_accessor_joints(
-                    accessors,
-                    buffer_views,
-                    buffers,
-                    idx as usize,
-                )?)
-            } else {
-                None
-            };
-
-            // Read WEIGHTS_0 (optional)
-            let weights = if let Some(idx) = attrs
-                .iter()
-                .find(|(k, _)| k == "WEIGHTS_0")
-                .and_then(|(_, v)| v.as_u32())
-            {
-                Some(read_accessor_vec4(
-                    accessors,
-                    buffer_views,
-                    buffers,
-                    idx as usize,
-                )?)
-            } else {
-                None
-            };
-
-            // Compute tangents if not provided
-            if tangents.is_none() {
-                compute_tangents(&mut vertices, &indices);
-            }
-
-            // Read material
-            let material = prim
-                .get("material")
-                .and_then(|v| v.as_u32())
-                .and_then(|idx| materials_json?.get(idx as usize))
-                .and_then(extract_material);
-
+            let mesh = read_primitive(prim, accessors, buffer_views, buffers, materials_json)?;
             meshes.push(GltfMesh {
-                vertices,
-                indices,
                 name: name.clone(),
-                material,
-                joints,
-                weights,
+                ..mesh
             });
         }
     }
@@ -219,6 +73,122 @@ pub(super) fn extract_meshes(json: &JsonValue, buffers: &[Vec<u8>]) -> crate::Re
         nodes,
         skins,
         animations,
+    })
+}
+
+/// Accessor index of a primitive attribute (`"POSITION"`, `"NORMAL"`, …).
+fn attribute_accessor(attrs: &[(String, JsonValue)], name: &str) -> Option<usize> {
+    attrs
+        .iter()
+        .find(|(k, _)| k == name)
+        .and_then(|(_, v)| v.as_u32())
+        .map(|idx| idx as usize)
+}
+
+/// One `mesh.primitives[i]` → vertices (tangents generated when absent),
+/// indices, optional skin attributes and material. `name` is left `None`.
+fn read_primitive(
+    prim: &JsonValue,
+    accessors: &[JsonValue],
+    buffer_views: &[JsonValue],
+    buffers: &[Vec<u8>],
+    materials_json: Option<&[JsonValue]>,
+) -> crate::Result<GltfMesh> {
+    let attrs = prim
+        .get("attributes")
+        .and_then(|v| v.as_object())
+        .ok_or("Primitive has no attributes")?;
+
+    let pos_idx = attribute_accessor(attrs, "POSITION").ok_or("Missing POSITION attribute")?;
+    let positions = read_accessor_vec3(accessors, buffer_views, buffers, pos_idx)?;
+
+    // Optional attributes get neutral defaults (up normal, zero UV).
+    let normals = match attribute_accessor(attrs, "NORMAL") {
+        Some(idx) => read_accessor_vec3(accessors, buffer_views, buffers, idx)?,
+        None => vec![[0.0, 1.0, 0.0]; positions.len()],
+    };
+    let uvs = match attribute_accessor(attrs, "TEXCOORD_0") {
+        Some(idx) => read_accessor_vec2(accessors, buffer_views, buffers, idx)?,
+        None => vec![[0.0, 0.0]; positions.len()],
+    };
+    let tangents = match attribute_accessor(attrs, "TANGENT") {
+        Some(idx) => Some(read_accessor_vec4(accessors, buffer_views, buffers, idx)?),
+        None => None,
+    };
+
+    let indices = if let Some(idx) = prim.get("indices").and_then(|v| v.as_u32()) {
+        read_accessor_indices(accessors, buffer_views, buffers, idx as usize)?
+    } else {
+        // No indices — generate sequential
+        (0..positions.len() as u32).collect()
+    };
+
+    // Defend against malformed glTF where attribute accessors disagree
+    // on count. Pre-fix, the loop below could panic with index-out-of-
+    // bounds when reading `normals[i]` / `uvs[i]` / `tangents[i]`.
+    if normals.len() != positions.len()
+        || uvs.len() != positions.len()
+        || tangents
+            .as_ref()
+            .is_some_and(|t| t.len() != positions.len())
+    {
+        return Err(format!(
+            "glTF primitive attribute length mismatch: positions={}, normals={}, uvs={}, tangents={:?}",
+            positions.len(),
+            normals.len(),
+            uvs.len(),
+            tangents.as_ref().map(|t| t.len()),
+        ).into());
+    }
+
+    let mut vertices: Vec<MeshVertex> = Vec::with_capacity(positions.len());
+    for i in 0..positions.len() {
+        vertices.push(MeshVertex {
+            position: positions[i],
+            normal: normals[i],
+            uv: uvs[i],
+            tangent: tangents.as_ref().map_or([0.0; 4], |t| t[i]),
+        });
+    }
+
+    // Indices come from the file; one past the vertex list would index
+    // out of bounds in tangent generation and on the GPU.
+    if let Some(&bad) = indices.iter().find(|&&ix| ix as usize >= vertices.len()) {
+        return Err(format!(
+            "glTF index {} out of range for {} vertices",
+            bad,
+            vertices.len()
+        )
+        .into());
+    }
+
+    // Skinning attributes (optional).
+    let joints = match attribute_accessor(attrs, "JOINTS_0") {
+        Some(idx) => Some(read_accessor_joints(accessors, buffer_views, buffers, idx)?),
+        None => None,
+    };
+    let weights = match attribute_accessor(attrs, "WEIGHTS_0") {
+        Some(idx) => Some(read_accessor_vec4(accessors, buffer_views, buffers, idx)?),
+        None => None,
+    };
+
+    if tangents.is_none() {
+        compute_tangents(&mut vertices, &indices);
+    }
+
+    let material = prim
+        .get("material")
+        .and_then(|v| v.as_u32())
+        .and_then(|idx| materials_json?.get(idx as usize))
+        .and_then(extract_material);
+
+    Ok(GltfMesh {
+        vertices,
+        indices,
+        name: None,
+        material,
+        joints,
+        weights,
     })
 }
 
@@ -299,8 +269,7 @@ fn read_accessor_indices(
 
     let mut result = Vec::with_capacity(count);
     match comp_type {
-        5121 => {
-            // UNSIGNED_BYTE
+        UNSIGNED_BYTE => {
             for i in 0..count {
                 if offset + i >= buffer.len() {
                     return Err("Buffer overflow reading u8 indices".into());
@@ -308,8 +277,7 @@ fn read_accessor_indices(
                 result.push(buffer[offset + i] as u32);
             }
         }
-        5123 => {
-            // UNSIGNED_SHORT
+        UNSIGNED_SHORT => {
             for i in 0..count {
                 let o = offset + i * 2;
                 if o + 2 > buffer.len() {
@@ -318,8 +286,7 @@ fn read_accessor_indices(
                 result.push(u16::from_le_bytes([buffer[o], buffer[o + 1]]) as u32);
             }
         }
-        5125 => {
-            // UNSIGNED_INT
+        UNSIGNED_INT => {
             for i in 0..count {
                 let o = offset + i * 4;
                 if o + 4 > buffer.len() {
@@ -353,12 +320,11 @@ fn read_accessor_joints(
     let comp_type = acc
         .get("componentType")
         .and_then(|v| v.as_u32())
-        .unwrap_or(5123);
+        .unwrap_or(UNSIGNED_SHORT);
     let (buffer, offset, stride) = get_buffer_data(acc, buffer_views, buffers)?;
     let mut result = Vec::with_capacity(count);
     match comp_type {
-        5121 => {
-            // UNSIGNED_BYTE
+        UNSIGNED_BYTE => {
             for i in 0..count {
                 let o = offset + i * stride.unwrap_or(4);
                 if o + 4 > buffer.len() {
@@ -372,8 +338,7 @@ fn read_accessor_joints(
                 ]);
             }
         }
-        5123 => {
-            // UNSIGNED_SHORT
+        UNSIGNED_SHORT => {
             for i in 0..count {
                 let o = offset + i * stride.unwrap_or(8);
                 if o + 8 > buffer.len() {
@@ -424,8 +389,8 @@ pub(super) fn read_accessor_mat4(
     Ok(result)
 }
 
-// Helper functions for tests
-#[allow(dead_code)]
+/// Test helper: `count` tightly packed f32 at `offset`.
+#[cfg(test)]
 pub(super) fn read_floats(buffer: &[u8], offset: usize, count: usize) -> Vec<f32> {
     (0..count)
         .map(|i| {
@@ -435,7 +400,8 @@ pub(super) fn read_floats(buffer: &[u8], offset: usize, count: usize) -> Vec<f32
         .collect()
 }
 
-#[allow(dead_code)]
+/// Test helper: `count` tightly packed u16 indices at `offset`.
+#[cfg(test)]
 pub(super) fn read_indices_u16(buffer: &[u8], offset: usize, count: usize) -> Vec<u32> {
     (0..count)
         .map(|i| {

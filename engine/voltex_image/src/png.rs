@@ -17,23 +17,59 @@ const PNG_MAX_DIMENSION: u32 = 16_384;
 /// RGBA8 byte buffer. 16-bit samples keep their high byte; Adam7-interlaced
 /// images return an error.
 pub fn parse_png(data: &[u8]) -> crate::Result<(Vec<u8>, u32, u32)> {
-    // 1. Verify PNG signature
-    let signature: [u8; 8] = [137, 80, 78, 71, 13, 10, 26, 10];
-    if data.len() < 8 || data[..8] != signature {
+    let chunks = read_chunks(data)?;
+    let header = chunks.header;
+    let decompressed = deflate::inflate(&chunks.idat)?;
+    let bits = crate::png_pixels::bits_per_pixel(header.color_type, header.bit_depth)?;
+    let (image_data, stride) = unfilter_scanlines(&decompressed, header.width, header.height, bits)?;
+    let rgba = crate::png_pixels::to_rgba8(
+        &image_data,
+        header.width as usize,
+        header.height as usize,
+        stride,
+        header.color_type,
+        header.bit_depth,
+        chunks.palette.as_deref(),
+        chunks.trns.as_deref(),
+    )?;
+    Ok((rgba, header.width, header.height))
+}
+
+/// The 8-byte magic every PNG file starts with.
+const PNG_SIGNATURE: [u8; 8] = [137, 80, 78, 71, 13, 10, 26, 10];
+
+/// IHDR fields the decoder uses.
+#[derive(Clone, Copy)]
+struct PngHeader {
+    width: u32,
+    height: u32,
+    bit_depth: u8,
+    color_type: u8,
+}
+
+/// Chunks collected up to IEND: header, optional palette/transparency, and
+/// the concatenated (still compressed) IDAT stream.
+struct PngChunks {
+    header: PngHeader,
+    palette: Option<Vec<u8>>,
+    trns: Option<Vec<u8>>,
+    idat: Vec<u8>,
+}
+
+/// Check the signature, walk the chunk list and validate the header
+/// (present, non-zero, within [`PNG_MAX_DIMENSION`]) and that IDAT exists.
+fn read_chunks(data: &[u8]) -> crate::Result<PngChunks> {
+    if data.len() < 8 || data[..8] != PNG_SIGNATURE {
         return Err("Invalid PNG signature".into());
     }
 
     let mut pos = 8;
-    let mut width: u32 = 0;
-    let mut height: u32 = 0;
-    let mut bit_depth: u8 = 8;
+    let mut header: Option<PngHeader> = None;
     let mut palette: Option<Vec<u8>> = None;
     let mut trns: Option<Vec<u8>> = None;
-    let mut color_type: u8 = 0;
-    let mut idat_data = Vec::new();
-    let mut got_ihdr = false;
+    let mut idat = Vec::new();
 
-    // 2. Parse chunks
+    // Each chunk: length(4, BE) + type(4) + data(length) + CRC(4, not checked).
     while pos + 8 <= data.len() {
         let chunk_len =
             u32::from_be_bytes([data[pos], data[pos + 1], data[pos + 2], data[pos + 3]]) as usize;
@@ -46,65 +82,23 @@ pub fn parse_png(data: &[u8]) -> crate::Result<(Vec<u8>, u32, u32)> {
         let chunk_data = &data[pos..pos + chunk_len];
         pos += chunk_len;
 
-        // Skip CRC (4 bytes)
         if pos + 4 > data.len() {
             return Err("Missing chunk CRC".into());
         }
         pos += 4;
 
         match chunk_type {
-            b"IHDR" => {
-                if chunk_len < 13 {
-                    return Err("IHDR chunk too small".into());
-                }
-                width = u32::from_be_bytes([
-                    chunk_data[0],
-                    chunk_data[1],
-                    chunk_data[2],
-                    chunk_data[3],
-                ]);
-                height = u32::from_be_bytes([
-                    chunk_data[4],
-                    chunk_data[5],
-                    chunk_data[6],
-                    chunk_data[7],
-                ]);
-                bit_depth = chunk_data[8];
-                color_type = chunk_data[9];
-                let compression = chunk_data[10];
-                let _filter = chunk_data[11];
-                let interlace = chunk_data[12];
-
-                crate::png_pixels::bits_per_pixel(color_type, bit_depth)?;
-                if compression != 0 {
-                    return Err("Unsupported compression method".into());
-                }
-                if interlace != 0 {
-                    return Err("Interlaced PNGs not supported".into());
-                }
-                got_ihdr = true;
-            }
-            b"PLTE" => {
-                palette = Some(chunk_data.to_vec());
-            }
-            b"tRNS" => {
-                trns = Some(chunk_data.to_vec());
-            }
-            b"IDAT" => {
-                idat_data.extend_from_slice(chunk_data);
-            }
-            b"IEND" => {
-                break;
-            }
-            _ => {
-                // Skip unknown chunks
-            }
+            b"IHDR" => header = Some(parse_ihdr(chunk_data)?),
+            b"PLTE" => palette = Some(chunk_data.to_vec()),
+            b"tRNS" => trns = Some(chunk_data.to_vec()),
+            b"IDAT" => idat.extend_from_slice(chunk_data),
+            b"IEND" => break,
+            _ => {} // ancillary chunks are skipped
         }
     }
 
-    if !got_ihdr {
-        return Err("Missing IHDR chunk".into());
-    }
+    let header = header.ok_or("Missing IHDR chunk")?;
+    let (width, height) = (header.width, header.height);
     if width == 0 || height == 0 {
         return Err(format!("PNG zero dimension: {}x{}", width, height).into());
     }
@@ -115,19 +109,53 @@ pub fn parse_png(data: &[u8]) -> crate::Result<(Vec<u8>, u32, u32)> {
         )
         .into());
     }
-    if idat_data.is_empty() {
+    if idat.is_empty() {
         return Err("No IDAT chunks found".into());
     }
+    Ok(PngChunks {
+        header,
+        palette,
+        trns,
+        idat,
+    })
+}
 
-    // 3. Decompress IDAT data
-    let decompressed = deflate::inflate(&idat_data)?;
+/// IHDR: width(4) height(4) bit_depth color_type compression filter interlace.
+fn parse_ihdr(chunk: &[u8]) -> crate::Result<PngHeader> {
+    if chunk.len() < 13 {
+        return Err("IHDR chunk too small".into());
+    }
+    let header = PngHeader {
+        width: u32::from_be_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]),
+        height: u32::from_be_bytes([chunk[4], chunk[5], chunk[6], chunk[7]]),
+        bit_depth: chunk[8],
+        color_type: chunk[9],
+    };
+    let compression = chunk[10];
+    let interlace = chunk[12];
 
-    // 4. Apply PNG filters
-    let bits = crate::png_pixels::bits_per_pixel(color_type, bit_depth)?;
+    crate::png_pixels::bits_per_pixel(header.color_type, header.bit_depth)?;
+    if compression != 0 {
+        return Err("Unsupported compression method".into());
+    }
+    if interlace != 0 {
+        return Err("Interlaced PNGs not supported".into());
+    }
+    Ok(header)
+}
+
+/// Undo the per-row PNG filters. `decompressed` holds `height` rows of
+/// `1 filter byte + stride bytes`; returns the packed rows and `stride`.
+fn unfilter_scanlines(
+    decompressed: &[u8],
+    width: u32,
+    height: u32,
+    bits_per_pixel: usize,
+) -> crate::Result<(Vec<u8>, usize)> {
     // Filters operate on whole bytes: sub-byte pixels use a 1-byte step.
-    let bpp = bits.div_ceil(8);
+    let bpp = bits_per_pixel.div_ceil(8);
     let stride = (width as usize)
-        .checked_mul(bits)
+        .checked_mul(bits_per_pixel)
         .ok_or("PNG stride overflow")?
         .div_ceil(8);
     let expected_size = (height as usize)
@@ -147,7 +175,8 @@ pub fn parse_png(data: &[u8]) -> crate::Result<(Vec<u8>, u32, u32)> {
         .checked_mul(stride)
         .ok_or("PNG image size overflow")?;
     let mut image_data = vec![0u8; image_size];
-    let mut prev_row = vec![0u8; stride];
+    // The row above the first row counts as all zeros.
+    let zero_row = vec![0u8; stride];
 
     for y in 0..height as usize {
         let row_start = y * (1 + stride);
@@ -161,31 +190,14 @@ pub fn parse_png(data: &[u8]) -> crate::Result<(Vec<u8>, u32, u32)> {
         let (before, current) = image_data.split_at_mut(dst_start);
         let current = &mut current[..stride];
         let previous = if y == 0 {
-            &prev_row[..]
+            &zero_row[..]
         } else {
             &before[dst_start - stride..dst_start]
         };
 
         reconstruct_row(filter_type, current, previous, bpp)?;
-
-        if y == 0 {
-            prev_row.copy_from_slice(current);
-        }
     }
-
-    // 5. Convert to RGBA8
-    let rgba = crate::png_pixels::to_rgba8(
-        &image_data,
-        width as usize,
-        height as usize,
-        stride,
-        color_type,
-        bit_depth,
-        palette.as_deref(),
-        trns.as_deref(),
-    )?;
-
-    Ok((rgba, width, height))
+    Ok((image_data, stride))
 }
 
 fn reconstruct_row(
