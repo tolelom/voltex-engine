@@ -32,7 +32,7 @@ pub mod encryption;
 mod wire;
 
 pub use error::{NetError, Result};
-pub use packet::Packet;
+pub use packet::{Packet, MAX_PAYLOAD_LEN};
 pub use socket::NetSocket;
 pub use server::{NetServer, ServerEvent, ClientInfo};
 pub use client::{NetClient, ClientEvent};
