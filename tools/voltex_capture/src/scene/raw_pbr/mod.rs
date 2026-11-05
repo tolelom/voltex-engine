@@ -309,7 +309,7 @@ fn default_pbr_texture_bind_group(
     // 1×1 텍스처를 만들 때만 쓰는 단일 텍스처 bind group 레이아웃.
     let single_texture_layout = GpuTexture::bind_group_layout(device);
     let albedo = GpuTexture::white_1x1(device, queue, &single_texture_layout);
-    let normal = GpuTexture::flat_normal_1x1(device, queue);
+    let normal = GpuTexture::flat_normal_map_1x1(device, queue, &single_texture_layout);
     let orm = GpuTexture::white_1x1(device, queue, &single_texture_layout);
     let emissive = GpuTexture::black_1x1(device, queue, &single_texture_layout);
     create_pbr_full_texture_bind_group(
@@ -317,8 +317,8 @@ fn default_pbr_texture_bind_group(
         pbr_tex_layout,
         &albedo.view,
         &albedo.sampler,
-        &normal.1,
-        &normal.2,
+        &normal.view,
+        &normal.sampler,
         &orm.view,
         &orm.sampler,
         &emissive.view,

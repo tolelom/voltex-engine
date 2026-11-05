@@ -60,12 +60,8 @@ pub struct Skeleton {
     node_to_joint: HashMap<usize, usize>,
 }
 
-const IDENTITY4: [[f32; 4]; 4] = [
-    [1.0, 0.0, 0.0, 0.0],
-    [0.0, 1.0, 0.0, 0.0],
-    [0.0, 0.0, 1.0, 0.0],
-    [0.0, 0.0, 0.0, 1.0],
-];
+/// 단위 행렬 (column-major 배열 — `build_trs`/`mat4_mul` 과 같은 표현).
+const IDENTITY4: [[f32; 4]; 4] = voltex_math::Mat4::IDENTITY.cols;
 
 impl Skeleton {
     /// Build a skeleton from a glTF skin + the scene node array.

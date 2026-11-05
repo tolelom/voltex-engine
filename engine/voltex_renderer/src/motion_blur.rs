@@ -162,7 +162,7 @@ impl MotionBlur {
         });
         cpass.set_pipeline(&self.pipeline);
         cpass.set_bind_group(0, &bind_group, &[]);
-        cpass.dispatch_workgroups(width.div_ceil(16), height.div_ceil(16), 1);
+        crate::compute::dispatch_screen(&mut cpass, width, height);
     }
 }
 

@@ -6,13 +6,13 @@ use winit::{
     window::WindowId,
 };
 use voltex::prelude::*;
-use voltex::renderer::{GpuContext, pipeline, vertex::Vertex};
+use voltex::renderer::{GpuContext, pipeline, vertex::PositionColorVertex};
 use wgpu::util::DeviceExt;
 
-const TRIANGLE_VERTICES: &[Vertex] = &[
-    Vertex { position: [0.0, 0.5, 0.0], color: [1.0, 0.0, 0.0] },
-    Vertex { position: [-0.5, -0.5, 0.0], color: [0.0, 1.0, 0.0] },
-    Vertex { position: [0.5, -0.5, 0.0], color: [0.0, 0.0, 1.0] },
+const TRIANGLE_VERTICES: &[PositionColorVertex] = &[
+    PositionColorVertex { position: [0.0, 0.5, 0.0], color: [1.0, 0.0, 0.0] },
+    PositionColorVertex { position: [-0.5, -0.5, 0.0], color: [0.0, 1.0, 0.0] },
+    PositionColorVertex { position: [0.5, -0.5, 0.0], color: [0.0, 0.0, 1.0] },
 ];
 
 struct TriangleApp {
@@ -38,7 +38,7 @@ impl ApplicationHandler for TriangleApp {
         };
         let window = VoltexWindow::new(event_loop, &config);
         let gpu = GpuContext::new(window.handle.clone()).expect("voltex: GPU initialization failed");
-        let pipeline = pipeline::create_render_pipeline(&gpu.device, gpu.surface_format);
+        let pipeline = pipeline::create_position_color_pipeline(&gpu.device, gpu.surface_format);
         let vertex_buffer = gpu.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Triangle Vertex Buffer"),
             contents: bytemuck::cast_slice(TRIANGLE_VERTICES),

@@ -15,7 +15,7 @@ use winit::{
 use voltex::prelude::*;
 use voltex::ecs::{MaterialHandle, MeshHandle, Transform};
 use voltex::renderer::{
-    create_pbr_full_texture_bind_group, create_pbr_pipeline, create_shadow_pipeline,
+    align_up, create_pbr_full_texture_bind_group, create_pbr_pipeline, create_shadow_pipeline,
     generate_sphere, pbr_full_texture_bind_group_layout, shadow_pass_bind_group_layout,
     CameraUniform, GpuContext, GpuTexture, IblResources, LightData, LightsUniform,
     MaterialUniform, Mesh, ShadowMap, ShadowPassUniform, ShadowUniform, SHADOW_MAP_SIZE,
@@ -61,7 +61,7 @@ struct AppState {
     material_buffer: wgpu::Buffer,
     camera_light_bind_group: wgpu::BindGroup,
     _albedo_tex: GpuTexture,
-    _normal_tex: (wgpu::Texture, wgpu::TextureView, wgpu::Sampler),
+    _normal_tex: GpuTexture,
     _orm_tex: GpuTexture,
     _emissive_tex: GpuTexture,
     pbr_texture_bind_group: wgpu::BindGroup,
@@ -114,10 +114,6 @@ fn camera_light_bind_group_layout(device: &wgpu::Device) -> wgpu::BindGroupLayou
             },
         ],
     })
-}
-
-fn align_up(size: u32, alignment: u32) -> u32 {
-    size.div_ceil(alignment) * alignment
 }
 
 /// Extract translation (last column) from a column-major Mat4.
@@ -253,7 +249,7 @@ impl ApplicationHandler for SurvivorApp {
         // material.roughness/metallic/ao unchanged; black emissive = no glow.
         let old_tex_layout = GpuTexture::bind_group_layout(&gpu.device);
         let albedo_tex = GpuTexture::white_1x1(&gpu.device, &gpu.queue, &old_tex_layout);
-        let normal_tex = GpuTexture::flat_normal_1x1(&gpu.device, &gpu.queue);
+        let normal_tex = GpuTexture::flat_normal_map_1x1(&gpu.device, &gpu.queue, &old_tex_layout);
         let orm_tex = GpuTexture::white_1x1(&gpu.device, &gpu.queue, &old_tex_layout);
         let emissive_tex = GpuTexture::black_1x1(&gpu.device, &gpu.queue, &old_tex_layout);
         let pbr_texture_bind_group = create_pbr_full_texture_bind_group(
@@ -261,8 +257,8 @@ impl ApplicationHandler for SurvivorApp {
             &pbr_tex_layout,
             &albedo_tex.view,
             &albedo_tex.sampler,
-            &normal_tex.1,
-            &normal_tex.2,
+            &normal_tex.view,
+            &normal_tex.sampler,
             &orm_tex.view,
             &orm_tex.sampler,
             &emissive_tex.view,

@@ -1,128 +1,19 @@
-//! GPU texture wrapper + BMP loader + bind-group-layout helpers for the PBR
-//! material slots (albedo / normal / ORM / emissive).
+//! GPU texture wrapper + bind-group-layout helpers for the PBR material slots
+//! (albedo / normal / ORM / emissive).
 #![allow(missing_docs)]
 
-/// In-memory decoded BMP image (RGBA pixel rows).
-pub struct BmpImage {
-    /// Pixel width.
-    pub width: u32,
-    /// Pixel height.
-    pub height: u32,
-    /// Pixel data — `width * height * 4` bytes, RGBA.
-    pub pixels: Vec<u8>,
-}
+// BMP 디코더는 GPU 무관이라 voltex_image 로 옮겼다. 기존 경로
+// `voltex_renderer::texture::{parse_bmp, BmpImage, BMP_MAX_DIMENSION}` 는 유지.
+pub use voltex_image::bmp::{BmpImage, BMP_MAX_DIMENSION};
 
-/// Hard cap on either dimension we'll decode. Matches the typical GPU texture
-/// limit (`max_texture_dimension_2d = 16384`) on desktop adapters and prevents
-/// adversarial BMP headers from triggering huge allocations or arithmetic
-/// overflow on the size computation below.
-pub const BMP_MAX_DIMENSION: u32 = 16_384;
-
+/// Decode an uncompressed 24/32-bit BMP. Thin wrapper over
+/// [`voltex_image::parse_bmp`] that keeps the renderer's error type.
 pub fn parse_bmp(data: &[u8]) -> crate::Result<BmpImage> {
-    if data.len() < 54 {
-        return Err(format!("BMP too small: {} bytes", data.len()).into());
-    }
-    if data[0] != b'B' || data[1] != b'M' {
-        return Err("Not a BMP file: missing 'BM' signature".into());
-    }
-
-    let pixel_offset = u32::from_le_bytes(data[10..14].try_into().unwrap()) as usize;
-    let width_raw = i32::from_le_bytes(data[18..22].try_into().unwrap());
-    let height_raw = i32::from_le_bytes(data[22..26].try_into().unwrap());
-    let bpp = u16::from_le_bytes(data[28..30].try_into().unwrap());
-    let compression = u32::from_le_bytes(data[30..34].try_into().unwrap());
-
-    if bpp != 24 && bpp != 32 {
-        return Err(format!("Unsupported BMP bpp: {} (only 24 and 32 supported)", bpp).into());
-    }
-    if compression != 0 {
-        return Err(format!(
-            "Unsupported BMP compression: {} (only 0/uncompressed supported)",
-            compression
-        )
-        .into());
-    }
-
-    let width = width_raw.unsigned_abs();
-    let height = height_raw.unsigned_abs();
-    let bottom_up = height_raw > 0;
-
-    if width == 0 || height == 0 {
-        return Err(format!("BMP zero dimension: {}x{}", width, height).into());
-    }
-    if width > BMP_MAX_DIMENSION || height > BMP_MAX_DIMENSION {
-        return Err(format!(
-            "BMP exceeds max dimension {}: {}x{}",
-            BMP_MAX_DIMENSION, width, height
-        )
-        .into());
-    }
-
-    let bytes_per_pixel = (bpp as usize) / 8;
-    let row_size = (bpp as usize)
-        .checked_mul(width as usize)
-        .ok_or("BMP row size overflow")?
-        .div_ceil(32)
-        .checked_mul(4)
-        .ok_or("BMP row size overflow")?;
-    let row_bytes = row_size
-        .checked_mul(height as usize)
-        .ok_or("BMP pixel block size overflow")?;
-    let required_data_size = pixel_offset
-        .checked_add(row_bytes)
-        .ok_or("BMP data offset overflow")?;
-
-    if data.len() < required_data_size {
-        return Err(format!(
-            "BMP data too small: need {} bytes, got {}",
-            required_data_size,
-            data.len()
-        )
-        .into());
-    }
-
-    let dst_size = (width as usize)
-        .checked_mul(height as usize)
-        .and_then(|v| v.checked_mul(4))
-        .ok_or("BMP output size overflow")?;
-    let mut pixels = vec![0u8; dst_size];
-
-    for row in 0..height as usize {
-        let src_row = if bottom_up {
-            height as usize - 1 - row
-        } else {
-            row
-        };
-        let row_start = pixel_offset + src_row * row_size;
-
-        for col in 0..width as usize {
-            let src_offset = row_start + col * bytes_per_pixel;
-            let dst_offset = (row * width as usize + col) * 4;
-
-            // BMP stores BGR(A), convert to RGBA
-            let b = data[src_offset];
-            let g = data[src_offset + 1];
-            let r = data[src_offset + 2];
-            let a = if bytes_per_pixel == 4 {
-                data[src_offset + 3]
-            } else {
-                255
-            };
-
-            pixels[dst_offset] = r;
-            pixels[dst_offset + 1] = g;
-            pixels[dst_offset + 2] = b;
-            pixels[dst_offset + 3] = a;
-        }
-    }
-
-    Ok(BmpImage {
-        width,
-        height,
-        pixels,
-    })
+    voltex_image::parse_bmp(data).map_err(|e| crate::RendererError::Generic(e.to_string()))
 }
 
+/// RGBA8 GPU texture + its view, sampler and a group bound with
+/// [`GpuTexture::bind_group_layout`] (binding 0 = view, 1 = sampler).
 pub struct GpuTexture {
     pub texture: wgpu::Texture,
     pub view: wgpu::TextureView,
@@ -189,7 +80,7 @@ impl GpuTexture {
         };
 
         let texture = device.create_texture(&wgpu::TextureDescriptor {
-            label: Some("BmpTexture"),
+            label: Some("GpuTexture"),
             size,
             mip_level_count: 1,
             sample_count: 1,
@@ -218,7 +109,7 @@ impl GpuTexture {
         let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
 
         let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
-            label: Some("BmpSampler"),
+            label: Some("GpuTexture Sampler"),
             address_mode_u: wgpu::AddressMode::Repeat,
             address_mode_v: wgpu::AddressMode::Repeat,
             address_mode_w: wgpu::AddressMode::Repeat,
@@ -229,7 +120,7 @@ impl GpuTexture {
         });
 
         let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("BmpBindGroup"),
+            label: Some("GpuTexture Bind Group"),
             layout,
             entries: &[
                 wgpu::BindGroupEntry {
@@ -264,6 +155,8 @@ impl GpuTexture {
         Ok(Self::from_rgba(device, queue, width, height, &pixels, layout))
     }
 
+    /// Create a 1x1 white texture (sRGB 255,255,255,255). Used as the default
+    /// albedo and ORM map (no tint, full occlusion/roughness/metallic factors).
     pub fn white_1x1(
         device: &wgpu::Device,
         queue: &wgpu::Queue,
@@ -305,64 +198,32 @@ impl GpuTexture {
         })
     }
 
-    /// Create a 1x1 flat normal map texture (tangent-space up: 0,0,1).
-    /// Uses Rgba8Unorm (linear) since normal data is not sRGB.
+    /// Create a 1x1 flat normal map (tangent-space up: 0,0,1) — the default
+    /// for PBR materials without a normal map. Linear `Rgba8Unorm`, since
+    /// normal data is not sRGB.
+    pub fn flat_normal_map_1x1(
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        layout: &wgpu::BindGroupLayout,
+    ) -> Self {
+        Self::from_rgba_linear(device, queue, 1, 1, &FLAT_NORMAL_RGBA, layout)
+    }
+
+    /// Old form of [`Self::flat_normal_map_1x1`] that returns an unnamed
+    /// `(texture, view, sampler)` tuple.
+    #[deprecated(note = "use `GpuTexture::flat_normal_map_1x1`, which returns a `GpuTexture`")]
     pub fn flat_normal_1x1(
         device: &wgpu::Device,
         queue: &wgpu::Queue,
     ) -> (wgpu::Texture, wgpu::TextureView, wgpu::Sampler) {
-        let size = wgpu::Extent3d {
-            width: 1,
-            height: 1,
-            depth_or_array_layers: 1,
-        };
-
-        // [128, 128, 255, 255] maps to (0, 0, 1) after * 2 - 1
-        let pixels: [u8; 4] = [128, 128, 255, 255];
-
-        let texture = device.create_texture(&wgpu::TextureDescriptor {
-            label: Some("FlatNormalTexture"),
-            size,
-            mip_level_count: 1,
-            sample_count: 1,
-            dimension: wgpu::TextureDimension::D2,
-            format: wgpu::TextureFormat::Rgba8Unorm,
-            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
-            view_formats: &[],
-        });
-
-        queue.write_texture(
-            wgpu::TexelCopyTextureInfo {
-                texture: &texture,
-                mip_level: 0,
-                origin: wgpu::Origin3d::ZERO,
-                aspect: wgpu::TextureAspect::All,
-            },
-            &pixels,
-            wgpu::TexelCopyBufferLayout {
-                offset: 0,
-                bytes_per_row: Some(4),
-                rows_per_image: Some(1),
-            },
-            size,
-        );
-
-        let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
-
-        let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
-            label: Some("FlatNormalSampler"),
-            address_mode_u: wgpu::AddressMode::Repeat,
-            address_mode_v: wgpu::AddressMode::Repeat,
-            address_mode_w: wgpu::AddressMode::Repeat,
-            mag_filter: wgpu::FilterMode::Linear,
-            min_filter: wgpu::FilterMode::Linear,
-            mipmap_filter: wgpu::MipmapFilterMode::Linear,
-            ..Default::default()
-        });
-
-        (texture, view, sampler)
+        let layout = Self::bind_group_layout(device);
+        let t = Self::flat_normal_map_1x1(device, queue, &layout);
+        (t.texture, t.view, t.sampler)
     }
 }
+
+/// Tangent-space `(0, 0, 1)` encoded as `n * 0.5 + 0.5` → `[128, 128, 255]`.
+const FLAT_NORMAL_RGBA: [u8; 4] = [128, 128, 255, 255];
 
 /// Bind group layout for PBR textures: albedo (binding 0-1) + normal map (binding 2-3).
 pub fn pbr_texture_bind_group_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
@@ -577,5 +438,3 @@ pub fn create_pbr_full_texture_bind_group(
     })
 }
 
-#[cfg(test)]
-mod tests;

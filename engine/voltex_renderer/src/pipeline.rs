@@ -3,30 +3,32 @@
 use crate::gpu::DEPTH_FORMAT;
 use crate::shadow::SHADOW_FORMAT;
 use crate::skinned_vertex::{BonePalette, SkinnedMeshVertex};
-use crate::vertex::{Vertex, MESH_VERTEX_LAYOUT};
+use crate::vertex::{PositionColorVertex, MESH_VERTEX_LAYOUT};
 
-pub fn create_render_pipeline(
+/// Unlit pipeline for [`PositionColorVertex`] (clip-space position + vertex
+/// color, no bind groups, no depth) — the triangle example.
+pub fn create_position_color_pipeline(
     device: &wgpu::Device,
     format: wgpu::TextureFormat,
 ) -> wgpu::RenderPipeline {
     let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-        label: Some("Voltex Shader"),
-        source: wgpu::ShaderSource::Wgsl(include_str!("shader.wgsl").into()),
+        label: Some("Position Color Shader"),
+        source: wgpu::ShaderSource::Wgsl(include_str!("position_color.wgsl").into()),
     });
 
     let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-        label: Some("Render Pipeline Layout"),
+        label: Some("Position Color Pipeline Layout"),
         bind_group_layouts: &[],
         immediate_size: 0,
     });
 
     device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-        label: Some("Render Pipeline"),
+        label: Some("Position Color Pipeline"),
         layout: Some(&layout),
         vertex: wgpu::VertexState {
             module: &shader,
             entry_point: Some("vs_main"),
-            buffers: &[Some(Vertex::LAYOUT)],
+            buffers: &[Some(PositionColorVertex::LAYOUT)],
             compilation_options: wgpu::PipelineCompilationOptions::default(),
         },
         fragment: Some(wgpu::FragmentState {
@@ -57,6 +59,15 @@ pub fn create_render_pipeline(
         multiview_mask: None,
         cache: None,
     })
+}
+
+/// Old name of [`create_position_color_pipeline`].
+#[deprecated(note = "use `create_position_color_pipeline`")]
+pub fn create_render_pipeline(
+    device: &wgpu::Device,
+    format: wgpu::TextureFormat,
+) -> wgpu::RenderPipeline {
+    create_position_color_pipeline(device, format)
 }
 
 /// Bind group layout for the skinned shader's camera UBO (group 0): a single

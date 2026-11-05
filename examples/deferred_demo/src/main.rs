@@ -8,7 +8,7 @@ use winit::{
 use voltex_math::{Vec3, Mat4};
 use voltex_platform::{VoltexWindow, WindowConfig, InputState, GameTimer};
 use voltex_renderer::{
-    GpuContext, Camera, FpsController, CameraUniform, LightsUniform, LightData,
+    align_up, GpuContext, Camera, FpsController, CameraUniform, LightsUniform, LightData,
     Mesh, GpuTexture, MaterialUniform, generate_sphere,
     ShadowMap, ShadowUniform, IblResources,
     GBuffer, create_fullscreen_vertex_buffer,
@@ -41,10 +41,6 @@ const NUM_POINT_LIGHTS: usize = 8;
 struct CameraPositionUniform {
     camera_pos: [f32; 3],
     _padding: f32,
-}
-
-fn align_up(size: u32, alignment: u32) -> u32 {
-    size.div_ceil(alignment) * alignment
 }
 
 struct DeferredDemoApp {
@@ -118,7 +114,7 @@ struct AppState {
 
     // Keep textures alive
     _albedo_tex: GpuTexture,
-    _normal_tex: (wgpu::Texture, wgpu::TextureView, wgpu::Sampler),
+    _normal_tex: GpuTexture,
     _orm_tex: GpuTexture,
     _emissive_tex: GpuTexture,
     _shadow_map: ShadowMap,
@@ -210,7 +206,7 @@ impl ApplicationHandler for DeferredDemoApp {
         // PBR textures: white albedo + flat normal + ORM + emissive
         let old_tex_layout = GpuTexture::bind_group_layout(&gpu.device);
         let albedo_tex = GpuTexture::white_1x1(&gpu.device, &gpu.queue, &old_tex_layout);
-        let normal_tex = GpuTexture::flat_normal_1x1(&gpu.device, &gpu.queue);
+        let normal_tex = GpuTexture::flat_normal_map_1x1(&gpu.device, &gpu.queue, &old_tex_layout);
         let orm_tex = GpuTexture::white_1x1(&gpu.device, &gpu.queue, &old_tex_layout);
         let emissive_tex = GpuTexture::black_1x1(&gpu.device, &gpu.queue, &old_tex_layout);
         let pbr_texture_bind_group = create_pbr_full_texture_bind_group(
@@ -218,8 +214,8 @@ impl ApplicationHandler for DeferredDemoApp {
             &pbr_tex_layout,
             &albedo_tex.view,
             &albedo_tex.sampler,
-            &normal_tex.1,
-            &normal_tex.2,
+            &normal_tex.view,
+            &normal_tex.sampler,
             &orm_tex.view,
             &orm_tex.sampler,
             &emissive_tex.view,

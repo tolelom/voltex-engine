@@ -144,9 +144,7 @@ impl AutoExposure {
             });
             cpass.set_pipeline(&self.compute_pipeline);
             cpass.set_bind_group(0, &bind_group, &[]);
-            let wg_x = hdr_width.div_ceil(16);
-            let wg_y = hdr_height.div_ceil(16);
-            cpass.dispatch_workgroups(wg_x, wg_y, 1);
+            crate::compute::dispatch_screen(&mut cpass, hdr_width, hdr_height);
         }
 
         // Copy result to staging for CPU readback
