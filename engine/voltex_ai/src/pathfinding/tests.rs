@@ -1,4 +1,5 @@
 use super::*;
+use crate::experimental::funnel::funnel_smooth;
 use crate::navmesh::{NavMesh, NavTriangle};
 
 /// Build a 3-triangle strip along Z axis:

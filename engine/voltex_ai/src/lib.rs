@@ -9,10 +9,14 @@
 //!   [`follow_path`] — Reynolds-style steering behaviours.
 //! - [`nav_agent_system`] — ECS system driving [`NavAgent`] entities along
 //!   NavMesh paths each frame.
+//! - [`experimental`] — funnel (string-pulling) path smoothing; implemented
+//!   but not used by the engine runtime.
 
 #![warn(missing_docs)]
 
 pub mod error;
+// Not used by the engine runtime yet
+pub mod experimental;
 pub mod flocking;
 pub mod nav_agent;
 pub mod nav_agent_system;
