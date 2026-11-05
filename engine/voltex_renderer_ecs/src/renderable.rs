@@ -256,13 +256,17 @@ impl MaterialDesc {
     }
 }
 
+/// Serialized `MaterialDesc`: base_color(4) + metallic + roughness + ao, f32 LE.
+const MATERIAL_DESC_FLOATS: usize = 7;
+const MATERIAL_DESC_BYTES: usize = MATERIAL_DESC_FLOATS * 4;
+
 impl Component for MaterialDesc {
     const NAME: &'static str = "material_desc";
 
     fn serialize(world: &World, entity: Entity) -> Option<Vec<u8>> {
         let d = world.get::<MaterialDesc>(entity)?;
         let m = d.0;
-        let mut data = Vec::with_capacity(28);
+        let mut data = Vec::with_capacity(MATERIAL_DESC_BYTES);
         for v in [
             m.base_color[0],
             m.base_color[1],
@@ -278,13 +282,13 @@ impl Component for MaterialDesc {
     }
 
     fn deserialize(world: &mut World, entity: Entity, data: &[u8]) -> voltex_ecs::Result<()> {
-        if data.len() < 28 {
+        if data.len() < MATERIAL_DESC_BYTES {
             return Err("MaterialDesc data too short".into());
         }
-        let mut f = [0.0f32; 7];
+        let mut f = [0.0f32; MATERIAL_DESC_FLOATS];
         for (i, slot) in f.iter_mut().enumerate() {
-            let o = i * 4;
-            *slot = f32::from_le_bytes([data[o], data[o + 1], data[o + 2], data[o + 3]]);
+            let at = i * 4;
+            *slot = f32::from_le_bytes([data[at], data[at + 1], data[at + 2], data[at + 3]]);
         }
         world.add(
             entity,

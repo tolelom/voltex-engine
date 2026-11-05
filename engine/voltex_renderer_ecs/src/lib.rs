@@ -4,7 +4,8 @@
 //!   C0a 의 phantom-typed `MeshHandle` / `MaterialHandle` 과 lockstep id/generation 유지.
 //! - [`collect_render_items`] : World 를 iterate 하여 `RenderItem` 리스트 생성. 자체
 //!   pipeline 을 쓰는 호출자가 평행 Vec 대신 사용.
-//! - [`BasicRenderer`] : mesh_shader.wgsl 기반 pipeline + per-entity dynamic UBO 를 소유.
+//! - [`BasicRenderer`] : mesh_colored.wgsl(Blinn-Phong, 선택적으로 PBR) 기반 pipeline +
+//!   per-entity dynamic UBO 를 소유.
 //!   `render(...)` 한 메서드로 World 를 그린다.
 
 #![warn(missing_docs)]
@@ -14,6 +15,8 @@ pub mod assets;
 pub mod items;
 pub mod basic_renderer;
 mod debug_line_pass;
+mod dynamic_uniform;
+mod scene_pass;
 mod sprite_pass;
 pub mod particle;
 pub mod renderable;

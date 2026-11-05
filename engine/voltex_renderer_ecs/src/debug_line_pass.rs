@@ -22,8 +22,8 @@ pub(crate) struct DebugLinePass {
 
 impl DebugLinePass {
     pub(crate) fn new(device: &wgpu::Device, target_format: wgpu::TextureFormat) -> Self {
-        let line_cam_layout = line_camera_bind_group_layout(device);
-        let pipeline = create_line_pipeline(device, target_format, &line_cam_layout);
+        let camera_layout = line_camera_bind_group_layout(device);
+        let pipeline = create_line_pipeline(device, target_format, &camera_layout);
         let camera_buffer = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("BasicRenderer Debug Line Camera UBO"),
             size: std::mem::size_of::<LineCameraUniform>() as u64,
@@ -32,7 +32,7 @@ impl DebugLinePass {
         });
         let camera_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("BasicRenderer Debug Line Camera BG"),
-            layout: &line_cam_layout,
+            layout: &camera_layout,
             entries: &[wgpu::BindGroupEntry {
                 binding: 0,
                 resource: camera_buffer.as_entire_binding(),
@@ -56,15 +56,15 @@ impl DebugLinePass {
     /// Upload the endpoints for the next frame (2 per segment); excess beyond
     /// [`MAX_DEBUG_LINE_VERTICES`] is dropped, an empty slice clears.
     pub(crate) fn set_lines(&self, queue: &wgpu::Queue, verts: &[LineVertex]) {
-        let n = verts.len().min(MAX_DEBUG_LINE_VERTICES) & !1; // even count (pairs)
-        if n > 0 {
+        let vertex_count = verts.len().min(MAX_DEBUG_LINE_VERTICES) & !1; // even count (pairs)
+        if vertex_count > 0 {
             queue.write_buffer(
                 &self.vertex_buffer,
                 0,
-                bytemuck::cast_slice(&verts[..n]),
+                bytemuck::cast_slice(&verts[..vertex_count]),
             );
         }
-        self.vertex_count.set(n as u32);
+        self.vertex_count.set(vertex_count as u32);
     }
 
     /// Draw the queued segments (`LineList`, depth-tested against the scene, no
@@ -86,29 +86,12 @@ impl DebugLinePass {
         };
         queue.write_buffer(&self.camera_buffer, 0, bytemuck::bytes_of(&cam));
 
-        let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-            label: Some("BasicRenderer Debug Line Pass"),
-            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                view: target_view,
-                resolve_target: None,
-                depth_slice: None,
-                ops: wgpu::Operations {
-                    load: wgpu::LoadOp::Load,
-                    store: wgpu::StoreOp::Store,
-                },
-            })],
-            depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
-                view: depth_view,
-                depth_ops: Some(wgpu::Operations {
-                    load: wgpu::LoadOp::Load,
-                    store: wgpu::StoreOp::Store,
-                }),
-                stencil_ops: None,
-            }),
-            occlusion_query_set: None,
-            timestamp_writes: None,
-            multiview_mask: None,
-        });
+        let mut pass = crate::scene_pass::begin_overlay_pass(
+            encoder,
+            "BasicRenderer Debug Line Pass",
+            target_view,
+            depth_view,
+        );
         pass.set_pipeline(&self.pipeline);
         pass.set_bind_group(0, &self.camera_bind_group, &[]);
         pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
