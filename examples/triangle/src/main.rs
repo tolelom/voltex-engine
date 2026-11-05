@@ -107,7 +107,7 @@ impl ApplicationHandler for TriangleApp {
 
             WindowEvent::RedrawRequested => {
                 state.timer.tick();
-                state.input.begin_frame();
+                state.input.clear_frame_edges();
 
                 // Fixed update loop
                 while state.timer.should_fixed_update() {

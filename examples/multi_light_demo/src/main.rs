@@ -374,7 +374,7 @@ impl ApplicationHandler for MultiLightApp {
                 state
                     .fps_controller
                     .process_movement(&mut state.camera, forward, right, up, dt);
-                state.input.begin_frame();
+                state.input.clear_frame_edges();
 
                 state.time += dt;
 

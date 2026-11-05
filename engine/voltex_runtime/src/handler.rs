@@ -322,7 +322,7 @@ fn redraw(app: &mut RuntimeApp) {
     // user systems have observed them. Previously this ran before
     // tick_systems_only, so `is_key_just_pressed` was always false in user
     // systems — fixed in v1.0.1.
-    app.input.begin_frame();
+    app.input.clear_frame_edges();
 
     // Acquire swapchain texture (graceful resize/recover).
     let state = app.runtime_state.as_mut().unwrap();

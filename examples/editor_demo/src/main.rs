@@ -655,7 +655,7 @@ impl ApplicationHandler for EditorDemoApp {
 
             WindowEvent::RedrawRequested => {
                 state.timer.tick();
-                state.input.begin_frame();
+                state.input.clear_frame_edges();
 
                 // Physics: only ticks while in Play mode.
                 if state.session.mode == EditorMode::Play {

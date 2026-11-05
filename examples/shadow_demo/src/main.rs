@@ -417,7 +417,7 @@ impl ApplicationHandler for ShadowDemoApp {
                 if state.input.is_key_pressed(KeyCode::Space) { up += 1.0; }
                 if state.input.is_key_pressed(KeyCode::ShiftLeft) { up -= 1.0; }
                 state.fps_controller.process_movement(&mut state.camera, forward, right, up, dt);
-                state.input.begin_frame();
+                state.input.clear_frame_edges();
 
                 // ----- Compute light VP -----
                 let light_dir = Vec3::new(-1.0, -2.0, -1.0).normalize();

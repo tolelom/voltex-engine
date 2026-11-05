@@ -5,7 +5,7 @@
 
 ## 공개 API 진입점
 - `VoltexWindow` — winit 윈도우 래퍼 (src/window.rs)
-- `InputState` — 키보드/마우스 입력 추적 + `window_size()`/`set_window_size()` (물리 픽셀, mouse_position과 동일 단위 — screen→NDC 변환용; runtime이 창 생성/Resized 시 주입, begin_frame에 유지) (src/input.rs)
+- `InputState` — 키보드/마우스 입력 추적 + `window_size()`/`set_window_size()` (물리 픽셀, mouse_position과 동일 단위 — screen→NDC 변환용; runtime이 창 생성/Resized 시 주입, clear_frame_edges에 유지) (src/input.rs)
 - `InputMap` / `Trigger` — 시맨틱 액션/축 매핑 레이어 (src/input_map.rs). `bind_key`/`bind_mouse`/`bind_axis` 로 바인딩, `is_pressed`/`just_pressed`/`just_released`/`axis`/`vector(&InputState)` 로 질의. InputState 위 순수 매핑(상태 없음 → 윈도우/GPU 없이 테스트 가능)
 - `KeyCode` / `MouseButton` — winit enum 재export (게임이 winit 직접 의존 회피)
 - `GameTimer` — frame timing, delta time (src/game_loop.rs)

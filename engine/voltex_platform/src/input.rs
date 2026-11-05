@@ -5,7 +5,7 @@
 //!
 //! 1. winit events feed [`InputState::process_key`] / `process_mouse_*`.
 //! 2. User systems read state via the `is_*` / `mouse_*` accessors.
-//! 3. The runtime calls [`InputState::begin_frame`] at frame end to
+//! 3. The runtime calls [`InputState::clear_frame_edges`] at frame end to
 //!    clear the `just_*` sets and delta accumulators.
 
 use winit::keyboard::KeyCode;
@@ -14,7 +14,7 @@ use winit::event::MouseButton;
 
 /// Snapshot of all input state for the current frame.
 pub struct InputState {
-    pressed: HashSet<KeyCode>,
+    keys_held: HashSet<KeyCode>,
     just_pressed: HashSet<KeyCode>,
     just_released: HashSet<KeyCode>,
     mouse_position: (f64, f64),
@@ -25,7 +25,7 @@ pub struct InputState {
     /// delta on the first frame.
     mouse_seen: bool,
     mouse_delta: (f64, f64),
-    mouse_buttons: HashSet<MouseButton>,
+    mouse_buttons_held: HashSet<MouseButton>,
     mouse_buttons_just_pressed: HashSet<MouseButton>,
     mouse_buttons_just_released: HashSet<MouseButton>,
     mouse_scroll_delta: f32,
@@ -48,13 +48,13 @@ impl InputState {
     /// mouse at `(0, 0)`.
     pub fn new() -> Self {
         Self {
-            pressed: HashSet::new(),
+            keys_held: HashSet::new(),
             just_pressed: HashSet::new(),
             just_released: HashSet::new(),
             mouse_position: (0.0, 0.0),
             mouse_seen: false,
             mouse_delta: (0.0, 0.0),
-            mouse_buttons: HashSet::new(),
+            mouse_buttons_held: HashSet::new(),
             mouse_buttons_just_pressed: HashSet::new(),
             mouse_buttons_just_released: HashSet::new(),
             mouse_scroll_delta: 0.0,
@@ -64,7 +64,7 @@ impl InputState {
 
     /// `true` while `key` is held down.
     pub fn is_key_pressed(&self, key: KeyCode) -> bool {
-        self.pressed.contains(&key)
+        self.keys_held.contains(&key)
     }
 
     /// `true` for one frame on the press edge of `key`.
@@ -84,14 +84,14 @@ impl InputState {
     }
 
     /// Mouse motion `(dx, dy)` accumulated since the last
-    /// [`begin_frame`](Self::begin_frame).
+    /// [`clear_frame_edges`](Self::clear_frame_edges).
     pub fn mouse_delta(&self) -> (f64, f64) {
         self.mouse_delta
     }
 
     /// `true` while `button` is held down.
     pub fn is_mouse_button_pressed(&self, button: MouseButton) -> bool {
-        self.mouse_buttons.contains(&button)
+        self.mouse_buttons_held.contains(&button)
     }
 
     /// `true` for one frame on the press edge of `button`.
@@ -100,7 +100,7 @@ impl InputState {
     }
 
     /// Mouse scroll-wheel delta accumulated since the last
-    /// [`begin_frame`](Self::begin_frame). Sign: positive = up / away.
+    /// [`clear_frame_edges`](Self::clear_frame_edges). Sign: positive = up / away.
     pub fn mouse_scroll(&self) -> f32 {
         self.mouse_scroll_delta
     }
@@ -114,20 +114,29 @@ impl InputState {
 
     /// Record the window inner size in physical pixels. Called by the
     /// runtime on window creation and on every `Resized` event. Persists
-    /// across [`begin_frame`](Self::begin_frame) like `mouse_seen`.
+    /// across [`clear_frame_edges`](Self::clear_frame_edges) like `mouse_seen`.
     pub fn set_window_size(&mut self, width: u32, height: u32) {
         self.window_size = (width, height);
     }
 
     /// Clear the `just_*` sets and reset mouse / scroll deltas to zero.
-    /// Called by the runtime at the end of each frame.
-    pub fn begin_frame(&mut self) {
+    /// Called by the runtime at the **end** of each frame, after systems
+    /// have observed this frame's edges. Held keys / buttons, cursor
+    /// position and window size are kept.
+    pub fn clear_frame_edges(&mut self) {
         self.just_pressed.clear();
         self.just_released.clear();
         self.mouse_buttons_just_pressed.clear();
         self.mouse_buttons_just_released.clear();
         self.mouse_delta = (0.0, 0.0);
         self.mouse_scroll_delta = 0.0;
+    }
+
+    /// Old name of [`clear_frame_edges`](Self::clear_frame_edges) — it runs at
+    /// the end of a frame, not the beginning.
+    #[deprecated(note = "use `clear_frame_edges`")]
+    pub fn begin_frame(&mut self) {
+        self.clear_frame_edges();
     }
 
     /// Apply a key event from winit. `pressed` is the new state.
@@ -139,12 +148,12 @@ impl InputState {
     /// stays a single-frame edge.
     pub fn process_key(&mut self, key: KeyCode, pressed: bool) {
         if pressed {
-            if self.pressed.insert(key) {
+            if self.keys_held.insert(key) {
                 self.just_pressed.insert(key);
             } else {
                 self.just_pressed.remove(&key);
             }
-        } else if self.pressed.remove(&key) {
+        } else if self.keys_held.remove(&key) {
             self.just_released.insert(key);
         }
     }
@@ -171,10 +180,10 @@ impl InputState {
     /// state.
     pub fn process_mouse_button(&mut self, button: MouseButton, pressed: bool) {
         if pressed {
-            if self.mouse_buttons.insert(button) {
+            if self.mouse_buttons_held.insert(button) {
                 self.mouse_buttons_just_pressed.insert(button);
             }
-        } else if self.mouse_buttons.remove(&button) {
+        } else if self.mouse_buttons_held.remove(&button) {
             self.mouse_buttons_just_released.insert(button);
         }
     }
@@ -205,14 +214,14 @@ mod tests {
     }
 
     #[test]
-    fn begin_frame_clears_delta_but_keeps_mouse_seen() {
+    fn clear_frame_edges_clears_delta_but_keeps_mouse_seen() {
         // After a frame ends, the next move still uses the proper delta —
-        // mouse_seen survives begin_frame so we don't get a second false zero.
+        // mouse_seen survives clear_frame_edges so we don't get a second false zero.
         let mut input = InputState::new();
         input.process_mouse_move(100.0, 100.0); // initialise
         input.process_mouse_move(110.0, 100.0); // delta (10, 0)
-        input.begin_frame();
-        assert_eq!(input.mouse_delta(), (0.0, 0.0), "begin_frame clears delta");
+        input.clear_frame_edges();
+        assert_eq!(input.mouse_delta(), (0.0, 0.0), "clear_frame_edges clears delta");
         input.process_mouse_move(115.0, 100.0); // delta (5, 0)
         assert!((input.mouse_delta().0 - 5.0).abs() < 1e-9);
     }
@@ -241,27 +250,27 @@ mod tests {
     }
 
     #[test]
-    fn begin_frame_clears_just_sets_but_keeps_held() {
+    fn clear_frame_edges_clears_just_sets_but_keeps_held() {
         let mut input = InputState::new();
         input.process_key(KeyCode::KeyW, true);
         input.process_mouse_button(MouseButton::Left, true);
         input.process_scroll(2.0);
 
-        input.begin_frame();
+        input.clear_frame_edges();
 
         // just_* edges and scroll/delta accumulators are cleared.
-        assert!(!input.is_key_just_pressed(KeyCode::KeyW), "begin_frame clears just_pressed");
-        assert!(!input.is_mouse_button_just_pressed(MouseButton::Left), "begin_frame clears button just_pressed");
-        assert_eq!(input.mouse_scroll(), 0.0, "begin_frame clears scroll");
-        assert_eq!(input.mouse_delta(), (0.0, 0.0), "begin_frame clears delta");
+        assert!(!input.is_key_just_pressed(KeyCode::KeyW), "clear_frame_edges clears just_pressed");
+        assert!(!input.is_mouse_button_just_pressed(MouseButton::Left), "clear_frame_edges clears button just_pressed");
+        assert_eq!(input.mouse_scroll(), 0.0, "clear_frame_edges clears scroll");
+        assert_eq!(input.mouse_delta(), (0.0, 0.0), "clear_frame_edges clears delta");
 
         // Held state survives a frame boundary.
-        assert!(input.is_key_pressed(KeyCode::KeyW), "begin_frame keeps held key");
-        assert!(input.is_mouse_button_pressed(MouseButton::Left), "begin_frame keeps held button");
+        assert!(input.is_key_pressed(KeyCode::KeyW), "clear_frame_edges keeps held key");
+        assert!(input.is_mouse_button_pressed(MouseButton::Left), "clear_frame_edges keeps held button");
 
-        // A release after begin_frame still produces a just_released edge.
+        // A release after clear_frame_edges still produces a just_released edge.
         input.process_key(KeyCode::KeyW, false);
-        assert!(input.is_key_just_released(KeyCode::KeyW), "release edge after begin_frame");
+        assert!(input.is_key_just_released(KeyCode::KeyW), "release edge after clear_frame_edges");
     }
 
     #[test]
@@ -275,13 +284,13 @@ mod tests {
     }
 
     #[test]
-    fn window_size_survives_begin_frame() {
+    fn window_size_survives_clear_frame_edges() {
         // Window size is persistent state (like mouse_seen), not a per-frame
-        // accumulator — begin_frame must not reset it.
+        // accumulator — clear_frame_edges must not reset it.
         let mut input = InputState::new();
         input.set_window_size(1600, 900);
-        input.begin_frame();
-        assert_eq!(input.window_size(), (1600, 900), "begin_frame keeps window size");
+        input.clear_frame_edges();
+        assert_eq!(input.window_size(), (1600, 900), "clear_frame_edges keeps window size");
     }
 
     #[test]

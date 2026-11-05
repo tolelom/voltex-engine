@@ -316,7 +316,7 @@ impl ApplicationHandler for AssetDemoApp {
                 }
                 state.r_was_pressed = r_pressed;
 
-                state.input.begin_frame();
+                state.input.clear_frame_edges();
                 state.time += dt;
 
                 // Propagate transforms to compute WorldTransform

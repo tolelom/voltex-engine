@@ -459,7 +459,7 @@ impl ApplicationHandler for SurvivorApp {
             WindowEvent::RedrawRequested => {
                 state.timer.tick();
                 let dt = state.timer.frame_dt();
-                state.input.begin_frame();
+                state.input.clear_frame_edges();
 
                 // Restart on R when game over
                 if state.game.game_over && state.input.is_key_just_pressed(KeyCode::KeyR) {

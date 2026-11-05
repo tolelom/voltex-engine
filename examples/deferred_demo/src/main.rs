@@ -797,7 +797,7 @@ impl ApplicationHandler for DeferredDemoApp {
                 if state.input.is_key_pressed(KeyCode::Space) { up += 1.0; }
                 if state.input.is_key_pressed(KeyCode::ShiftLeft) { up -= 1.0; }
                 state.fps_controller.process_movement(&mut state.camera, forward, right, up, dt);
-                state.input.begin_frame();
+                state.input.clear_frame_edges();
 
                 // Compute view-projection
                 let view_proj = state.camera.view_projection();

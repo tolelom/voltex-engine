@@ -9,6 +9,11 @@
 
 use std::time::{Duration, Instant};
 
+/// Upper bound on one frame's measured wallclock delta. A longer stall
+/// (alt-tab, breakpoint) is clamped to this so the accumulator can't
+/// demand a burst of catch-up steps ("spiral of death").
+const MAX_FRAME_TIME: Duration = Duration::from_millis(250);
+
 /// Fixed-timestep game-loop timer.
 pub struct GameTimer {
     last_frame: Instant,
@@ -37,13 +42,13 @@ impl GameTimer {
     }
 
     /// Sample wallclock and accumulate elapsed time into the fixed-
-    /// timestep bucket. Clamps frame_time to 250 ms to avoid death
-    /// spirals after long stalls (alt-tab, breakpoint).
+    /// timestep bucket. Clamps frame_time to [`MAX_FRAME_TIME`] (250 ms)
+    /// to avoid death spirals after long stalls (alt-tab, breakpoint).
     pub fn tick(&mut self) {
         let now = Instant::now();
         self.frame_time = now - self.last_frame;
-        if self.frame_time > Duration::from_millis(250) {
-            self.frame_time = Duration::from_millis(250);
+        if self.frame_time > MAX_FRAME_TIME {
+            self.frame_time = MAX_FRAME_TIME;
         }
         self.accumulator += self.frame_time;
         self.last_frame = now;
