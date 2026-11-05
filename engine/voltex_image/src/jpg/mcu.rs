@@ -3,19 +3,35 @@
 
 use super::headers::JpegComponent;
 
-#[allow(clippy::too_many_arguments)]
+/// Largest horizontal / vertical sampling factors among the components; one
+/// MCU covers `max_h * 8` x `max_v * 8` pixels.
+#[derive(Clone, Copy)]
+pub(super) struct McuSampling {
+    pub(super) max_h: u8,
+    pub(super) max_v: u8,
+}
+
+/// Packed RGB8 output image the MCUs are written into.
+pub(super) struct RgbImage<'a> {
+    pub(super) pixels: &'a mut [u8],
+    pub(super) width: usize,
+    pub(super) height: usize,
+}
+
+/// Writes the MCU at (`mcu_col`, `mcu_row`) into `image`, skipping pixels
+/// past the image edge.
 pub(super) fn assemble_mcu(
     mcu_blocks: &[Vec<[i32; 64]>],
     components: &[JpegComponent],
     num_components: u8,
-    max_h: u8,
-    max_v: u8,
+    sampling: McuSampling,
     mcu_col: usize,
     mcu_row: usize,
-    img_width: usize,
-    img_height: usize,
-    rgb: &mut [u8],
+    image: &mut RgbImage,
 ) {
+    let McuSampling { max_h, max_v } = sampling;
+    let (img_width, img_height) = (image.width, image.height);
+    let rgb = &mut *image.pixels;
     let mcu_px = mcu_col * max_h as usize * 8;
     let mcu_py = mcu_row * max_v as usize * 8;
 

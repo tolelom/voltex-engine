@@ -10,7 +10,7 @@ mod idct;
 mod mcu;
 
 use decoder::decode_scan;
-use headers::{parse_dht, parse_dqt, parse_sof, HuffTable, JpegComponent};
+use headers::{parse_dht, parse_dqt, parse_sof, JpegTables, SofData};
 
 use crate::DecodedImage;
 
@@ -22,21 +22,16 @@ const JPG_MAX_DIMENSION: u32 = 16_384;
 /// Decode a baseline JPEG file from raw bytes into packed RGBA8 pixels.
 ///
 /// Supports SOF0 grayscale and YCbCr with 4:4:4, 4:2:2, and 4:2:0 subsampling.
+/// Walks the marker segments, collecting the frame header and tables, and
+/// decodes the image at the first SOS.
 pub fn decode_jpg(data: &[u8]) -> crate::Result<DecodedImage> {
     if data.len() < 2 || data[0] != 0xFF || data[1] != 0xD8 {
         return Err("Invalid JPEG: missing SOI marker".into());
     }
 
     let mut pos = 2;
-    let mut width: u16 = 0;
-    let mut height: u16 = 0;
-    let mut num_components: u8 = 0;
-    let mut components: Vec<JpegComponent> = Vec::new();
-    let mut qt_tables: [[u16; 64]; 4] = [[0; 64]; 4];
-    let mut dc_tables: [Option<HuffTable>; 4] = [None, None, None, None];
-    let mut ac_tables: [Option<HuffTable>; 4] = [None, None, None, None];
-    let mut found_sof = false;
-    let mut restart_interval: u16 = 0;
+    let mut frame: Option<SofData> = None;
+    let mut tables = JpegTables::new();
 
     while pos + 1 < data.len() {
         if data[pos] != 0xFF {
@@ -57,75 +52,26 @@ pub fn decode_jpg(data: &[u8]) -> crate::Result<DecodedImage> {
             0xD9 => break, // EOI
             0xDA => {
                 // SOS — Start of Scan
-                if !found_sof {
+                let Some(frame) = &frame else {
                     return Err("SOS before SOF".into());
-                }
-                let (rgb, scan_end) = decode_scan(
-                    data,
-                    pos,
-                    width,
-                    height,
-                    num_components,
-                    &components,
-                    &qt_tables,
-                    &dc_tables,
-                    &ac_tables,
-                    restart_interval,
-                )?;
-                let _ = scan_end;
-                // Convert RGB to RGBA
-                let w = width as u32;
-                let h = height as u32;
-                // SOF0 path enforces the cap above, but if we ever decode
-                // without going through the cap (e.g. progressive path), be
-                // defensive on the capacity computation.
-                let cap = (w as usize)
-                    .checked_mul(h as usize)
-                    .and_then(|v| v.checked_mul(4))
-                    .ok_or("JPEG RGBA output size overflow")?;
-                let mut rgba = Vec::with_capacity(cap);
-                for &[r, g, b] in rgb.as_chunks::<3>().0 {
-                    rgba.extend_from_slice(&[r, g, b, 255]);
-                }
-                return Ok(DecodedImage { width: w, height: h, rgba });
+                };
+                let (rgb, _scan_end) = decode_scan(data, pos, frame, &tables)?;
+                return rgb_to_image(frame, &rgb);
             }
             0xC0 => {
                 // SOF0 — Baseline DCT
                 let (sof, len) = parse_sof(data, pos)?;
-                width = sof.width;
-                height = sof.height;
-                if width == 0 || height == 0 {
-                    return Err(format!("JPEG zero dimension: {}x{}", width, height).into());
-                }
-                if width as u32 > JPG_MAX_DIMENSION || height as u32 > JPG_MAX_DIMENSION {
-                    return Err(format!(
-                        "JPEG exceeds max dimension {}: {}x{}",
-                        JPG_MAX_DIMENSION, width, height
-                    )
-                    .into());
-                }
-                // Only grayscale (1) and YCbCr (3) are decoded; CMYK/YCCK (4)
-                // would otherwise run through the YCbCr path as garbage colour.
-                if sof.num_components != 1 && sof.num_components != 3 {
-                    return Err(format!(
-                        "Unsupported JPEG component count: {} (only 1 or 3)",
-                        sof.num_components
-                    )
-                    .into());
-                }
-                num_components = sof.num_components;
-                components = sof.components;
-                found_sof = true;
+                frame = Some(check_frame(sof)?);
                 pos += len;
             }
             0xC4 => {
                 // DHT — Define Huffman Table
-                let len = parse_dht(data, pos, &mut dc_tables, &mut ac_tables)?;
+                let len = parse_dht(data, pos, &mut tables.dc, &mut tables.ac)?;
                 pos += len;
             }
             0xDB => {
                 // DQT — Define Quantization Table
-                let len = parse_dqt(data, pos, &mut qt_tables)?;
+                let len = parse_dqt(data, pos, &mut tables.quant)?;
                 pos += len;
             }
             0xDD => {
@@ -134,7 +80,7 @@ pub fn decode_jpg(data: &[u8]) -> crate::Result<DecodedImage> {
                     return Err("DRI too short".into());
                 }
                 let seg_len = u16::from_be_bytes([data[pos], data[pos + 1]]) as usize;
-                restart_interval = u16::from_be_bytes([data[pos + 2], data[pos + 3]]);
+                tables.restart_interval = u16::from_be_bytes([data[pos + 2], data[pos + 3]]);
                 pos += seg_len;
             }
             0xD0..=0xD7 => {
@@ -160,6 +106,50 @@ pub fn decode_jpg(data: &[u8]) -> crate::Result<DecodedImage> {
     }
 
     Err("No image data found (missing SOS)".into())
+}
+
+/// Rejects frames this decoder cannot or will not decode: zero or oversized
+/// dimensions, and component counts other than 1 (gray) or 3 (YCbCr).
+fn check_frame(sof: SofData) -> crate::Result<SofData> {
+    let (width, height) = (sof.width, sof.height);
+    if width == 0 || height == 0 {
+        return Err(format!("JPEG zero dimension: {}x{}", width, height).into());
+    }
+    if width as u32 > JPG_MAX_DIMENSION || height as u32 > JPG_MAX_DIMENSION {
+        return Err(format!(
+            "JPEG exceeds max dimension {}: {}x{}",
+            JPG_MAX_DIMENSION, width, height
+        )
+        .into());
+    }
+    // Only grayscale (1) and YCbCr (3) are decoded; CMYK/YCCK (4)
+    // would otherwise run through the YCbCr path as garbage colour.
+    if sof.num_components != 1 && sof.num_components != 3 {
+        return Err(format!(
+            "Unsupported JPEG component count: {} (only 1 or 3)",
+            sof.num_components
+        )
+        .into());
+    }
+    Ok(sof)
+}
+
+/// Expands the decoded RGB8 pixels to RGBA8 with opaque alpha.
+fn rgb_to_image(frame: &SofData, rgb: &[u8]) -> crate::Result<DecodedImage> {
+    let w = frame.width as u32;
+    let h = frame.height as u32;
+    // SOF0 path enforces the cap above, but if we ever decode
+    // without going through the cap (e.g. progressive path), be
+    // defensive on the capacity computation.
+    let cap = (w as usize)
+        .checked_mul(h as usize)
+        .and_then(|v| v.checked_mul(4))
+        .ok_or("JPEG RGBA output size overflow")?;
+    let mut rgba = Vec::with_capacity(cap);
+    for &[r, g, b] in rgb.as_chunks::<3>().0 {
+        rgba.extend_from_slice(&[r, g, b, 255]);
+    }
+    Ok(DecodedImage { width: w, height: h, rgba })
 }
 
 /// Old form of [`decode_jpg`] that returns an unnamed

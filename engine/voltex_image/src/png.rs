@@ -24,11 +24,8 @@ pub fn decode_png(data: &[u8]) -> crate::Result<DecodedImage> {
     let (image_data, stride) = unfilter_scanlines(&decompressed, header.width, header.height, bits)?;
     let rgba = crate::png_pixels::to_rgba8(
         &image_data,
-        header.width as usize,
-        header.height as usize,
         stride,
-        header.color_type,
-        header.bit_depth,
+        header,
         chunks.palette.as_deref(),
         chunks.trns.as_deref(),
     )?;
@@ -47,11 +44,11 @@ const PNG_SIGNATURE: [u8; 8] = [137, 80, 78, 71, 13, 10, 26, 10];
 
 /// IHDR fields the decoder uses.
 #[derive(Clone, Copy)]
-struct PngHeader {
-    width: u32,
-    height: u32,
-    bit_depth: u8,
-    color_type: u8,
+pub(crate) struct PngHeader {
+    pub(crate) width: u32,
+    pub(crate) height: u32,
+    pub(crate) bit_depth: u8,
+    pub(crate) color_type: u8,
 }
 
 /// Chunks collected up to IEND: header, optional palette/transparency, and

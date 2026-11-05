@@ -16,6 +16,7 @@ pub(super) struct JpegComponent {
     pub(super) ac_table: u8,
 }
 
+/// Frame header from the SOF0 segment: image size and per-component sampling.
 pub(super) struct SofData {
     pub(super) width: u16,
     pub(super) height: u16,
@@ -28,6 +29,27 @@ pub(super) struct HuffTable {
     pub(super) offsets: [u16; 17],
     pub(super) maxcode: [i32; 17],
     pub(super) mincode: [u16; 17],
+}
+
+/// Tables the DQT / DHT / DRI segments define before a scan, indexed by the
+/// table ids the components refer to.
+pub(super) struct JpegTables {
+    pub(super) quant: [[u16; 64]; 4],
+    pub(super) dc: [Option<HuffTable>; 4],
+    pub(super) ac: [Option<HuffTable>; 4],
+    /// MCUs between RST markers; 0 = no restart markers.
+    pub(super) restart_interval: u16,
+}
+
+impl JpegTables {
+    pub(super) fn new() -> Self {
+        Self {
+            quant: [[0; 64]; 4],
+            dc: [None, None, None, None],
+            ac: [None, None, None, None],
+            restart_interval: 0,
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
