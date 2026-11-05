@@ -8,7 +8,8 @@
 
 use std::collections::HashMap;
 use crate::draw_list::DrawList;
-use crate::bitmap_font::FontAtlas;
+use crate::bitmap_font::{FontAtlas, UvRect};
+use crate::dock::Rect;
 use crate::layout::LayoutState;
 
 /// Key events the UI system understands.
@@ -173,8 +174,9 @@ impl UiContext {
                 if info.width > 0.0 && info.height > 0.0 {
                     let gx = cx + info.bearing_x;
                     let gy = y + ascender - info.bearing_y;
-                    let (u0, v0, u1, v1) = (info.uv[0], info.uv[1], info.uv[2], info.uv[3]);
-                    self.draw_list.add_rect_uv(gx, gy, info.width, info.height, u0, v0, u1, v1, color);
+                    let [u0, v0, u1, v1] = info.uv;
+                    let rect = Rect { x: gx, y: gy, w: info.width, h: info.height };
+                    self.draw_list.add_quad(rect, UvRect { u0, v0, u1, v1 }, color);
                 }
                 cx += info.advance;
             }
@@ -189,10 +191,9 @@ impl UiContext {
         self.draw_list.add_rect(x, y, w, h, color);
     }
 
-    /// Draw a horizontal progress / health bar: `bg` fills the whole track and
-    /// `fg` fills `fraction` (clamped to `0..=1`) of the width. A staple HUD
-    /// primitive (health, mana, reload, XP).
-    #[allow(clippy::too_many_arguments)]
+    /// Old form of [`Self::progress_bar_in`] with the rect spelled out.
+    #[deprecated(note = "use `progress_bar_in` with a `Rect`")]
+    #[allow(clippy::too_many_arguments)] // reason: legacy signature kept for compatibility
     pub fn progress_bar(
         &mut self,
         x: f32,
@@ -203,6 +204,14 @@ impl UiContext {
         fg: [u8; 4],
         bg: [u8; 4],
     ) {
+        self.progress_bar_in(Rect { x, y, w, h }, fraction, fg, bg);
+    }
+
+    /// Draw a horizontal progress / health bar in `rect`: `bg` fills the whole
+    /// track and `fg` fills `fraction` (clamped to `0..=1`) of the width. A
+    /// staple HUD primitive (health, mana, reload, XP).
+    pub fn progress_bar_in(&mut self, rect: Rect, fraction: f32, fg: [u8; 4], bg: [u8; 4]) {
+        let Rect { x, y, w, h } = rect;
         self.draw_list.add_rect(x, y, w, h, bg);
         let f = fraction.clamp(0.0, 1.0);
         if f > 0.0 {
@@ -229,7 +238,7 @@ mod tests {
         let mut ui = UiContext::new(800.0, 600.0);
         ui.begin_frame(0.0, 0.0, false);
         let before = ui.draw_list.vertices.len();
-        ui.progress_bar(10.0, 10.0, 100.0, 8.0, 0.5, [0, 255, 0, 255], [40, 40, 40, 255]);
+        ui.progress_bar_in(Rect { x: 10.0, y: 10.0, w: 100.0, h: 8.0 }, 0.5, [0, 255, 0, 255], [40, 40, 40, 255]);
         // Two rects (bg + fg) = 8 vertices.
         assert_eq!(ui.draw_list.vertices.len() - before, 8);
         ui.end_frame();
@@ -240,7 +249,7 @@ mod tests {
         let mut ui = UiContext::new(800.0, 600.0);
         ui.begin_frame(0.0, 0.0, false);
         let before = ui.draw_list.vertices.len();
-        ui.progress_bar(0.0, 0.0, 100.0, 8.0, 0.0, [0, 255, 0, 255], [40, 40, 40, 255]);
+        ui.progress_bar_in(Rect { x: 0.0, y: 0.0, w: 100.0, h: 8.0 }, 0.0, [0, 255, 0, 255], [40, 40, 40, 255]);
         assert_eq!(ui.draw_list.vertices.len() - before, 4, "only bg rect when fraction=0");
         ui.end_frame();
     }
@@ -250,7 +259,7 @@ mod tests {
         let mut ui = UiContext::new(800.0, 600.0);
         ui.begin_frame(0.0, 0.0, false);
         // fraction > 1 must not panic and still emits bg + fg.
-        ui.progress_bar(0.0, 0.0, 100.0, 8.0, 5.0, [0, 255, 0, 255], [40, 40, 40, 255]);
+        ui.progress_bar_in(Rect { x: 0.0, y: 0.0, w: 100.0, h: 8.0 }, 5.0, [0, 255, 0, 255], [40, 40, 40, 255]);
         assert_eq!(ui.draw_list.vertices.len(), 8);
         ui.end_frame();
     }

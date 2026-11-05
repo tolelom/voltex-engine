@@ -11,7 +11,7 @@ use voltex_renderer::{
     align_up, GpuContext, Camera, FpsController, CameraUniform, LightsUniform, LightData,
     Mesh, GpuTexture, MaterialUniform, generate_sphere_mesh, create_pbr_pipeline,
     ShadowMap, ShadowUniform,
-    IblResources, pbr_full_texture_bind_group_layout, create_pbr_full_texture_bind_group,
+    IblResources, pbr_full_texture_bind_group_layout, create_pbr_texture_set_bind_group, PbrTextureSet,
 };
 use wgpu::util::DeviceExt;
 
@@ -166,17 +166,15 @@ impl ApplicationHandler for IblDemoApp {
         let normal_tex = GpuTexture::flat_normal_map_1x1(&gpu.device, &gpu.queue, &old_tex_layout);
         let orm_tex = GpuTexture::white_1x1(&gpu.device, &gpu.queue, &old_tex_layout);
         let emissive_tex = GpuTexture::black_1x1(&gpu.device, &gpu.queue, &old_tex_layout);
-        let pbr_texture_bind_group = create_pbr_full_texture_bind_group(
+        let pbr_texture_bind_group = create_pbr_texture_set_bind_group(
             &gpu.device,
             &pbr_tex_layout,
-            &albedo_tex.view,
-            &albedo_tex.sampler,
-            &normal_tex.view,
-            &normal_tex.sampler,
-            &orm_tex.view,
-            &orm_tex.sampler,
-            &emissive_tex.view,
-            &emissive_tex.sampler,
+            PbrTextureSet {
+                albedo: &albedo_tex,
+                normal: &normal_tex,
+                orm: &orm_tex,
+                emissive: &emissive_tex,
+            },
         );
 
         // IBL resources

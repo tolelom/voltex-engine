@@ -2,23 +2,22 @@
 //! dequantizes each 8x8 block, runs the IDCT and assembles MCUs into the output image.
 
 use super::bit_reader::BitReader;
-use super::headers::{HuffTable, JpegComponent};
+use super::headers::{HuffTable, JpegTables, SofData};
 use super::idct::idct;
-use super::mcu::assemble_mcu;
+use super::mcu::{assemble_mcu, McuSampling, RgbImage};
 
-#[allow(clippy::too_many_arguments)]
+/// Decodes the scan starting at `pos` (just past the SOS marker) into packed
+/// RGB8 pixels. Returns the pixels and the position where the scan data ends.
 pub(super) fn decode_scan(
     data: &[u8],
     pos: usize,
-    width: u16,
-    height: u16,
-    num_components: u8,
-    components: &[JpegComponent],
-    qt_tables: &[[u16; 64]; 4],
-    dc_tables: &[Option<HuffTable>; 4],
-    ac_tables: &[Option<HuffTable>; 4],
-    restart_interval: u16,
+    frame: &SofData,
+    tables: &JpegTables,
 ) -> crate::Result<(Vec<u8>, usize)> {
+    let SofData { width, height, num_components, ref components } = *frame;
+    let JpegTables { quant: ref qt_tables, dc: ref dc_tables, ac: ref ac_tables, restart_interval } =
+        *tables;
+
     // Parse SOS header
     if pos + 3 > data.len() {
         return Err("SOS too short".into());
@@ -110,17 +109,15 @@ pub(super) fn decode_scan(
                 mcu_blocks.push(blocks);
             }
 
+            let mut image = RgbImage { pixels: &mut rgb, width: width as usize, height: height as usize };
             assemble_mcu(
                 &mcu_blocks,
                 &scan_components,
                 num_components,
-                max_h,
-                max_v,
+                McuSampling { max_h, max_v },
                 mcu_col as usize,
                 mcu_row as usize,
-                width as usize,
-                height as usize,
-                &mut rgb,
+                &mut image,
             );
 
             mcu_count = mcu_count.wrapping_add(1);

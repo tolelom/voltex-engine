@@ -66,65 +66,45 @@ pub enum CliError {
     },
 }
 
+// One arm per variant, in declaration order: each arm is the whole message.
 impl fmt::Display for CliError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            CliError::MissingArg(name) => {
-                write!(f, "missing argument `{}`", name)
-            }
-            CliError::ManifestNotFound(path) => {
-                write!(
-                    f,
-                    "voltex.toml not found at {} — run `voltex new <name>` to scaffold a project",
-                    path.display()
-                )
-            }
-            CliError::ManifestParse { line, column, msg } => {
-                write!(
-                    f,
-                    "voltex.toml parse error on line {}, column {}: {}",
-                    line, column, msg
-                )
-            }
+            CliError::MissingArg(name) => write!(f, "missing argument `{name}`"),
+            CliError::ManifestNotFound(path) => write!(
+                f,
+                "voltex.toml not found at {} — run `voltex new <name>` to scaffold a project",
+                path.display()
+            ),
+            CliError::ManifestParse { line, column, msg } => write!(
+                f,
+                "voltex.toml parse error on line {line}, column {column}: {msg}"
+            ),
             CliError::MissingField { section, field } => {
-                write!(
-                    f,
-                    "missing required field [{}] {} in voltex.toml",
-                    section, field
-                )
+                write!(f, "missing required field [{section}] {field} in voltex.toml")
             }
             CliError::InvalidValue { field, got } => {
-                write!(f, "invalid value for `{}`: got `{}`", field, got)
+                write!(f, "invalid value for `{field}`: got `{got}`")
             }
             CliError::NewTargetExists(path) => {
-                write!(
-                    f,
-                    "cannot create project: {} already exists",
-                    path.display()
-                )
+                write!(f, "cannot create project: {} already exists", path.display())
             }
             CliError::CargoMissing => write!(
                 f,
                 "`cargo` not found in PATH — install rustup at https://rustup.rs"
             ),
             CliError::CargoBuildFailed(code) => {
-                write!(f, "cargo build failed (exit code {})", code)
+                write!(f, "cargo build failed (exit code {code})")
             }
-            CliError::Io(s) => write!(f, "io error: {}", s),
-            CliError::CrossCompileNotSupported { host, requested } => {
-                write!(
-                    f,
-                    "cross-compile not supported.\n  current host: {}\n  requested target: {}\n  hint: run `voltex build --target {}` on a {} machine.",
-                    host, requested, requested, requested
-                )
-            }
-            CliError::HostNotInManifestTargets { host, listed } => {
-                write!(
-                    f,
-                    "manifest targets do not include host triple.\n  current host: {}\n  manifest targets = {:?}\n  hint: add \"{}\" to the targets array, or pass --target {} explicitly.",
-                    host, listed, host, host
-                )
-            }
+            CliError::Io(s) => write!(f, "io error: {s}"),
+            CliError::CrossCompileNotSupported { host, requested } => write!(
+                f,
+                "cross-compile not supported.\n  current host: {host}\n  requested target: {requested}\n  hint: run `voltex build --target {requested}` on a {requested} machine."
+            ),
+            CliError::HostNotInManifestTargets { host, listed } => write!(
+                f,
+                "manifest targets do not include host triple.\n  current host: {host}\n  manifest targets = {listed:?}\n  hint: add \"{host}\" to the targets array, or pass --target {host} explicitly."
+            ),
             CliError::UnknownField {
                 section,
                 field,
@@ -132,53 +112,42 @@ impl fmt::Display for CliError {
                 suggestion,
             } => {
                 let hint = match suggestion {
-                    Some(s) => format!("\n  hint: did you mean `{}`?", s),
-                    None => format!("\n  valid keys: {:?}", valid),
+                    Some(s) => format!("\n  hint: did you mean `{s}`?"),
+                    None => format!("\n  valid keys: {valid:?}"),
                 };
-                write!(
-                    f,
-                    "unknown key `{}` in [{}] section of voltex.toml{}",
-                    field, section, hint
-                )
+                write!(f, "unknown key `{field}` in [{section}] section of voltex.toml{hint}")
             }
             CliError::UnknownSection {
                 name,
                 valid_prefixes,
-            } => {
-                write!(
-                    f,
-                    "unknown section [{}] in voltex.toml\n  valid sections: {:?}",
-                    name, valid_prefixes
-                )
-            }
+            } => write!(
+                f,
+                "unknown section [{name}] in voltex.toml\n  valid sections: {valid_prefixes:?}"
+            ),
             CliError::ManifestPathMissing {
                 field,
                 path,
                 base_dir,
-            } => {
-                write!(
-                    f,
-                    "manifest field `{}` references missing path\n  path:     {}\n  base dir: {}\n  hint: create the file/directory, or remove the entry from voltex.toml",
-                    field,
-                    path.display(),
-                    base_dir.display()
-                )
-            }
+            } => write!(
+                f,
+                "manifest field `{field}` references missing path\n  path:     {}\n  base dir: {}\n  hint: create the file/directory, or remove the entry from voltex.toml",
+                path.display(),
+                base_dir.display()
+            ),
             CliError::AmbiguousExecutable { project, candidates } => {
                 let list: Vec<String> =
                     candidates.iter().map(|p| p.display().to_string()).collect();
                 write!(
                     f,
-                    "cargo built {} executables but none is named `{}`\n  candidates: {}\n  hint: rename the game's [[bin]] to `{}`, or set [project] name to the game binary's name",
+                    "cargo built {} executables but none is named `{project}`\n  candidates: {}\n  hint: rename the game's [[bin]] to `{project}`, or set [project] name to the game binary's name",
                     candidates.len(),
-                    project,
-                    list.join(", "),
-                    project
+                    list.join(", ")
                 )
             }
         }
     }
 }
+
 
 impl std::error::Error for CliError {}
 

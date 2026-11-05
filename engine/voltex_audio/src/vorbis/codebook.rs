@@ -65,6 +65,8 @@ impl Codebook {
     }
 }
 
+/// Parses one codebook from the setup header (Vorbis spec § 3.2.1):
+/// sync + shape, codeword lengths, then the optional VQ lookup table.
 pub(super) fn decode_codebook(reader: &mut BitReader) -> crate::Result<Codebook> {
     // Sync pattern
     let sync = reader.read_bits(24)?;
@@ -75,7 +77,25 @@ pub(super) fn decode_codebook(reader: &mut BitReader) -> crate::Result<Codebook>
     let dimensions = reader.read_bits(16)? as u16;
     let entries = reader.read_bits(24)?;
 
-    // Read codeword lengths
+    let lengths = read_codeword_lengths(reader, entries)?;
+    let sorted_entries = build_huffman_codewords(&lengths);
+
+    let lookup_type = reader.read_bits(4)? as u8;
+    let vq_table = read_vq_lookup(reader, lookup_type, entries, dimensions)?;
+
+    Ok(Codebook {
+        dimensions,
+        entries,
+        lengths,
+        lookup_type,
+        vq_table,
+        sorted_entries,
+    })
+}
+
+/// Reads the codeword length of every entry, in the ordered or the
+/// (possibly sparse) unordered encoding. Length 0 marks an unused entry.
+fn read_codeword_lengths(reader: &mut BitReader, entries: u32) -> crate::Result<Vec<u8>> {
     let ordered = reader.read_bit()?;
     let mut lengths = vec![0u8; entries as usize];
 
@@ -110,15 +130,19 @@ pub(super) fn decode_codebook(reader: &mut BitReader) -> crate::Result<Codebook>
         }
     }
 
-    // Build Huffman codewords from lengths (canonical Huffman)
+    Ok(lengths)
+}
+
+/// Builds canonical Huffman codewords from the lengths, bit-reversed for
+/// Vorbis' LSB-first reading. Returns `(codeword, entry_index, length)`.
+fn build_huffman_codewords(lengths: &[u8]) -> Vec<(u32, u32, u8)> {
     let max_len = lengths.iter().copied().max().unwrap_or(0);
     let mut sorted_entries: Vec<(u32, u32, u8)> = Vec::new();
 
     if max_len > 0 {
-        // Assign canonical Huffman codes
         // Count entries per length
         let mut bl_count = vec![0u32; max_len as usize + 1];
-        for &l in &lengths {
+        for &l in lengths {
             if l > 0 {
                 bl_count[l as usize] += 1;
             }
@@ -144,8 +168,17 @@ pub(super) fn decode_codebook(reader: &mut BitReader) -> crate::Result<Codebook>
         }
     }
 
-    // Read VQ lookup
-    let lookup_type = reader.read_bits(4)? as u8;
+    sorted_entries
+}
+
+/// Reads the VQ lookup parameters and multiplicands, then expands them into
+/// one vector per entry. Lookup type 0 has no table.
+fn read_vq_lookup(
+    reader: &mut BitReader,
+    lookup_type: u8,
+    entries: u32,
+    dimensions: u16,
+) -> crate::Result<Vec<Vec<f32>>> {
     let mut vq_table: Vec<Vec<f32>> = Vec::new();
 
     if lookup_type == 1 || lookup_type == 2 {
@@ -199,12 +232,5 @@ pub(super) fn decode_codebook(reader: &mut BitReader) -> crate::Result<Codebook>
         return Err(format!("Unsupported codebook lookup type: {}", lookup_type).into());
     }
 
-    Ok(Codebook {
-        dimensions,
-        entries,
-        lengths,
-        lookup_type,
-        vq_table,
-        sorted_entries,
-    })
+    Ok(vq_table)
 }

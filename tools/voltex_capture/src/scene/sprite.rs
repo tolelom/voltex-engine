@@ -6,7 +6,7 @@ use voltex_renderer::{Camera, LightUniform};
 use voltex_renderer_ecs::{BasicRenderer, RenderAssets};
 
 use crate::headless::HeadlessGpu;
-use super::draw_and_read;
+use super::{draw_and_read, FrameSpec};
 use crate::target::{OffscreenTarget, CAPTURE_FORMAT};
 
 /// Spawn an orange particle burst at the origin, advance it `ticks` times by
@@ -48,13 +48,14 @@ pub fn render_particle_burst(
         gpu,
         &target,
         &renderer,
-        "capture parts",
-        wgpu::Color { r: 0.0, g: 0.0, b: 0.0, a: 1.0 },
         &mut world,
         &assets,
-        camera.view_projection(),
-        camera.position,
-        light,
+        FrameSpec {
+            label: "capture parts",
+            clear_color: wgpu::Color { r: 0.0, g: 0.0, b: 0.0, a: 1.0 },
+            camera: &camera,
+            light,
+        },
     )
 }
 
@@ -108,13 +109,14 @@ pub fn render_sprite_sheet_frame(gpu: &HeadlessGpu, width: u32, height: u32, fra
         gpu,
         &target,
         &renderer,
-        "capture sheet",
-        wgpu::Color { r: 0.0, g: 0.0, b: 0.0, a: 1.0 },
         &mut world,
         &assets,
-        camera.view_projection(),
-        camera.position,
-        light,
+        FrameSpec {
+            label: "capture sheet",
+            clear_color: wgpu::Color { r: 0.0, g: 0.0, b: 0.0, a: 1.0 },
+            camera: &camera,
+            light,
+        },
     )
 }
 
@@ -148,13 +150,14 @@ pub fn render_billboard_sprite(
         gpu,
         &target,
         &renderer,
-        "capture sprite",
-        wgpu::Color { r: 0.0, g: 0.0, b: 0.0, a: 1.0 },
         &mut world,
         &assets,
-        camera.view_projection(),
-        camera.position,
-        light,
+        FrameSpec {
+            label: "capture sprite",
+            clear_color: wgpu::Color { r: 0.0, g: 0.0, b: 0.0, a: 1.0 },
+            camera: &camera,
+            light,
+        },
     )
 }
 
@@ -236,17 +239,21 @@ mod tests {
             let mut encoder = gpu.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
                 label: Some("capture sprite order"),
             });
-            renderer.render(
+            renderer.render_frame(
                 &gpu.queue,
                 &mut encoder,
-                &target.color_view,
-                &target.depth_view,
-                wgpu::Color { r: 0.0, g: 0.0, b: 0.0, a: 1.0 },
+                voltex_renderer_ecs::FrameTarget {
+                    color_view: &target.color_view,
+                    depth_view: &target.depth_view,
+                    clear_color: wgpu::Color { r: 0.0, g: 0.0, b: 0.0, a: 1.0 },
+                },
                 &mut world,
                 &assets,
-                camera.view_projection(),
-                camera.position,
-                LightUniform::new(),
+                &voltex_renderer_ecs::FrameView {
+                    view_proj: camera.view_projection(),
+                    camera_pos: camera.position,
+                    light: LightUniform::new(),
+                },
             );
             gpu.queue.submit(Some(encoder.finish()));
             let rgba = target.read_rgba8(&gpu.device, &gpu.queue);
@@ -297,17 +304,21 @@ mod tests {
         let mut encoder = gpu.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
             label: Some("capture png loader"),
         });
-        renderer.render(
+        renderer.render_frame(
             &gpu.queue,
             &mut encoder,
-            &target.color_view,
-            &target.depth_view,
-            wgpu::Color { r: 0.0, g: 0.0, b: 0.0, a: 1.0 },
+            voltex_renderer_ecs::FrameTarget {
+                color_view: &target.color_view,
+                depth_view: &target.depth_view,
+                clear_color: wgpu::Color { r: 0.0, g: 0.0, b: 0.0, a: 1.0 },
+            },
             &mut world,
             &assets,
-            camera.view_projection(),
-            camera.position,
-            LightUniform::new(),
+            &voltex_renderer_ecs::FrameView {
+                view_proj: camera.view_projection(),
+                camera_pos: camera.position,
+                light: LightUniform::new(),
+            },
         );
         gpu.queue.submit(Some(encoder.finish()));
         let rgba = target.read_rgba8(&gpu.device, &gpu.queue);

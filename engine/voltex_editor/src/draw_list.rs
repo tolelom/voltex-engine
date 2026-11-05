@@ -7,7 +7,8 @@
 #![allow(missing_docs)]
 
 use bytemuck::{Pod, Zeroable};
-use crate::bitmap_font::FontAtlas;
+use crate::bitmap_font::{FontAtlas, UvRect};
+use crate::dock::Rect;
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug, Pod, Zeroable)]
@@ -84,17 +85,25 @@ impl DrawList {
 
     /// Add a solid-color rectangle. UV is (0,0) for solid color rendering.
     pub fn add_rect(&mut self, x: f32, y: f32, w: f32, h: f32, color: [u8; 4]) {
-        self.add_rect_uv(x, y, w, h, 0.0, 0.0, 0.0, 0.0, color);
+        self.add_quad(Rect { x, y, w, h }, UvRect { u0: 0.0, v0: 0.0, u1: 0.0, v1: 0.0 }, color);
     }
 
-    /// Add a textured quad with explicit UV coordinates.
-    #[allow(clippy::too_many_arguments)]
+    /// Old form of [`Self::add_quad`] with the rect and UVs spelled out.
+    #[deprecated(note = "use `add_quad` with a `Rect` and a `UvRect`")]
+    #[allow(clippy::too_many_arguments)] // reason: legacy signature kept for compatibility
     pub fn add_rect_uv(
         &mut self,
         x: f32, y: f32, w: f32, h: f32,
         u0: f32, v0: f32, u1: f32, v1: f32,
         color: [u8; 4],
     ) {
+        self.add_quad(Rect { x, y, w, h }, UvRect { u0, v0, u1, v1 }, color);
+    }
+
+    /// Add a textured quad covering `rect` (screen pixels) that samples `uv`.
+    pub fn add_quad(&mut self, rect: Rect, uv: UvRect, color: [u8; 4]) {
+        let Rect { x, y, w, h } = rect;
+        let UvRect { u0, v0, u1, v1 } = uv;
         let index_offset = self.indices.len() as u32;
         let base_vertex = self.vertices.len() as u16;
 
@@ -124,7 +133,8 @@ impl DrawList {
     /// tint). `texture_slot` comes from `UiRenderer::register_texture`; an
     /// unregistered slot falls back to the font atlas at render time.
     pub fn add_image(&mut self, x: f32, y: f32, w: f32, h: f32, texture_slot: u32) {
-        self.add_rect_uv(x, y, w, h, 0.0, 0.0, 1.0, 1.0, [255, 255, 255, 255]);
+        let full = UvRect { u0: 0.0, v0: 0.0, u1: 1.0, v1: 1.0 };
+        self.add_quad(Rect { x, y, w, h }, full, [255, 255, 255, 255]);
         if let Some(cmd) = self.commands.last_mut() {
             cmd.texture = Some(texture_slot);
         }
@@ -137,7 +147,7 @@ impl DrawList {
         let mut cx = x;
         for ch in text.chars() {
             let uv = font.glyph_uv_rect(ch);
-            self.add_rect_uv(cx, y, gw, gh, uv.u0, uv.v0, uv.u1, uv.v1, color);
+            self.add_quad(Rect { x: cx, y, w: gw, h: gh }, uv, color);
             cx += gw;
         }
     }

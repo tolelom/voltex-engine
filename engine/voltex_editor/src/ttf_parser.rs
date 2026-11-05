@@ -306,56 +306,9 @@ impl TtfParser {
         let instruction_length = read_u16(&self.data, off) as usize;
         off += 2 + instruction_length;
 
-        // Parse flags
-        let mut flags = Vec::with_capacity(num_points);
-        while flags.len() < num_points {
-            let flag = read_u8(&self.data, off);
-            off += 1;
-            flags.push(flag);
-            if flag & REPEAT_FLAG != 0 {
-                let repeat_count = read_u8(&self.data, off) as usize;
-                off += 1;
-                for _ in 0..repeat_count {
-                    flags.push(flag);
-                }
-            }
-        }
-
-        // Parse x-coordinates (delta-encoded)
-        let mut x_coords = Vec::with_capacity(num_points);
-        let mut x: i32 = 0;
-        for &flag in flags.iter().take(num_points) {
-            if flag & X_SHORT != 0 {
-                let dx = read_u8(&self.data, off) as i32;
-                off += 1;
-                x += if flag & X_SAME_OR_POS != 0 { dx } else { -dx };
-            } else if flag & X_SAME_OR_POS != 0 {
-                // delta = 0
-            } else {
-                let dx = read_i16(&self.data, off) as i32;
-                off += 2;
-                x += dx;
-            }
-            x_coords.push(x);
-        }
-
-        // Parse y-coordinates (delta-encoded)
-        let mut y_coords = Vec::with_capacity(num_points);
-        let mut y: i32 = 0;
-        for &flag in flags.iter().take(num_points) {
-            if flag & Y_SHORT != 0 {
-                let dy = read_u8(&self.data, off) as i32;
-                off += 1;
-                y += if flag & Y_SAME_OR_POS != 0 { dy } else { -dy };
-            } else if flag & Y_SAME_OR_POS != 0 {
-                // delta = 0
-            } else {
-                let dy = read_i16(&self.data, off) as i32;
-                off += 2;
-                y += dy;
-            }
-            y_coords.push(y);
-        }
+        let flags = read_point_flags(&self.data, &mut off, num_points);
+        let x_coords = read_coordinates(&self.data, &mut off, &flags, num_points, X_SHORT, X_SAME_OR_POS);
+        let y_coords = read_coordinates(&self.data, &mut off, &flags, num_points, Y_SHORT, Y_SAME_OR_POS);
 
         // Build contours with implicit on-curve point insertion
         let mut contours = Vec::with_capacity(num_contours);
@@ -370,37 +323,8 @@ impl TtfParser {
                     )
                 })
                 .collect();
-
-            let mut contour = Vec::new();
-            let n = raw_points.len();
-            if n == 0 {
-                start = end + 1;
-                contours.push(contour);
-                continue;
-            }
-
-            for j in 0..n {
-                let (cx, cy, c_on) = raw_points[j];
-                let (nx, ny, n_on) = raw_points[(j + 1) % n];
-
-                contour.push(OutlinePoint {
-                    x: cx,
-                    y: cy,
-                    on_curve: c_on,
-                });
-
-                // If both current and next are off-curve, insert implicit midpoint
-                if !c_on && !n_on {
-                    contour.push(OutlinePoint {
-                        x: (cx + nx) * 0.5,
-                        y: (cy + ny) * 0.5,
-                        on_curve: true,
-                    });
-                }
-            }
-
+            contours.push(with_implicit_on_curve_points(&raw_points));
             start = end + 1;
-            contours.push(contour);
         }
 
         Some(GlyphOutline {
@@ -444,6 +368,84 @@ impl TtfParser {
             }
         }
     }
+}
+
+
+/// Reads the per-point flags of a simple glyph, expanding `REPEAT_FLAG` runs.
+/// Advances `off` past the flag bytes.
+fn read_point_flags(data: &[u8], off: &mut usize, num_points: usize) -> Vec<u8> {
+    let mut flags = Vec::with_capacity(num_points);
+    while flags.len() < num_points {
+        let flag = read_u8(data, *off);
+        *off += 1;
+        flags.push(flag);
+        if flag & REPEAT_FLAG != 0 {
+            let repeat_count = read_u8(data, *off) as usize;
+            *off += 1;
+            for _ in 0..repeat_count {
+                flags.push(flag);
+            }
+        }
+    }
+    flags
+}
+
+/// Reads one axis of delta-encoded point coordinates. `short_bit` /
+/// `same_or_pos_bit` are that axis' flag bits (`X_SHORT`/`X_SAME_OR_POS` or
+/// the Y pair). Advances `off` past the coordinate bytes.
+fn read_coordinates(
+    data: &[u8],
+    off: &mut usize,
+    flags: &[u8],
+    num_points: usize,
+    short_bit: u8,
+    same_or_pos_bit: u8,
+) -> Vec<i32> {
+    let mut coords = Vec::with_capacity(num_points);
+    let mut value: i32 = 0;
+    for &flag in flags.iter().take(num_points) {
+        if flag & short_bit != 0 {
+            let delta = read_u8(data, *off) as i32;
+            *off += 1;
+            value += if flag & same_or_pos_bit != 0 { delta } else { -delta };
+        } else if flag & same_or_pos_bit != 0 {
+            // delta = 0
+        } else {
+            let delta = read_i16(data, *off) as i32;
+            *off += 2;
+            value += delta;
+        }
+        coords.push(value);
+    }
+    coords
+}
+
+/// Turns one contour's `(x, y, on_curve)` points into outline points,
+/// inserting the implicit on-curve midpoint between two consecutive
+/// off-curve points (wrapping from the last point to the first).
+fn with_implicit_on_curve_points(raw_points: &[(f32, f32, bool)]) -> Vec<OutlinePoint> {
+    let mut contour = Vec::new();
+    let n = raw_points.len();
+    for j in 0..n {
+        let (cx, cy, c_on) = raw_points[j];
+        let (nx, ny, n_on) = raw_points[(j + 1) % n];
+
+        contour.push(OutlinePoint {
+            x: cx,
+            y: cy,
+            on_curve: c_on,
+        });
+
+        // If both current and next are off-curve, insert implicit midpoint
+        if !c_on && !n_on {
+            contour.push(OutlinePoint {
+                x: (cx + nx) * 0.5,
+                y: (cy + ny) * 0.5,
+                on_curve: true,
+            });
+        }
+    }
+    contour
 }
 
 #[cfg(test)]

@@ -2,6 +2,8 @@
 //! previous frame's view-projection (`MotionBlurParams`) and blurs along that velocity.
 #![allow(missing_docs)]
 
+use crate::compute::{ComputeContext, ScreenOutput};
+
 use bytemuck::{Pod, Zeroable};
 
 #[repr(C)]
@@ -122,21 +124,17 @@ impl MotionBlur {
         }
     }
 
-    #[allow(clippy::too_many_arguments)]
-    pub fn dispatch(
+    /// 입력 텍스처를 읽어 `output` 에 결과를 쓰는 compute 패스를 기록한다.
+    pub fn encode(
         &self,
-        device: &wgpu::Device,
-        queue: &wgpu::Queue,
-        encoder: &mut wgpu::CommandEncoder,
+        gpu: &mut ComputeContext<'_>,
         color_view: &wgpu::TextureView,
         depth_view: &wgpu::TextureView,
-        output_view: &wgpu::TextureView,
+        output: ScreenOutput<'_>,
         params: &MotionBlurParams,
-        width: u32,
-        height: u32,
     ) {
-        queue.write_buffer(&self.params_buffer, 0, bytemuck::cast_slice(&[*params]));
-        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+        gpu.queue.write_buffer(&self.params_buffer, 0, bytemuck::cast_slice(&[*params]));
+        let bind_group = gpu.device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("Motion Blur BG"),
             layout: &self.bind_group_layout,
             entries: &[
@@ -150,7 +148,7 @@ impl MotionBlur {
                 },
                 wgpu::BindGroupEntry {
                     binding: 2,
-                    resource: wgpu::BindingResource::TextureView(output_view),
+                    resource: wgpu::BindingResource::TextureView(output.view),
                 },
                 wgpu::BindGroupEntry {
                     binding: 3,
@@ -158,13 +156,46 @@ impl MotionBlur {
                 },
             ],
         });
-        let mut cpass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
+        let mut cpass = gpu.encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
             label: Some("Motion Blur Pass"),
             timestamp_writes: None,
         });
         cpass.set_pipeline(&self.pipeline);
         cpass.set_bind_group(0, &bind_group, &[]);
-        crate::compute::dispatch_screen(&mut cpass, width, height);
+        crate::compute::dispatch_screen(&mut cpass, output.width, output.height);
+    }
+
+    /// 옛 인자 나열형. [`Self::encode`] 를 쓴다.
+    #[deprecated(note = "use `encode` (ComputeContext + ScreenOutput)")]
+    // reason: 역호환용 옛 시그니처를 그대로 둔다.
+    #[allow(clippy::too_many_arguments)]
+    pub fn dispatch(
+        &self,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        encoder: &mut wgpu::CommandEncoder,
+        color_view: &wgpu::TextureView,
+        depth_view: &wgpu::TextureView,
+        output_view: &wgpu::TextureView,
+        params: &MotionBlurParams,
+        width: u32,
+        height: u32,
+    ) {
+        self.encode(
+            &mut ComputeContext {
+                device,
+                queue,
+                encoder,
+            },
+            color_view,
+            depth_view,
+            ScreenOutput {
+                view: output_view,
+                width,
+                height,
+            },
+            params,
+        );
     }
 }
 

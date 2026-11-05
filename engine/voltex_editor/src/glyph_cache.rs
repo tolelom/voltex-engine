@@ -21,6 +21,28 @@ pub struct GlyphInfo {
     pub bearing_y: f32,
 }
 
+/// A rasterised glyph: `width * height` alpha bytes, row-major.
+#[derive(Clone, Copy)]
+pub struct GlyphBitmap<'a> {
+    pub pixels: &'a [u8],
+    pub width: u32,
+    pub height: u32,
+}
+
+impl GlyphBitmap<'_> {
+    /// Zero-size bitmap for glyphs with no outline (e.g. space).
+    pub const EMPTY: GlyphBitmap<'static> = GlyphBitmap { pixels: &[], width: 0, height: 0 };
+}
+
+/// Where a glyph sits relative to the pen, in pixels: horizontal advance,
+/// left bearing and distance from the baseline up to the bitmap top.
+#[derive(Clone, Copy)]
+pub struct GlyphPlacement {
+    pub advance: f32,
+    pub bearing_x: f32,
+    pub bearing_y: f32,
+}
+
 pub struct GlyphCache {
     pub atlas_data: Vec<u8>,
     pub atlas_width: u32,
@@ -50,9 +72,10 @@ impl GlyphCache {
         self.glyphs.get(&ch)
     }
 
-    /// Insert a rasterized glyph bitmap into the atlas.
-    /// Returns reference to the cached GlyphInfo.
-    #[allow(clippy::too_many_arguments)]
+    /// Old form of [`Self::insert_glyph`] with the bitmap and placement
+    /// spelled out.
+    #[deprecated(note = "use `insert_glyph` with a `GlyphBitmap` and a `GlyphPlacement`")]
+    #[allow(clippy::too_many_arguments)] // reason: legacy signature kept for compatibility
     pub fn insert(
         &mut self,
         ch: char,
@@ -63,6 +86,15 @@ impl GlyphCache {
         bearing_x: f32,
         bearing_y: f32,
     ) -> &GlyphInfo {
+        let bitmap = GlyphBitmap { pixels: bitmap, width: bmp_w, height: bmp_h };
+        self.insert_glyph(ch, bitmap, GlyphPlacement { advance, bearing_x, bearing_y })
+    }
+
+    /// Insert a rasterized glyph bitmap into the atlas.
+    /// Returns reference to the cached GlyphInfo.
+    pub fn insert_glyph(&mut self, ch: char, bitmap: GlyphBitmap, placement: GlyphPlacement) -> &GlyphInfo {
+        let GlyphBitmap { pixels: bitmap, width: bmp_w, height: bmp_h } = bitmap;
+        let GlyphPlacement { advance, bearing_x, bearing_y } = placement;
         // Handle zero-size glyphs (e.g., space)
         if bmp_w == 0 || bmp_h == 0 {
             self.glyphs.insert(ch, GlyphInfo {
@@ -149,7 +181,7 @@ mod tests {
     fn test_insert_and_get() {
         let mut cache = GlyphCache::new(256, 256);
         let bitmap = vec![255u8; 10 * 12]; // 10x12 glyph
-        cache.insert('A', &bitmap, 10, 12, 11.0, 0.5, 10.0);
+        cache.insert_glyph('A', GlyphBitmap { pixels: &bitmap, width: 10, height: 12 }, GlyphPlacement { advance: 11.0, bearing_x: 0.5, bearing_y: 10.0 });
         let info = cache.get('A');
         assert!(info.is_some());
         let info = info.unwrap();
@@ -162,7 +194,7 @@ mod tests {
     fn test_cache_hit() {
         let mut cache = GlyphCache::new(256, 256);
         let bitmap = vec![255u8; 8 * 8];
-        cache.insert('B', &bitmap, 8, 8, 9.0, 0.0, 8.0);
+        cache.insert_glyph('B', GlyphBitmap { pixels: &bitmap, width: 8, height: 8 }, GlyphPlacement { advance: 9.0, bearing_x: 0.0, bearing_y: 8.0 });
         cache.clear_dirty();
         // Second access should be cache hit (no dirty)
         let _info = cache.get('B').unwrap();
@@ -175,10 +207,10 @@ mod tests {
         let bitmap = vec![255u8; 20 * 10];
         // Insert 4 glyphs of width 20 in a 64-wide atlas
         // 3 fit in first row (20+1 + 20+1 + 20 = 62), 4th wraps
-        cache.insert('A', &bitmap, 20, 10, 21.0, 0.0, 10.0);
-        cache.insert('B', &bitmap, 20, 10, 21.0, 0.0, 10.0);
-        cache.insert('C', &bitmap, 20, 10, 21.0, 0.0, 10.0);
-        cache.insert('D', &bitmap, 20, 10, 21.0, 0.0, 10.0);
+        cache.insert_glyph('A', GlyphBitmap { pixels: &bitmap, width: 20, height: 10 }, GlyphPlacement { advance: 21.0, bearing_x: 0.0, bearing_y: 10.0 });
+        cache.insert_glyph('B', GlyphBitmap { pixels: &bitmap, width: 20, height: 10 }, GlyphPlacement { advance: 21.0, bearing_x: 0.0, bearing_y: 10.0 });
+        cache.insert_glyph('C', GlyphBitmap { pixels: &bitmap, width: 20, height: 10 }, GlyphPlacement { advance: 21.0, bearing_x: 0.0, bearing_y: 10.0 });
+        cache.insert_glyph('D', GlyphBitmap { pixels: &bitmap, width: 20, height: 10 }, GlyphPlacement { advance: 21.0, bearing_x: 0.0, bearing_y: 10.0 });
         let d = cache.get('D').unwrap();
         // D should be on a different row (v0 > 0)
         assert!(d.uv[1] > 0.0, "D should be on second row, v0={}", d.uv[1]);
@@ -188,7 +220,7 @@ mod tests {
     fn test_uv_range() {
         let mut cache = GlyphCache::new(256, 256);
         let bitmap = vec![128u8; 15 * 20];
-        cache.insert('X', &bitmap, 15, 20, 16.0, 1.0, 18.0);
+        cache.insert_glyph('X', GlyphBitmap { pixels: &bitmap, width: 15, height: 20 }, GlyphPlacement { advance: 16.0, bearing_x: 1.0, bearing_y: 18.0 });
         let info = cache.get('X').unwrap();
         assert!(info.uv[0] >= 0.0 && info.uv[0] < 1.0);
         assert!(info.uv[1] >= 0.0 && info.uv[1] < 1.0);
@@ -199,7 +231,7 @@ mod tests {
     #[test]
     fn test_zero_size_glyph() {
         let mut cache = GlyphCache::new(256, 256);
-        cache.insert(' ', &[], 0, 0, 5.0, 0.0, 0.0);
+        cache.insert_glyph(' ', GlyphBitmap::EMPTY, GlyphPlacement { advance: 5.0, bearing_x: 0.0, bearing_y: 0.0 });
         let info = cache.get(' ').unwrap();
         assert!((info.advance - 5.0).abs() < 0.1);
         assert!((info.width - 0.0).abs() < 0.1);

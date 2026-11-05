@@ -8,7 +8,7 @@
 use voltex_math::Mat4;
 use voltex_platform::InputState;
 use voltex_renderer::{Camera, FpsController, GpuContext, LightUniform};
-use voltex_renderer_ecs::BasicRenderer;
+use voltex_renderer_ecs::{BasicRenderer, FrameTarget, FrameView};
 use voltex_ecs::World;
 use winit::application::ApplicationHandler;
 use winit::event::{ElementState, KeyEvent, MouseButton, MouseScrollDelta, WindowEvent};
@@ -343,17 +343,21 @@ fn render_frame(app: &mut RuntimeApp) {
 
     gpu_window.renderer.set_point_lights(&gpu_window.gpu.queue, &app.point_lights);
     gpu_window.renderer.set_debug_lines(&gpu_window.gpu.queue, app.debug_lines.vertices());
-    gpu_window.renderer.render(
+    gpu_window.renderer.render_frame(
         &gpu_window.gpu.queue,
         &mut encoder,
-        &view,
-        &gpu_window.gpu.depth_view,
-        CLEAR_COLOR,
+        FrameTarget {
+            color_view: &view,
+            depth_view: &gpu_window.gpu.depth_view,
+            clear_color: CLEAR_COLOR,
+        },
         &mut app.world,
         &app.assets,
-        view_proj,
-        camera_position,
-        gpu_window.light,
+        &FrameView {
+            view_proj,
+            camera_pos: camera_position,
+            light: gpu_window.light,
+        },
     );
 
     if app.config.enable_hud {
@@ -386,14 +390,7 @@ fn draw_hud_overlay(
         ui.begin_frame(mouse_x as f32, mouse_y as f32, mouse_down);
         hud_fn(ui, world);
         ui.end_frame();
-        ui_renderer.render(
-            &gpu_window.gpu.device,
-            &gpu_window.gpu.queue,
-            encoder,
-            view,
-            &ui.draw_list,
-            surface_width,
-            surface_height,
-        );
+        let screen = voltex_editor::ScreenTarget { view, width: surface_width, height: surface_height };
+        ui_renderer.render_to(&gpu_window.gpu.device, &gpu_window.gpu.queue, encoder, &screen, &ui.draw_list);
     }
 }

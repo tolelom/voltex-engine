@@ -6,7 +6,7 @@ use voltex_math::{Quat, Vec3};
 use voltex_renderer::{Camera, LightUniform};
 use voltex_renderer_ecs::{BasicRenderer, RenderAssets};
 
-use super::draw_and_read;
+use super::{draw_and_read, FrameSpec};
 use crate::headless::HeadlessGpu;
 use crate::target::{OffscreenTarget, CAPTURE_FORMAT};
 
@@ -44,7 +44,6 @@ pub fn render_materialized_primitives(gpu: &HeadlessGpu, width: u32, height: u32
 
     let mut camera = Camera::new(Vec3::new(0.0, 1.0, 4.0), width as f32 / height as f32);
     camera.pitch = -0.22;
-    let view_proj = camera.view_projection();
     let mut light = LightUniform::new();
     light.direction = [-0.4, -1.0, -0.6];
 
@@ -52,18 +51,14 @@ pub fn render_materialized_primitives(gpu: &HeadlessGpu, width: u32, height: u32
         gpu,
         &target,
         &renderer,
-        "capture materialized_primitives",
-        wgpu::Color {
-            r: 0.05,
-            g: 0.05,
-            b: 0.08,
-            a: 1.0,
-        },
         &mut world,
         &assets,
-        view_proj,
-        camera.position,
-        light,
+        FrameSpec {
+            label: "capture materialized_primitives",
+            clear_color: wgpu::Color { r: 0.05, g: 0.05, b: 0.08, a: 1.0 },
+            camera: &camera,
+            light,
+        },
     )
 }
 
@@ -110,7 +105,6 @@ pub fn render_data_authored_scene(gpu: &HeadlessGpu, width: u32, height: u32) ->
 
     let mut camera = Camera::new(Vec3::new(0.0, 1.0, 4.0), width as f32 / height as f32);
     camera.pitch = -0.22;
-    let view_proj = camera.view_projection();
     let mut light = LightUniform::new();
     light.direction = [-0.4, -1.0, -0.6];
 
@@ -118,18 +112,14 @@ pub fn render_data_authored_scene(gpu: &HeadlessGpu, width: u32, height: u32) ->
         gpu,
         &target,
         &renderer,
-        "capture data_authored_scene",
-        wgpu::Color {
-            r: 0.05,
-            g: 0.05,
-            b: 0.08,
-            a: 1.0,
-        },
         &mut world,
         &assets,
-        view_proj,
-        camera.position,
-        light,
+        FrameSpec {
+            label: "capture data_authored_scene",
+            clear_color: wgpu::Color { r: 0.05, g: 0.05, b: 0.08, a: 1.0 },
+            camera: &camera,
+            light,
+        },
     )
 }
 
@@ -174,7 +164,6 @@ pub fn render_boids_swarm(gpu: &HeadlessGpu, width: u32, height: u32) -> Vec<u8>
 
     let mut camera = Camera::new(Vec3::new(0.0, 36.0, 0.01), width as f32 / height as f32);
     camera.pitch = -std::f32::consts::FRAC_PI_2;
-    let view_proj = camera.view_projection();
     let mut light = LightUniform::new();
     light.direction = [-0.3, -1.0, -0.2];
 
@@ -182,28 +171,96 @@ pub fn render_boids_swarm(gpu: &HeadlessGpu, width: u32, height: u32) -> Vec<u8>
         gpu,
         &target,
         &renderer,
-        "capture boids_swarm",
-        wgpu::Color { r: 0.02, g: 0.02, b: 0.04, a: 1.0 },
         &mut world,
         &assets,
-        view_proj,
-        camera.position,
-        light,
+        FrameSpec {
+            label: "capture boids_swarm",
+            clear_color: wgpu::Color { r: 0.02, g: 0.02, b: 0.04, a: 1.0 },
+            camera: &camera,
+            light,
+        },
     )
+}
+
+
+/// Where the [`render_world_from`] camera stands and looks: world position plus
+/// yaw/pitch in radians (same meaning as `Camera::yaw`/`Camera::pitch`).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct CameraPose {
+    /// Camera position in world space.
+    pub position: Vec3,
+    /// Rotation around +Y (radians).
+    pub yaw: f32,
+    /// Up/down tilt (radians); negative looks down.
+    pub pitch: f32,
+}
+
+/// The lens of the [`render_world_from`] camera.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum Projection {
+    /// Default FOV 45° (`FRAC_PI_4`), near 0.1 / far 100.
+    Perspective,
+    /// View `height` world units tall, width = height × aspect — matches the
+    /// runtime's `RuntimeConfig::with_orthographic`.
+    Orthographic {
+        /// Visible world-space height.
+        height: f32,
+    },
 }
 
 /// Render an arbitrary caller-built `World` of *declarative* renderables
 /// (`PrimitiveMesh` + `MaterialDesc` entities): materialize → `BasicRenderer`
 /// → RGBA8. The public entry point for game crates to pixel-verify their own
-/// scenes (added for depths dogfooding).
+/// scenes (added for depths/leap dogfooding); a 2D game passes
+/// [`Projection::Orthographic`] to verify the same framing the player sees.
 ///
-/// Fixed contract (not parameters — parameterize when a second game needs it):
+/// Fixed contract (not parameters — parameterize when a game needs it):
 /// - Light: one asymmetric directional, direction `[-0.4, -1.0, -0.6]`
 ///   (`LightUniform::new()` defaults otherwise).
-/// - Camera: perspective, default FOV 45° (`FRAC_PI_4`), near 0.1 / far 100;
-///   looks from `cam_pos` with the given yaw/pitch (radians).
 /// - Capacity: `max_entities = 1024` — entities beyond the cap are
 ///   **silently dropped** from the frame.
+pub fn render_world_from(
+    gpu: &HeadlessGpu,
+    width: u32,
+    height: u32,
+    world: &mut World,
+    pose: CameraPose,
+    projection: Projection,
+) -> Vec<u8> {
+    use voltex_renderer_ecs::materialize_renderables;
+
+    let target = OffscreenTarget::new(&gpu.device, width, height);
+    let renderer = BasicRenderer::new(&gpu.device, &gpu.queue, CAPTURE_FORMAT, 1024);
+    let mut assets = RenderAssets::new();
+    materialize_renderables(world, &mut assets, &gpu.device);
+
+    let mut camera = Camera::new(pose.position, width as f32 / height as f32);
+    camera.yaw = pose.yaw;
+    camera.pitch = pose.pitch;
+    camera.ortho_height = match projection {
+        Projection::Perspective => None,
+        Projection::Orthographic { height } => Some(height),
+    };
+    let mut light = LightUniform::new();
+    light.direction = [-0.4, -1.0, -0.6];
+
+    draw_and_read(
+        gpu,
+        &target,
+        &renderer,
+        world,
+        &assets,
+        FrameSpec {
+            label: "capture render_world",
+            clear_color: wgpu::Color { r: 0.05, g: 0.05, b: 0.08, a: 1.0 },
+            camera: &camera,
+            light,
+        },
+    )
+}
+
+/// [`render_world_from`] with a perspective camera at `cam_pos`, looking with
+/// the given yaw/pitch (radians).
 pub fn render_world(
     gpu: &HeadlessGpu,
     width: u32,
@@ -213,15 +270,18 @@ pub fn render_world(
     cam_yaw: f32,
     cam_pitch: f32,
 ) -> Vec<u8> {
-    render_world_impl(gpu, width, height, world, cam_pos, cam_yaw, cam_pitch, None)
+    let pose = CameraPose {
+        position: cam_pos,
+        yaw: cam_yaw,
+        pitch: cam_pitch,
+    };
+    render_world_from(gpu, width, height, world, pose, Projection::Perspective)
 }
 
-/// [`render_world`] with an **orthographic** camera (view height `ortho_height`
-/// world units, width = height × aspect) — matches the runtime's
-/// `RuntimeConfig::with_orthographic`, so 2D games can pixel-verify the same
-/// framing the player sees. Same fixed light/capacity contract as
-/// [`render_world`].
-#[allow(clippy::too_many_arguments)]
+/// [`render_world_from`] with an orthographic camera `ortho_height` world
+/// units tall. Kept so older callers compile; new code should use
+/// [`render_world_from`] — eight positional arguments are easy to mix up.
+#[allow(clippy::too_many_arguments)] // compat shim: keeps the old positional signature
 pub fn render_world_ortho(
     gpu: &HeadlessGpu,
     width: u32,
@@ -232,61 +292,15 @@ pub fn render_world_ortho(
     cam_pitch: f32,
     ortho_height: f32,
 ) -> Vec<u8> {
-    render_world_impl(
-        gpu,
-        width,
-        height,
-        world,
-        cam_pos,
-        cam_yaw,
-        cam_pitch,
-        Some(ortho_height),
-    )
-}
-
-#[allow(clippy::too_many_arguments)]
-fn render_world_impl(
-    gpu: &HeadlessGpu,
-    width: u32,
-    height: u32,
-    world: &mut World,
-    cam_pos: Vec3,
-    cam_yaw: f32,
-    cam_pitch: f32,
-    ortho_height: Option<f32>,
-) -> Vec<u8> {
-    use voltex_renderer_ecs::materialize_renderables;
-
-    let target = OffscreenTarget::new(&gpu.device, width, height);
-    let renderer = BasicRenderer::new(&gpu.device, &gpu.queue, CAPTURE_FORMAT, 1024);
-    let mut assets = RenderAssets::new();
-    materialize_renderables(world, &mut assets, &gpu.device);
-
-    let mut camera = Camera::new(cam_pos, width as f32 / height as f32);
-    camera.yaw = cam_yaw;
-    camera.pitch = cam_pitch;
-    camera.ortho_height = ortho_height;
-    let view_proj = camera.view_projection();
-    let mut light = LightUniform::new();
-    light.direction = [-0.4, -1.0, -0.6];
-
-    draw_and_read(
-        gpu,
-        &target,
-        &renderer,
-        "capture render_world",
-        wgpu::Color {
-            r: 0.05,
-            g: 0.05,
-            b: 0.08,
-            a: 1.0,
-        },
-        world,
-        &assets,
-        view_proj,
-        camera.position,
-        light,
-    )
+    let pose = CameraPose {
+        position: cam_pos,
+        yaw: cam_yaw,
+        pitch: cam_pitch,
+    };
+    let projection = Projection::Orthographic {
+        height: ortho_height,
+    };
+    render_world_from(gpu, width, height, world, pose, projection)
 }
 
 /// Render `survivor`'s seed scene through the *declarative* path it now

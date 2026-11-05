@@ -4,6 +4,8 @@
 //! high byte; sub-byte grayscale scales to 0..=255; `tRNS` supplies palette
 //! alpha or a gray/RGB colour key.
 
+use crate::png::PngHeader;
+
 /// Bits per pixel for a valid (colour type, bit depth) pair, else an error.
 pub(crate) fn bits_per_pixel(color_type: u8, bit_depth: u8) -> crate::Result<usize> {
     let channels = match (color_type, bit_depth) {
@@ -47,18 +49,17 @@ fn to_u8(v: u16, bit_depth: u8) -> u8 {
     }
 }
 
-/// `image` is the unfiltered image: `height` rows of `stride` bytes.
-#[allow(clippy::too_many_arguments)]
+/// `image` is the unfiltered image: `header.height` rows of `stride` bytes.
+/// `palette` / `trns` are the PLTE / tRNS chunk bodies, if present.
 pub(crate) fn to_rgba8(
     image: &[u8],
-    width: usize,
-    height: usize,
     stride: usize,
-    color_type: u8,
-    bit_depth: u8,
+    header: PngHeader,
     palette: Option<&[u8]>,
     trns: Option<&[u8]>,
 ) -> crate::Result<Vec<u8>> {
+    let PngHeader { color_type, bit_depth, .. } = header;
+    let (width, height) = (header.width as usize, header.height as usize);
     let mut out = Vec::with_capacity(width * height * 4);
     // Colour key from tRNS (compared at native depth) for gray / RGB.
     let key = |i: usize| -> Option<u16> {

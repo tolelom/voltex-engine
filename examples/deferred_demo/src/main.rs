@@ -16,7 +16,7 @@ use voltex_renderer::{
     gbuffer_camera_bind_group_layout,
     lighting_gbuffer_bind_group_layout, lighting_lights_bind_group_layout,
     lighting_shadow_bind_group_layout,
-    pbr_full_texture_bind_group_layout, create_pbr_full_texture_bind_group,
+    pbr_full_texture_bind_group_layout, create_pbr_texture_set_bind_group, PbrTextureSet,
     SsgiResources, SsgiUniform,
     ssgi_gbuffer_bind_group_layout, ssgi_data_bind_group_layout, create_ssgi_pipeline,
     RtAccel, RtInstance, BlasMeshData, RtShadowResources, RtShadowUniform,
@@ -209,17 +209,15 @@ impl ApplicationHandler for DeferredDemoApp {
         let normal_tex = GpuTexture::flat_normal_map_1x1(&gpu.device, &gpu.queue, &old_tex_layout);
         let orm_tex = GpuTexture::white_1x1(&gpu.device, &gpu.queue, &old_tex_layout);
         let emissive_tex = GpuTexture::black_1x1(&gpu.device, &gpu.queue, &old_tex_layout);
-        let pbr_texture_bind_group = create_pbr_full_texture_bind_group(
+        let pbr_texture_bind_group = create_pbr_texture_set_bind_group(
             &gpu.device,
             &pbr_tex_layout,
-            &albedo_tex.view,
-            &albedo_tex.sampler,
-            &normal_tex.view,
-            &normal_tex.sampler,
-            &orm_tex.view,
-            &orm_tex.sampler,
-            &emissive_tex.view,
-            &emissive_tex.sampler,
+            PbrTextureSet {
+                albedo: &albedo_tex,
+                normal: &normal_tex,
+                orm: &orm_tex,
+                emissive: &emissive_tex,
+            },
         );
 
         // Material bind group (dynamic offset, group 2)

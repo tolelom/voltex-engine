@@ -7,10 +7,10 @@
 
 use voltex_math::{Mat4, Vec3};
 use voltex_renderer::{
-    create_pbr_full_texture_bind_group, create_pbr_pipeline, create_pbr_skinned_pipeline,
+    create_pbr_pipeline, create_pbr_skinned_pipeline, create_pbr_texture_set_bind_group,
     pbr_full_texture_bind_group_layout, BonePalette, CameraUniform, GpuTexture, IblResources,
-    LightData, LightUniform, LightsUniform, MaterialUniform, PointLight, ShadowMap,
-    ShadowUniform, SHADOW_MAP_SIZE,
+    LightData, LightUniform, LightsUniform, MaterialUniform, PbrTextureSet, PointLight,
+    ShadowMap, ShadowUniform, SHADOW_MAP_SIZE,
 };
 
 use super::{
@@ -18,6 +18,7 @@ use super::{
 };
 use crate::assets::{PbrTextures, RenderAssets, TextureHandle};
 use crate::dynamic_uniform::DynamicUniformBuffer;
+use crate::frame::{FrameTarget, FrameView};
 use crate::items::RenderItem;
 use crate::scene_pass::begin_clearing_pass;
 
@@ -62,6 +63,8 @@ pub(super) struct PbrResources {
 }
 
 impl PbrResources {
+    // reason: BasicRenderer::new 가 만든 공유 자원(포맷·정렬·용량·레이아웃·기본 텍스처·그림자 맵)을
+    // 하나씩 받는 private 생성자 — 묶으면 호출부만 한 단계 더 멀어진다.
     #[allow(clippy::too_many_arguments)]
     pub(super) fn new(
         device: &wgpu::Device,
@@ -132,13 +135,15 @@ impl PbrResources {
         // Group 1 defaults: white albedo, flat normal, white ORM, black emissive.
         let flat_normal = GpuTexture::flat_normal_map_1x1(device, queue, texture_layout);
         let black = GpuTexture::black_1x1(device, queue, texture_layout);
-        let default_maps_bind_group = pbr_maps_bind_group(
+        let default_maps_bind_group = create_pbr_texture_set_bind_group(
             device,
             &maps_layout,
-            default_texture,
-            &flat_normal,
-            default_texture,
-            &black,
+            PbrTextureSet {
+                albedo: default_texture,
+                normal: &flat_normal,
+                orm: default_texture,
+                emissive: &black,
+            },
         );
 
         // Group 3: depth map + comparison sampler + ShadowUniform + BRDF LUT.
@@ -261,20 +266,16 @@ impl BasicRenderer {
     /// the point lights into a multi-light `LightsUniform`, stages per-entity
     /// `CameraUniform`/`MaterialUniform`, builds a 4-map texture bind group per
     /// entity (defaults for absent slots), and draws.
-    #[allow(clippy::too_many_arguments)]
     pub(super) fn pbr_mesh_pass(
         &self,
         queue: &wgpu::Queue,
         encoder: &mut wgpu::CommandEncoder,
-        target_view: &wgpu::TextureView,
-        depth_view: &wgpu::TextureView,
-        clear_color: wgpu::Color,
+        target: &FrameTarget<'_>,
+        view: &FrameView,
         items: &[RenderItem],
-        view_proj: Mat4,
-        cam_pos: Vec3,
-        light: LightUniform,
         assets: &RenderAssets,
     ) {
+        let FrameView { view_proj, camera_pos, light } = *view;
         // Shadow group: full ShadowUniform (also carries the sky direction +
         // zeroed SH → shader falls back to procedural ambient).
         let shadow_map_size = if self.shadows_enabled { SHADOW_MAP_SIZE as f32 } else { 0.0 };
@@ -290,7 +291,7 @@ impl BasicRenderer {
         queue.write_buffer(&self.pbr.lights_buffer, 0, bytemuck::bytes_of(&lights));
 
         let cameras: Vec<CameraUniform> =
-            items.iter().map(|item| pbr_camera(view_proj, item.model, cam_pos)).collect();
+            items.iter().map(|item| pbr_camera(view_proj, item.model, camera_pos)).collect();
         let materials: Vec<MaterialUniform> = items.iter().map(|item| item.material).collect();
         self.pbr.cameras.upload(queue, &cameras);
         self.pbr.materials.upload(queue, &materials);
@@ -303,9 +304,9 @@ impl BasicRenderer {
         let mut pass = begin_clearing_pass(
             encoder,
             "BasicRenderer PBR Pass",
-            target_view,
-            depth_view,
-            clear_color,
+            target.color_view,
+            target.depth_view,
+            target.clear_color,
         );
         pass.set_pipeline(&self.pbr.pipeline);
         pass.set_bind_group(3, &self.pbr.shadow_bind_group, &[]);
@@ -393,13 +394,15 @@ impl BasicRenderer {
         let texture_or = |handle: Option<TextureHandle>, fallback| {
             handle.and_then(|h| assets.texture(h)).unwrap_or(fallback)
         };
-        Some(pbr_maps_bind_group(
+        Some(create_pbr_texture_set_bind_group(
             &self.device,
             &self.pbr.texture_layout,
-            texture_or(albedo, &self.default_texture),
-            texture_or(maps.and_then(|m| m.normal), &self.pbr.flat_normal),
-            texture_or(maps.and_then(|m| m.orm), &self.default_texture),
-            texture_or(maps.and_then(|m| m.emissive), &self.pbr.black),
+            PbrTextureSet {
+                albedo: texture_or(albedo, &self.default_texture),
+                normal: texture_or(maps.and_then(|m| m.normal), &self.pbr.flat_normal),
+                orm: texture_or(maps.and_then(|m| m.orm), &self.default_texture),
+                emissive: texture_or(maps.and_then(|m| m.emissive), &self.pbr.black),
+            },
         ))
     }
 }
@@ -436,29 +439,6 @@ fn pbr_lights_uniform(sun: LightUniform, point_lights: &[PointLight]) -> LightsU
         sun.color[2] * sun.ambient_strength,
     ];
     lights
-}
-
-/// Group-1 bind group from four textures (albedo, normal, ORM, emissive).
-fn pbr_maps_bind_group(
-    device: &wgpu::Device,
-    layout: &wgpu::BindGroupLayout,
-    albedo: &GpuTexture,
-    normal: &GpuTexture,
-    orm: &GpuTexture,
-    emissive: &GpuTexture,
-) -> wgpu::BindGroup {
-    create_pbr_full_texture_bind_group(
-        device,
-        layout,
-        &albedo.view,
-        &albedo.sampler,
-        &normal.view,
-        &normal.sampler,
-        &orm.view,
-        &orm.sampler,
-        &emissive.view,
-        &emissive.sampler,
-    )
 }
 
 /// PBR group-0 layout: dynamic-offset `CameraUniform` (binding 0, vertex +

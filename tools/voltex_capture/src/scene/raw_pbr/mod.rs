@@ -11,9 +11,9 @@
 
 use voltex_math::Mat4;
 use voltex_renderer::{
-    create_pbr_full_texture_bind_group, create_pbr_pipeline, pbr_full_texture_bind_group_layout,
-    CameraUniform, GpuTexture, IblResources, LightsUniform, MaterialUniform, Mesh, ShadowMap,
-    ShadowUniform,
+    create_pbr_pipeline, create_pbr_texture_set_bind_group, pbr_full_texture_bind_group_layout,
+    CameraUniform, GpuTexture, IblResources, LightsUniform, MaterialUniform, Mesh, PbrTextureSet,
+    ShadowMap, ShadowUniform,
 };
 use wgpu::util::DeviceExt;
 
@@ -312,17 +312,15 @@ fn default_pbr_texture_bind_group(
     let normal = GpuTexture::flat_normal_map_1x1(device, queue, &single_texture_layout);
     let orm = GpuTexture::white_1x1(device, queue, &single_texture_layout);
     let emissive = GpuTexture::black_1x1(device, queue, &single_texture_layout);
-    create_pbr_full_texture_bind_group(
+    create_pbr_texture_set_bind_group(
         device,
         pbr_tex_layout,
-        &albedo.view,
-        &albedo.sampler,
-        &normal.view,
-        &normal.sampler,
-        &orm.view,
-        &orm.sampler,
-        &emissive.view,
-        &emissive.sampler,
+        PbrTextureSet {
+            albedo: &albedo,
+            normal: &normal,
+            orm: &orm,
+            emissive: &emissive,
+        },
     )
 }
 

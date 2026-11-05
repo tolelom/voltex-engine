@@ -91,17 +91,21 @@ fn hidden_component_skips_rendering() {
         let mut encoder = gpu
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
-        renderer.render(
+        renderer.render_frame(
             &gpu.queue,
             &mut encoder,
-            &target.color_view,
-            &target.depth_view,
-            wgpu::Color { r: 0.0, g: 0.0, b: 0.0, a: 1.0 },
+            voltex_renderer_ecs::FrameTarget {
+                color_view: &target.color_view,
+                depth_view: &target.depth_view,
+                clear_color: wgpu::Color { r: 0.0, g: 0.0, b: 0.0, a: 1.0 },
+            },
             &mut world,
             &assets,
-            camera.view_projection(),
-            camera.position,
-            LightUniform::new(),
+            &voltex_renderer_ecs::FrameView {
+                view_proj: camera.view_projection(),
+                camera_pos: camera.position,
+                light: LightUniform::new(),
+            },
         );
         gpu.queue.submit(Some(encoder.finish()));
         target.read_rgba8(&gpu.device, &gpu.queue)
@@ -450,19 +454,19 @@ fn render_game_ready_demo_from_camera(
     let mut camera = Camera::new(cam_pos, width as f32 / height as f32);
     camera.yaw = yaw;
     camera.pitch = pitch;
-    let view_proj = camera.view_projection();
     let light = LightUniform::new();
     draw_and_read(
         gpu,
         &target,
         &renderer,
-        "demo_like_cam",
-        wgpu::Color { r: 0.02, g: 0.02, b: 0.05, a: 1.0 },
         &mut world,
         &assets,
-        view_proj,
-        camera.position,
-        light,
+        FrameSpec {
+            label: "demo_like_cam",
+            clear_color: wgpu::Color { r: 0.02, g: 0.02, b: 0.05, a: 1.0 },
+            camera: &camera,
+            light,
+        },
     )
 }
 

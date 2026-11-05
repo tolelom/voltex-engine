@@ -6,7 +6,7 @@ use voltex_renderer::{Camera, LightUniform, MaterialUniform, Mesh};
 use voltex_renderer_ecs::{BasicRenderer, RenderAssets};
 
 use crate::headless::HeadlessGpu;
-use super::{draw_and_read, unit_cube};
+use super::{draw_and_read, FrameSpec, unit_cube};
 use crate::target::{OffscreenTarget, CAPTURE_FORMAT};
 
 /// Hot-reload regression helper. Renders one cube textured from `png_a`, then
@@ -49,13 +49,14 @@ pub fn render_texture_hot_reload(
             gpu,
             &target,
             &renderer,
-            "hot reload",
-            wgpu::Color { r: 0.05, g: 0.05, b: 0.08, a: 1.0 },
             world,
             assets,
-            camera.view_projection(),
-            camera.position,
-            LightUniform::new(),
+            FrameSpec {
+                label: "hot reload",
+                clear_color: wgpu::Color { r: 0.05, g: 0.05, b: 0.08, a: 1.0 },
+                camera: &camera,
+                light: LightUniform::new(),
+            },
         )
     };
 
@@ -105,13 +106,14 @@ pub fn render_mesh_hot_reload(
             gpu,
             &target,
             &renderer,
-            "mesh hot reload",
-            wgpu::Color { r: 0.05, g: 0.05, b: 0.08, a: 1.0 },
             world,
             assets,
-            camera.view_projection(),
-            camera.position,
-            LightUniform::new(),
+            FrameSpec {
+                label: "mesh hot reload",
+                clear_color: wgpu::Color { r: 0.05, g: 0.05, b: 0.08, a: 1.0 },
+                camera: &camera,
+                light: LightUniform::new(),
+            },
         )
     };
 

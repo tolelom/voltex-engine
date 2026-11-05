@@ -15,10 +15,10 @@ use winit::{
 use voltex::prelude::*;
 use voltex::ecs::{MaterialHandle, MeshHandle, Transform};
 use voltex::renderer::{
-    align_up, create_pbr_full_texture_bind_group, create_pbr_pipeline, create_shadow_pipeline,
+    align_up, create_pbr_pipeline, create_pbr_texture_set_bind_group, create_shadow_pipeline,
     generate_sphere_mesh, pbr_full_texture_bind_group_layout, shadow_pass_bind_group_layout,
     CameraUniform, GpuContext, GpuTexture, IblResources, LightData, LightsUniform,
-    MaterialUniform, Mesh, ShadowMap, ShadowPassUniform, ShadowUniform, SHADOW_MAP_SIZE,
+    MaterialUniform, Mesh, PbrTextureSet, ShadowMap, ShadowPassUniform, ShadowUniform, SHADOW_MAP_SIZE,
 };
 use voltex::editor::{UiContext, UiRenderer};
 use voltex::audio::{AudioClip, AudioSystem};
@@ -251,17 +251,15 @@ impl ApplicationHandler for SurvivorApp {
         let normal_tex = GpuTexture::flat_normal_map_1x1(&gpu.device, &gpu.queue, &old_tex_layout);
         let orm_tex = GpuTexture::white_1x1(&gpu.device, &gpu.queue, &old_tex_layout);
         let emissive_tex = GpuTexture::black_1x1(&gpu.device, &gpu.queue, &old_tex_layout);
-        let pbr_texture_bind_group = create_pbr_full_texture_bind_group(
+        let pbr_texture_bind_group = create_pbr_texture_set_bind_group(
             &gpu.device,
             &pbr_tex_layout,
-            &albedo_tex.view,
-            &albedo_tex.sampler,
-            &normal_tex.view,
-            &normal_tex.sampler,
-            &orm_tex.view,
-            &orm_tex.sampler,
-            &emissive_tex.view,
-            &emissive_tex.sampler,
+            PbrTextureSet {
+                albedo: &albedo_tex,
+                normal: &normal_tex,
+                orm: &orm_tex,
+                emissive: &emissive_tex,
+            },
         );
 
         // IBL resources
@@ -726,14 +724,13 @@ impl ApplicationHandler for SurvivorApp {
 
                     state.ui.end_frame();
 
-                    state.ui_renderer.render(
+                    let screen = voltex::editor::ScreenTarget { view: &color_view, width: screen_w, height: screen_h };
+                    state.ui_renderer.render_to(
                         &state.gpu.device,
                         &state.gpu.queue,
                         &mut encoder,
-                        &color_view,
+                        &screen,
                         &state.ui.draw_list,
-                        screen_w,
-                        screen_h,
                     );
                 }
 

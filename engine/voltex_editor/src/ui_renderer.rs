@@ -33,6 +33,15 @@ const VERTEX_LAYOUT: wgpu::VertexBufferLayout<'static> = wgpu::VertexBufferLayou
     ],
 };
 
+/// A color target to draw into and its size in pixels (the size sets the
+/// projection and the default scissor).
+#[derive(Clone, Copy)]
+pub struct ScreenTarget<'a> {
+    pub view: &'a wgpu::TextureView,
+    pub width: f32,
+    pub height: f32,
+}
+
 /// GPU-side UI renderer that turns a DrawList into a rendered frame.
 pub struct UiRenderer {
     pipeline: wgpu::RenderPipeline,
@@ -70,41 +79,7 @@ impl UiRenderer {
             source: wgpu::ShaderSource::Wgsl(include_str!("ui_shader.wgsl").into()),
         });
 
-        // --- Bind group layout: uniform + texture + sampler ---
-        let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            label: Some("UI Bind Group Layout"),
-            entries: &[
-                // @binding(0): uniform buffer (projection mat4x4)
-                wgpu::BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: wgpu::ShaderStages::VERTEX,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Uniform,
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
-                    },
-                    count: None,
-                },
-                // @binding(1): texture
-                wgpu::BindGroupLayoutEntry {
-                    binding: 1,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Texture {
-                        multisampled: false,
-                        view_dimension: wgpu::TextureViewDimension::D2,
-                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
-                    },
-                    count: None,
-                },
-                // @binding(2): sampler
-                wgpu::BindGroupLayoutEntry {
-                    binding: 2,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
-                    count: None,
-                },
-            ],
-        });
+        let bind_group_layout = create_bind_group_layout(device);
 
         // --- Pipeline layout ---
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
@@ -119,27 +94,7 @@ impl UiRenderer {
         let image_pipeline =
             build_ui_pipeline(device, &shader, &pipeline_layout, surface_format, "fs_image");
 
-        // --- Font atlas GPU texture (R8Unorm) ---
-        let atlas_texture = device.create_texture_with_data(
-            queue,
-            &wgpu::TextureDescriptor {
-                label: Some("UI Font Atlas"),
-                size: wgpu::Extent3d {
-                    width: font.width,
-                    height: font.height,
-                    depth_or_array_layers: 1,
-                },
-                mip_level_count: 1,
-                sample_count: 1,
-                dimension: wgpu::TextureDimension::D2,
-                format: wgpu::TextureFormat::R8Unorm,
-                usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
-                view_formats: &[],
-            },
-            wgpu::util::TextureDataOrder::LayerMajor,
-            &font.pixels,
-        );
-        let atlas_view = atlas_texture.create_view(&wgpu::TextureViewDescriptor::default());
+        let atlas_view = upload_font_atlas(device, queue, font);
 
         let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
             label: Some("UI Sampler"),
@@ -158,25 +113,14 @@ impl UiRenderer {
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         });
 
-        // --- Bind group ---
-        let font_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("UI Font Bind Group"),
-            layout: &bind_group_layout,
-            entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: uniform_buffer.as_entire_binding(),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 1,
-                    resource: wgpu::BindingResource::TextureView(&atlas_view),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 2,
-                    resource: wgpu::BindingResource::Sampler(&sampler),
-                },
-            ],
-        });
+        let font_bind_group = create_texture_bind_group(
+            device,
+            &bind_group_layout,
+            &uniform_buffer,
+            &atlas_view,
+            &sampler,
+            "UI Font Bind Group",
+        );
 
         UiRenderer {
             pipeline,
@@ -199,24 +143,14 @@ impl UiRenderer {
     /// texture alive. Slots are never freed (editor-lifetime scale — see
     /// design doc); registering per frame would leak, cache per asset instead.
     pub fn register_texture(&mut self, device: &wgpu::Device, view: &wgpu::TextureView) -> u32 {
-        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("UI Image Bind Group"),
-            layout: &self.bind_group_layout,
-            entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: self.uniform_buffer.as_entire_binding(),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 1,
-                    resource: wgpu::BindingResource::TextureView(view),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 2,
-                    resource: wgpu::BindingResource::Sampler(&self.sampler),
-                },
-            ],
-        });
+        let bind_group = create_texture_bind_group(
+            device,
+            &self.bind_group_layout,
+            &self.uniform_buffer,
+            view,
+            &self.sampler,
+            "UI Image Bind Group",
+        );
         let slot = self.textures.len() as u32;
         self.textures.push(bind_group);
         slot
@@ -269,33 +203,21 @@ impl UiRenderer {
 
         let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
 
-        self.font_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("UI Font Bind Group"),
-            layout: &self.bind_group_layout,
-            entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: self.uniform_buffer.as_entire_binding(),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 1,
-                    resource: wgpu::BindingResource::TextureView(&view),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 2,
-                    resource: wgpu::BindingResource::Sampler(&self.sampler),
-                },
-            ],
-        });
+        self.font_bind_group = create_texture_bind_group(
+            device,
+            &self.bind_group_layout,
+            &self.uniform_buffer,
+            &view,
+            &self.sampler,
+            "UI Font Bind Group",
+        );
 
         self.atlas_dirty = false;
     }
 
-    /// Render the draw list onto the given target view.
-    ///
-    /// Uses `LoadOp::Load` so the UI overlays whatever was previously rendered.
-    /// For a standalone UI demo, clear the surface before calling this.
-    #[allow(clippy::too_many_arguments)]
+    /// Old form of [`Self::render_to`] with the screen size spelled out.
+    #[deprecated(note = "use `render_to` with a `ScreenTarget`")]
+    #[allow(clippy::too_many_arguments)] // reason: legacy signature kept for compatibility
     pub fn render(
         &mut self,
         device: &wgpu::Device,
@@ -306,6 +228,23 @@ impl UiRenderer {
         screen_w: f32,
         screen_h: f32,
     ) {
+        let target = ScreenTarget { view: target_view, width: screen_w, height: screen_h };
+        self.render_to(device, queue, encoder, &target, draw_list);
+    }
+
+    /// Render the draw list onto `target`.
+    ///
+    /// Uses `LoadOp::Load` so the UI overlays whatever was previously rendered.
+    /// For a standalone UI demo, clear the surface before calling this.
+    pub fn render_to(
+        &mut self,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        encoder: &mut wgpu::CommandEncoder,
+        target: &ScreenTarget,
+        draw_list: &DrawList,
+    ) {
+        let ScreenTarget { view: target_view, width: screen_w, height: screen_h } = *target;
         if draw_list.vertices.is_empty() || draw_list.indices.is_empty() {
             return;
         }
@@ -397,6 +336,99 @@ impl UiRenderer {
             }
         }
     }
+}
+
+/// Bind group layout shared by every UI bind group: @binding(0) projection
+/// uniform, @binding(1) texture, @binding(2) sampler.
+fn create_bind_group_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
+    device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+        label: Some("UI Bind Group Layout"),
+        entries: &[
+            // @binding(0): uniform buffer (projection mat4x4)
+            wgpu::BindGroupLayoutEntry {
+                binding: 0,
+                visibility: wgpu::ShaderStages::VERTEX,
+                ty: wgpu::BindingType::Buffer {
+                    ty: wgpu::BufferBindingType::Uniform,
+                    has_dynamic_offset: false,
+                    min_binding_size: None,
+                },
+                count: None,
+            },
+            // @binding(1): texture
+            wgpu::BindGroupLayoutEntry {
+                binding: 1,
+                visibility: wgpu::ShaderStages::FRAGMENT,
+                ty: wgpu::BindingType::Texture {
+                    multisampled: false,
+                    view_dimension: wgpu::TextureViewDimension::D2,
+                    sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                },
+                count: None,
+            },
+            // @binding(2): sampler
+            wgpu::BindGroupLayoutEntry {
+                binding: 2,
+                visibility: wgpu::ShaderStages::FRAGMENT,
+                ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                count: None,
+            },
+        ],
+    })
+}
+
+/// Uploads the bitmap font atlas as an R8Unorm texture and returns its view.
+fn upload_font_atlas(device: &wgpu::Device, queue: &wgpu::Queue, font: &FontAtlas) -> wgpu::TextureView {
+    let atlas_texture = device.create_texture_with_data(
+        queue,
+        &wgpu::TextureDescriptor {
+            label: Some("UI Font Atlas"),
+            size: wgpu::Extent3d {
+                width: font.width,
+                height: font.height,
+                depth_or_array_layers: 1,
+            },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::R8Unorm,
+            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+            view_formats: &[],
+        },
+        wgpu::util::TextureDataOrder::LayerMajor,
+        &font.pixels,
+    );
+    atlas_texture.create_view(&wgpu::TextureViewDescriptor::default())
+}
+
+/// Bind group for one sampled texture: the shared projection uniform, `view`
+/// and the UI sampler.
+fn create_texture_bind_group(
+    device: &wgpu::Device,
+    layout: &wgpu::BindGroupLayout,
+    uniform_buffer: &wgpu::Buffer,
+    view: &wgpu::TextureView,
+    sampler: &wgpu::Sampler,
+    label: &str,
+) -> wgpu::BindGroup {
+    device.create_bind_group(&wgpu::BindGroupDescriptor {
+        label: Some(label),
+        layout,
+        entries: &[
+            wgpu::BindGroupEntry {
+                binding: 0,
+                resource: uniform_buffer.as_entire_binding(),
+            },
+            wgpu::BindGroupEntry {
+                binding: 1,
+                resource: wgpu::BindingResource::TextureView(view),
+            },
+            wgpu::BindGroupEntry {
+                binding: 2,
+                resource: wgpu::BindingResource::Sampler(sampler),
+            },
+        ],
+    })
 }
 
 /// Build one UI render pipeline (alpha blend, no depth) with the given

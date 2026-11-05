@@ -61,6 +61,9 @@ pub(super) fn decode_residue_config(reader: &mut BitReader, residue_type: u16) -
     })
 }
 
+/// Decodes the residue vectors of `ch` channels from an audio packet
+/// (Vorbis spec § 8.6). Type 2 decodes one interleaved vector and splits it
+/// per channel; types 0/1 decode each channel separately.
 pub(super) fn decode_residue(
     reader: &mut BitReader,
     residue: &ResidueConfig,
@@ -86,7 +89,7 @@ pub(super) fn decode_residue(
 
     let partitions_to_read = (limit_end - limit_begin) / residue.partition_size as usize;
     let classbook = &codebooks[residue.classbook as usize];
-    let classwords = classbook.dimensions as usize;
+    let partitions = PartitionRange { begin: limit_begin, count: partitions_to_read };
 
     if residue.residue_type == 2 {
         // Interleaved residue: decode into a single big vector, then deinterleave
@@ -96,56 +99,7 @@ pub(super) fn decode_residue(
         }
 
         let mut interleaved = vec![0.0f32; actual_size];
-
-        let mut partition_idx = 0usize;
-        while partition_idx < partitions_to_read {
-            // Decode classification
-            let temp = classbook.decode_scalar(reader)?;
-            let mut classifications = vec![0u8; classwords];
-            let mut t = temp;
-            for j in (0..classwords).rev() {
-                classifications[j] = (t % residue.classifications as u32) as u8;
-                t /= residue.classifications as u32;
-            }
-
-            for j in 0..classwords {
-                if partition_idx + j >= partitions_to_read {
-                    break;
-                }
-
-                let vqclass = classifications[j] as usize;
-                let offset = limit_begin + (partition_idx + j) * residue.partition_size as usize;
-
-                // Pass 0 only (simplified — only read first pass)
-                if residue.cascade[vqclass] & 1 != 0 {
-                    let book_idx = residue.books[vqclass][0];
-                    if book_idx >= 0 {
-                        let book = &codebooks[book_idx as usize];
-                        if book.lookup_type != 0 {
-                            // VQ decode
-                            let mut pos = offset;
-                            while pos < offset + residue.partition_size as usize && pos < actual_size {
-                                let vq = book.decode_vq(reader)?;
-                                for &v in vq {
-                                    if pos < actual_size {
-                                        interleaved[pos] += v;
-                                        pos += 1;
-                                    }
-                                }
-                            }
-                        } else {
-                            // Scalar decode
-                            for pos in offset..(offset + residue.partition_size as usize).min(actual_size) {
-                                let val = book.decode_scalar(reader)?;
-                                interleaved[pos] += val as f32;
-                            }
-                        }
-                    }
-                }
-            }
-
-            partition_idx += classwords;
-        }
+        decode_partitions(reader, residue, codebooks, classbook, partitions, &mut interleaved)?;
 
         // Deinterleave
         for i in 0..actual_size {
@@ -161,54 +115,108 @@ pub(super) fn decode_residue(
             if do_not_decode[c] {
                 continue;
             }
-
-            let mut partition_idx = 0usize;
-            while partition_idx < partitions_to_read {
-                let temp = classbook.decode_scalar(reader)?;
-                let mut classifications = vec![0u8; classwords];
-                let mut t = temp;
-                for j in (0..classwords).rev() {
-                    classifications[j] = (t % residue.classifications as u32) as u8;
-                    t /= residue.classifications as u32;
-                }
-
-                for j in 0..classwords {
-                    if partition_idx + j >= partitions_to_read {
-                        break;
-                    }
-
-                    let vqclass = classifications[j] as usize;
-                    let offset = limit_begin + (partition_idx + j) * residue.partition_size as usize;
-
-                    if residue.cascade[vqclass] & 1 != 0 {
-                        let book_idx = residue.books[vqclass][0];
-                        if book_idx >= 0 {
-                            let book = &codebooks[book_idx as usize];
-                            if book.lookup_type != 0 {
-                                let mut pos = offset;
-                                while pos < offset + residue.partition_size as usize && pos < n_half {
-                                    let vq = book.decode_vq(reader)?;
-                                    for &v in vq {
-                                        if pos < n_half {
-                                            residue_vectors[c][pos] += v;
-                                            pos += 1;
-                                        }
-                                    }
-                                }
-                            } else {
-                                for pos in offset..(offset + residue.partition_size as usize).min(n_half) {
-                                    let val = book.decode_scalar(reader)?;
-                                    residue_vectors[c][pos] += val as f32;
-                                }
-                            }
-                        }
-                    }
-                }
-
-                partition_idx += classwords;
-            }
+            decode_partitions(reader, residue, codebooks, classbook, partitions, &mut residue_vectors[c])?;
         }
     }
 
     Ok(residue_vectors)
+}
+
+/// Which partitions of a residue vector to decode: the first sample offset
+/// and the number of partitions after it.
+#[derive(Clone, Copy)]
+struct PartitionRange {
+    begin: usize,
+    count: usize,
+}
+
+/// Decodes `partitions` into `target`, one classword group at a time: read
+/// the classifications, then each partition's values (pass 0 only).
+fn decode_partitions(
+    reader: &mut BitReader,
+    residue: &ResidueConfig,
+    codebooks: &[Codebook],
+    classbook: &Codebook,
+    partitions: PartitionRange,
+    target: &mut [f32],
+) -> crate::Result<()> {
+    let classwords = classbook.dimensions as usize;
+    let partition_size = residue.partition_size as usize;
+
+    let mut partition_idx = 0usize;
+    while partition_idx < partitions.count {
+        let classifications = read_classifications(reader, classbook, classwords, residue.classifications)?;
+
+        for j in 0..classwords {
+            if partition_idx + j >= partitions.count {
+                break;
+            }
+
+            let vqclass = classifications[j] as usize;
+            let offset = partitions.begin + (partition_idx + j) * partition_size;
+
+            // Pass 0 only (simplified — only read first pass)
+            if residue.cascade[vqclass] & 1 != 0 {
+                let book_idx = residue.books[vqclass][0];
+                if book_idx >= 0 {
+                    let book = &codebooks[book_idx as usize];
+                    decode_partition_values(reader, book, target, offset, partition_size)?;
+                }
+            }
+        }
+
+        partition_idx += classwords;
+    }
+
+    Ok(())
+}
+
+/// Reads one classbook scalar and splits it into `classwords` per-partition
+/// classifications, most significant first.
+fn read_classifications(
+    reader: &mut BitReader,
+    classbook: &Codebook,
+    classwords: usize,
+    class_count: u8,
+) -> crate::Result<Vec<u8>> {
+    let temp = classbook.decode_scalar(reader)?;
+    let mut classifications = vec![0u8; classwords];
+    let mut t = temp;
+    for j in (0..classwords).rev() {
+        classifications[j] = (t % class_count as u32) as u8;
+        t /= class_count as u32;
+    }
+    Ok(classifications)
+}
+
+/// Adds one partition's decoded values into `target[offset..]`, clipped to
+/// the end of `target`.
+fn decode_partition_values(
+    reader: &mut BitReader,
+    book: &Codebook,
+    target: &mut [f32],
+    offset: usize,
+    partition_size: usize,
+) -> crate::Result<()> {
+    let limit = target.len();
+    if book.lookup_type != 0 {
+        // VQ decode
+        let mut pos = offset;
+        while pos < offset + partition_size && pos < limit {
+            let vq = book.decode_vq(reader)?;
+            for &v in vq {
+                if pos < limit {
+                    target[pos] += v;
+                    pos += 1;
+                }
+            }
+        }
+    } else {
+        // Scalar decode
+        for pos in offset..(offset + partition_size).min(limit) {
+            let val = book.decode_scalar(reader)?;
+            target[pos] += val as f32;
+        }
+    }
+    Ok(())
 }

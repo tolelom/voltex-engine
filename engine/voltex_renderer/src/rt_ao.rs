@@ -2,6 +2,8 @@
 //! reads only G-buffer textures; the shader's occlusion test is still a placeholder.
 #![allow(missing_docs)]
 
+use crate::compute::{ComputeContext, ScreenOutput};
+
 use bytemuck::{Pod, Zeroable};
 
 /// Uniform parameters for the RT ambient occlusion compute pass.
@@ -129,22 +131,18 @@ impl RtAo {
         }
     }
 
-    #[allow(clippy::too_many_arguments)]
-    pub fn dispatch(
+    /// 입력 텍스처를 읽어 `output` 에 결과를 쓰는 compute 패스를 기록한다.
+    pub fn encode(
         &self,
-        device: &wgpu::Device,
-        queue: &wgpu::Queue,
-        encoder: &mut wgpu::CommandEncoder,
+        gpu: &mut ComputeContext<'_>,
         position_view: &wgpu::TextureView,
         normal_view: &wgpu::TextureView,
-        output_view: &wgpu::TextureView,
+        output: ScreenOutput<'_>,
         params: &RtAoParams,
-        width: u32,
-        height: u32,
     ) {
-        queue.write_buffer(&self.params_buffer, 0, bytemuck::cast_slice(&[*params]));
+        gpu.queue.write_buffer(&self.params_buffer, 0, bytemuck::cast_slice(&[*params]));
 
-        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+        let bind_group = gpu.device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("RT AO BG"),
             layout: &self.bind_group_layout,
             entries: &[
@@ -158,7 +156,7 @@ impl RtAo {
                 },
                 wgpu::BindGroupEntry {
                     binding: 2,
-                    resource: wgpu::BindingResource::TextureView(output_view),
+                    resource: wgpu::BindingResource::TextureView(output.view),
                 },
                 wgpu::BindGroupEntry {
                     binding: 3,
@@ -167,13 +165,46 @@ impl RtAo {
             ],
         });
 
-        let mut cpass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
+        let mut cpass = gpu.encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
             label: Some("RT AO Pass"),
             timestamp_writes: None,
         });
         cpass.set_pipeline(&self.pipeline);
         cpass.set_bind_group(0, &bind_group, &[]);
-        crate::compute::dispatch_screen(&mut cpass, width, height);
+        crate::compute::dispatch_screen(&mut cpass, output.width, output.height);
+    }
+
+    /// 옛 인자 나열형. [`Self::encode`] 를 쓴다.
+    #[deprecated(note = "use `encode` (ComputeContext + ScreenOutput)")]
+    // reason: 역호환용 옛 시그니처를 그대로 둔다.
+    #[allow(clippy::too_many_arguments)]
+    pub fn dispatch(
+        &self,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        encoder: &mut wgpu::CommandEncoder,
+        position_view: &wgpu::TextureView,
+        normal_view: &wgpu::TextureView,
+        output_view: &wgpu::TextureView,
+        params: &RtAoParams,
+        width: u32,
+        height: u32,
+    ) {
+        self.encode(
+            &mut ComputeContext {
+                device,
+                queue,
+                encoder,
+            },
+            position_view,
+            normal_view,
+            ScreenOutput {
+                view: output_view,
+                width,
+                height,
+            },
+            params,
+        );
     }
 }
 

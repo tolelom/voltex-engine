@@ -2,7 +2,7 @@
 //! pipeline (`voltex_editor::UiRenderer`) that the editor workflow depends on
 //! and that has never been visually verified.
 
-use voltex_editor::{UiContext, UiRenderer};
+use voltex_editor::{ScreenTarget, UiContext, UiRenderer};
 
 use crate::headless::HeadlessGpu;
 use crate::target::{OffscreenTarget, CAPTURE_FORMAT};
@@ -75,15 +75,8 @@ pub fn render_editor_ui(gpu: &HeadlessGpu, width: u32, height: u32) -> Vec<u8> {
             multiview_mask: None,
         });
     }
-    ui_renderer.render(
-        device,
-        queue,
-        &mut encoder,
-        &target.color_view,
-        &ui.draw_list,
-        screen_w,
-        height as f32,
-    );
+    let screen = ScreenTarget { view: &target.color_view, width: screen_w, height: height as f32 };
+    ui_renderer.render_to(device, queue, &mut encoder, &screen, &ui.draw_list);
     queue.submit(Some(encoder.finish()));
 
     target.read_rgba8(device, queue)
@@ -141,15 +134,8 @@ pub fn render_ui_image_widget(gpu: &HeadlessGpu, width: u32, height: u32) -> Vec
             multiview_mask: None,
         });
     }
-    ui_renderer.render(
-        device,
-        queue,
-        &mut encoder,
-        &target.color_view,
-        &ui.draw_list,
-        width as f32,
-        height as f32,
-    );
+    let screen = ScreenTarget { view: &target.color_view, width: width as f32, height: height as f32 };
+    ui_renderer.render_to(device, queue, &mut encoder, &screen, &ui.draw_list);
     queue.submit(Some(encoder.finish()));
 
     target.read_rgba8(device, queue)

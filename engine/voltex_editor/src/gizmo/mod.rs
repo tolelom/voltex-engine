@@ -11,7 +11,10 @@ pub mod renderer;
 use voltex_ecs::{Entity, Transform, World, WorldTransform};
 use voltex_math::{Mat4, Vec3};
 
-pub use renderer::GizmoRenderer;
+use crate::dock::Rect;
+use crate::picking::ViewportCursor;
+
+pub use renderer::{GizmoDraw, GizmoRenderer};
 
 /// Two unit vectors `(u, v)` perpendicular to `axis` and to each other
 /// (`u = axis × helper`, `v = axis × u`). Spans the plane a rotate ring or
@@ -129,8 +132,9 @@ impl GizmoState {
         world.get::<Transform>(entity).map(|t| t.position)
     }
 
-    /// Try to start a drag. Returns true if a gizmo axis was hit.
-    #[allow(clippy::too_many_arguments)]
+    /// Old form of [`Self::begin_drag`] with the camera, viewport rect and
+    /// mouse as separate arguments.
+    #[deprecated(note = "use `begin_drag` with a `ViewportCursor`")]
     pub fn try_begin_drag(
         &mut self,
         world: &mut World,
@@ -140,6 +144,13 @@ impl GizmoState {
         rect: (f32, f32, f32, f32),
         mouse: (f32, f32),
     ) -> bool {
+        let cursor = ViewportCursor::new(*view_proj, cam_pos, rect_from_tuple(rect), mouse);
+        self.begin_drag(world, entity, &cursor)
+    }
+
+    /// Try to start a drag on the gizmo handle under `cursor`. Returns true if
+    /// a gizmo axis was hit.
+    pub fn begin_drag(&mut self, world: &mut World, entity: Entity, cursor: &ViewportCursor) -> bool {
         if self.drag.is_some() {
             return false;
         }
@@ -152,12 +163,11 @@ impl GizmoState {
             Some(t) => *t,
             None => return false,
         };
-        let inv = match view_proj.inverse() {
-            Some(m) => m,
+        let ray = match cursor.world_ray() {
+            Some(r) => r,
             None => return false,
         };
-        let ndc = crate::picking::ndc_from_viewport(mouse.0, mouse.1, rect.0, rect.1, rect.2, rect.3);
-        let ray = crate::picking::ray_from_ndc(&inv, cam_pos, ndc);
+        let cam_pos = cursor.cam_pos;
 
         let drag = match self.mode {
             GizmoMode::Translate => translate::try_begin(origin, &ray, cam_pos, initial),
@@ -172,8 +182,9 @@ impl GizmoState {
         }
     }
 
-    /// Update the entity's Transform directly from the current mouse position.
-    #[allow(clippy::too_many_arguments)]
+    /// Old form of [`Self::drag_to`] with the camera, viewport rect and mouse
+    /// as separate arguments.
+    #[deprecated(note = "use `drag_to` with a `ViewportCursor`")]
     pub fn update_drag(
         &mut self,
         world: &mut World,
@@ -183,16 +194,20 @@ impl GizmoState {
         rect: (f32, f32, f32, f32),
         mouse: (f32, f32),
     ) {
+        let cursor = ViewportCursor::new(*view_proj, cam_pos, rect_from_tuple(rect), mouse);
+        self.drag_to(world, entity, &cursor);
+    }
+
+    /// Update the entity's Transform directly from the current mouse position.
+    pub fn drag_to(&mut self, world: &mut World, entity: Entity, cursor: &ViewportCursor) {
         let drag = match &self.drag {
             Some(d) => d.clone(),
             None => return,
         };
-        let inv = match view_proj.inverse() {
-            Some(m) => m,
+        let ray = match cursor.world_ray() {
+            Some(r) => r,
             None => return,
         };
-        let ndc = crate::picking::ndc_from_viewport(mouse.0, mouse.1, rect.0, rect.1, rect.2, rect.3);
-        let ray = crate::picking::ray_from_ndc(&inv, cam_pos, ndc);
         let new_t = match self.mode {
             GizmoMode::Translate => translate::compute_transform(&drag, &ray),
             GizmoMode::Rotate    => rotate::compute_transform(&drag, &ray),
@@ -201,7 +216,6 @@ impl GizmoState {
         if let Some(t) = world.get_mut::<Transform>(entity) {
             *t = new_t;
         }
-        let _ = cam_pos;
     }
 
     /// End the drag. Restores the entity Transform to `initial` and returns
@@ -215,6 +229,11 @@ impl GizmoState {
         }
         Some(DragResult { initial: drag.initial_transform, final_transform })
     }
+}
+
+/// `(x, y, w, h)` tuple of the deprecated drag API → [`Rect`].
+fn rect_from_tuple((x, y, w, h): (f32, f32, f32, f32)) -> Rect {
+    Rect { x, y, w, h }
 }
 
 impl Default for GizmoState {
@@ -260,7 +279,7 @@ mod tests {
             anchor: 0.0,
         });
 
-        // Mutate the world Transform to simulate update_drag having moved it.
+        // Mutate the world Transform to simulate drag_to having moved it.
         if let Some(t) = world.get_mut::<Transform>(e) {
             t.position = Vec3::new(5.0, 0.0, 0.0);
         }
@@ -290,7 +309,7 @@ mod tests {
         let view = Mat4::look_at(cam_pos, Vec3::ZERO, Vec3::Y);
         let proj = Mat4::perspective(60f32.to_radians(), 1.0, 0.1, 100.0);
         let view_proj = proj * view;
-        let rect = (0.0f32, 0.0f32, 800.0f32, 800.0f32);
+        let rect = Rect { x: 0.0, y: 0.0, w: 800.0, h: 800.0 };
 
         // Project a world point to a mouse pixel (inverse of ndc_from_viewport).
         let to_mouse = |p: Vec3| -> (f32, f32) {
@@ -299,18 +318,19 @@ mod tests {
             let ndc_y = clip.y / clip.w;
             let rx = (ndc_x + 1.0) * 0.5;
             let ry = (1.0 - ndc_y) * 0.5;
-            (rx * rect.2 + rect.0, ry * rect.3 + rect.1)
+            (rx * rect.w + rect.x, ry * rect.h + rect.y)
         };
 
         // Begin a drag on a point on the +X arrow (within [0.15, 1.5]).
         let begin_mouse = to_mouse(Vec3::new(0.8, 0.0, 0.0));
-        let hit = g.try_begin_drag(&mut world, e, &view_proj, cam_pos, rect, begin_mouse);
+        let cursor = |mouse| ViewportCursor::new(view_proj, cam_pos, rect, mouse);
+        let hit = g.begin_drag(&mut world, e, &cursor(begin_mouse));
         assert!(hit, "ray through the projected X-axis point should hit the X gizmo");
         assert_eq!(g.active_axis(), Some(GizmoAxis::X));
 
         // Drag to a point 0.4 further along +X (same drag plane) → +0.4 move.
         let drag_mouse = to_mouse(Vec3::new(1.2, 0.0, 0.0));
-        g.update_drag(&mut world, e, &view_proj, cam_pos, rect, drag_mouse);
+        g.drag_to(&mut world, e, &cursor(drag_mouse));
         let pos = world.get::<Transform>(e).unwrap().position;
         assert!((pos.x - 0.4).abs() < 0.05, "expected x≈0.4, got {}", pos.x);
         assert!(pos.y.abs() < 0.05 && pos.z.abs() < 0.05, "off-axis drift: {pos:?}");

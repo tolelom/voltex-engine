@@ -20,8 +20,9 @@ Headless offscreen 렌더링 + PNG 캡처. 윈도우 없는 환경에서 *실제
 | `ImageStats::analyze(&[u8])` / `looks_blank()` | `lib.rs` | blank/단색 프레임 자동 탐지 |
 | `scene::render_single_cube` / `render_cube_grid` | `scene/mod.rs` | `(gpu, w, h) -> Vec<u8>` |
 | `scene::raw_pbr::render_pbr_grid` / `render_shadow_scene` / `render_multi_light` | `scene/raw_pbr/` | 손으로 조립한 PBR 파이프라인, `(gpu, w, h) -> Vec<u8>` |
-| `scene::render_world(gpu, w, h, &mut World, cam_pos, yaw, pitch) -> Vec<u8>` | `scene/declarative.rs` | 외부 게임 crate가 자기 씬을 픽셀 검증하는 공개 진입점 (depths 도그푸딩용). 고정 라이트/FOV/1024 entity 상한 — doc 주석 참고 |
-| `scene::render_world_ortho(gpu, w, h, &mut World, cam_pos, yaw, pitch, ortho_height) -> Vec<u8>` | `scene/declarative.rs` | `render_world`의 직교 변형 — 런타임 `with_orthographic`과 동일 의미의 뷰 높이. 2D 게임이 실제 화면 구도로 픽셀 검증 (leap 도그푸딩용) |
+| `scene::render_world_from(gpu, w, h, &mut World, CameraPose, Projection) -> Vec<u8>` | `scene/declarative.rs` | 외부 게임 crate가 자기 씬을 픽셀 검증하는 공개 진입점 (depths·leap 도그푸딩용). `CameraPose { position, yaw, pitch }`, `Projection::{Perspective, Orthographic { height }}` (직교 높이는 런타임 `with_orthographic`과 같은 의미). 고정 라이트/FOV/1024 entity 상한 — doc 주석 참고 |
+| `scene::render_world(gpu, w, h, &mut World, cam_pos, yaw, pitch)` / `render_world_ortho(…, ortho_height)` | `scene/declarative.rs` | 기존 위치 인자 시그니처를 유지하는 얇은 래퍼 (새 코드는 `render_world_from`) |
+| `scene::render_demo_frame_mode(gpu, w, h, DemoMoment, DemoShading) -> Vec<u8>` | `scene/playthrough.rs` | `DemoMoment { t, player_x, chaser_pos }`, `DemoShading::{Colored, Pbr}` |
 | bin `capture` | `bin/capture.rs` | `cargo run -p voltex_capture --bin capture [out_dir]` |
 
 ## 의존성
@@ -37,9 +38,9 @@ src/
 ├── headless.rs         # HeadlessGpu (surface 없는 device/queue)
 ├── target.rs           # OffscreenTarget + readback + align_up
 ├── scene/
-│   ├── mod.rs          # 공용 헬퍼(unit_cube·draw_and_read·matte·ground_quad_mesh) + 기본 큐브 씬 + 하위 모듈 re-export
+│   ├── mod.rs          # 공용 헬퍼(unit_cube·draw_and_read+FrameSpec·matte·ground_quad_mesh) + 기본 큐브 씬 + 하위 모듈 re-export
 │   │                   # ── BasicRenderer 경로 (scene:: 로 평평하게 노출) ──
-│   ├── declarative.rs  # PrimitiveMesh+MaterialDesc 씬, render_world / render_world_ortho, survivor 시드 씬
+│   ├── declarative.rs  # PrimitiveMesh+MaterialDesc 씬, render_world_from(+CameraPose/Projection) 및 래퍼, survivor 시드 씬
 │   ├── lighting.rs     # 그림자 on/off·점광원·스포트라이트 씬
 │   ├── pbr.rs          # BasicRenderer PBR 경로 (금속도 줄·노멀맵)
 │   ├── texture.rs      # 텍스처·PNG·OBJ 로딩 씬

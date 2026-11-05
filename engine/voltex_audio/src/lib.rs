@@ -6,7 +6,7 @@
 //!   [`vorbis::decode_vorbis`] (simplified Vorbis I), bundled into
 //!   [`decode_ogg_vorbis_bytes`] for convenience.
 //! - Playback model: [`AudioClip`] holds samples, [`AudioSource`] is the per
-//!   ECS instance, [`mixing::PlayingSound`] + [`mix_sounds`] do per-frame mix.
+//!   ECS instance, [`mixing::PlayingSound`] + [`mix_buffer`] do per-frame mix.
 //! - Spatialisation: [`Listener`] + [`SpatialParams`] +
 //!   [`compute_spatial_gains`], 3D distance attenuation + stereo pan.
 //! - Mixer: [`MixGroup`] / [`MixerState`] per-group volumes.
@@ -54,7 +54,9 @@ pub use audio_source::{AudioSource, ClipId};
 pub use wav::{parse_wav, generate_wav_bytes};
 pub use ogg::parse_ogg;
 pub use vorbis::decode_vorbis;
-pub use mixing::{PlayingSound, VoiceId, mix_sounds};
+#[allow(deprecated)]
+pub use mixing::mix_sounds;
+pub use mixing::{OutputFormat, PlayingSound, VoiceId, mix_buffer};
 pub use audio_system::AudioSystem;
 pub use spatial::{Listener, SpatialParams, distance_attenuation, stereo_pan, compute_spatial_gains};
 pub use mix_group::{MixGroup, MixerState};
