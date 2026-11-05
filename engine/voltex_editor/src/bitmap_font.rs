@@ -253,9 +253,9 @@ impl FontAtlas {
         }
     }
 
-    /// Returns (u0, v0, u1, v1) UV coordinates for a given character.
-    /// Returns coordinates for space if character is out of ASCII range.
-    pub fn glyph_uv(&self, ch: char) -> (f32, f32, f32, f32) {
+    /// Atlas UV rectangle of `ch`. Characters outside ASCII 32-126 map to
+    /// the space glyph.
+    pub fn glyph_uv_rect(&self, ch: char) -> UvRect {
         let code = ch as u32;
         let index = if (32..=126).contains(&code) {
             code - 32
@@ -272,8 +272,25 @@ impl FontAtlas {
         let u1 = u0 + self.glyph_width as f32 / self.width as f32;
         let v1 = v0 + self.glyph_height as f32 / self.height as f32;
 
-        (u0, v0, u1, v1)
+        UvRect { u0, v0, u1, v1 }
     }
+
+    /// Returns `(u0, v0, u1, v1)` for `ch`.
+    #[deprecated(note = "use `glyph_uv_rect`")]
+    pub fn glyph_uv(&self, ch: char) -> (f32, f32, f32, f32) {
+        let uv = self.glyph_uv_rect(ch);
+        (uv.u0, uv.v0, uv.u1, uv.v1)
+    }
+}
+
+/// Texture-space rectangle (0..1) of one glyph: top-left `(u0, v0)`,
+/// bottom-right `(u1, v1)`.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct UvRect {
+    pub u0: f32,
+    pub v0: f32,
+    pub u1: f32,
+    pub v1: f32,
 }
 
 #[cfg(test)]
@@ -291,7 +308,7 @@ mod tests {
     #[test]
     fn test_glyph_uv_space() {
         let atlas = FontAtlas::generate();
-        let (u0, v0, u1, v1) = atlas.glyph_uv(' ');
+        let UvRect { u0, v0, u1, v1 } = atlas.glyph_uv_rect(' ');
         assert!((u0 - 0.0).abs() < 1e-6);
         assert!((v0 - 0.0).abs() < 1e-6);
         assert!((u1 - 8.0 / 128.0).abs() < 1e-6);
@@ -303,7 +320,7 @@ mod tests {
         let atlas = FontAtlas::generate();
         // 'A' = ASCII 65, index = 65 - 32 = 33
         // col = 33 % 16 = 1, row = 33 / 16 = 2
-        let (u0, v0, u1, v1) = atlas.glyph_uv('A');
+        let UvRect { u0, v0, u1, v1 } = atlas.glyph_uv_rect('A');
         let expected_u0 = 1.0 * 8.0 / 128.0;
         let expected_v0 = 2.0 * 12.0 / 72.0;
         let expected_u1 = expected_u0 + 8.0 / 128.0;

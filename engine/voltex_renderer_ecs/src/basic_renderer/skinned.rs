@@ -5,39 +5,44 @@
 use voltex_ecs::{MaterialHandle, World, WorldTransform};
 use voltex_math::{Mat4, Vec3};
 use voltex_renderer::{
-    create_pbr_full_texture_bind_group, create_skinned_shadow_pipeline,
-    pipeline::create_skinned_mesh_pipeline, BonePalette, CameraUniform,
+    create_skinned_shadow_pipeline, pipeline::create_skinned_mesh_pipeline, BonePalette,
     MaterialUniform, SkinnedCameraUniform,
 };
 
-use super::{dynamic_uniform_layout, warn_overflow_once, BasicRenderer, MAX_SKINNED};
-use crate::assets::RenderAssets;
+use super::{
+    dynamic_uniform_layout, single_buffer_bind_group, warn_overflow_once, BasicRenderer,
+    MAX_SKINNED,
+};
+use crate::assets::{PbrTextures, RenderAssets, TextureHandle};
+use crate::dynamic_uniform::DynamicUniformBuffer;
+use crate::items::Hidden;
+use crate::scene_pass::begin_overlay_pass;
 use crate::skinned::{SkinnedMeshHandle, SkinnedPose};
 
 /// Per-skinned-entity render data gathered for one frame.
-struct SkinnedItem {
-    model: Mat4,
-    handle: SkinnedMeshHandle,
-    palette: BonePalette,
-    material: MaterialUniform,
-    texture: Option<crate::assets::TextureHandle>,
-    pbr: Option<crate::assets::PbrTextures>,
+pub(super) struct SkinnedItem {
+    pub(super) model: Mat4,
+    pub(super) handle: SkinnedMeshHandle,
+    pub(super) palette: BonePalette,
+    pub(super) material: MaterialUniform,
+    pub(super) texture: Option<TextureHandle>,
+    pub(super) pbr: Option<PbrTextures>,
 }
 
 pub(super) struct SkinnedResources {
     pub(super) pipeline: wgpu::RenderPipeline,
-    pub(super) cam_buffer: wgpu::Buffer,
-    pub(super) palette_buffer: wgpu::Buffer,
-    pub(super) cam_bind_group: wgpu::BindGroup,
+    pub(super) cameras: DynamicUniformBuffer<SkinnedCameraUniform>,
+    pub(super) camera_bind_group: wgpu::BindGroup,
+    /// One `BonePalette` per skinned entity; shared by the Blinn-Phong pass,
+    /// the shadow casters and the PBR skinned pass.
+    pub(super) palettes: DynamicUniformBuffer<BonePalette>,
     pub(super) palette_bind_group: wgpu::BindGroup,
-    pub(super) cam_aligned: u32,
-    pub(super) palette_aligned: u32,
     // Skinned shadow caster: depth-only skinning pipeline + a light-space camera
-    // UBO (reuses the palette buffer + skinned_cam/palette layouts). Lets skinned
-    // meshes write into the directional shadow map alongside static meshes.
+    // UBO (reuses the palette buffer + skinned camera/palette layouts). Lets
+    // skinned meshes write into the directional shadow map alongside static meshes.
     pub(super) shadow_pipeline: wgpu::RenderPipeline,
-    pub(super) shadow_cam_buffer: wgpu::Buffer,
-    pub(super) shadow_cam_bind_group: wgpu::BindGroup,
+    pub(super) shadow_cameras: DynamicUniformBuffer<SkinnedCameraUniform>,
+    pub(super) shadow_camera_bind_group: wgpu::BindGroup,
 }
 
 impl SkinnedResources {
@@ -46,12 +51,7 @@ impl SkinnedResources {
         target_format: wgpu::TextureFormat,
         alignment: u32,
     ) -> Self {
-        let skinned_cam_aligned =
-            (std::mem::size_of::<SkinnedCameraUniform>() as u32).div_ceil(alignment) * alignment;
-        let palette_aligned =
-            (std::mem::size_of::<BonePalette>() as u32).div_ceil(alignment) * alignment;
-
-        let skinned_cam_layout = dynamic_uniform_layout(
+        let camera_layout = dynamic_uniform_layout(
             device,
             "BasicRenderer Skinned Camera BGL",
             std::mem::size_of::<SkinnedCameraUniform>() as u64,
@@ -61,86 +61,68 @@ impl SkinnedResources {
             "BasicRenderer Bone Palette BGL",
             std::mem::size_of::<BonePalette>() as u64,
         );
-        let skinned_pipeline = create_skinned_mesh_pipeline(
+        let pipeline =
+            create_skinned_mesh_pipeline(device, target_format, &camera_layout, &palette_layout);
+        let cameras = DynamicUniformBuffer::<SkinnedCameraUniform>::new(
             device,
-            target_format,
-            &skinned_cam_layout,
-            &palette_layout,
+            "BasicRenderer Skinned Camera Dynamic UBO",
+            alignment,
+            MAX_SKINNED,
         );
-        let skinned_cam_buffer = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("BasicRenderer Skinned Camera Dynamic UBO"),
-            size: (skinned_cam_aligned as usize * MAX_SKINNED) as u64,
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
-        });
-        let palette_buffer = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("BasicRenderer Bone Palette Dynamic UBO"),
-            size: (palette_aligned as usize * MAX_SKINNED) as u64,
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
-        });
-        let skinned_cam_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("BasicRenderer Skinned Camera BG"),
-            layout: &skinned_cam_layout,
-            entries: &[wgpu::BindGroupEntry {
-                binding: 0,
-                resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
-                    buffer: &skinned_cam_buffer,
-                    offset: 0,
-                    size: wgpu::BufferSize::new(std::mem::size_of::<SkinnedCameraUniform>() as u64),
-                }),
-            }],
-        });
-        let palette_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("BasicRenderer Bone Palette BG"),
-            layout: &palette_layout,
-            entries: &[wgpu::BindGroupEntry {
-                binding: 0,
-                resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
-                    buffer: &palette_buffer,
-                    offset: 0,
-                    size: wgpu::BufferSize::new(std::mem::size_of::<BonePalette>() as u64),
-                }),
-            }],
-        });
+        let palettes = DynamicUniformBuffer::<BonePalette>::new(
+            device,
+            "BasicRenderer Bone Palette Dynamic UBO",
+            alignment,
+            MAX_SKINNED,
+        );
+        let camera_bind_group = single_buffer_bind_group(
+            device,
+            "BasicRenderer Skinned Camera BG",
+            &camera_layout,
+            cameras.binding(),
+        );
+        let palette_bind_group = single_buffer_bind_group(
+            device,
+            "BasicRenderer Bone Palette BG",
+            &palette_layout,
+            palettes.binding(),
+        );
 
         // Skinned shadow caster: depth-only pipeline (reuses the skinned camera +
         // palette layouts) and a dedicated light-space camera UBO. The palette
         // buffer is shared — render() uploads identical pose data for the shadow
         // pass and the main skinned pass each frame.
-        let skinned_shadow_pipeline =
-            create_skinned_shadow_pipeline(device, &skinned_cam_layout, &palette_layout);
-        let skinned_shadow_cam_buffer = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("BasicRenderer Skinned Shadow Camera Dynamic UBO"),
-            size: (skinned_cam_aligned as usize * MAX_SKINNED) as u64,
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
-        });
-        let skinned_shadow_cam_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("BasicRenderer Skinned Shadow Camera BG"),
-            layout: &skinned_cam_layout,
-            entries: &[wgpu::BindGroupEntry {
-                binding: 0,
-                resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
-                    buffer: &skinned_shadow_cam_buffer,
-                    offset: 0,
-                    size: wgpu::BufferSize::new(std::mem::size_of::<SkinnedCameraUniform>() as u64),
-                }),
-            }],
-        });
+        let shadow_pipeline =
+            create_skinned_shadow_pipeline(device, &camera_layout, &palette_layout);
+        let shadow_cameras = DynamicUniformBuffer::<SkinnedCameraUniform>::new(
+            device,
+            "BasicRenderer Skinned Shadow Camera Dynamic UBO",
+            alignment,
+            MAX_SKINNED,
+        );
+        let shadow_camera_bind_group = single_buffer_bind_group(
+            device,
+            "BasicRenderer Skinned Shadow Camera BG",
+            &camera_layout,
+            shadow_cameras.binding(),
+        );
         Self {
-            pipeline: skinned_pipeline,
-            cam_buffer: skinned_cam_buffer,
-            palette_buffer,
-            cam_bind_group: skinned_cam_bind_group,
+            pipeline,
+            cameras,
+            camera_bind_group,
+            palettes,
             palette_bind_group,
-            cam_aligned: skinned_cam_aligned,
-            palette_aligned,
-            shadow_pipeline: skinned_shadow_pipeline,
-            shadow_cam_buffer: skinned_shadow_cam_buffer,
-            shadow_cam_bind_group: skinned_shadow_cam_bind_group,
+            shadow_pipeline,
+            shadow_cameras,
+            shadow_camera_bind_group,
         }
     }
+}
+
+/// Material for a skinned entity without a `MaterialHandle`: light grey,
+/// non-metallic, roughness 0.6.
+fn default_skinned_material() -> MaterialUniform {
+    MaterialUniform::with_params([0.8, 0.8, 0.82, 1.0], 0.0, 0.6)
 }
 
 impl BasicRenderer {
@@ -156,29 +138,26 @@ impl BasicRenderer {
         world: &World,
         light_vp: Mat4,
     ) -> Vec<SkinnedMeshHandle> {
-        let items: Vec<(SkinnedMeshHandle, Mat4, voltex_renderer::BonePalette)> = world
+        let mut casters: Vec<(SkinnedMeshHandle, Mat4, BonePalette)> = world
             .query3::<WorldTransform, SkinnedMeshHandle, SkinnedPose>()
-            .filter(|(e, _, _, _)| world.get::<crate::items::Hidden>(*e).is_none())
+            .filter(|(e, _, _, _)| world.get::<Hidden>(*e).is_none())
             .map(|(_, wt, handle, pose)| (*handle, wt.0, pose.palette()))
             .collect();
-        let n = items.len().min(MAX_SKINNED);
-        if n == 0 {
+        casters.truncate(MAX_SKINNED);
+        if casters.is_empty() {
             return Vec::new();
         }
-        let cam_aligned = self.skinned.cam_aligned as usize;
-        let pal_aligned = self.skinned.palette_aligned as usize;
-        let mut cam_staging = vec![0u8; n * cam_aligned];
-        let mut pal_staging = vec![0u8; n * pal_aligned];
-        for (i, (_, model, palette)) in items.iter().take(n).enumerate() {
-            let cam = SkinnedCameraUniform { view_proj: light_vp.cols, model: model.cols };
-            let cb = bytemuck::bytes_of(&cam);
-            cam_staging[i * cam_aligned..i * cam_aligned + cb.len()].copy_from_slice(cb);
-            let pb = bytemuck::bytes_of(palette);
-            pal_staging[i * pal_aligned..i * pal_aligned + pb.len()].copy_from_slice(pb);
-        }
-        queue.write_buffer(&self.skinned.shadow_cam_buffer, 0, &cam_staging);
-        queue.write_buffer(&self.skinned.palette_buffer, 0, &pal_staging);
-        items.into_iter().take(n).map(|(h, _, _)| h).collect()
+        let cameras: Vec<SkinnedCameraUniform> = casters
+            .iter()
+            .map(|(_, model, _)| SkinnedCameraUniform {
+                view_proj: light_vp.cols,
+                model: model.cols,
+            })
+            .collect();
+        let palettes: Vec<BonePalette> = casters.iter().map(|(_, _, palette)| *palette).collect();
+        self.skinned.shadow_cameras.upload(queue, &cameras);
+        self.skinned.palettes.upload(queue, &palettes);
+        casters.into_iter().map(|(handle, _, _)| handle).collect()
     }
 
     /// Second pass: GPU vertex skinning for entities carrying both a
@@ -197,176 +176,82 @@ impl BasicRenderer {
         view_proj: Mat4,
         cam_pos: Vec3,
     ) {
-        // Per skinned entity: model, mesh, palette, + (PBR only) material maps.
-        let pbr = self.pbr_enabled;
-        let items: Vec<SkinnedItem> = world
+        let mut items = self.collect_skinned_items(world, assets);
+        warn_overflow_once(&self.skinned_overflow_warned, "skinned meshes", items.len(), MAX_SKINNED);
+        items.truncate(MAX_SKINNED);
+        if items.is_empty() {
+            return;
+        }
+
+        // Palettes are shared by both skinned paths.
+        let palettes: Vec<BonePalette> = items.iter().map(|it| it.palette).collect();
+        self.skinned.palettes.upload(queue, &palettes);
+
+        if self.pbr_enabled {
+            let maps_bind_groups =
+                self.prepare_skinned_pbr(queue, assets, &items, view_proj, cam_pos);
+            let mut pass =
+                begin_overlay_pass(encoder, "BasicRenderer Skinned Pass", target_view, depth_view);
+            self.draw_skinned_pbr(&mut pass, assets, &items, &maps_bind_groups);
+        } else {
+            let cameras: Vec<SkinnedCameraUniform> = items
+                .iter()
+                .map(|it| SkinnedCameraUniform {
+                    view_proj: view_proj.cols,
+                    model: it.model.cols,
+                })
+                .collect();
+            self.skinned.cameras.upload(queue, &cameras);
+            let mut pass =
+                begin_overlay_pass(encoder, "BasicRenderer Skinned Pass", target_view, depth_view);
+            self.draw_skinned_blinn_phong(&mut pass, assets, &items);
+        }
+    }
+
+    /// Model, mesh, palette and material of every visible skinned entity
+    /// (+ PBR maps when the PBR path is on).
+    fn collect_skinned_items(&self, world: &World, assets: &RenderAssets) -> Vec<SkinnedItem> {
+        world
             .query3::<WorldTransform, SkinnedMeshHandle, SkinnedPose>()
-            .filter(|(e, _, _, _)| world.get::<crate::items::Hidden>(*e).is_none())
+            .filter(|(e, _, _, _)| world.get::<Hidden>(*e).is_none())
             .map(|(e, wt, handle, pose)| {
                 let material = world
                     .get::<MaterialHandle>(e)
                     .and_then(|h| assets.material(*h).copied())
-                    .unwrap_or_else(|| {
-                        MaterialUniform::with_params([0.8, 0.8, 0.82, 1.0], 0.0, 0.6)
-                    });
+                    .unwrap_or_else(default_skinned_material);
                 SkinnedItem {
                     model: wt.0,
                     handle: *handle,
                     palette: pose.palette(),
                     material,
-                    texture: world.get::<crate::assets::TextureHandle>(e).copied(),
-                    pbr: if pbr { world.get::<crate::assets::PbrTextures>(e).copied() } else { None },
+                    texture: world.get::<TextureHandle>(e).copied(),
+                    pbr: if self.pbr_enabled {
+                        world.get::<PbrTextures>(e).copied()
+                    } else {
+                        None
+                    },
                 }
             })
-            .collect();
-        warn_overflow_once(&self.skinned_overflow_warned, "skinned meshes", items.len(), MAX_SKINNED);
-        let n = items.len().min(MAX_SKINNED);
-        if n == 0 {
-            return;
-        }
+            .collect()
+    }
 
-        // Palettes are shared by both skinned paths.
-        let pal_aligned = self.skinned.palette_aligned as usize;
-        let mut pal_staging = vec![0u8; n * pal_aligned];
-        for (i, it) in items.iter().take(n).enumerate() {
-            let pb = bytemuck::bytes_of(&it.palette);
-            pal_staging[i * pal_aligned..i * pal_aligned + pb.len()].copy_from_slice(pb);
-        }
-        queue.write_buffer(&self.skinned.palette_buffer, 0, &pal_staging);
-
-        // Per-entity camera uniform: PBR uses CameraUniform (w/ camera_pos), the
-        // colored path uses SkinnedCameraUniform.
-        let cam_aligned = if self.pbr_enabled {
-            let a = self.pbr_skinned.cam_aligned as usize;
-            let mut staging = vec![0u8; n * a];
-            for (i, it) in items.iter().take(n).enumerate() {
-                let cam = CameraUniform {
-                    view_proj: view_proj.cols,
-                    model: it.model.cols,
-                    camera_pos: [cam_pos.x, cam_pos.y, cam_pos.z],
-                    _padding: 0.0,
-                };
-                let cb = bytemuck::bytes_of(&cam);
-                staging[i * a..i * a + cb.len()].copy_from_slice(cb);
-            }
-            queue.write_buffer(&self.pbr_skinned.cam_buffer, 0, &staging);
-            a
-        } else {
-            let a = self.skinned.cam_aligned as usize;
-            let mut staging = vec![0u8; n * a];
-            for (i, it) in items.iter().take(n).enumerate() {
-                let cam = SkinnedCameraUniform {
-                    view_proj: view_proj.cols,
-                    model: it.model.cols,
-                };
-                let cb = bytemuck::bytes_of(&cam);
-                staging[i * a..i * a + cb.len()].copy_from_slice(cb);
-            }
-            queue.write_buffer(&self.skinned.cam_buffer, 0, &staging);
-            a
-        };
-
-        // PBR skinned: stage per-entity material + build per-entity texture
-        // bind groups (defaults for absent maps), mirroring the static pass.
-        let mat_aligned = self.pbr_skinned.material_aligned as usize;
-        let skinned_tex_bgs: Vec<Option<wgpu::BindGroup>> = if self.pbr_enabled {
-            let mut mat_staging = vec![0u8; n * mat_aligned];
-            for (i, it) in items.iter().take(n).enumerate() {
-                let mb = bytemuck::bytes_of(&it.material);
-                mat_staging[i * mat_aligned..i * mat_aligned + mb.len()].copy_from_slice(mb);
-            }
-            queue.write_buffer(&self.pbr_skinned.material_buffer, 0, &mat_staging);
-
-            let resolve = |h: Option<crate::assets::TextureHandle>| {
-                h.and_then(|h| assets.texture(h)).map(|t| (&t.view, &t.sampler))
+    fn draw_skinned_blinn_phong(
+        &self,
+        pass: &mut wgpu::RenderPass<'_>,
+        assets: &RenderAssets,
+        items: &[SkinnedItem],
+    ) {
+        let skinned = &self.skinned;
+        pass.set_pipeline(&skinned.pipeline);
+        for (i, it) in items.iter().enumerate() {
+            let Some(mesh) = assets.skinned_mesh(it.handle) else {
+                continue;
             };
-            items
-                .iter()
-                .take(n)
-                .map(|it| {
-                    let has_maps = it.texture.is_some()
-                        || it.pbr.map(|p| p.normal.or(p.orm).or(p.emissive).is_some())
-                            == Some(true);
-                    if !has_maps {
-                        return None;
-                    }
-                    let (av, asamp) = resolve(it.texture)
-                        .unwrap_or((&self.default_texture.view, &self.default_texture.sampler));
-                    let (nv, nsamp) = resolve(it.pbr.and_then(|p| p.normal))
-                        .unwrap_or((&self.pbr.flat_normal.1, &self.pbr.flat_normal.2));
-                    let (ov, osamp) = resolve(it.pbr.and_then(|p| p.orm))
-                        .unwrap_or((&self.default_texture.view, &self.default_texture.sampler));
-                    let (ev, esamp) = resolve(it.pbr.and_then(|p| p.emissive))
-                        .unwrap_or((&self.pbr.black.view, &self.pbr.black.sampler));
-                    Some(create_pbr_full_texture_bind_group(
-                        &self.device, &self.pbr.tex_layout, av, asamp, nv, nsamp, ov, osamp, ev,
-                        esamp,
-                    ))
-                })
-                .collect()
-        } else {
-            Vec::new()
-        };
-
-        let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-            label: Some("BasicRenderer Skinned Pass"),
-            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                view: target_view,
-                resolve_target: None,
-                depth_slice: None,
-                ops: wgpu::Operations {
-                    load: wgpu::LoadOp::Load,
-                    store: wgpu::StoreOp::Store,
-                },
-            })],
-            depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
-                view: depth_view,
-                depth_ops: Some(wgpu::Operations {
-                    load: wgpu::LoadOp::Load,
-                    store: wgpu::StoreOp::Store,
-                }),
-                stencil_ops: None,
-            }),
-            occlusion_query_set: None,
-            timestamp_writes: None,
-            multiview_mask: None,
-        });
-
-        if self.pbr_enabled {
-            pass.set_pipeline(&self.pbr_skinned.pipeline);
-            pass.set_bind_group(3, &self.pbr.shadow_bind_group, &[]);
-            for (i, it) in items.iter().take(n).enumerate() {
-                let Some(mesh) = assets.skinned_mesh(it.handle) else {
-                    continue;
-                };
-                let cam_off = (i * cam_aligned) as u32;
-                let pal_off = (i * pal_aligned) as u32;
-                let mat_off = (i * mat_aligned) as u32;
-                // g0 has two dynamic bindings (camera @0, palette @2).
-                pass.set_bind_group(0, &self.pbr_skinned.g0_bind_group, &[cam_off, pal_off]);
-                let tex_bg = skinned_tex_bgs[i]
-                    .as_ref()
-                    .unwrap_or(&self.pbr.default_texture_bind_group);
-                pass.set_bind_group(1, tex_bg, &[]);
-                pass.set_bind_group(2, &self.pbr_skinned.material_bind_group, &[mat_off]);
-                pass.set_vertex_buffer(0, mesh.vertex_buffer.slice(..));
-                pass.set_index_buffer(mesh.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
-                pass.draw_indexed(0..mesh.num_indices, 0, 0..1);
-            }
-        } else {
-            pass.set_pipeline(&self.skinned.pipeline);
-            for (i, it) in items.iter().take(n).enumerate() {
-                let Some(mesh) = assets.skinned_mesh(it.handle) else {
-                    continue;
-                };
-                let cam_off = (i * cam_aligned) as u32;
-                let pal_off = (i * pal_aligned) as u32;
-                pass.set_bind_group(0, &self.skinned.cam_bind_group, &[cam_off]);
-                pass.set_bind_group(1, &self.skinned.palette_bind_group, &[pal_off]);
-                pass.set_vertex_buffer(0, mesh.vertex_buffer.slice(..));
-                pass.set_index_buffer(mesh.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
-                pass.draw_indexed(0..mesh.num_indices, 0, 0..1);
-            }
+            pass.set_bind_group(0, &skinned.camera_bind_group, &[skinned.cameras.offset(i)]);
+            pass.set_bind_group(1, &skinned.palette_bind_group, &[skinned.palettes.offset(i)]);
+            pass.set_vertex_buffer(0, mesh.vertex_buffer.slice(..));
+            pass.set_index_buffer(mesh.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
+            pass.draw_indexed(0..mesh.num_indices, 0, 0..1);
         }
     }
 }

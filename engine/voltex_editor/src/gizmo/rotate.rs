@@ -3,24 +3,13 @@
 use voltex_ecs::Transform;
 use voltex_math::{Quat, Ray, Vec3};
 
-use super::{DragState, GizmoAxis};
+use super::{ortho_basis, DragState, GizmoAxis};
 
 const RING_RADIUS: f32 = 1.2;
 const RING_TOLERANCE: f32 = 0.15;
 
 fn ring_plane_normal(axis: GizmoAxis) -> Vec3 {
     axis.dir()
-}
-
-fn ortho_basis(axis: Vec3) -> (Vec3, Vec3) {
-    let helper = if axis.y.abs() < 0.9 {
-        Vec3::new(0.0, 1.0, 0.0)
-    } else {
-        Vec3::new(1.0, 0.0, 0.0)
-    };
-    let u = axis.cross(helper).normalize();
-    let v = axis.cross(u).normalize();
-    (u, v)
 }
 
 fn ray_plane_hit(ray: &Ray, origin: Vec3, normal: Vec3) -> Option<Vec3> {

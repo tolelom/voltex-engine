@@ -1,4 +1,4 @@
-use super::{Heightfield, NavMeshBuilder};
+use super::{GridLayout, Heightfield, NavMeshBuilder};
 use voltex_math::Vec3;
 
 impl NavMeshBuilder {
@@ -40,26 +40,26 @@ impl NavMeshBuilder {
             let tri_min_z = v0.z.min(v1.z).min(v2.z);
             let tri_max_z = v0.z.max(v1.z).max(v2.z);
 
-            let gx0 = ((tri_min_x - min_x) / self.cell_size).floor() as isize;
-            let gx1 = ((tri_max_x - min_x) / self.cell_size).ceil() as isize;
-            let gz0 = ((tri_min_z - min_z) / self.cell_size).floor() as isize;
-            let gz1 = ((tri_max_z - min_z) / self.cell_size).ceil() as isize;
+            let gx_min = ((tri_min_x - min_x) / self.cell_size).floor() as isize;
+            let gx_max = ((tri_max_x - min_x) / self.cell_size).ceil() as isize;
+            let gz_min = ((tri_min_z - min_z) / self.cell_size).floor() as isize;
+            let gz_max = ((tri_max_z - min_z) / self.cell_size).ceil() as isize;
 
-            let gx0 = gx0.max(0) as usize;
-            let gx1 = (gx1 as usize).min(width - 1);
-            let gz0 = gz0.max(0) as usize;
-            let gz1 = (gz1 as usize).min(depth - 1);
+            let gx_min = gx_min.max(0) as usize;
+            let gx_max = (gx_max as usize).min(width - 1);
+            let gz_min = gz_min.max(0) as usize;
+            let gz_max = (gz_max as usize).min(depth - 1);
 
-            for gz in gz0..=gz1 {
-                for gx in gx0..=gx1 {
-                    let cx = min_x + (gx as f32 + 0.5) * self.cell_size;
-                    let cz = min_z + (gz as f32 + 0.5) * self.cell_size;
+            for gz in gz_min..=gz_max {
+                for gx in gx_min..=gx_max {
+                    let center_x = min_x + (gx as f32 + 0.5) * self.cell_size;
+                    let center_z = min_z + (gz as f32 + 0.5) * self.cell_size;
 
                     // Check if cell center is inside triangle (XZ)
-                    let p = Vec3::new(cx, 0.0, cz);
-                    if super::triangulate::point_in_triangle_xz_loose(p, v0, v1, v2, self.cell_size * 0.5) {
+                    let center = Vec3::new(center_x, 0.0, center_z);
+                    if super::triangulate::point_in_triangle_xz_loose(center, v0, v1, v2, self.cell_size * 0.5) {
                         // Interpolate Y at this XZ point
-                        let y = super::triangulate::interpolate_y(v0, v1, v2, cx, cz);
+                        let y = super::triangulate::interpolate_y(v0, v1, v2, center_x, center_z);
                         let idx = gz * width + gx;
                         match &mut cells[idx] {
                             Some((ref mut lo, ref mut hi)) => {
@@ -76,11 +76,7 @@ impl NavMeshBuilder {
         }
 
         Heightfield {
-            width,
-            depth,
-            min_x,
-            min_z,
-            cell_size: self.cell_size,
+            grid: GridLayout { width, depth, min_x, min_z, cell_size: self.cell_size },
             cells,
         }
     }

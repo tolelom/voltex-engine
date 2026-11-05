@@ -23,6 +23,11 @@ pub struct LuaState {
     state: *mut ffi::lua_State,
 }
 
+// SAFETY: LuaState exclusively owns its lua_State (not Clone; closed once in
+// Drop). A Lua state has no thread affinity — it only must not be used from two
+// threads at once, which `Send` without `Sync` guarantees. States wired by
+// `register_engine_api` also carry a raw `*mut World`; moving them across
+// threads is only sound if that World's owner moves with them.
 unsafe impl Send for LuaState {}
 
 impl Default for LuaState {
@@ -31,9 +36,16 @@ impl Default for LuaState {
     }
 }
 
+// SAFETY (all `unsafe` blocks in this impl): `self.state` is the non-null
+// state created in `new` and closed only in `Drop`, so it is valid for as long
+// as `&self` is. Strings handed to Lua are `CString`s that outlive the call,
+// and strings returned by `lua_tostring` are copied into Rust before the Lua
+// value is popped.
 impl LuaState {
     /// Creates a fresh Lua state with stdlibs opened.
     pub fn new() -> Self {
+        // SAFETY: luaL_newstate has no preconditions; the result is checked
+        // for NULL before use.
         unsafe {
             let state = ffi::luaL_newstate();
             assert!(!state.is_null(), "Failed to create Lua state");
@@ -332,6 +344,10 @@ impl LuaState {
         self.state
     }
 
+    /// Pop the error message a failed load/pcall left on top of the stack.
+    ///
+    /// # Safety
+    /// The top of the stack must be that error value.
     unsafe fn pop_error(&self) -> String {
         let ptr = ffi::lua_tostring(self.state, -1);
         let msg = if ptr.is_null() {
@@ -346,6 +362,7 @@ impl LuaState {
 
 impl Drop for LuaState {
     fn drop(&mut self) {
+        // SAFETY: the state is closed exactly once, here.
         unsafe { ffi::lua_close(self.state); }
     }
 }

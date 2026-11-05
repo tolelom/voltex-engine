@@ -35,10 +35,12 @@ pub struct RuntimeConfig {
     pub setup_systems: Option<SystemSetupFn>,
     /// Optional callback that runs once after GPU init (uploads meshes etc.).
     pub gpu_init: Option<GpuInitFn>,
-    /// When `Some(dt)`, every frame's update step is forced to that delta —
-    /// useful for deterministic playback. When `None`, the wallclock-derived
-    /// `GameTimer::frame_dt` is used.
-    pub fixed_dt: Option<f32>,
+    /// When `Some(dt)`, every frame's systems receive exactly this `dt`
+    /// instead of the measured wallclock frame delta — deterministic playback
+    /// / capture. Not a fixed-update accumulator: the runtime still ticks once
+    /// per rendered frame. When `None`, `RuntimeApp::frame_timer`'s
+    /// `frame_dt()` is used.
+    pub fixed_frame_dt: Option<f32>,
     /// Enable the physics solver step in the default schedule.
     pub enable_physics: bool,
     /// Enable Lua script start/update systems in the default schedule.
@@ -120,7 +122,7 @@ impl Default for RuntimeConfig {
             build_scene: None,
             setup_systems: None,
             gpu_init: None,
-            fixed_dt: None,
+            fixed_frame_dt: None,
             enable_physics: true,
             enable_scripts: true,
             enable_hud: false,
@@ -211,10 +213,19 @@ impl RuntimeConfig {
         self
     }
 
-    /// Forces a fixed timestep `dt` (seconds) — useful for deterministic playback.
-    pub fn with_fixed_dt(mut self, dt: f32) -> Self {
-        self.fixed_dt = Some(dt);
+    /// Feed every frame's systems this constant `dt` (seconds) instead of the
+    /// measured frame time — useful for deterministic playback. One tick per
+    /// rendered frame still; see [`Self::fixed_frame_dt`].
+    pub fn with_fixed_frame_dt(mut self, dt: f32) -> Self {
+        self.fixed_frame_dt = Some(dt);
         self
+    }
+
+    /// Old name of [`Self::with_fixed_frame_dt`]. "Fixed timestep" suggested a
+    /// fixed-update accumulator, which this is not.
+    #[deprecated(note = "use `with_fixed_frame_dt`")]
+    pub fn with_fixed_dt(self, dt: f32) -> Self {
+        self.with_fixed_frame_dt(dt)
     }
 
     /// Removes physics_step from the default schedule.
@@ -388,7 +399,7 @@ mod tests {
         assert!(c.enable_physics);
         assert!(c.enable_scripts);
         assert!(c.initial_scene.is_none());
-        assert!(c.fixed_dt.is_none());
+        assert!(c.fixed_frame_dt.is_none());
     }
 
     #[test]
@@ -405,10 +416,10 @@ mod tests {
     }
 
     #[test]
-    fn builder_with_fixed_dt_sets_value() {
-        let c = RuntimeConfig::new().with_fixed_dt(1.0 / 60.0);
-        assert!(c.fixed_dt.is_some());
-        assert!((c.fixed_dt.unwrap() - (1.0 / 60.0)).abs() < 1e-6);
+    fn builder_with_fixed_frame_dt_sets_value() {
+        let c = RuntimeConfig::new().with_fixed_frame_dt(1.0 / 60.0);
+        assert!(c.fixed_frame_dt.is_some());
+        assert!((c.fixed_frame_dt.unwrap() - (1.0 / 60.0)).abs() < 1e-6);
     }
 
     #[test]

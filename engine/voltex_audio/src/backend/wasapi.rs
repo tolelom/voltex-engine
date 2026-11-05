@@ -1,10 +1,10 @@
 //! `WasapiBackend` — `AudioBackend` impl on top of the existing
-//! `crate::wasapi::WasapiDevice` FFI wrapper.
+//! `crate::wasapi_ffi::WasapiDevice` FFI wrapper.
 //!
-//! This is a thin adapter; the FFI heavy lifting stays in `src/wasapi.rs`.
+//! This is a thin adapter; the FFI heavy lifting stays in `src/wasapi_ffi.rs`.
 
 use super::{AudioBackend, BackendError};
-use crate::wasapi::WasapiDevice;
+use crate::wasapi_ffi::WasapiDevice;
 
 /// `AudioBackend` adapter over the WASAPI FFI wrapper.
 pub struct WasapiBackend {

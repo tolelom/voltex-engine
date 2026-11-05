@@ -60,15 +60,15 @@ impl AudioClipCache {
     /// since the `with_audio_files` watch replaces the same clip index).
     pub fn seed(&mut self, path: impl Into<PathBuf>, clip_id: u32) {
         self.clips
-            .insert(crate::asset_paths::normalize_path_key(&path.into()), Some(clip_id));
+            .insert(crate::asset_io::normalize_path_key(&path.into()), Some(clip_id));
     }
 
     /// The clip id `path` is bound to, if resolved or seeded. Spelling
     /// variants (`./`, `\` vs `/`) hit the same slot — see
-    /// `asset_paths::normalize_path_key`.
+    /// `asset_io::normalize_path_key`.
     pub fn get(&self, path: &Path) -> Option<u32> {
         self.clips
-            .get(&crate::asset_paths::normalize_path_key(path))
+            .get(&crate::asset_io::normalize_path_key(path))
             .copied()
             .flatten()
     }
@@ -99,7 +99,7 @@ pub fn resolve_audio_paths_with(
     for (entity, path) in targets {
         let slot = cache
             .clips
-            .entry(crate::asset_paths::normalize_path_key(&path))
+            .entry(crate::asset_io::normalize_path_key(&path))
             .or_insert_with(|| load_clip(&path));
         let Some(id) = *slot else { continue };
         match world.get_mut::<AudioSource>(entity) {
@@ -118,9 +118,9 @@ pub fn resolve_audio_paths_with(
     bound
 }
 
-/// Real resolver: reads clip bytes **Vfs-first with fs fallback** (the same
-/// contract as scene/texture loading, so `.vpkg`-bundled audio works without
-/// loose files), decodes by extension
+/// Real resolver: reads clip bytes via `asset_io::read_asset` (Vfs →
+/// `asset_root` → cwd — the texture/mesh contract, so `.vpkg`-bundled audio
+/// works without loose files), decodes by extension
 /// ([`decode_clip_bytes`](voltex_audio::decode_clip_bytes)) and registers the
 /// clip with [`AudioSystem::add_clip`]. Failures are logged once and cached
 /// as `None` — see [`AudioClipCache`].
@@ -131,8 +131,8 @@ pub fn resolve_audio_paths(
     vfs: Option<&voltex_asset::Vfs>,
     asset_root: Option<&std::path::Path>,
 ) -> usize {
-    let n = resolve_audio_paths_with(world, cache, |path| {
-        match crate::asset_paths::read_asset(vfs, asset_root, path)
+    let sources_bound = resolve_audio_paths_with(world, cache, |path| {
+        match crate::asset_io::read_asset(vfs, asset_root, path)
             .and_then(|bytes| {
                 voltex_audio::decode_clip_bytes(path, &bytes).map_err(|e| e.to_string())
             }) {
@@ -149,10 +149,10 @@ pub fn resolve_audio_paths(
     // Positive evidence for hands-off verification (same contract as the
     // texture/mesh resolver). Idempotence keeps this quiet after the first
     // resolving frame.
-    if n > 0 {
-        crate::log_info!("voltex_runtime: resolved {n} audio path(s)");
+    if sources_bound > 0 {
+        crate::log_info!("voltex_runtime: resolved {sources_bound} audio path(s)");
     }
-    n
+    sources_bound
 }
 
 #[cfg(test)]

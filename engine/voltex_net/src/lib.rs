@@ -10,7 +10,7 @@
 //! - [`ReliableChannel`] / [`OrderedChannel`] — sequence + ACK + retransmission
 //!   on top of UDP, with optional in-order delivery.
 //! - [`Snapshot`] — entity-state container + delta compression (`diff_snapshots`
-//!   / `apply_diff`).
+//!   / `apply_snapshot_diff`).
 //! - [`InterpolationBuffer`] — client-side linear interpolation over
 //!   `Snapshot`s.
 //! - [`LagCompensation`] — server-side history rewind for hit registration.
@@ -29,6 +29,7 @@ pub mod snapshot;
 pub mod interpolation;
 pub mod lag_compensation;
 pub mod encryption;
+mod wire;
 
 pub use error::{NetError, Result};
 pub use packet::Packet;
@@ -36,7 +37,9 @@ pub use socket::NetSocket;
 pub use server::{NetServer, ServerEvent, ClientInfo};
 pub use client::{NetClient, ClientEvent};
 pub use reliable::{ReliableChannel, OrderedChannel};
-pub use snapshot::{Snapshot, EntityState, serialize_snapshot, deserialize_snapshot, diff_snapshots, apply_diff};
+pub use snapshot::{Snapshot, EntityState, serialize_snapshot, deserialize_snapshot, diff_snapshots, apply_snapshot_diff};
+#[allow(deprecated)]
+pub use snapshot::apply_diff;
 pub use interpolation::InterpolationBuffer;
 pub use lag_compensation::LagCompensation;
 pub use encryption::{PacketCipher, AuthToken};

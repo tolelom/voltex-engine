@@ -18,15 +18,6 @@
 
 mod headless;
 pub mod scene;
-pub mod scene_gizmo;
-mod scene_hot_reload;
-pub mod scene_lights;
-pub mod scene_playthrough;
-pub mod scene_shadow;
-pub mod scene_skinned;
-mod scene_sprite;
-mod scene_texture;
-pub mod scene_ui;
 mod target;
 
 pub use headless::HeadlessGpu;

@@ -1,9 +1,14 @@
 //! Audio output backend abstraction.
 //!
-//! The audio thread does not care whether samples end up on WASAPI, ALSA, or
-//! `/dev/null` — it just calls `write()`. `make_backend()` picks the best
-//! candidate for the current OS at runtime, with a hard fallback to
-//! `NullBackend` whenever device init fails.
+//! A push-style `write()` interface over WASAPI / ALSA / CoreAudio /
+//! `NullBackend`. `make_backend()` picks the best candidate for the current OS
+//! at runtime, with a hard fallback to `NullBackend` whenever device init
+//! fails.
+//!
+//! **Not wired into [`AudioSystem`](crate::AudioSystem) yet**: its audio thread
+//! drives `crate::wasapi_ffi::WasapiDevice` directly on Windows and runs
+//! silent (commands only, no output) on every other OS. Nothing in the engine
+//! calls `make_backend()` today.
 
 use std::fmt;
 

@@ -72,6 +72,14 @@ pub struct DirEntry {
     pub kind: AssetKind,
 }
 
+/// The per-row fields the list/grid drawers need, copied out of
+/// [`DirEntry`] for one frame.
+struct EntryRow {
+    name: String,
+    is_dir: bool,
+    kind: AssetKind,
+}
+
 /// How [`asset_browser_panel`] lays out the current directory's entries.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum BrowserView {
@@ -252,10 +260,11 @@ pub fn asset_browser_panel(
             return;
         }
 
-    // Collect click action to avoid borrow conflict
+    // Snapshot the rows so the draw helpers can mutate `browser` (selection)
+    // while iterating; a directory click is applied after drawing.
     let mut clicked_dir: Option<String> = None;
-    let entries_snapshot: Vec<(String, bool, AssetKind)> = browser.entries.iter()
-        .map(|e| (e.name.clone(), e.is_dir, e.kind))
+    let entries_snapshot: Vec<EntryRow> = browser.entries.iter()
+        .map(|e| EntryRow { name: e.name.clone(), is_dir: e.is_dir, kind: e.kind })
         .collect();
 
     match browser.view {
@@ -301,14 +310,13 @@ fn draw_entry_list(
     ui: &mut UiContext,
     browser: &mut AssetBrowser,
     rect: &Rect,
-    entries: &[(String, bool, AssetKind)],
+    entries: &[EntryRow],
     clicked_dir: &mut Option<String>,
 ) {
-    let gw = ui.font.glyph_width as f32;
     let gh = ui.font.glyph_height as f32;
     let line_h = gh + PADDING;
 
-    for (name, is_dir, kind) in entries {
+    for EntryRow { name, is_dir, kind } in entries {
         let y = ui.layout.cursor_y;
         let x = rect.x + PADDING;
 
@@ -335,12 +343,7 @@ fn draw_entry_list(
         };
 
         let text_y = y + (line_h - gh) * 0.5;
-        let mut cx = x;
-        for ch in label.chars() {
-            let (u0, v0, u1, v1) = ui.font.glyph_uv(ch);
-            ui.draw_list.add_rect_uv(cx, text_y, gw, gh, u0, v0, u1, v1, COLOR_TEXT);
-            cx += gw;
-        }
+        ui.draw_list.add_text(&ui.font, &label, x, text_y, COLOR_TEXT);
 
         ui.layout.cursor_y += line_h;
     }
@@ -353,7 +356,7 @@ fn draw_entry_grid(
     ui: &mut UiContext,
     browser: &mut AssetBrowser,
     rect: &Rect,
-    entries: &[(String, bool, AssetKind)],
+    entries: &[EntryRow],
     thumbs: Option<&std::collections::HashMap<String, u32>>,
     clicked_dir: &mut Option<String>,
 ) {
@@ -367,7 +370,7 @@ fn draw_entry_grid(
     let origin_y = ui.layout.cursor_y;
     let label_chars = (cell_w / gw).floor() as usize;
 
-    for (i, (name, is_dir, kind)) in entries.iter().enumerate() {
+    for (i, EntryRow { name, is_dir, kind }) in entries.iter().enumerate() {
         let col = i % cols;
         let row = i / cols;
         let x = origin_x + col as f32 * (cell_w + PADDING);
@@ -389,24 +392,14 @@ fn draw_entry_grid(
                 let tag = if *is_dir { "[D]" } else { kind.list_prefix().trim() };
                 let tx = x + (cell_w - tag.chars().count() as f32 * gw) * 0.5;
                 let ty = y + (cell_w - gh) * 0.5;
-                let mut cx = tx;
-                for ch in tag.chars() {
-                    let (u0, v0, u1, v1) = ui.font.glyph_uv(ch);
-                    ui.draw_list.add_rect_uv(cx, ty, gw, gh, u0, v0, u1, v1, COLOR_TEXT);
-                    cx += gw;
-                }
+                ui.draw_list.add_text(&ui.font, tag, tx, ty, COLOR_TEXT);
             }
         }
 
         // Label line under the thumbnail, truncated to the cell width.
         let label: String = name.chars().take(label_chars).collect();
-        let mut cx = x;
         let ly = y + GRID_CELL + PADDING * 0.5;
-        for ch in label.chars() {
-            let (u0, v0, u1, v1) = ui.font.glyph_uv(ch);
-            ui.draw_list.add_rect_uv(cx, ly, gw, gh, u0, v0, u1, v1, COLOR_TEXT);
-            cx += gw;
-        }
+        ui.draw_list.add_text(&ui.font, &label, x, ly, COLOR_TEXT);
 
         // Click
         if ui.mouse_clicked && ui.mouse_in_rect(x, y, cell_w, cell_h) {

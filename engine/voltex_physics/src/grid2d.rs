@@ -17,9 +17,9 @@ const GROUND_PROBE_FRAC: f32 = 0.02;
 
 /// [`move_and_collide_2d`] 결과.
 pub struct MoveResult2D {
-    /// 해소된 위치 (`z`는 입력 그대로).
+    /// 해소된 위치 (`z`는 입력 그대로). 외부(games/leap)가 쓰는 필드라 이름 유지.
     pub pos: Vec3,
-    /// 충돌한 축의 성분이 0으로 소거된 속도.
+    /// 충돌한 축의 성분이 0으로 소거된 속도. 외부가 쓰는 필드라 이름 유지.
     pub vel: Vec3,
     /// 하향 접촉으로 정지했거나 발밑 프로브가 솔리드에 닿음.
     pub grounded: bool,
@@ -28,6 +28,7 @@ pub struct MoveResult2D {
 }
 
 /// AABB(`half` = 반폭/반높이)를 `is_solid` 그리드에 대해 이동·해소한다.
+/// `tile`은 셀 한 변의 길이, 셀 `(gx, gy)`는 `[gx·tile, (gx+1)·tile)` 범위.
 ///
 /// 한 호출의 이동량이 tile을 넘으면(히칭 프레임, 고속 투사체) 내부적으로
 /// 서브스텝으로 쪼개 해소한다 — 호출자는 dt/속도 크기를 신경 쓸 필요 없음.
@@ -40,94 +41,94 @@ pub fn move_and_collide_2d(
     dt: f32,
 ) -> MoveResult2D {
     debug_assert!(tile > 0.0, "grid2d: tile must be positive");
-    let tile = tile.max(f32::MIN_POSITIVE);
+    let tile_size = tile.max(f32::MIN_POSITIVE);
     // 서브스텝당 축 이동량을 tile의 절반 이하로 — 셀 하나를 건너뛰는 일이
     // 없도록 (충돌 시 축 속도가 0이 되므로 이후 서브스텝은 자연히 저렴).
     let max_axis_move = vel.x.abs().max(vel.y.abs()) * dt;
-    let steps = ((max_axis_move / (tile * 0.5)).ceil() as u32).max(1);
-    let sub_dt = dt / steps as f32;
-    let mut r = MoveResult2D { pos, vel, grounded: false, hit_wall: false };
-    for _ in 0..steps {
-        let hit_wall_so_far = r.hit_wall;
-        r = step(&is_solid, tile, r.pos, r.vel, half, sub_dt);
-        r.hit_wall |= hit_wall_so_far;
-        if r.vel.x == 0.0 && r.vel.y == 0.0 {
+    let substeps = ((max_axis_move / (tile_size * 0.5)).ceil() as u32).max(1);
+    let sub_dt = dt / substeps as f32;
+    let mut result = MoveResult2D { pos, vel, grounded: false, hit_wall: false };
+    for _ in 0..substeps {
+        let hit_wall_so_far = result.hit_wall;
+        result = substep(&is_solid, tile_size, result.pos, result.vel, half, sub_dt);
+        result.hit_wall |= hit_wall_so_far;
+        if result.vel.x == 0.0 && result.vel.y == 0.0 {
             break; // 양축 정지 — 남은 서브스텝은 이동 없음
         }
     }
-    r
+    result
 }
 
 /// 단일 스텝 해소 (이동량 < tile 전제는 호출자 [`move_and_collide_2d`]가 보장).
-fn step(
+fn substep(
     is_solid: &impl Fn(i32, i32) -> bool,
-    tile: f32,
-    pos: Vec3,
-    vel: Vec3,
-    half: [f32; 2],
+    tile_size: f32,
+    start_position: Vec3,
+    start_velocity: Vec3,
+    half_size: [f32; 2],
     dt: f32,
 ) -> MoveResult2D {
-    let eps = tile * EPS_FRAC;
-    let mut p = pos;
-    let mut v = vel;
+    let flush_margin = tile_size * EPS_FRAC;
+    let mut position = start_position;
+    let mut velocity = start_velocity;
     let mut hit_wall = false;
     let mut grounded = false;
 
     // ---- X 축
-    if v.x != 0.0 {
-        p.x += v.x * dt;
-        if let Some((gx, _)) = first_solid_overlap(&is_solid, tile, eps, p, half) {
-            if v.x > 0.0 {
-                p.x = gx as f32 * tile - half[0];
+    if velocity.x != 0.0 {
+        position.x += velocity.x * dt;
+        if let Some((gx, _)) = first_solid_overlap(&is_solid, tile_size, flush_margin, position, half_size) {
+            if velocity.x > 0.0 {
+                position.x = gx as f32 * tile_size - half_size[0];
             } else {
-                p.x = (gx + 1) as f32 * tile + half[0];
+                position.x = (gx + 1) as f32 * tile_size + half_size[0];
             }
-            v.x = 0.0;
+            velocity.x = 0.0;
             hit_wall = true;
         }
     }
 
     // ---- Y 축
-    if v.y != 0.0 {
-        p.y += v.y * dt;
-        if let Some((_, gy)) = first_solid_overlap(&is_solid, tile, eps, p, half) {
-            if v.y > 0.0 {
-                p.y = gy as f32 * tile - half[1];
+    if velocity.y != 0.0 {
+        position.y += velocity.y * dt;
+        if let Some((_, gy)) = first_solid_overlap(&is_solid, tile_size, flush_margin, position, half_size) {
+            if velocity.y > 0.0 {
+                position.y = gy as f32 * tile_size - half_size[1];
             } else {
-                p.y = (gy + 1) as f32 * tile + half[1];
+                position.y = (gy + 1) as f32 * tile_size + half_size[1];
                 grounded = true;
             }
-            v.y = 0.0;
+            velocity.y = 0.0;
         }
     }
 
     // ---- 발밑 프로브 (수직 이동 없이도 접지 유지)
-    if !grounded && v.y == 0.0 {
-        let probe_y = p.y - half[1] - tile * GROUND_PROBE_FRAC;
-        let gy = (probe_y / tile).floor() as i32;
-        let gx0 = ((p.x - half[0] + eps) / tile).floor() as i32;
-        let gx1 = ((p.x + half[0] - eps) / tile).floor() as i32;
-        grounded = (gx0..=gx1).any(|gx| is_solid(gx, gy));
+    if !grounded && velocity.y == 0.0 {
+        let probe_y = position.y - half_size[1] - tile_size * GROUND_PROBE_FRAC;
+        let gy = (probe_y / tile_size).floor() as i32;
+        let gx_min = ((position.x - half_size[0] + flush_margin) / tile_size).floor() as i32;
+        let gx_max = ((position.x + half_size[0] - flush_margin) / tile_size).floor() as i32;
+        grounded = (gx_min..=gx_max).any(|gx| is_solid(gx, gy));
     }
 
-    MoveResult2D { pos: p, vel: v, grounded, hit_wall }
+    MoveResult2D { pos: position, vel: velocity, grounded, hit_wall }
 }
 
 /// AABB가 겹치는 셀 중 첫 솔리드 셀. 프레임 이동량 < tile 전제에서 겹칠 수
 /// 있는 솔리드는 진행 방향 경계 셀뿐이라 순회 순서는 결과에 무관하다.
 fn first_solid_overlap(
     is_solid: &impl Fn(i32, i32) -> bool,
-    tile: f32,
-    eps: f32,
-    p: Vec3,
-    half: [f32; 2],
+    tile_size: f32,
+    flush_margin: f32,
+    position: Vec3,
+    half_size: [f32; 2],
 ) -> Option<(i32, i32)> {
-    let gx0 = ((p.x - half[0] + eps) / tile).floor() as i32;
-    let gx1 = ((p.x + half[0] - eps) / tile).floor() as i32;
-    let gy0 = ((p.y - half[1] + eps) / tile).floor() as i32;
-    let gy1 = ((p.y + half[1] - eps) / tile).floor() as i32;
-    for gy in gy0..=gy1 {
-        for gx in gx0..=gx1 {
+    let gx_min = ((position.x - half_size[0] + flush_margin) / tile_size).floor() as i32;
+    let gx_max = ((position.x + half_size[0] - flush_margin) / tile_size).floor() as i32;
+    let gy_min = ((position.y - half_size[1] + flush_margin) / tile_size).floor() as i32;
+    let gy_max = ((position.y + half_size[1] - flush_margin) / tile_size).floor() as i32;
+    for gy in gy_min..=gy_max {
+        for gx in gx_min..=gx_max {
             if is_solid(gx, gy) {
                 return Some((gx, gy));
             }

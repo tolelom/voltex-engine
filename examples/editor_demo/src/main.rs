@@ -514,7 +514,7 @@ impl ApplicationHandler for EditorDemoApp {
                     }
                 }
                 if world.is_alive(ground_id) {
-                    world.add(ground_id, RigidBody::statik());
+                    world.add(ground_id, RigidBody::fixed());
                     world.add(ground_id, Collider::Box {
                         half_extents: Vec3::new(5.0, 0.05, 5.0),
                     });
@@ -655,7 +655,7 @@ impl ApplicationHandler for EditorDemoApp {
 
             WindowEvent::RedrawRequested => {
                 state.timer.tick();
-                state.input.begin_frame();
+                state.input.clear_frame_edges();
 
                 // Physics: only ticks while in Play mode.
                 if state.session.mode == EditorMode::Play {

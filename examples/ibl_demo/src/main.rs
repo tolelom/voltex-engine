@@ -8,7 +8,7 @@ use winit::{
 use voltex_math::{Vec3, Mat4};
 use voltex_platform::{VoltexWindow, WindowConfig, InputState, GameTimer};
 use voltex_renderer::{
-    GpuContext, Camera, FpsController, CameraUniform, LightsUniform, LightData,
+    align_up, GpuContext, Camera, FpsController, CameraUniform, LightsUniform, LightData,
     Mesh, GpuTexture, MaterialUniform, generate_sphere, create_pbr_pipeline,
     ShadowMap, ShadowUniform,
     IblResources, pbr_full_texture_bind_group_layout, create_pbr_full_texture_bind_group,
@@ -35,7 +35,7 @@ struct AppState {
     material_buffer: wgpu::Buffer,
     camera_light_bind_group: wgpu::BindGroup,
     _albedo_tex: GpuTexture,
-    _normal_tex: (wgpu::Texture, wgpu::TextureView, wgpu::Sampler),
+    _normal_tex: GpuTexture,
     _orm_tex: GpuTexture,
     _emissive_tex: GpuTexture,
     pbr_texture_bind_group: wgpu::BindGroup,
@@ -77,10 +77,6 @@ fn camera_light_bind_group_layout(device: &wgpu::Device) -> wgpu::BindGroupLayou
             },
         ],
     })
-}
-
-fn align_up(size: u32, alignment: u32) -> u32 {
-    size.div_ceil(alignment) * alignment
 }
 
 impl ApplicationHandler for IblDemoApp {
@@ -168,7 +164,7 @@ impl ApplicationHandler for IblDemoApp {
         // PBR texture bind group (albedo + normal + ORM + emissive)
         let old_tex_layout = GpuTexture::bind_group_layout(&gpu.device);
         let albedo_tex = GpuTexture::white_1x1(&gpu.device, &gpu.queue, &old_tex_layout);
-        let normal_tex = GpuTexture::flat_normal_1x1(&gpu.device, &gpu.queue);
+        let normal_tex = GpuTexture::flat_normal_map_1x1(&gpu.device, &gpu.queue, &old_tex_layout);
         let orm_tex = GpuTexture::white_1x1(&gpu.device, &gpu.queue, &old_tex_layout);
         let emissive_tex = GpuTexture::black_1x1(&gpu.device, &gpu.queue, &old_tex_layout);
         let pbr_texture_bind_group = create_pbr_full_texture_bind_group(
@@ -176,8 +172,8 @@ impl ApplicationHandler for IblDemoApp {
             &pbr_tex_layout,
             &albedo_tex.view,
             &albedo_tex.sampler,
-            &normal_tex.1,
-            &normal_tex.2,
+            &normal_tex.view,
+            &normal_tex.sampler,
             &orm_tex.view,
             &orm_tex.sampler,
             &emissive_tex.view,
@@ -361,7 +357,7 @@ impl ApplicationHandler for IblDemoApp {
                 state
                     .fps_controller
                     .process_movement(&mut state.camera, forward, right, up, dt);
-                state.input.begin_frame();
+                state.input.clear_frame_edges();
 
                 // Compute view-projection
                 let view_proj = state.camera.view_projection();

@@ -33,9 +33,15 @@ impl LayoutState {
     /// Record the rect a widget just occupied so a following [`same_line`]
     /// (on `UiContext`) can place the next widget to its right. Call this
     /// immediately before [`advance_line`](Self::advance_line).
-    pub fn record(&mut self, x: f32, y: f32, width: f32) {
+    pub fn record_last_widget(&mut self, x: f32, y: f32, width: f32) {
         self.prev_y = y;
         self.prev_end_x = x + width + self.padding;
+    }
+
+    /// Old name of [`record_last_widget`](Self::record_last_widget).
+    #[deprecated(note = "use `record_last_widget`")]
+    pub fn record(&mut self, x: f32, y: f32, width: f32) {
+        self.record_last_widget(x, y, width);
     }
 
     /// Advance to the next line: cursor_y += line_height + padding, cursor_x = indent.

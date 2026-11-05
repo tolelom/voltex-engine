@@ -7,10 +7,10 @@ Immediate-mode UI 에디터 — 도킹/플로팅/뷰포트/인스펙터/에셋 �
 
 ### 코어 UI
 - `UiContext` — IMGUI 컨텍스트 (src/ui_context.rs)
-- `UiRenderer` — wgpu UI 렌더러 (src/renderer.rs)
-- `DrawList`, `DrawVertex`, `DrawCommand` (src/draw_list.rs)
-- `FontAtlas` — 8x12 비트맵 ASCII (src/font.rs)
-- `LayoutState` — 레이아웃 (src/layout.rs)
+- `UiRenderer` — wgpu UI 렌더러 (src/ui_renderer.rs; 옛 경로 `voltex_editor::renderer` 는 deprecated 재export)
+- `DrawList`, `DrawVertex`, `DrawCommand` (src/draw_list.rs) — 비트맵 글자 그리기는 모두 `DrawList::add_text` 한 곳
+- `FontAtlas` + `UvRect` (`glyph_uv_rect`) — 8x12 비트맵 ASCII (src/bitmap_font.rs; 옛 경로 `voltex_editor::font`·`glyph_uv` 는 deprecated)
+- `LayoutState` — 레이아웃 (src/layout.rs). `record_last_widget` 가 same_line 용 직전 위젯 위치 기록 (옛 이름 `record` deprecated)
 - `TtfFont`, TTF 파서/래스터라이저/캐시 (src/ttf_font.rs, src/ttf_parser.rs, src/rasterizer.rs, src/glyph_cache.rs)
 
 ### Widgets
@@ -24,7 +24,7 @@ Immediate-mode UI 에디터 — 도킹/플로팅/뷰포트/인스펙터/에셋 �
 - `OrbitCamera` (src/orbit_camera.rs) — `forward()`는 yaw/pitch만으로 계산해 `distance` 0에서도 유한 (v1.0.126)
 - `ViewportTexture`, `VIEWPORT_COLOR_FORMAT`, `VIEWPORT_DEPTH_FORMAT` (src/viewport_texture.rs)
 - `ViewportRenderer` (src/viewport_renderer.rs)
-- `picking::pick_entity` + helpers (ndc_from_viewport / ray_from_ndc / ray_vs_sphere_t) — 좌클릭 → ray → sphere intersection → 가장 가까운 entity. 반경은 default × max(scale). 메시 바운드 미구현 (DEFERRED). (src/picking.rs)
+- `picking::pick_entity` + helpers (ndc_from_viewport / ray_from_ndc / ray_vs_aabb / ray_vs_sphere_t) — 좌클릭 → ray → 가장 가까운 entity. `Bounds`+`WorldTransform` 이 있으면 world AABB, 없으면 sphere(반경 default × max(scale)). 카메라를 품은 AABB 는 다른 히트가 없을 때만 선택. (src/picking.rs)
 
 ### Panels (통합 완료, 단일 경로)
 - `panels::hierarchy::hierarchy_panel` — 트리 뷰, click 으로 `session.selected` 설정 (src/panels/hierarchy.rs)
@@ -57,7 +57,7 @@ Immediate-mode UI 에디터 — 도킹/플로팅/뷰포트/인스펙터/에셋 �
 - **미등록 컴포넌트는 Play→Stop 시 자동 소멸**. snapshot 은 `ComponentRegistry` 에 등록된 타입만 보존 (built-in: Transform, Tag, MeshHandle, MaterialHandle, Bounds). RigidBody / Collider / Velocity 처럼 미등록인 컴포넌트는 Play 중에 추가했어도 Stop 시 사라진다. editor_demo 의 physics 데모가 이 동작을 이용해 RigidBody 를 PlayStart 콜백에서 부착 → Stop 자동 정리. 게임 측 영구 컴포넌트는 `registry.register::<MyComponent>()` 로 등록 필수.
 
 ## 모듈 구조
-- 코어: ui_context, renderer, draw_list, font, layout, ttf_* (parser, font, rasterizer, glyph_cache)
+- 코어: ui_context, ui_renderer, draw_list, bitmap_font, layout, ttf_* (parser, font, rasterizer, glyph_cache)
 - 위젯: widgets/ (controls, containers, text_input, drag)
 - 레이아웃: dock, floating_panel
 - 뷰포트: orbit_camera, viewport_texture, viewport_renderer, picking, gizmo/

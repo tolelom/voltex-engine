@@ -6,6 +6,9 @@ use voltex_math::Vec3;
 use crate::collider::Collider;
 use crate::rigid_body::{RigidBody, PhysicsConfig, SLEEP_VELOCITY_THRESHOLD, SLEEP_TIME_THRESHOLD};
 
+/// Below this a principal moment of inertia counts as zero (no rotation about that axis).
+const MIN_INERTIA: f32 = 1e-10;
+
 /// Compute diagonal inertia tensor for a collider shape.
 /// Returns Vec3 where each component is the moment of inertia about that axis.
 pub fn inertia_tensor(collider: &Collider, mass: f32) -> Vec3 {
@@ -14,19 +17,9 @@ pub fn inertia_tensor(collider: &Collider, mass: f32) -> Vec3 {
             let i = (2.0 / 5.0) * mass * radius * radius;
             Vec3::new(i, i, i)
         }
-        Collider::Box { half_extents } => {
-            let w = half_extents.x * 2.0;
-            let h = half_extents.y * 2.0;
-            let d = half_extents.z * 2.0;
-            let factor = mass / 12.0;
-            Vec3::new(
-                factor * (h * h + d * d),
-                factor * (w * w + d * d),
-                factor * (w * w + h * h),
-            )
-        }
+        Collider::Box { half_extents } => box_inertia(*half_extents * 2.0, mass),
         Collider::Capsule { radius, half_height } => {
-            // Approximate as cylinder with total height = 2*half_height + 2*radius
+            // Approximated as a cylinder of height 2*half_height (caps ignored).
             let r = *radius;
             let h = half_height * 2.0;
             let ix = mass * (3.0 * r * r + h * h) / 12.0;
@@ -36,33 +29,27 @@ pub fn inertia_tensor(collider: &Collider, mass: f32) -> Vec3 {
         }
         Collider::ConvexHull(hull) => {
             // Approximate using AABB of the hull vertices
-            let mut min = hull.vertices[0];
-            let mut max = min;
-            for &v in &hull.vertices[1..] {
-                min = Vec3::new(min.x.min(v.x), min.y.min(v.y), min.z.min(v.z));
-                max = Vec3::new(max.x.max(v.x), max.y.max(v.y), max.z.max(v.z));
-            }
-            let size = max - min;
-            let w = size.x;
-            let h = size.y;
-            let d = size.z;
-            let factor = mass / 12.0;
-            Vec3::new(
-                factor * (h * h + d * d),
-                factor * (w * w + d * d),
-                factor * (w * w + h * h),
-            )
+            let bounds = hull.local_aabb();
+            box_inertia(bounds.max - bounds.min, mass)
         }
     }
 }
 
+/// Inertia of a solid box with full edge lengths `size`.
+fn box_inertia(size: Vec3, mass: f32) -> Vec3 {
+    let (w, h, d) = (size.x, size.y, size.z);
+    let factor = mass / 12.0;
+    Vec3::new(
+        factor * (h * h + d * d),
+        factor * (w * w + d * d),
+        factor * (w * w + h * h),
+    )
+}
+
 /// Compute inverse inertia (component-wise 1/I). Returns zero for zero-mass or zero-inertia.
 pub fn inv_inertia(inertia: Vec3) -> Vec3 {
-    Vec3::new(
-        if inertia.x > 1e-10 { 1.0 / inertia.x } else { 0.0 },
-        if inertia.y > 1e-10 { 1.0 / inertia.y } else { 0.0 },
-        if inertia.z > 1e-10 { 1.0 / inertia.z } else { 0.0 },
-    )
+    let invert = |moment: f32| if moment > MIN_INERTIA { 1.0 / moment } else { 0.0 };
+    Vec3::new(invert(inertia.x), invert(inertia.y), invert(inertia.z))
 }
 
 /// Advances every `(Transform, RigidBody)` entity by one `config.fixed_dt`
@@ -78,7 +65,7 @@ pub fn integrate(world: &mut World, config: &PhysicsConfig) {
             let new_position = transform.position + new_velocity * config.fixed_dt;
             let new_rotation = transform
                 .rotation
-                .integrate(rb.angular_velocity, config.fixed_dt);
+                .integrate_angular_velocity(rb.angular_velocity, config.fixed_dt);
             (entity, new_velocity, new_position, new_rotation)
         })
         .collect();
@@ -164,7 +151,7 @@ mod tests {
         let mut world = World::new();
         let e = world.spawn();
         world.add(e, Transform::from_position(Vec3::new(0.0, 5.0, 0.0)));
-        world.add(e, RigidBody::statik());
+        world.add(e, RigidBody::fixed());
 
         let config = PhysicsConfig::default();
         integrate(&mut world, &config);

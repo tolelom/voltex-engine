@@ -5,20 +5,21 @@ use bytemuck::{Pod, Zeroable};
 /// PBR mesh vertex (POD geometry) — re-exported from `voltex_image`.
 pub use voltex_image::MeshVertex;
 
-/// Position + color vertex used by the triangle example pipeline.
+/// Position + color vertex for [`create_position_color_pipeline`](crate::pipeline::create_position_color_pipeline)
+/// (the triangle example).
 #[repr(C)]
 #[derive(Copy, Clone, Debug, Pod, Zeroable)]
-pub struct Vertex {
+pub struct PositionColorVertex {
     /// World-space position `[x, y, z]`.
     pub position: [f32; 3],
     /// RGB color `[r, g, b]` in linear space.
     pub color: [f32; 3],
 }
 
-impl Vertex {
-    /// wgpu vertex buffer layout for [`Vertex`].
+impl PositionColorVertex {
+    /// wgpu vertex buffer layout for [`PositionColorVertex`].
     pub const LAYOUT: wgpu::VertexBufferLayout<'static> = wgpu::VertexBufferLayout {
-        array_stride: std::mem::size_of::<Vertex>() as wgpu::BufferAddress,
+        array_stride: std::mem::size_of::<PositionColorVertex>() as wgpu::BufferAddress,
         step_mode: wgpu::VertexStepMode::Vertex,
         attributes: &[
             wgpu::VertexAttribute {
@@ -34,6 +35,10 @@ impl Vertex {
         ],
     };
 }
+
+/// Old name of [`PositionColorVertex`].
+#[deprecated(note = "use `PositionColorVertex`")]
+pub type Vertex = PositionColorVertex;
 
 /// wgpu vertex buffer layout for [`MeshVertex`].
 ///

@@ -25,7 +25,6 @@
 
 | 항목 | 막힌 이유 | 기록 위치 |
 |---|---|---|
-| 600줄 초과 파일 17개 | 기계적 분할이 안 되는 큰 파일(`voltex_capture/src/scene.rs` 2787줄 등). 한 파일로 분할 패턴을 정한 뒤 나머지에 적용 | [DEFERRED](DEFERRED.md) "600줄 한도 재위반" |
 | 안에서 시작하는 레이 규약 | Box는 t=0, Sphere·Capsule은 출구 t. 통일하면 동작이 바뀌므로 호출 측이 t=0을 어떻게 쓰는지 확인 필요 | [DEFERRED](DEFERRED.md) "레이캐스트" |
 | `.vpkg` 4 GiB 한계 | 인덱스 offset·size가 u32. 포맷 버전을 올릴지, 쓰기 단계에서 에러를 낼지 호환성 결정 필요 | [DEFERRED](DEFERRED.md) "`.vpkg` 4 GiB 한계" |
 | 지연 보상 타임스탬프 정밀도 | `HistoryEntry.timestamp`가 f32라 서버 가동 수 시간 뒤 ms 정밀도 손실 가능. 공개 필드라 타입 변경은 API 변경 (`crates/voltex_net/src/lag_compensation.rs`) | CHANGELOG v1.0.161 |

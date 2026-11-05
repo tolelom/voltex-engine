@@ -8,6 +8,12 @@ use crate::error::{RendererError, Result};
 /// Depth attachment format the renderer uses everywhere.
 pub const DEPTH_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth32Float;
 
+/// `value` 를 `alignment` 의 배수로 올린다. 동적 오프셋 uniform 버퍼의 엔트리 간격
+/// (`min_uniform_buffer_offset_alignment` 배수)이나 텍스처 복사의 행 간격을 구할 때 쓴다.
+pub fn align_up(value: u32, alignment: u32) -> u32 {
+    value.div_ceil(alignment) * alignment
+}
+
 fn create_depth_texture(device: &wgpu::Device, width: u32, height: u32) -> wgpu::TextureView {
     let texture = device.create_texture(&wgpu::TextureDescriptor {
         label: Some("Depth Texture"),

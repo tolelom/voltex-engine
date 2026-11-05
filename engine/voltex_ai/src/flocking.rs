@@ -24,6 +24,9 @@ use std::collections::HashMap;
 use voltex_ecs::{Entity, SpatialGrid, Transform, World};
 use voltex_math::Vec3;
 
+/// Neighbours closer than this are treated as coincident and ignored by [`separation`].
+const COINCIDENT_DISTANCE: f32 = 1e-6;
+
 /// Velocity carried by a flocking agent. Attach alongside a [`Transform`]; the
 /// [`flocking_system`] integrates it each tick.
 #[derive(Debug, Clone, Copy)]
@@ -53,11 +56,11 @@ impl Boid {
 pub struct BoidParams {
     /// Agents within this distance count as neighbours.
     pub neighbour_radius: f32,
-    /// Weight of the [`separation`] rule.
+    /// Weight (multiplier) of the [`separation`] rule.
     pub separation: f32,
-    /// Weight of the [`cohesion`] rule.
+    /// Weight (multiplier) of the [`cohesion`] rule.
     pub cohesion: f32,
-    /// Weight of the [`alignment`] rule.
+    /// Weight (multiplier) of the [`alignment`] rule.
     pub alignment: f32,
     /// Maximum speed; velocity is clamped to this after applying forces.
     pub max_speed: f32,
@@ -85,51 +88,51 @@ impl Default for BoidParams {
 pub fn flocking_system(world: &mut World, params: &BoidParams, dt: f32) {
     let boids: Vec<(Entity, Vec3, Vec3)> = world
         .query2::<Transform, Boid>()
-        .map(|(e, t, b)| (e, t.position, b.velocity))
+        .map(|(entity, transform, boid)| (entity, transform.position, boid.velocity))
         .collect();
     if boids.is_empty() {
         return;
     }
 
     let mut grid = SpatialGrid::new(params.neighbour_radius);
-    let mut state: HashMap<Entity, (Vec3, Vec3)> = HashMap::with_capacity(boids.len());
-    for &(e, pos, vel) in &boids {
-        grid.insert(e, pos);
-        state.insert(e, (pos, vel));
+    let mut position_velocity: HashMap<Entity, (Vec3, Vec3)> = HashMap::with_capacity(boids.len());
+    for &(entity, position, velocity) in &boids {
+        grid.insert(entity, position);
+        position_velocity.insert(entity, (position, velocity));
     }
 
     let mut neighbour_buf = Vec::new();
     let mut updates: Vec<(Entity, Vec3, Vec3)> = Vec::with_capacity(boids.len());
-    for &(e, pos, vel) in &boids {
-        grid.query_radius_into(pos, params.neighbour_radius, &mut neighbour_buf);
-        let mut npos = Vec::new();
-        let mut nvel = Vec::new();
-        for &ne in &neighbour_buf {
-            if ne == e {
+    for &(entity, position, velocity) in &boids {
+        grid.query_radius_into(position, params.neighbour_radius, &mut neighbour_buf);
+        let mut neighbour_positions = Vec::new();
+        let mut neighbour_velocities = Vec::new();
+        for &neighbour in &neighbour_buf {
+            if neighbour == entity {
                 continue;
             }
-            let (p, v) = state[&ne];
-            npos.push(p);
-            nvel.push(v);
+            let (neighbour_position, neighbour_velocity) = position_velocity[&neighbour];
+            neighbour_positions.push(neighbour_position);
+            neighbour_velocities.push(neighbour_velocity);
         }
-        let acc = separation(pos, &npos) * params.separation
-            + cohesion(pos, &npos) * params.cohesion
-            + alignment(&nvel) * params.alignment;
-        let mut new_vel = vel + acc * dt;
-        let speed = new_vel.length();
+        let acceleration = separation(position, &neighbour_positions) * params.separation
+            + cohesion(position, &neighbour_positions) * params.cohesion
+            + alignment(&neighbour_velocities) * params.alignment;
+        let mut new_velocity = velocity + acceleration * dt;
+        let speed = new_velocity.length();
         if speed > params.max_speed {
-            new_vel = new_vel.normalize_or_zero() * params.max_speed;
+            new_velocity = new_velocity.normalize_or_zero() * params.max_speed;
         }
-        let new_pos = pos + new_vel * dt;
-        updates.push((e, new_pos, new_vel));
+        let new_position = position + new_velocity * dt;
+        updates.push((entity, new_position, new_velocity));
     }
 
-    for (e, p, v) in updates {
-        if let Some(t) = world.get_mut::<Transform>(e) {
-            t.position = p;
+    for (entity, new_position, new_velocity) in updates {
+        if let Some(transform) = world.get_mut::<Transform>(entity) {
+            transform.position = new_position;
         }
-        if let Some(b) = world.get_mut::<Boid>(e) {
-            b.velocity = v;
+        if let Some(boid) = world.get_mut::<Boid>(entity) {
+            boid.velocity = new_velocity;
         }
     }
 }
@@ -138,16 +141,16 @@ pub fn flocking_system(world: &mut World, params: &BoidParams, dt: f32) {
 /// crowders push harder. Returns a unit direction away from the crowd, or zero
 /// if there are no (non-coincident) neighbours.
 pub fn separation(position: Vec3, neighbours: &[Vec3]) -> Vec3 {
-    let mut acc = Vec3::ZERO;
-    for &n in neighbours {
-        let away = position - n;
+    let mut push = Vec3::ZERO;
+    for &neighbour in neighbours {
+        let away = position - neighbour;
         let len = away.length();
-        if len > 1e-6 {
+        if len > COINCIDENT_DISTANCE {
             // away/len is the unit direction; the extra 1/len weights by 1/dist.
-            acc = acc + away * (1.0 / (len * len));
+            push = push + away * (1.0 / (len * len));
         }
     }
-    acc.normalize_or_zero()
+    push.normalize_or_zero()
 }
 
 /// Steer toward the average position of `neighbours` (group centre). Unit

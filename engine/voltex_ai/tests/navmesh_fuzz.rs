@@ -3,7 +3,7 @@
 //! pathfinding can query without panicking.
 
 use std::panic::{catch_unwind, AssertUnwindSafe};
-use voltex_ai::{deserialize_navmesh, find_path, serialize_navmesh, NavMesh, NavTriangle};
+use voltex_ai::{deserialize_navmesh_headerless, find_path, serialize_navmesh_headerless, NavMesh, NavTriangle};
 use voltex_math::Vec3;
 
 struct XorShift(u32);
@@ -59,9 +59,9 @@ fn grid() -> NavMesh {
 #[test]
 fn navmesh_loaders_never_panic_and_loaded_meshes_are_queryable() {
     let mesh = grid();
-    let vnav = mesh.serialize();
-    let legacy = serialize_navmesh(&mesh);
-    let clean = NavMesh::deserialize(&vnav).unwrap();
+    let vnav = mesh.to_vnav_bytes();
+    let legacy = serialize_navmesh_headerless(&mesh);
+    let clean = NavMesh::from_vnav_bytes(&vnav).unwrap();
     assert!(find_path(&clean, Vec3::new(1.0, 0.0, 1.0), Vec3::new(8.0, 0.0, 8.0)).is_some());
     let mut rng = XorShift(0x7A7C_0003);
     for i in 0..20_000u32 {
@@ -77,7 +77,7 @@ fn navmesh_loaders_never_panic_and_loaded_meshes_are_queryable() {
         }
         let (start, goal) = (Vec3::new(rng.f(), 0.0, rng.f()), Vec3::new(rng.f(), 0.0, rng.f()));
         let outcome = catch_unwind(AssertUnwindSafe(|| {
-            let loaded = if vnav_format { NavMesh::deserialize(&b) } else { deserialize_navmesh(&b) };
+            let loaded = if vnav_format { NavMesh::from_vnav_bytes(&b) } else { deserialize_navmesh_headerless(&b) };
             if let Ok(m) = loaded {
                 let _ = find_path(&m, start, goal);
             }

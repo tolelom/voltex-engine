@@ -270,7 +270,7 @@ impl ApplicationHandler for HierarchyDemoApp {
                         KeyCode::KeyP => {
                             // Print serialized scene to stdout
                             let scene_str =
-                                voltex::ecs::serialize_scene(&state.world);
+                                voltex::ecs::serialize_scene_text(&state.world);
                             println!("--- Scene Snapshot ---\n{}", scene_str);
                         }
                         _ => {}
@@ -330,7 +330,7 @@ impl ApplicationHandler for HierarchyDemoApp {
                 state
                     .fps_controller
                     .process_movement(&mut state.camera, forward, right, up, dt);
-                state.input.begin_frame();
+                state.input.clear_frame_edges();
 
                 state.time += dt;
 

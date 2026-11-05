@@ -5,8 +5,8 @@
 
 use std::panic::{catch_unwind, AssertUnwindSafe};
 use voltex_ecs::{
-    add_child, deserialize_scene, deserialize_scene_binary, deserialize_scene_json,
-    propagate_transforms, serialize_scene, serialize_scene_binary, serialize_scene_json,
+    add_child, deserialize_scene_text, deserialize_scene_binary, deserialize_scene_json,
+    propagate_transforms, serialize_scene_text, serialize_scene_binary, serialize_scene_json,
     ComponentRegistry, Tag, Transform, World,
 };
 use voltex_math::Vec3;
@@ -71,7 +71,7 @@ fn scene_loaders_never_panic_on_corrupted_files() {
     let reg = registry();
     let binary = serialize_scene_binary(&world, &reg);
     let json = serialize_scene_json(&world, &reg);
-    let text = serialize_scene(&world);
+    let text = serialize_scene_text(&world);
     let mut rng = XorShift(0x5CE7_E001);
     for i in 0..9000 {
         let kind = i % 3;
@@ -88,7 +88,7 @@ fn scene_loaders_never_panic_on_corrupted_files() {
                 }
                 _ => {
                     let input = mutate(&mut rng, text.as_bytes(), true);
-                    deserialize_scene(&mut w, &String::from_utf8_lossy(&input));
+                    deserialize_scene_text(&mut w, &String::from_utf8_lossy(&input));
                 }
             }
             check_loaded(&mut w);

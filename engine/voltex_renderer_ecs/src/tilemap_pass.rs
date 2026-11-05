@@ -18,6 +18,9 @@ use crate::tilemap::{tilemap_vertices, Tilemap};
 /// `render()` has no `Device` to grow them).
 pub(crate) const MAX_TILE_QUADS: usize = 16_384;
 
+/// Two triangles per tile quad (see `tilemap_quad_indices`).
+const INDICES_PER_QUAD: u32 = 6;
+
 /// One map's slice of the shared vertex stream.
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct TilemapBatch {
@@ -26,14 +29,22 @@ pub(crate) struct TilemapBatch {
     pub quad_count: u32,
 }
 
-/// Concatenate per-map quad streams up to `cap_quads`, returning the vertices,
-/// one batch per (non-empty, in-budget) map, and the total quads requested so
-/// the caller can warn on overflow. Maps past the cap are truncated, not
-/// reordered.
+/// All tilemaps of a frame packed into one vertex stream.
+pub(crate) struct PackedTilemaps {
+    /// Quads (4 vertices each) of every in-budget map, back to back.
+    pub vertices: Vec<TilemapVertex>,
+    /// One batch per non-empty, in-budget map.
+    pub batches: Vec<TilemapBatch>,
+    /// Quads requested before the cap — compare with the cap to warn on overflow.
+    pub requested_quads: usize,
+}
+
+/// Concatenate per-map quad streams up to `cap_quads`. Maps past the cap are
+/// truncated, not reordered.
 pub(crate) fn pack_tilemap_batches(
     maps: Vec<(Option<TextureHandle>, Vec<TilemapVertex>)>,
     cap_quads: usize,
-) -> (Vec<TilemapVertex>, Vec<TilemapBatch>, usize) {
+) -> PackedTilemaps {
     let requested: usize = maps.iter().map(|(_, v)| v.len() / 4).sum();
     let mut vertices = Vec::with_capacity(requested.min(cap_quads) * 4);
     let mut batches = Vec::new();
@@ -50,7 +61,11 @@ pub(crate) fn pack_tilemap_batches(
             quad_count: take as u32,
         });
     }
-    (vertices, batches, requested)
+    PackedTilemaps {
+        vertices,
+        batches,
+        requested_quads: requested,
+    }
 }
 
 pub(crate) struct TilemapPass {
@@ -131,11 +146,15 @@ impl TilemapPass {
         if maps.is_empty() {
             return;
         }
-        let (vertices, batches, requested) = pack_tilemap_batches(maps, MAX_TILE_QUADS);
+        let PackedTilemaps {
+            vertices,
+            batches,
+            requested_quads,
+        } = pack_tilemap_batches(maps, MAX_TILE_QUADS);
         crate::basic_renderer::warn_overflow_once(
             &self.overflow_warned,
             "tile quads",
-            requested,
+            requested_quads,
             MAX_TILE_QUADS,
         );
         if batches.is_empty() {
@@ -148,42 +167,25 @@ impl TilemapPass {
         );
         queue.write_buffer(&self.vertex_buffer, 0, bytemuck::cast_slice(&vertices));
 
-        let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-            label: Some("BasicRenderer Tilemap Pass"),
-            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                view: target_view,
-                resolve_target: None,
-                depth_slice: None,
-                ops: wgpu::Operations {
-                    load: wgpu::LoadOp::Load,
-                    store: wgpu::StoreOp::Store,
-                },
-            })],
-            depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
-                view: depth_view,
-                depth_ops: Some(wgpu::Operations {
-                    load: wgpu::LoadOp::Load,
-                    store: wgpu::StoreOp::Store,
-                }),
-                stencil_ops: None,
-            }),
-            occlusion_query_set: None,
-            timestamp_writes: None,
-            multiview_mask: None,
-        });
+        let mut pass = crate::scene_pass::begin_overlay_pass(
+            encoder,
+            "BasicRenderer Tilemap Pass",
+            target_view,
+            depth_view,
+        );
         pass.set_pipeline(&self.pipeline);
         pass.set_bind_group(0, &self.uniform_bind_group, &[]);
         pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
         pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
         for batch in &batches {
-            let tex_bg = batch
+            let texture_bind_group = batch
                 .texture
                 .and_then(|h| assets.texture(h))
                 .map(|t| &t.bind_group)
                 .unwrap_or(&default_texture.bind_group);
-            pass.set_bind_group(1, tex_bg, &[]);
-            let first = batch.first_quad * 6;
-            pass.draw_indexed(first..first + batch.quad_count * 6, 0, 0..1);
+            pass.set_bind_group(1, texture_bind_group, &[]);
+            let first_index = batch.first_quad * INDICES_PER_QUAD;
+            pass.draw_indexed(first_index..first_index + batch.quad_count * INDICES_PER_QUAD, 0, 0..1);
         }
     }
 }
@@ -201,31 +203,31 @@ mod tests {
 
     #[test]
     fn packs_maps_back_to_back_one_batch_each() {
-        let (v, b, requested) = pack_tilemap_batches(vec![(None, quads(3)), (None, quads(2))], 100);
-        assert_eq!(v.len(), 20);
-        assert_eq!(requested, 5);
+        let packed = pack_tilemap_batches(vec![(None, quads(3)), (None, quads(2))], 100);
+        assert_eq!(packed.vertices.len(), 20);
+        assert_eq!(packed.requested_quads, 5);
         assert_eq!(
-            b.iter().map(|b| (b.first_quad, b.quad_count)).collect::<Vec<_>>(),
+            packed.batches.iter().map(|b| (b.first_quad, b.quad_count)).collect::<Vec<_>>(),
             vec![(0, 3), (3, 2)]
         );
     }
 
     #[test]
     fn empty_maps_get_no_batch() {
-        let (v, b, _) = pack_tilemap_batches(vec![(None, quads(0)), (None, quads(1))], 100);
-        assert_eq!(v.len(), 4);
-        assert_eq!(b.len(), 1);
-        assert_eq!(b[0].first_quad, 0);
+        let packed = pack_tilemap_batches(vec![(None, quads(0)), (None, quads(1))], 100);
+        assert_eq!(packed.vertices.len(), 4);
+        assert_eq!(packed.batches.len(), 1);
+        assert_eq!(packed.batches[0].first_quad, 0);
     }
 
     #[test]
     fn cap_truncates_the_overflowing_map_and_drops_later_ones() {
-        let (v, b, requested) =
+        let packed =
             pack_tilemap_batches(vec![(None, quads(3)), (None, quads(4)), (None, quads(2))], 5);
-        assert_eq!(requested, 9, "overflow is still reported in full");
-        assert_eq!(v.len(), 5 * 4);
+        assert_eq!(packed.requested_quads, 9, "overflow is still reported in full");
+        assert_eq!(packed.vertices.len(), 5 * 4);
         assert_eq!(
-            b.iter().map(|b| (b.first_quad, b.quad_count)).collect::<Vec<_>>(),
+            packed.batches.iter().map(|b| (b.first_quad, b.quad_count)).collect::<Vec<_>>(),
             vec![(0, 3), (3, 2)]
         );
     }

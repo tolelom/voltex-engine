@@ -4,7 +4,7 @@
 //! so it converts to/from `[f32; 4]` for free.
 //!
 //! ```ignore
-//! let c = Color::hex(0xFF8800);              // orange
+//! let c = Color::from_hex(0xFF8800);         // orange
 //! let faded = c.with_alpha(0.5);
 //! let mixed = Color::RED.lerp(Color::BLUE, 0.5);
 //! material_desc_color(mixed.to_array());     // hand off to the renderer
@@ -56,7 +56,7 @@ impl Color {
     }
 
     /// Opaque color from a `0xRRGGBB` hex literal.
-    pub fn hex(rgb: u32) -> Self {
+    pub fn from_hex(rgb: u32) -> Self {
         let r = ((rgb >> 16) & 0xFF) as f32 / 255.0;
         let g = ((rgb >> 8) & 0xFF) as f32 / 255.0;
         let b = (rgb & 0xFF) as f32 / 255.0;
@@ -64,12 +64,24 @@ impl Color {
     }
 
     /// Color from a `0xRRGGBBAA` hex literal (alpha in the low byte).
-    pub fn hexa(rgba: u32) -> Self {
+    pub fn from_hex_rgba(rgba: u32) -> Self {
         let r = ((rgba >> 24) & 0xFF) as f32 / 255.0;
         let g = ((rgba >> 16) & 0xFF) as f32 / 255.0;
         let b = ((rgba >> 8) & 0xFF) as f32 / 255.0;
         let a = (rgba & 0xFF) as f32 / 255.0;
         Self { r, g, b, a }
+    }
+
+    /// Old name of [`Color::from_hex`].
+    #[deprecated(note = "use `from_hex`")]
+    pub fn hex(rgb: u32) -> Self {
+        Self::from_hex(rgb)
+    }
+
+    /// Old name of [`Color::from_hex_rgba`].
+    #[deprecated(note = "use `from_hex_rgba`")]
+    pub fn hexa(rgba: u32) -> Self {
+        Self::from_hex_rgba(rgba)
     }
 
     /// Opaque color from HSV (hue in degrees `[0, 360)`, saturation/value in
@@ -157,17 +169,17 @@ mod tests {
 
     #[test]
     fn hex_decodes_channels() {
-        assert!(approx(Color::hex(0xFF0000), Color::RED));
-        assert!(approx(Color::hex(0x00FF00), Color::GREEN));
-        assert!(approx(Color::hex(0x0000FF), Color::BLUE));
+        assert!(approx(Color::from_hex(0xFF0000), Color::RED));
+        assert!(approx(Color::from_hex(0x00FF00), Color::GREEN));
+        assert!(approx(Color::from_hex(0x0000FF), Color::BLUE));
         // A mixed value.
-        let c = Color::hex(0xFF8000);
+        let c = Color::from_hex(0xFF8000);
         assert!((c.r - 1.0).abs() < 1e-3 && (c.g - 0.502).abs() < 1e-3 && c.b == 0.0);
     }
 
     #[test]
     fn hexa_decodes_alpha() {
-        let c = Color::hexa(0x00000080);
+        let c = Color::from_hex_rgba(0x00000080);
         assert!((c.a - 0.502).abs() < 1e-3, "alpha {}", c.a);
         assert_eq!(c.r, 0.0);
     }

@@ -16,8 +16,9 @@ pub struct WindowConfig {
     pub height: u32,
     /// Open as borderless fullscreen on the primary monitor.
     pub fullscreen: bool,
-    /// Enable vsync on the swapchain (set on the wgpu present mode by
-    /// the renderer).
+    /// Requested vsync. Only copied onto [`VoltexWindow::vsync`] — no
+    /// renderer reads it yet (`GpuContext` picks the surface's first
+    /// supported present mode on its own).
     pub vsync: bool,
 }
 

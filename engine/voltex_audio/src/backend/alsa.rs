@@ -51,16 +51,25 @@ unsafe extern "C" {
     fn snd_strerror(err: c_int) -> *const u8;
 }
 
+/// Human-readable text for an ALSA error code.
+///
+/// # Safety
+/// Only calls `snd_strerror`, which accepts any code; marked `unsafe` because
+/// it trusts the returned pointer to be NUL-terminated static text.
 unsafe fn alsa_strerror(err: c_int) -> String {
+    // SAFETY: snd_strerror takes any int and returns static text or NULL.
     let ptr = unsafe { snd_strerror(err) };
     if ptr.is_null() {
         return format!("snd error {}", err);
     }
     // Walk to NUL ourselves so we don't pull in libc::strlen.
     let mut len = 0usize;
+    // SAFETY: ptr is non-null and NUL-terminated (snd_strerror contract), so
+    // every byte up to and including the NUL is readable.
     while unsafe { *ptr.add(len) } != 0 {
         len += 1;
     }
+    // SAFETY: the `len` bytes before the NUL were just read above.
     let slice = unsafe { std::slice::from_raw_parts(ptr, len) };
     String::from_utf8_lossy(slice).into_owned()
 }
@@ -75,6 +84,10 @@ pub struct AlsaBackend {
     buffer_frames: u32,
 }
 
+// SAFETY: the PCM handle is owned exclusively by this struct (never copied out)
+// and every FFI call goes through `&mut self` or `Drop`, so only one thread
+// touches it at a time. ALSA PCM handles may be used from any thread as long
+// as access is not concurrent.
 unsafe impl Send for AlsaBackend {}
 
 impl AlsaBackend {
@@ -88,6 +101,8 @@ impl AlsaBackend {
 
         let device = CString::new("default").unwrap();
         let mut pcm: *mut snd_pcm_t = std::ptr::null_mut();
+        // SAFETY: `device` is a valid C string that outlives the call; `pcm`
+        // is only passed on to set_params/close after snd_pcm_open succeeded.
         unsafe {
             let rc = snd_pcm_open(
                 &mut pcm,
@@ -143,6 +158,9 @@ impl AudioBackend for AlsaBackend {
         if frames == 0 {
             return Ok(0);
         }
+        // SAFETY: relies on self.pcm being the handle opened in `new` — calling
+        // `write` after `shutdown` (pcm = NULL) is not guarded here. `samples`
+        // holds at least `frames * channels` interleaved f32 values.
         unsafe {
             let written = snd_pcm_writei(self.pcm, samples.as_ptr(), frames);
             if written >= 0 {
@@ -176,6 +194,8 @@ impl AudioBackend for AlsaBackend {
     }
     fn shutdown(&mut self) {
         if !self.pcm.is_null() {
+            // SAFETY: non-null handle from snd_pcm_open, closed exactly once
+            // (nulled right after).
             unsafe {
                 snd_pcm_drop(self.pcm);
                 snd_pcm_close(self.pcm);

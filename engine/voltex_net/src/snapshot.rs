@@ -1,6 +1,6 @@
 //! Snapshot + delta encoding for replicated world state. Defines
 //! [`EntityState`] / [`Snapshot`] plus binary `serialize_snapshot` /
-//! `deserialize_snapshot` and `diff_snapshots` / `apply_diff` helpers used by
+//! `deserialize_snapshot` and `diff_snapshots` / `apply_snapshot_diff` helpers used by
 //! the `Snapshot` and `SnapshotDelta` packet variants.
 
 /// State of a single entity at a point in time.
@@ -30,15 +30,33 @@ pub struct Snapshot {
     pub entities: Vec<EntityState>,
 }
 
-/// Binary size of one entity: id(4) + pos(12) + rot quat(16) + vel(12) = 44 bytes
-const ENTITY_SIZE: usize = 4 + 12 + 16 + 12;
+use crate::wire::{read_f32, read_u32};
+
+/// Snapshot and delta header: tick(4 LE) + entry count(4 LE).
+const HEADER_LEN: usize = 8;
+/// Byte sizes of the encoded entity fields.
+const ID_LEN: usize = 4;
+const POSITION_LEN: usize = 12;
+const ROTATION_LEN: usize = 16;
+const VELOCITY_LEN: usize = 12;
+/// Full entity state without the id: pos(12) + rot quat(16) + vel(12) = 40 bytes.
+const FULL_STATE_LEN: usize = POSITION_LEN + ROTATION_LEN + VELOCITY_LEN;
+/// Binary size of one entity: id(4) + full state(40) = 44 bytes
+const ENTITY_SIZE: usize = ID_LEN + FULL_STATE_LEN;
+/// Delta entry header: id(4) + flags(1).
+const DELTA_ENTRY_HEADER_LEN: usize = ID_LEN + 1;
+
+/// Delta entry flags (bitmask).
+const FLAG_POSITION: u8 = 0x01;
+const FLAG_ROTATION: u8 = 0x02;
+const FLAG_VELOCITY: u8 = 0x04;
+/// Entity removed — no field data follows.
+const FLAG_REMOVED: u8 = 0x40;
+/// Entity added — full state follows.
+const FLAG_NEW: u8 = 0x80;
 
 fn write_f32_le(buf: &mut Vec<u8>, v: f32) {
     buf.extend_from_slice(&v.to_le_bytes());
-}
-
-fn read_f32_le(data: &[u8], offset: usize) -> f32 {
-    f32::from_le_bytes([data[offset], data[offset + 1], data[offset + 2], data[offset + 3]])
 }
 
 fn write_f32x3(buf: &mut Vec<u8>, v: &[f32; 3]) {
@@ -49,9 +67,9 @@ fn write_f32x3(buf: &mut Vec<u8>, v: &[f32; 3]) {
 
 fn read_f32x3(data: &[u8], offset: usize) -> [f32; 3] {
     [
-        read_f32_le(data, offset),
-        read_f32_le(data, offset + 4),
-        read_f32_le(data, offset + 8),
+        read_f32(data, offset),
+        read_f32(data, offset + 4),
+        read_f32(data, offset + 8),
     ]
 }
 
@@ -64,10 +82,10 @@ fn write_f32x4(buf: &mut Vec<u8>, v: &[f32; 4]) {
 
 fn read_f32x4(data: &[u8], offset: usize) -> [f32; 4] {
     [
-        read_f32_le(data, offset),
-        read_f32_le(data, offset + 4),
-        read_f32_le(data, offset + 8),
-        read_f32_le(data, offset + 12),
+        read_f32(data, offset),
+        read_f32(data, offset + 4),
+        read_f32(data, offset + 8),
+        read_f32(data, offset + 12),
     ]
 }
 
@@ -78,13 +96,17 @@ fn serialize_entity(buf: &mut Vec<u8>, e: &EntityState) {
     write_f32x3(buf, &e.velocity);
 }
 
+/// Reads position + rotation + velocity ([`FULL_STATE_LEN`] bytes) at `offset`.
+fn read_full_state(data: &[u8], offset: usize) -> ([f32; 3], [f32; 4], [f32; 3]) {
+    let position = read_f32x3(data, offset);
+    let rotation = read_f32x4(data, offset + POSITION_LEN);
+    let velocity = read_f32x3(data, offset + POSITION_LEN + ROTATION_LEN);
+    (position, rotation, velocity)
+}
+
 fn deserialize_entity(data: &[u8], offset: usize) -> EntityState {
-    let id = u32::from_le_bytes([
-        data[offset], data[offset + 1], data[offset + 2], data[offset + 3],
-    ]);
-    let position = read_f32x3(data, offset + 4);
-    let rotation = read_f32x4(data, offset + 16);
-    let velocity = read_f32x3(data, offset + 32);
+    let id = read_u32(data, offset);
+    let (position, rotation, velocity) = read_full_state(data, offset + ID_LEN);
     EntityState { id, position, rotation, velocity }
 }
 
@@ -92,7 +114,7 @@ fn deserialize_entity(data: &[u8], offset: usize) -> EntityState {
 /// Layout: tick(4 LE) + entity_count(4 LE) + entities...
 pub fn serialize_snapshot(snapshot: &Snapshot) -> Vec<u8> {
     let count = snapshot.entities.len() as u32;
-    let mut buf = Vec::with_capacity(8 + ENTITY_SIZE * snapshot.entities.len());
+    let mut buf = Vec::with_capacity(HEADER_LEN + ENTITY_SIZE * snapshot.entities.len());
     buf.extend_from_slice(&snapshot.tick.to_le_bytes());
     buf.extend_from_slice(&count.to_le_bytes());
     for e in &snapshot.entities {
@@ -111,11 +133,11 @@ const MAX_SNAPSHOT_ENTITIES: usize = 1_000_000;
 
 /// Deserialize a snapshot from binary data.
 pub fn deserialize_snapshot(data: &[u8]) -> crate::Result<Snapshot> {
-    if data.len() < 8 {
+    if data.len() < HEADER_LEN {
         return Err("Snapshot data too short for header".into());
     }
-    let tick = u32::from_le_bytes([data[0], data[1], data[2], data[3]]);
-    let count = u32::from_le_bytes([data[4], data[5], data[6], data[7]]) as usize;
+    let tick = read_u32(data, 0);
+    let count = read_u32(data, 4) as usize;
 
     if count > MAX_SNAPSHOT_ENTITIES {
         return Err(format!(
@@ -128,7 +150,7 @@ pub fn deserialize_snapshot(data: &[u8]) -> crate::Result<Snapshot> {
         .checked_mul(ENTITY_SIZE)
         .ok_or("Snapshot body size overflow")?;
     let expected = body_size
-        .checked_add(8)
+        .checked_add(HEADER_LEN)
         .ok_or("Snapshot expected size overflow")?;
     if data.len() < expected {
         return Err(format!(
@@ -140,7 +162,7 @@ pub fn deserialize_snapshot(data: &[u8]) -> crate::Result<Snapshot> {
 
     let mut entities = Vec::with_capacity(count);
     for i in 0..count {
-        entities.push(deserialize_entity(data, 8 + i * ENTITY_SIZE));
+        entities.push(deserialize_entity(data, HEADER_LEN + i * ENTITY_SIZE));
     }
 
     Ok(Snapshot { tick, entities })
@@ -148,8 +170,9 @@ pub fn deserialize_snapshot(data: &[u8]) -> crate::Result<Snapshot> {
 
 /// Compute a delta between two snapshots.
 /// Format: new_tick(4) + count(4) + [id(4) + flags(1) + changed_fields...]
-/// Flags bitmask: 0x01 = position, 0x02 = rotation, 0x04 = velocity,
-/// 0x40 = removed entity (no field data), 0x80 = new entity (full).
+/// Flags bitmask: [`FLAG_POSITION`] 0x01, [`FLAG_ROTATION`] 0x02,
+/// [`FLAG_VELOCITY`] 0x04, [`FLAG_REMOVED`] 0x40 (no field data),
+/// [`FLAG_NEW`] 0x80 (full state).
 pub fn diff_snapshots(old: &Snapshot, new: &Snapshot) -> Vec<u8> {
     use std::collections::{HashMap, HashSet};
 
@@ -164,15 +187,15 @@ pub fn diff_snapshots(old: &Snapshot, new: &Snapshot) -> Vec<u8> {
             let mut fields = Vec::new();
 
             if new_ent.position != old_ent.position {
-                flags |= 0x01;
+                flags |= FLAG_POSITION;
                 write_f32x3(&mut fields, &new_ent.position);
             }
             if new_ent.rotation != old_ent.rotation {
-                flags |= 0x02;
+                flags |= FLAG_ROTATION;
                 write_f32x4(&mut fields, &new_ent.rotation);
             }
             if new_ent.velocity != old_ent.velocity {
-                flags |= 0x04;
+                flags |= FLAG_VELOCITY;
                 write_f32x3(&mut fields, &new_ent.velocity);
             }
 
@@ -185,7 +208,7 @@ pub fn diff_snapshots(old: &Snapshot, new: &Snapshot) -> Vec<u8> {
         } else {
             // New entity — send full state
             entries.extend_from_slice(&new_ent.id.to_le_bytes());
-            entries.push(0x80); // "new entity" flag
+            entries.push(FLAG_NEW);
             write_f32x3(&mut entries, &new_ent.position);
             write_f32x4(&mut entries, &new_ent.rotation);
             write_f32x3(&mut entries, &new_ent.velocity);
@@ -200,54 +223,51 @@ pub fn diff_snapshots(old: &Snapshot, new: &Snapshot) -> Vec<u8> {
     for old_ent in &old.entities {
         if !new_ids.contains(&old_ent.id) {
             entries.extend_from_slice(&old_ent.id.to_le_bytes());
-            entries.push(0x40); // "removed entity" flag, no field data
+            entries.push(FLAG_REMOVED);
             count += 1;
         }
     }
 
-    let mut buf = Vec::with_capacity(8 + entries.len());
+    let mut buf = Vec::with_capacity(HEADER_LEN + entries.len());
     buf.extend_from_slice(&new.tick.to_le_bytes());
     buf.extend_from_slice(&count.to_le_bytes());
     buf.extend_from_slice(&entries);
     buf
 }
 
-/// Apply a delta to a base snapshot to produce an updated snapshot.
-pub fn apply_diff(base: &Snapshot, diff: &[u8]) -> crate::Result<Snapshot> {
-    if diff.len() < 8 {
+/// Apply a delta from [`diff_snapshots`] to a base snapshot to produce the
+/// updated snapshot.
+pub fn apply_snapshot_diff(base: &Snapshot, diff: &[u8]) -> crate::Result<Snapshot> {
+    if diff.len() < HEADER_LEN {
         return Err("Diff data too short for header".into());
     }
 
-    let tick = u32::from_le_bytes([diff[0], diff[1], diff[2], diff[3]]);
-    let count = u32::from_le_bytes([diff[4], diff[5], diff[6], diff[7]]) as usize;
+    let tick = read_u32(diff, 0);
+    let count = read_u32(diff, 4) as usize;
 
     // Start from a clone of the base
     let mut entities: Vec<EntityState> = base.entities.clone();
-    let mut offset = 8;
+    let mut offset = HEADER_LEN;
 
     for _ in 0..count {
-        if offset + 5 > diff.len() {
+        if offset + DELTA_ENTRY_HEADER_LEN > diff.len() {
             return Err("Diff truncated at entry header".into());
         }
-        let id = u32::from_le_bytes([diff[offset], diff[offset + 1], diff[offset + 2], diff[offset + 3]]);
-        let flags = diff[offset + 4];
-        offset += 5;
+        let id = read_u32(diff, offset);
+        let flags = diff[offset + ID_LEN];
+        offset += DELTA_ENTRY_HEADER_LEN;
 
-        if flags & 0x40 != 0 {
-            // Removed entity — no field data follows.
+        if flags & FLAG_REMOVED != 0 {
             entities.retain(|e| e.id != id);
             continue;
         }
 
-        if flags & 0x80 != 0 {
-            // New entity — full state (pos 12 + quat 16 + vel 12 = 40)
-            if offset + 40 > diff.len() {
+        if flags & FLAG_NEW != 0 {
+            if offset + FULL_STATE_LEN > diff.len() {
                 return Err("Diff truncated at new entity data".into());
             }
-            let position = read_f32x3(diff, offset);
-            let rotation = read_f32x4(diff, offset + 12);
-            let velocity = read_f32x3(diff, offset + 28);
-            offset += 40;
+            let (position, rotation, velocity) = read_full_state(diff, offset);
+            offset += FULL_STATE_LEN;
 
             // Add or replace
             if let Some(ent) = entities.iter_mut().find(|e| e.id == id) {
@@ -262,31 +282,37 @@ pub fn apply_diff(base: &Snapshot, diff: &[u8]) -> crate::Result<Snapshot> {
             let ent = entities.iter_mut().find(|e| e.id == id)
                 .ok_or_else(|| crate::NetError::from(format!("Diff references unknown entity {}", id)))?;
 
-            if flags & 0x01 != 0 {
-                if offset + 12 > diff.len() {
+            if flags & FLAG_POSITION != 0 {
+                if offset + POSITION_LEN > diff.len() {
                     return Err("Diff truncated at position".into());
                 }
                 ent.position = read_f32x3(diff, offset);
-                offset += 12;
+                offset += POSITION_LEN;
             }
-            if flags & 0x02 != 0 {
-                if offset + 16 > diff.len() {
+            if flags & FLAG_ROTATION != 0 {
+                if offset + ROTATION_LEN > diff.len() {
                     return Err("Diff truncated at rotation".into());
                 }
                 ent.rotation = read_f32x4(diff, offset);
-                offset += 16;
+                offset += ROTATION_LEN;
             }
-            if flags & 0x04 != 0 {
-                if offset + 12 > diff.len() {
+            if flags & FLAG_VELOCITY != 0 {
+                if offset + VELOCITY_LEN > diff.len() {
                     return Err("Diff truncated at velocity".into());
                 }
                 ent.velocity = read_f32x3(diff, offset);
-                offset += 12;
+                offset += VELOCITY_LEN;
             }
         }
     }
 
     Ok(Snapshot { tick, entities })
+}
+
+/// Old name of [`apply_snapshot_diff`].
+#[deprecated(note = "use `apply_snapshot_diff`")]
+pub fn apply_diff(base: &Snapshot, diff: &[u8]) -> crate::Result<Snapshot> {
+    apply_snapshot_diff(base, diff)
 }
 
 #[cfg(test)]
@@ -361,7 +387,7 @@ mod tests {
         };
 
         let diff = diff_snapshots(&old, &new);
-        let result = apply_diff(&old, &diff).expect("apply_diff failed");
+        let result = apply_snapshot_diff(&old, &diff).expect("apply_snapshot_diff failed");
 
         assert_eq!(result.tick, 11);
         assert_eq!(result.entities.len(), 1);
@@ -384,7 +410,7 @@ mod tests {
         };
 
         let diff = diff_snapshots(&old, &new);
-        let result = apply_diff(&old, &diff).expect("apply_diff failed");
+        let result = apply_snapshot_diff(&old, &diff).expect("apply_snapshot_diff failed");
 
         assert_eq!(result.entities.len(), 2);
         assert_eq!(result.entities[1].id, 2);
@@ -413,7 +439,7 @@ mod tests {
         };
 
         let diff = diff_snapshots(&old, &new);
-        let result = apply_diff(&old, &diff).unwrap();
+        let result = apply_snapshot_diff(&old, &diff).unwrap();
 
         assert_eq!(result.entities[0].position, [1.0, 1.0, 1.0]);
         assert_eq!(result.entities[0].rotation, [0.1, 0.2, 0.3, 0.9]);
@@ -435,7 +461,7 @@ mod tests {
         };
 
         let diff = diff_snapshots(&old, &new);
-        let result = apply_diff(&old, &diff).expect("apply_diff failed");
+        let result = apply_snapshot_diff(&old, &diff).expect("apply_snapshot_diff failed");
 
         assert_eq!(result.tick, 11);
         assert_eq!(result.entities.len(), 1, "removed entity must not linger");
@@ -465,7 +491,7 @@ mod tests {
             ],
         };
 
-        let result = apply_diff(&old, &diff_snapshots(&old, &new)).unwrap();
+        let result = apply_snapshot_diff(&old, &diff_snapshots(&old, &new)).unwrap();
         // Compare as id->position maps (order is not guaranteed).
         use std::collections::HashMap;
         let got: HashMap<u32, [f32; 3]> =

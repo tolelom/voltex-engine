@@ -6,7 +6,7 @@ ECS World ↔ voltex_renderer 브릿지. C0a 의 `MeshHandle` / `MaterialHandle`
 
 - `voltex_renderer::Mesh` 와 `MaterialUniform` 을 `RenderAssets` 에 저장
 - C0a 의 phantom-typed `Handle<MeshAsset>` / `Handle<MaterialAsset>` 과 내부 `Handle<Mesh>` / `Handle<MaterialUniform>` 의 id/generation lockstep 유지
-- `BasicRenderer` (mesh_shader.wgsl, Blinn-Phong) 로 한 메서드 호출로 World 를 그림
+- `BasicRenderer` (mesh_colored.wgsl Blinn-Phong, `set_pbr_enabled` 시 PBR) 로 한 메서드 호출로 World 를 그림
 - `collect_render_items` 로 자체 pipeline 호출자(survivor_game PBR loop) 를 위한 RenderItem 리스트 생성
 
 ## 공개 API
@@ -17,7 +17,7 @@ ECS World ↔ voltex_renderer 브릿지. C0a 의 `MeshHandle` / `MaterialHandle`
 | `RenderAssets::replace_mesh(handle, Mesh) -> Result` | `assets.rs` | 핫리로드 — 기존 `MeshHandle` 뒤 GPU Mesh를 in-place 교체(generation 보존, 엔티티 재부착 불필요). 디코드는 호출자가 `Mesh::from_obj`/`from_gltf` 로. stale handle → Err |
 | `RenderItem { entity, model, mesh, material, texture }` | `items.rs` | per-frame 데이터 단위 (texture: Option<TextureHandle>) |
 | `collect_render_items(&mut World, &RenderAssets) -> Vec<RenderItem>` | `items.rs` | `propagate_transforms` 자동 호출 |
-| `BasicRenderer::new(device, queue, target_format, max_entities)` | `basic_renderer/mod.rs` | mesh_shader.wgsl pipeline 소유 |
+| `BasicRenderer::new(device, queue, target_format, max_entities)` | `basic_renderer/mod.rs` | Blinn-Phong(mesh_colored.wgsl) + PBR + 스킨드 + 그림자 pipeline 소유 |
 | `BasicRenderer::render(queue, encoder, target_view, depth_view, clear_color, &mut World, &RenderAssets, view_proj, cam_pos, light)` | `basic_renderer/mod.rs` | 메시 패스(colored Blinn-Phong 또는 `set_pbr_enabled` 시 PBR) + 스킨드 패스(colored 또는 PBR) + 스프라이트/파티클/디버그 라인 패스. PBR 시 메시·스킨드 모두 Cook-Torrance |
 | `BasicRenderer::set_point_lights(&queue, &[PointLight])` / `set_shadows(bool)` / `set_debug_lines(&queue, &[LineVertex])` | `basic_renderer/mod.rs` | 매 프레임 호출(`&self`). 디버그 라인은 `LineList` depth-tested 마지막 패스 (MAX 8192 verts, 초과 drop) |
 | `Sprite { texture, size, color, uv_rect, flip_x, roll_from_transform }` + `Sprite::solid` / `textured` / `with_uv_rect(rect)` / `with_roll_from_transform()` / `set_sheet_frame(cols,rows,index)` / `effective_uv_rect()` | `sprite.rs` | 카메라-facing 빌보드 컴포넌트. `WorldTransform`+`Sprite` 엔티티를 mesh 패스 후 alpha-blended·depth-tested(no write) 빌보드로 렌더. `uv_rect`로 스프라이트시트/아틀라스 프레임 선택, `flip_x`는 렌더 시점 u-스왑(표시 전용 — 애니 시스템과 충돌 없음, 렌더러는 `effective_uv_rect()` 사용). 카메라 right/up은 inverse VP에서 복원. `roll_from_transform`(기본 false)이면 엔티티 로컬 X축의 화면 투영 각도만큼 화면 평면에서 회전(`SpriteUniform.size.z`). 카메라 거리 기준 back-to-front 정렬(투명도 합성 순서 무관). MAX 256/frame |
@@ -41,7 +41,7 @@ ECS World ↔ voltex_renderer 브릿지. C0a 의 `MeshHandle` / `MaterialHandle`
 - voltex_math — `Mat4`, `Vec3`
 - voltex_ecs — `World`, `Entity`, `MeshHandle`, `MaterialHandle`, `WorldTransform`, `propagate_transforms`
 - voltex_asset — `Handle`, `Assets`
-- voltex_renderer — `Mesh`, `MaterialUniform`, `CameraUniform`, `LightUniform`, `GpuTexture`, `pipeline::create_mesh_pipeline`
+- voltex_renderer — `Mesh`, `MaterialUniform`, `CameraUniform`, `LightUniform`, `GpuTexture`, `align_up`, `create_colored_mesh_pipeline` / `create_pbr_pipeline` 등
 - wgpu, bytemuck, thiserror
 
 ## 모듈 구조
@@ -53,10 +53,13 @@ src/
 ├── assets.rs           # RenderAssets
 ├── items.rs            # RenderItem + collect_render_items
 ├── basic_renderer/
-│   ├── mod.rs          # BasicRenderer struct·new·render(패스 순서)·colored 메시 패스·setter
+│   ├── mod.rs          # BasicRenderer struct·new·render(패스 순서)·setter
+│   ├── blinn_phong.rs  # BlinnPhongResources + blinn_phong_mesh_pass (기본 메시 패스)
 │   ├── shadow.rs       # ShadowResources + 그림자 깊이 전처리(shadow_prepass)
 │   ├── skinned.rs      # SkinnedResources + render_skinned / gather_skinned_shadow
-│   └── pbr.rs          # PbrResources / PbrSkinnedResources + pbr_color_pass
+│   └── pbr.rs          # PbrResources / PbrSkinnedResources + pbr_mesh_pass / 스킨드 PBR draw
+├── dynamic_uniform.rs  # DynamicUniformBuffer<T> — 엔티티별 dynamic-offset UBO (stride·upload·offset)
+├── scene_pass.rs       # begin_clearing_pass / begin_overlay_pass — 컬러+깊이 렌더 패스 시작
 ├── debug_line_pass.rs  # BasicRenderer 디버그 라인 패스 (DebugLinePass)
 ├── sprite_pass.rs      # BasicRenderer 빌보드 스프라이트 패스 (SpritePass) + cull_and_sort_sprites
 ├── renderable.rs       # PrimitiveMesh / MaterialDesc / materialize_renderables (선언적 렌더러블)
@@ -73,8 +76,8 @@ src/
 
 - `RenderAssets::add_mesh` / `add_material` 외 경로로 핸들을 만들면 id 불일치 위험. `Handle::from_raw_parts` 의 직접 사용은 scene deserialize 가 유일한 정당 사용처.
 - `BasicRenderer::new(max_entities)` 보다 많은 엔티티가 World 에 있으면 초과분은 silently drop. v1 한도 (수십~수백) 에서는 무시 가능하지만 외부 사용 시 `max_entities` 적절히 설정.
-- `BasicRenderer` 의 pipeline 은 mesh_shader.wgsl (Blinn-Phong). PBR / 멀티라이트 / 그림자 사용 시 자체 pipeline + `collect_render_items` 패턴 사용 (survivor_game 참조).
+- `BasicRenderer` 의 기본 pipeline 은 mesh_colored.wgsl (Blinn-Phong + 점광원 + 방향광 그림자). `set_pbr_enabled(true)` 면 PBR(pbr_shader.wgsl). 그 외 커스텀 pipeline 은 `collect_render_items` 패턴 사용 (survivor_game 참조).
 - `propagate_transforms` 가 매 `collect_render_items` 호출마다 실행. 한 프레임에 여러 번 부르면 비용 누적 → 매 프레임 한 번만 호출 권장.
-- max_bind_groups=4 제약: BasicRenderer 비스킨 패스는 2개 (cam+light, texture), 스킨드 패스는 2개 (skinned cam, bone palette). 외부 추가 bind group 시점 점검.
-- 스킨드 패스: `SkinnedMeshHandle`+`SkinnedPose`+`WorldTransform` 엔티티를 `LoadOp::Load` 2차 패스로. per-entity palette(8KB)/cam dynamic-offset UBO, `MAX_SKINNED=64` 캡(VRAM 바운드). 포즈 진행은 `update_skinned_poses`(런타임 tick)가 담당 — 렌더는 `palette()` 만 읽음. PBR 스키닝은 미구현.
+- max_bind_groups=4 제약: Blinn-Phong·PBR 메시 패스와 스킨드 PBR 은 4개를 모두 쓴다 (Blinn-Phong: cam+light / texture / point lights / shadow, PBR: cam+lights / 4-map / material / shadow+BRDF LUT). Blinn-Phong 스킨드 패스는 2개 (skinned cam, bone palette).
+- 스킨드 패스: `SkinnedMeshHandle`+`SkinnedPose`+`WorldTransform` 엔티티를 `LoadOp::Load` 2차 패스로. per-entity palette(8KB)/cam dynamic-offset UBO, `MAX_SKINNED=64` 캡(VRAM 바운드). 포즈 진행은 `update_skinned_poses`(런타임 tick)가 담당 — 렌더는 `palette()` 만 읽음. PBR 활성 시 스킨드도 PBR(pbr_skinned.wgsl).
 - headless 단위 테스트는 GPU device 가 필요해서 `add_mesh` 라운드트립 / `collect_render_items` 의 emit 케이스 직접 검증 불가 → editor_demo 시각 검증으로 위임.

@@ -198,7 +198,7 @@ mod tests {
         assert!(m.just_pressed("jump", &input), "press edge");
 
         // Next frame, key still held (OS key-repeat) → no re-fire.
-        input.begin_frame();
+        input.clear_frame_edges();
         input.process_key(KeyCode::Space, true);
         assert!(!m.just_pressed("jump", &input), "held key must not re-fire");
         assert!(m.is_pressed("jump", &input), "still held");
@@ -209,7 +209,7 @@ mod tests {
         let m = map();
         let mut input = InputState::new();
         input.process_key(KeyCode::Space, true);
-        input.begin_frame();
+        input.clear_frame_edges();
         input.process_key(KeyCode::Space, false);
         assert!(m.just_released("jump", &input));
     }

@@ -298,11 +298,19 @@ impl World {
         }
     }
 
-    /// Advance tick on all component storages (call at end of frame).
-    pub fn clear_changed(&mut self) {
+    /// Advance the change tick on all component storages (call at end of
+    /// frame). Changes made before this no longer show up in
+    /// [`query_changed`](Self::query_changed); nothing is erased.
+    pub fn advance_change_tick(&mut self) {
         for storage in self.storages.values_mut() {
             storage.increment_tick();
         }
+    }
+
+    /// Old name of [`World::advance_change_tick`].
+    #[deprecated(note = "use `advance_change_tick`")]
+    pub fn clear_changed(&mut self) {
+        self.advance_change_tick();
     }
 
     /// `true` if `entity` has a component of type `T`.

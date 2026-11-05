@@ -1,6 +1,7 @@
 //! Built-in primitive mesh generators — the shapes every game reaches for.
-//! Each returns `(Vec<MeshVertex>, Vec<u32>)` (like [`generate_sphere`](crate::generate_sphere)),
-//! ready for [`Mesh::new`](crate::Mesh::new). Vertices carry correct per-face
+//! Each returns `(vertices, indices)` as `(Vec<MeshVertex>, Vec<u32>)` (like
+//! [`generate_sphere`](crate::generate_sphere)), ready for
+//! [`Mesh::new`](crate::Mesh::new). Vertices carry correct per-face
 //! normals, UVs, and tangents so they work with both the colored and PBR
 //! (normal-mapped) paths.
 
@@ -10,7 +11,7 @@ use voltex_image::MeshVertex;
 /// vertices, 36 indices; one quad per face with outward normals and CCW winding
 /// from outside). Tangents follow each face's U texture direction.
 pub fn generate_cube(size: f32) -> (Vec<MeshVertex>, Vec<u32>) {
-    let s = size * 0.5;
+    let s = size * 0.5; // half edge
     // (normal, [4 corners CCW from outside]) — corner[0]→[1] is +U, [0]→[3] is +V.
     let faces: [([f32; 3], [[f32; 3]; 4]); 6] = [
         ([1.0, 0.0, 0.0], [[s, -s, s], [s, -s, -s], [s, s, -s], [s, s, s]]),
@@ -45,20 +46,18 @@ pub fn generate_cube(size: f32) -> (Vec<MeshVertex>, Vec<u32>) {
 /// A flat ground quad on the XZ plane (`+Y` normal, CCW from above), spanning
 /// `size`×`size` centered at the origin. UVs span 0..1.
 pub fn generate_plane(size: f32) -> (Vec<MeshVertex>, Vec<u32>) {
-    let h = size * 0.5;
-    let n = [0.0, 1.0, 0.0];
-    let t = [1.0, 0.0, 0.0, 1.0];
-    let mk = |x: f32, z: f32, u: f32, v: f32| MeshVertex {
+    let half = size * 0.5;
+    let vertex_at = |x: f32, z: f32, u: f32, v: f32| MeshVertex {
         position: [x, 0.0, z],
-        normal: n,
+        normal: [0.0, 1.0, 0.0],
         uv: [u, v],
-        tangent: t,
+        tangent: [1.0, 0.0, 0.0, 1.0],
     };
     let verts = vec![
-        mk(-h, -h, 0.0, 0.0),
-        mk(h, -h, 1.0, 0.0),
-        mk(h, h, 1.0, 1.0),
-        mk(-h, h, 0.0, 1.0),
+        vertex_at(-half, -half, 0.0, 0.0),
+        vertex_at(half, -half, 1.0, 0.0),
+        vertex_at(half, half, 1.0, 1.0),
+        vertex_at(-half, half, 0.0, 1.0),
     ];
     let indices = vec![0u32, 2, 1, 0, 3, 2]; // CCW from above (+Y)
     (verts, indices)
@@ -68,20 +67,18 @@ pub fn generate_plane(size: f32) -> (Vec<MeshVertex>, Vec<u32>) {
 /// centered at the origin — for walls, sprites-as-geometry, billboards drawn as
 /// meshes, etc. UVs span 0..1.
 pub fn generate_quad(width: f32, height: f32) -> (Vec<MeshVertex>, Vec<u32>) {
-    let (hw, hh) = (width * 0.5, height * 0.5);
-    let n = [0.0, 0.0, 1.0];
-    let t = [1.0, 0.0, 0.0, 1.0];
-    let mk = |x: f32, y: f32, u: f32, v: f32| MeshVertex {
+    let (half_w, half_h) = (width * 0.5, height * 0.5);
+    let vertex_at = |x: f32, y: f32, u: f32, v: f32| MeshVertex {
         position: [x, y, 0.0],
-        normal: n,
+        normal: [0.0, 0.0, 1.0],
         uv: [u, v],
-        tangent: t,
+        tangent: [1.0, 0.0, 0.0, 1.0],
     };
     let verts = vec![
-        mk(-hw, -hh, 0.0, 1.0),
-        mk(hw, -hh, 1.0, 1.0),
-        mk(hw, hh, 1.0, 0.0),
-        mk(-hw, hh, 0.0, 0.0),
+        vertex_at(-half_w, -half_h, 0.0, 1.0),
+        vertex_at(half_w, -half_h, 1.0, 1.0),
+        vertex_at(half_w, half_h, 1.0, 0.0),
+        vertex_at(-half_w, half_h, 0.0, 0.0),
     ];
     let indices = vec![0u32, 1, 2, 0, 2, 3];
     (verts, indices)

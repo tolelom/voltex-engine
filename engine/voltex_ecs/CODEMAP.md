@@ -4,7 +4,7 @@
 ECS 코어 — Entity/Component/World/Query + Hierarchy + Scene 직렬화 + System Scheduler.
 
 ## 공개 API 진입점
-- `World` — type-erased 저장소 + query, `clear()` 로 전체 리셋 — 슬롯은 generation bump로 해제해 clear 전 핸들은 재spawn 뒤에도 stale (v1.0.120, src/world/mod.rs)
+- `World` — type-erased 저장소 + query, `clear()` 로 전체 리셋 — 슬롯은 generation bump로 해제해 clear 전 핸들은 재spawn 뒤에도 stale (v1.0.120, src/world/mod.rs). `advance_change_tick()`(옛 이름 `clear_changed`, deprecated)는 프레임 끝에 변경 tick만 올린다 — `query_changed`가 이전 변경을 더 이상 보지 않음
 - `World::insert_resource::<T>` / `resource::<T>()` / `resource_mut` / `remove_resource` / `resource_or_insert_with` / `has_resource` — 엔티티 무관 싱글턴 공유 상태(게임 점수/설정/이벤트 큐/RNG). 시스템이 이미 `&mut World` 를 받아 추가 배선 없이 접근. `clear()` 시 함께 제거
 - `Events<T>` + `World::send_event::<T>` / `drain_events::<T>() -> Vec<T>` — 시스템 간 디커플 메시징 (src/events.rs). 리소스 기반(`Events<T>` 가 리소스). single-buffer drain — producer 를 consumer 보다 먼저 등록
 - `SpatialGrid` + `from_transforms(&World, cell_size)` / `insert` / `query_radius(center, r)` / `query_radius_into` / `nearest(point, exclude)` — 게임플레이 근접 쿼리용 균일 그리드 공간 해시 (src/spatial.rs). AoE/어그로/이웃 탐색. physics BVH(콜라이더)와 별개로 Transform 위치 기반. 프레임당 재구축
@@ -15,14 +15,16 @@ ECS 코어 — Entity/Component/World/Query + Hierarchy + Scene 직렬화 + Syst
 - `SparseSet<T>` — 컴포넌트 저장소 (src/sparse_set.rs)
 - `Transform` — 위치/회전/스케일 컴포넌트 (src/transform.rs)
 - `Parent`, `Children`, `add_child`, `despawn_recursive` — 계층 (src/hierarchy.rs)
+- `repair_hierarchy_cycles(&mut World)`(옛 이름 `validate_hierarchy`, deprecated) — Parent 사이클·과심도 체인을 끊고 고친 엔티티 목록 반환. 세 deserializer가 로드 뒤 호출 (src/hierarchy.rs)
 - `WorldTransform` — 부모 변환 propagation (src/world_transform.rs)
-- `serialize_scene_json`/`deserialize_scene_json` — JSON 씬 (src/json.rs, src/scene/mod.rs)
+- `serialize_scene_text`/`deserialize_scene_text`(옛 이름 `serialize_scene`/`deserialize_scene`, deprecated) — `.vscn` 텍스트 씬, Transform/Parent/Tag만 (src/scene/mod.rs)
+- `serialize_scene_json`/`deserialize_scene_json` — JSON 씬 (src/json.rs, src/scene/mod.rs). `json::JsonValue`(옛 이름 `JsonVal`, deprecated)
 - VSCN binary format — `serialize_scene_binary` (src/binary_scene.rs)
 - `Component` — 직렬화 가능 컴포넌트 trait (`NAME` + `serialize`/`deserialize`) (src/component_registry.rs)
 - `MeshHandle`, `MaterialHandle`, `Bounds` — 렌더링 데이터 컴포넌트 (src/render_components.rs)
 - `MeshAsset`, `MaterialAsset` — Handle<T> 의 phantom marker (src/render_components.rs)
 - `ScriptComponent` — per-entity Lua 스크립트 첨부. `script_path` + `instance_id` (UNBOUND sentinel) (src/script_component.rs)
-- `World::live_entities()` — 살아있는 모든 entity iterator (src/world.rs, voltex_script::iter_entities 가 사용)
+- `World::live_entities()` — 살아있는 모든 entity iterator (src/world/mod.rs, voltex_script::iter_entities 가 사용)
 - `ComponentRegistry::register::<T>()` — Component trait 기반 표준 등록 (src/component_registry.rs)
 - `ComponentRegistry::register_raw` — trait 구현 불가 타입용 escape hatch (src/component_registry.rs)
 - `path_component!(Ty, "name")` — `struct Ty(pub String)` 경로 컴포넌트의 Component impl 생성 매크로 (UTF-8 round-trip). TexturePath/MeshPath(renderer_ecs)/AudioPath(runtime) 가 사용 (src/component_registry.rs)
@@ -33,7 +35,7 @@ ECS 코어 — Entity/Component/World/Query + Hierarchy + Scene 직렬화 + Syst
 ## 모듈 구조
 - `entity` — Entity (src/entity.rs)
 - `sparse_set` — SparseSet<T> (src/sparse_set.rs)
-- `world` — World + query<T>/query2/3/4, With/Without 필터 (src/world.rs)
+- `world` — World + query<T>/query2/3/4, With/Without 필터 (src/world/mod.rs, 테스트는 src/world/tests.rs)
 - `bundle` — Bundle trait (튜플 1~12) + World::spawn_bundle/insert_bundle/spawn_child_bundle (src/bundle.rs)
 - `prefab` — Prefabs 레지스트리 (명명된 엔티티 템플릿) (src/prefab.rs)
 - `events` — Events<T> + World::send_event/drain_events (시스템 간 메시징) (src/events.rs)
@@ -56,7 +58,6 @@ ECS 코어 — Entity/Component/World/Query + Hierarchy + Scene 직렬화 + Syst
 - ECS 인터페이스 변경은 모든 example, voltex_physics, voltex_ai, voltex_script, voltex_editor에 영향
 - ComponentRegistry에 등록된 타입의 직렬화 포맷 변경 시 기존 .vscn 파일 호환 깨짐
 - World의 query 시그니처 변경은 game 코드에 광범위 영향
-- world.rs는 589줄로 큰 편이나 spec 만족 (600줄 이하), 분리 대상 아님
 
 ## 테스트
 - 단위 테스트: src/**/*.rs `#[cfg(test)]`

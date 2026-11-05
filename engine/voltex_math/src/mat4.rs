@@ -12,6 +12,9 @@ pub struct Mat4 {
     pub cols: [[f32; 4]; 4],
 }
 
+/// `inverse` treats `|det| <= SINGULAR_DET_RATIO * (product of column lengths)` as singular.
+const SINGULAR_DET_RATIO: f32 = 1e-10;
+
 impl Mat4 {
     /// The identity matrix.
     pub const IDENTITY: Self = Self {
@@ -212,59 +215,62 @@ impl Mat4 {
     /// silently broke unprojection / viewport-picking.
     pub fn inverse(&self) -> Option<Self> {
         let m = &self.cols;
-        let e = |r: usize, c: usize| -> f32 { m[c][r] };
+        let element = |row: usize, col: usize| -> f32 { m[col][row] };
 
-        // 3x3 determinant of a row-major 3-by-3 block.
-        let det3 =
-            |a: f32, b: f32, c: f32, d: f32, ee: f32, f: f32, g: f32, h: f32, i: f32| -> f32 {
-                a * (ee * i - f * h) - b * (d * i - f * g) + c * (d * h - ee * g)
-            };
+        // Determinant of the 3x3 block given in row-major order.
+        #[allow(clippy::too_many_arguments)]
+        fn det3(
+            m00: f32, m01: f32, m02: f32,
+            m10: f32, m11: f32, m12: f32,
+            m20: f32, m21: f32, m22: f32,
+        ) -> f32 {
+            m00 * (m11 * m22 - m12 * m21) - m01 * (m10 * m22 - m12 * m20)
+                + m02 * (m10 * m21 - m11 * m20)
+        }
 
-        // Cofactor at (r, c): signed 3x3 minor with row r and column c removed.
-        let cof = |r: usize, c: usize| -> f32 {
-            let mut rows = [0usize; 3];
-            let mut cols = [0usize; 3];
-            let mut ri = 0;
-            for x in 0..4 {
-                if x != r {
-                    rows[ri] = x;
-                    ri += 1;
-                }
+        // The three indices of 0..4 other than `skip`.
+        let others = |skip: usize| -> [usize; 3] {
+            let mut kept = [0usize; 3];
+            for (slot, index) in (0..4).filter(|&index| index != skip).enumerate() {
+                kept[slot] = index;
             }
-            let mut ci = 0;
-            for x in 0..4 {
-                if x != c {
-                    cols[ci] = x;
-                    ci += 1;
-                }
-            }
-            let sign = if (r + c).is_multiple_of(2) { 1.0 } else { -1.0 };
+            kept
+        };
+
+        // Cofactor at (row, col): signed 3x3 minor with that row and column removed.
+        let cofactor = |row: usize, col: usize| -> f32 {
+            let rows = others(row);
+            let cols = others(col);
+            let sign = if (row + col).is_multiple_of(2) { 1.0 } else { -1.0 };
             sign * det3(
-                e(rows[0], cols[0]),
-                e(rows[0], cols[1]),
-                e(rows[0], cols[2]),
-                e(rows[1], cols[0]),
-                e(rows[1], cols[1]),
-                e(rows[1], cols[2]),
-                e(rows[2], cols[0]),
-                e(rows[2], cols[1]),
-                e(rows[2], cols[2]),
+                element(rows[0], cols[0]),
+                element(rows[0], cols[1]),
+                element(rows[0], cols[2]),
+                element(rows[1], cols[0]),
+                element(rows[1], cols[1]),
+                element(rows[1], cols[2]),
+                element(rows[2], cols[0]),
+                element(rows[2], cols[1]),
+                element(rows[2], cols[2]),
             )
         };
 
         // det(M) = Laplace expansion along row 0.
         let det =
-            e(0, 0) * cof(0, 0) + e(0, 1) * cof(0, 1) + e(0, 2) * cof(0, 2) + e(0, 3) * cof(0, 3);
+            element(0, 0) * cofactor(0, 0)
+            + element(0, 1) * cofactor(0, 1)
+            + element(0, 2) * cofactor(0, 2)
+            + element(0, 3) * cofactor(0, 3);
         // Singularity relative to the matrix's own size: |det| is bounded by
         // the product of its column lengths (Hadamard), so compare against
         // that instead of an absolute cut-off, which rejected well-conditioned
         // small-scale matrices (e.g. a 100k-unit orthographic projection).
         let column_len = |c: usize| (m[c][0] * m[c][0] + m[c][1] * m[c][1] + m[c][2] * m[c][2] + m[c][3] * m[c][3]).sqrt();
         let hadamard = column_len(0) * column_len(1) * column_len(2) * column_len(3);
-        // 1e-10, not ~f32::EPSILON: a large translation column inflates the
+        // SINGULAR_DET_RATIO is 1e-10, not ~f32::EPSILON: a large translation column inflates the
         // bound (a view matrix 1e5 units from the origin sits near 1e-6) and
         // such matrices are still fine for transforming points.
-        if !det.is_finite() || det.abs() <= 1e-10 * hadamard {
+        if !det.is_finite() || det.abs() <= SINGULAR_DET_RATIO * hadamard {
             return None;
         }
         let inv_det = 1.0 / det;
@@ -276,7 +282,7 @@ impl Mat4 {
         #[allow(clippy::needless_range_loop)]
         for r in 0..4 {
             for c in 0..4 {
-                out[c][r] = cof(c, r) * inv_det;
+                out[c][r] = cofactor(c, r) * inv_det;
             }
         }
         Some(Mat4 { cols: out })

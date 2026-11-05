@@ -8,13 +8,18 @@
 
 use voltex_ecs::{propagate_transforms, MaterialHandle, MeshHandle, Transform, World};
 use voltex_math::Vec3;
-use voltex_renderer::{Camera, LightUniform, LineVertex, MaterialUniform, PointLight, SkinnedMesh};
+use voltex_renderer::{Camera, LightUniform, LineVertex, PointLight, SkinnedMesh};
 use voltex_renderer_ecs::{update_skinned_poses, BasicRenderer, RenderAssets, Sprite, SkinnedPose};
 
+use super::skinned::{demo_skeleton, strip_vertices, wave_animation};
+use super::{matte, unit_cube};
 use crate::headless::HeadlessGpu;
-use crate::scene::unit_cube;
-use crate::scene_skinned::{demo_skeleton, strip_vertices, wave_animation};
 use crate::target::{OffscreenTarget, CAPTURE_FORMAT};
+
+/// `game_ready_demo` 역할별 색 (base color).
+pub(super) const GROUND_COLOR: [f32; 4] = [0.35, 0.37, 0.40, 1.0];
+pub(super) const PLAYER_COLOR: [f32; 4] = [0.20, 0.50, 1.00, 1.0];
+pub(super) const CHASER_COLOR: [f32; 4] = [1.00, 0.30, 0.20, 1.0];
 
 /// Render one demo frame: skeleton at time `t` seconds, player at
 /// `(player_x, 0.5, 0)`, chaser at `chaser_pos`. Follow camera frames the
@@ -52,11 +57,11 @@ pub fn render_demo_frame_mode(
 
     let mut assets = RenderAssets::new();
     let cube = assets.add_mesh(unit_cube(device));
-    let gray = assets.add_material(MaterialUniform::with_params([0.35, 0.37, 0.40, 1.0], 0.0, 1.0));
-    let blue = assets.add_material(MaterialUniform::with_params([0.20, 0.50, 1.00, 1.0], 0.0, 1.0));
-    let red = assets.add_material(MaterialUniform::with_params([1.00, 0.30, 0.20, 1.0], 0.0, 1.0));
-    let (sv, si) = strip_vertices();
-    let strip = assets.add_skinned_mesh(SkinnedMesh::new(device, &sv, &si));
+    let gray = assets.add_material(matte(GROUND_COLOR));
+    let blue = assets.add_material(matte(PLAYER_COLOR));
+    let red = assets.add_material(matte(CHASER_COLOR));
+    let (strip_verts, strip_indices) = strip_vertices();
+    let strip = assets.add_skinned_mesh(SkinnedMesh::new(device, &strip_verts, &strip_indices));
 
     let mut world = World::new();
 

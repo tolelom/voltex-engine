@@ -21,18 +21,13 @@ use crate::state::LuaState;
 pub struct ScriptInstancePool {
     instances: HashMap<u32, ScriptInstance>,
     path_to_id: HashMap<String, u32>,
-    /// Vfs 등에서 시드된 스크립트 소스 (키: forward-slash 정규화 경로).
+    /// Vfs 등에서 시드된 스크립트 소스 (키: [`voltex_asset::vfs_key`] 형식).
     /// [`Self::get_or_create`]가 파일시스템보다 먼저 조회 — `.vpkg`에 담긴
     /// 스크립트가 디스크에 루즈 파일 없이 동작하는 경로.
     sources: HashMap<String, String>,
     /// 로드에 실패한 경로 — 프레임마다 재시도/재로그하지 않기 위한 캐시.
     failed: std::collections::HashSet<String>,
     next_id: u32,
-}
-
-/// 소스/경로 맵 키 정규화 (vpkg 키 규약과 동일: forward slash).
-fn norm_key(path: &str) -> String {
-    path.replace('\\', "/")
 }
 
 impl ScriptInstancePool {
@@ -53,7 +48,7 @@ impl ScriptInstancePool {
     /// games run without loose script files (audit fix: scripts were the only
     /// asset class that bypassed the Vfs).
     pub fn seed_source(&mut self, path: impl Into<String>, source: impl Into<String>) {
-        self.sources.insert(norm_key(&path.into()), source.into());
+        self.sources.insert(voltex_asset::vfs_key(&path.into()), source.into());
     }
 
     /// Return the instance id for `path`. On first encounter, create a new
@@ -61,13 +56,17 @@ impl ScriptInstancePool {
     /// and execute the file. Subsequent calls return the cached id without
     /// re-loading.
     ///
-    /// # Safety
-    /// `world` must remain valid for the lifetime of every script call made
-    /// against this LuaState. In practice, the pool and the World are owned
-    /// by the same outer struct (EditorSession, RuntimeApp) and dropped in
-    /// pool-before-world order.
+    /// Path keys are compared in [`voltex_asset::vfs_key`] form, so `a\\b.lua`
+    /// and `a/b.lua` share one instance.
+    ///
+    /// **Pointer invariant** (not checked — this fn is safe because it only
+    /// stores the pointer): `world` must stay valid, and not be otherwise
+    /// borrowed, whenever a script on this LuaState runs. The pointer is
+    /// captured once at creation, so the World must also not move afterwards.
+    /// In practice the pool and the World are owned by the same outer struct
+    /// (EditorSession, RuntimeApp) and dropped in pool-before-world order.
     pub fn get_or_create(&mut self, path: &str, world: *mut World) -> crate::Result<u32> {
-        let key = norm_key(path);
+        let key = voltex_asset::vfs_key(path);
         if let Some(&id) = self.path_to_id.get(&key) {
             return Ok(id);
         }
@@ -118,7 +117,7 @@ impl ScriptInstancePool {
 
     /// Looks up the id assigned to `path`, if any.
     pub fn find_by_path(&self, path: &str) -> Option<u32> {
-        self.path_to_id.get(&norm_key(path)).copied()
+        self.path_to_id.get(&voltex_asset::vfs_key(path)).copied()
     }
 
     /// Number of loaded script instances.
@@ -135,7 +134,7 @@ impl ScriptInstancePool {
     /// the next `script_start_all` re-runs `on_start`. Returns `Ok(true)` if
     /// the instance existed, `Ok(false)` if the path was unknown to the pool.
     pub fn reload(&mut self, path: &str) -> crate::Result<bool> {
-        let Some(&id) = self.path_to_id.get(&norm_key(path)) else {
+        let Some(&id) = self.path_to_id.get(&voltex_asset::vfs_key(path)) else {
             return Ok(false);
         };
         let Some(inst) = self.instances.get_mut(&id) else {

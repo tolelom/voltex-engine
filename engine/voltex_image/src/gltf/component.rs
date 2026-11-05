@@ -5,12 +5,20 @@
 use super::accessor::{get_buffer_data, validate_count};
 use crate::json_parser::JsonValue;
 
+// glTF `accessor.componentType` 값 (glTF 2.0 §3.6.2.2 — OpenGL 타입 enum 과 같은 숫자).
+pub(super) const BYTE: u32 = 5120;
+pub(super) const UNSIGNED_BYTE: u32 = 5121;
+pub(super) const SHORT: u32 = 5122;
+pub(super) const UNSIGNED_SHORT: u32 = 5123;
+pub(super) const UNSIGNED_INT: u32 = 5125;
+pub(super) const FLOAT: u32 = 5126;
+
 /// Size in bytes of one glTF component, or `None` for an unknown type.
 pub(super) fn component_size(comp_type: u32) -> Option<usize> {
     match comp_type {
-        5120 | 5121 => Some(1), // BYTE / UNSIGNED_BYTE
-        5122 | 5123 => Some(2), // SHORT / UNSIGNED_SHORT
-        5126 => Some(4),        // FLOAT
+        BYTE | UNSIGNED_BYTE => Some(1),
+        SHORT | UNSIGNED_SHORT => Some(2),
+        FLOAT => Some(4),
         _ => None,
     }
 }
@@ -19,20 +27,20 @@ pub(super) fn component_size(comp_type: u32) -> Option<usize> {
 /// (signed: `max(c / MAX, -1)`, glTF 2.0 §3.11); others are cast.
 pub(super) fn read_component(b: &[u8], comp_type: u32, normalized: bool) -> f32 {
     match comp_type {
-        5126 => f32::from_le_bytes([b[0], b[1], b[2], b[3]]),
-        5121 => {
+        FLOAT => f32::from_le_bytes([b[0], b[1], b[2], b[3]]),
+        UNSIGNED_BYTE => {
             let v = b[0] as f32;
             if normalized { v / 255.0 } else { v }
         }
-        5120 => {
+        BYTE => {
             let v = b[0] as i8 as f32;
             if normalized { (v / 127.0).max(-1.0) } else { v }
         }
-        5123 => {
+        UNSIGNED_SHORT => {
             let v = u16::from_le_bytes([b[0], b[1]]) as f32;
             if normalized { v / 65535.0 } else { v }
         }
-        5122 => {
+        SHORT => {
             let v = i16::from_le_bytes([b[0], b[1]]) as f32;
             if normalized { (v / 32767.0).max(-1.0) } else { v }
         }
@@ -58,7 +66,7 @@ pub(super) fn read_accessor_vecn<const N: usize>(
     let comp_type = acc
         .get("componentType")
         .and_then(|v| v.as_u32())
-        .unwrap_or(5126);
+        .unwrap_or(FLOAT);
     let comp_size = component_size(comp_type)
         .ok_or_else(|| format!("Unsupported componentType {} for VEC{}", comp_type, N))?;
     let normalized = acc
@@ -114,7 +122,7 @@ pub(super) fn read_accessor_floats(
     let comp_type = acc
         .get("componentType")
         .and_then(|v| v.as_u32())
-        .unwrap_or(5126);
+        .unwrap_or(FLOAT);
     let comp_size = component_size(comp_type)
         .ok_or_else(|| format!("Unsupported componentType {} for animation data", comp_type))?;
     let normalized = acc

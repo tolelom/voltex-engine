@@ -13,6 +13,8 @@ use voltex_renderer::{
 
 use crate::assets::RenderAssets;
 use crate::basic_renderer::warn_overflow_once;
+use crate::dynamic_uniform::DynamicUniformBuffer;
+use crate::scene_pass::begin_overlay_pass;
 use crate::sprite::Sprite;
 
 /// Max billboard sprites drawn per frame (each needs one dynamic-UBO slot).
@@ -22,9 +24,8 @@ pub(crate) struct SpritePass {
     pipeline: wgpu::RenderPipeline,
     quad_vbuf: wgpu::Buffer,
     quad_ibuf: wgpu::Buffer,
-    uniform_buffer: wgpu::Buffer,
+    uniforms: DynamicUniformBuffer<SpriteUniform>,
     uniform_bind_group: wgpu::BindGroup,
-    uniform_aligned: u32,
     overflow_warned: Cell<bool>,
 }
 
@@ -33,12 +34,12 @@ impl SpritePass {
         device: &wgpu::Device,
         queue: &wgpu::Queue,
         target_format: wgpu::TextureFormat,
-        tex_layout: &wgpu::BindGroupLayout,
+        texture_layout: &wgpu::BindGroupLayout,
         alignment: u32,
     ) -> Self {
         let sprite_uniform_layout = sprite_uniform_bind_group_layout(device);
         let pipeline =
-            create_sprite_pipeline(device, target_format, &sprite_uniform_layout, tex_layout);
+            create_sprite_pipeline(device, target_format, &sprite_uniform_layout, texture_layout);
         let quad_vbuf = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("BasicRenderer Sprite Quad VB"),
             size: std::mem::size_of_val(&SPRITE_QUAD) as u64,
@@ -53,33 +54,26 @@ impl SpritePass {
             mapped_at_creation: false,
         });
         queue.write_buffer(&quad_ibuf, 0, bytemuck::cast_slice(&SPRITE_INDICES));
-        let uniform_aligned =
-            (std::mem::size_of::<SpriteUniform>() as u32).div_ceil(alignment) * alignment;
-        let uniform_buffer = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("BasicRenderer Sprite Uniform Dynamic UBO"),
-            size: (uniform_aligned as usize * MAX_SPRITES) as u64,
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
-        });
+        let uniforms = DynamicUniformBuffer::<SpriteUniform>::new(
+            device,
+            "BasicRenderer Sprite Uniform Dynamic UBO",
+            alignment,
+            MAX_SPRITES,
+        );
         let uniform_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("BasicRenderer Sprite Uniform BG"),
             layout: &sprite_uniform_layout,
             entries: &[wgpu::BindGroupEntry {
                 binding: 0,
-                resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
-                    buffer: &uniform_buffer,
-                    offset: 0,
-                    size: wgpu::BufferSize::new(std::mem::size_of::<SpriteUniform>() as u64),
-                }),
+                resource: uniforms.binding(),
             }],
         });
         Self {
             pipeline,
             quad_vbuf,
             quad_ibuf,
-            uniform_buffer,
+            uniforms,
             uniform_bind_group,
-            uniform_aligned,
             overflow_warned: Cell::new(false),
         }
     }
@@ -128,65 +122,43 @@ impl SpritePass {
         let forward = dir(Vec4::new(0.0, 0.0, 1.0, 0.0));
 
         warn_overflow_once(&self.overflow_warned, "sprites", items.len(), MAX_SPRITES);
-        let n = cull_and_sort_sprites(&mut items, cam_pos, forward, MAX_SPRITES);
+        let draw_count = cull_and_sort_sprites(&mut items, cam_pos, forward, MAX_SPRITES);
+        items.truncate(draw_count);
 
-        let aligned = self.uniform_aligned as usize;
-        let mut staging = vec![0u8; n * aligned];
-        for (i, (pos, (sprite, world_m))) in items.iter().take(n).enumerate() {
-            let roll = if sprite.roll_from_transform {
-                crate::sprite::sprite_roll(world_m, right, up)
-            } else {
-                0.0
-            };
-            let u = SpriteUniform {
-                view_proj: view_proj.cols,
-                camera_right: [right.x, right.y, right.z, 0.0],
-                camera_up: [up.x, up.y, up.z, 0.0],
-                center: [pos.x, pos.y, pos.z, 0.0],
-                color: sprite.color,
-                size: [sprite.size[0], sprite.size[1], roll, 0.0],
-                uv_rect: sprite.effective_uv_rect(),
-            };
-            let b = bytemuck::bytes_of(&u);
-            staging[i * aligned..i * aligned + b.len()].copy_from_slice(b);
-        }
-        queue.write_buffer(&self.uniform_buffer, 0, &staging);
+        let uniforms: Vec<SpriteUniform> = items
+            .iter()
+            .map(|(pos, (sprite, world_m))| {
+                let roll = if sprite.roll_from_transform {
+                    crate::sprite::sprite_roll(world_m, right, up)
+                } else {
+                    0.0
+                };
+                SpriteUniform {
+                    view_proj: view_proj.cols,
+                    camera_right: [right.x, right.y, right.z, 0.0],
+                    camera_up: [up.x, up.y, up.z, 0.0],
+                    center: [pos.x, pos.y, pos.z, 0.0],
+                    color: sprite.color,
+                    size: [sprite.size[0], sprite.size[1], roll, 0.0],
+                    uv_rect: sprite.effective_uv_rect(),
+                }
+            })
+            .collect();
+        self.uniforms.upload(queue, &uniforms);
 
-        let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-            label: Some("BasicRenderer Sprite Pass"),
-            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                view: target_view,
-                resolve_target: None,
-                depth_slice: None,
-                ops: wgpu::Operations {
-                    load: wgpu::LoadOp::Load,
-                    store: wgpu::StoreOp::Store,
-                },
-            })],
-            depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
-                view: depth_view,
-                depth_ops: Some(wgpu::Operations {
-                    load: wgpu::LoadOp::Load,
-                    store: wgpu::StoreOp::Store,
-                }),
-                stencil_ops: None,
-            }),
-            occlusion_query_set: None,
-            timestamp_writes: None,
-            multiview_mask: None,
-        });
+        let mut pass =
+            begin_overlay_pass(encoder, "BasicRenderer Sprite Pass", target_view, depth_view);
         pass.set_pipeline(&self.pipeline);
         pass.set_vertex_buffer(0, self.quad_vbuf.slice(..));
         pass.set_index_buffer(self.quad_ibuf.slice(..), wgpu::IndexFormat::Uint16);
-        for (i, (_, (sprite, _))) in items.iter().take(n).enumerate() {
-            let tex_bg = sprite
+        for (i, (_, (sprite, _))) in items.iter().enumerate() {
+            let texture_bind_group = sprite
                 .texture
                 .and_then(|h| assets.texture(h))
                 .map(|t| &t.bind_group)
                 .unwrap_or(&default_texture.bind_group);
-            pass.set_bind_group(1, tex_bg, &[]);
-            let off = (i as u32) * self.uniform_aligned;
-            pass.set_bind_group(0, &self.uniform_bind_group, &[off]);
+            pass.set_bind_group(1, texture_bind_group, &[]);
+            pass.set_bind_group(0, &self.uniform_bind_group, &[self.uniforms.offset(i)]);
             pass.draw_indexed(0..SPRITE_INDICES.len() as u32, 0, 0..1);
         }
     }

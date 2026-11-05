@@ -1,21 +1,26 @@
-//! BasicRenderer — mesh_shader.wgsl 기반 ECS-driven 렌더러.
+//! BasicRenderer — mesh_colored.wgsl(Blinn-Phong) 기반 ECS-driven 렌더러.
 //!
 //! pipeline + per-entity dynamic UBO + light buffer + 1×1 default texture
 //! 를 모두 owning. `render(...)` 한 메서드로 World 를 그린다.
+//!
+//! 한 프레임의 패스 순서 (`render`):
+//! 1. 그림자 깊이 전처리 (`shadow.rs`, 켜졌을 때만)
+//! 2. 메시 패스 — Blinn-Phong (`blinn_phong.rs`) 또는 PBR (`pbr.rs`). 타깃을 지운다.
+//! 3. 스킨드 메시 (`skinned.rs`)
+//! 4. 타일맵 → 스프라이트 → 디버그 라인 (crate 의 `*_pass.rs`)
 
 use voltex_ecs::World;
 use voltex_math::{Mat4, Vec3, Vec4, AABB};
-use voltex_renderer::{
-    pipeline::create_colored_mesh_pipeline, ColoredCameraUniform, GpuTexture, LightUniform,
-    LineVertex, PointLight, PointLightsUniform, ShadowUniform, SHADOW_MAP_SIZE,
-};
+use voltex_renderer::{GpuTexture, LightUniform, LineVertex, PointLight, PointLightsUniform};
 
 use std::cell::{Cell, RefCell};
 
+mod blinn_phong;
 mod pbr;
 mod shadow;
 mod skinned;
 
+use blinn_phong::BlinnPhongResources;
 use pbr::{PbrResources, PbrSkinnedResources};
 use shadow::ShadowResources;
 use skinned::SkinnedResources;
@@ -27,19 +32,18 @@ use crate::items::collect_render_items;
 /// so this is kept small + independent of `max_entities` to bound VRAM.
 const MAX_SKINNED: usize = 64;
 
+/// 그림자 맵 깊이 비교 bias — 표면이 자기 그림자를 받는 shadow acne 를 막는다.
+const SHADOW_BIAS: f32 = 0.003;
+
 /// World-driven mesh renderer — Blinn-Phong shader, per-entity dynamic UBO,
 /// camera + light shared bind group. Owns the wgpu pipeline objects.
 pub struct BasicRenderer {
-    pipeline: wgpu::RenderPipeline,
-    camera_buffer: wgpu::Buffer,
-    light_buffer: wgpu::Buffer,
-    camera_light_bind_group: wgpu::BindGroup,
+    // ── Default Blinn-Phong mesh path (camera/light/point lights) ──────────
+    blinn_phong: BlinnPhongResources,
+    // 1×1 white albedo for entities without a texture (also the white ORM
+    // default of the PBR path).
     default_texture: GpuTexture,
-    aligned_size: u32,
     max_entities: usize,
-    // Additive point lights (group 2 of the colored mesh shader).
-    point_lights_buffer: wgpu::Buffer,
-    point_lights_bind_group: wgpu::BindGroup,
     // Skinned pass (GPU vertex skinning) + skinned shadow casters.
     skinned: SkinnedResources,
     // Directional shadow mapping (off by default; enable with set_shadows).
@@ -51,11 +55,15 @@ pub struct BasicRenderer {
     // Billboard sprites (camera-facing quads). Drawn after meshes + lines,
     // alpha-blended, depth-tested but not depth-writing.
     sprite_pass: crate::sprite_pass::SpritePass,
+    /// Batched `Tilemap` pass (drawn before sprites).
+    tilemap_pass: crate::tilemap_pass::TilemapPass,
     // ── Full PBR mesh path (opt-in via set_pbr_enabled) ─────────────────────
     pbr_enabled: bool,
     pbr: PbrResources,
+    // ── Skinned PBR (used when both pbr_enabled and skinned entities exist) ──
+    pbr_skinned: PbrSkinnedResources,
     // Last-set point lights, kept CPU-side so the PBR pass can fold them into
-    // the multi-light `LightsUniform` (the colored pass uses the GPU buffer).
+    // the multi-light `LightsUniform` (the Blinn-Phong pass uses the GPU buffer).
     point_lights_cpu: RefCell<Vec<PointLight>>,
     // Device handle (cheap Arc clone) so the PBR pass can build per-entity
     // 4-map texture bind groups, which need the device at build time.
@@ -64,10 +72,6 @@ pub struct BasicRenderer {
     // "everything drew"). Set the first time each cap is exceeded.
     mesh_overflow_warned: Cell<bool>,
     skinned_overflow_warned: Cell<bool>,
-    /// Batched `Tilemap` pass (drawn before sprites).
-    tilemap_pass: crate::tilemap_pass::TilemapPass,
-    // ── Skinned PBR (used when both pbr_enabled and skinned entities exist) ──
-    pbr_skinned: PbrSkinnedResources,
 }
 
 impl BasicRenderer {
@@ -80,152 +84,69 @@ impl BasicRenderer {
         max_entities: usize,
     ) -> Self {
         let alignment = device.limits().min_uniform_buffer_offset_alignment;
-        let cam_size = std::mem::size_of::<ColoredCameraUniform>() as u32;
-        let aligned_size = cam_size.div_ceil(alignment) * alignment;
+        let texture_layout = GpuTexture::bind_group_layout(device);
+        let default_texture = GpuTexture::white_1x1(device, queue, &texture_layout);
 
-        let cl_layout = camera_light_bind_group_layout(device);
-        let tex_layout = GpuTexture::bind_group_layout(device);
-
-        let camera_buffer = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("BasicRenderer Camera Dynamic UBO"),
-            size: (aligned_size as usize * max_entities) as u64,
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
-        });
-
-        let light_buffer = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("BasicRenderer Light UBO"),
-            size: std::mem::size_of::<LightUniform>() as u64,
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
-        });
-
-        let camera_light_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("BasicRenderer Camera+Light BG"),
-            layout: &cl_layout,
-            entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
-                        buffer: &camera_buffer,
-                        offset: 0,
-                        size: wgpu::BufferSize::new(cam_size as u64),
-                    }),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 1,
-                    resource: light_buffer.as_entire_binding(),
-                },
-            ],
-        });
-
-        let default_texture = GpuTexture::white_1x1(device, queue, &tex_layout);
-
-        // Point lights (group 2): single fragment-visible uniform, no dynamic offset.
-        let pl_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            label: Some("BasicRenderer Point Lights BGL"),
-            entries: &[wgpu::BindGroupLayoutEntry {
-                binding: 0,
-                visibility: wgpu::ShaderStages::FRAGMENT,
-                ty: wgpu::BindingType::Buffer {
-                    ty: wgpu::BufferBindingType::Uniform,
-                    has_dynamic_offset: false,
-                    min_binding_size: wgpu::BufferSize::new(
-                        std::mem::size_of::<PointLightsUniform>() as u64,
-                    ),
-                },
-                count: None,
-            }],
-        });
-        let point_lights_buffer = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("BasicRenderer Point Lights UBO"),
-            size: std::mem::size_of::<PointLightsUniform>() as u64,
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
-        });
-        queue.write_buffer(
-            &point_lights_buffer,
-            0,
-            bytemuck::bytes_of(&PointLightsUniform::new()),
-        );
-        let point_lights_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("BasicRenderer Point Lights BG"),
-            layout: &pl_layout,
-            entries: &[wgpu::BindGroupEntry {
-                binding: 0,
-                resource: point_lights_buffer.as_entire_binding(),
-            }],
-        });
-
-        // ── Shadow mapping resources (group 3 of the colored shader) ────────
-        let (shadow, shadow_main_layout) =
-            ShadowResources::new(device, queue, alignment, max_entities);
-
-        let pipeline = create_colored_mesh_pipeline(
+        let shadow = ShadowResources::new(device, queue, alignment, max_entities);
+        let blinn_phong = BlinnPhongResources::new(
             device,
+            queue,
             target_format,
-            &cl_layout,
-            &tex_layout,
-            &pl_layout,
-            &shadow_main_layout,
+            alignment,
+            max_entities,
+            &texture_layout,
+            &shadow.main_layout,
         );
-
-        // ── Skinned pass resources ──────────────────────────────────────────
         let skinned = SkinnedResources::new(device, target_format, alignment);
-
-        // ── Debug line resources ────────────────────────────────────────────
-        let debug_line_pass = crate::debug_line_pass::DebugLinePass::new(device, target_format);
-
-        let tilemap_pass =
-            crate::tilemap_pass::TilemapPass::new(device, queue, target_format, &tex_layout);
-
-        // ── Billboard sprite resources ──────────────────────────────────────
-        let sprite_pass = crate::sprite_pass::SpritePass::new(
-            device, queue, target_format, &tex_layout, alignment,
-        );
-
-        // ── Full PBR mesh path resources (dormant until set_pbr_enabled) ────
-        let (pbr, pbr_mat_layout, pbr_shadow_layout) = PbrResources::new(
-            device, queue, target_format, alignment, max_entities, &tex_layout, &default_texture,
+        let pbr = PbrResources::new(
+            device,
+            queue,
+            target_format,
+            alignment,
+            max_entities,
+            &texture_layout,
+            &default_texture,
             &shadow.map,
         );
+        let pbr_skinned =
+            PbrSkinnedResources::new(device, target_format, alignment, &pbr, &skinned.palettes);
 
-        // ── Skinned PBR: g0 = camera(dyn) + lights(static) + palette(dyn) ────
-        let pbr_skinned = PbrSkinnedResources::new(
-            device, target_format, alignment, &pbr, &pbr_mat_layout, &pbr_shadow_layout,
-            &skinned.palette_buffer,
+        let tilemap_pass =
+            crate::tilemap_pass::TilemapPass::new(device, queue, target_format, &texture_layout);
+        let sprite_pass = crate::sprite_pass::SpritePass::new(
+            device,
+            queue,
+            target_format,
+            &texture_layout,
+            alignment,
         );
+        let debug_line_pass = crate::debug_line_pass::DebugLinePass::new(device, target_format);
 
         Self {
-            pipeline,
-            camera_buffer,
-            light_buffer,
-            camera_light_bind_group,
+            blinn_phong,
             default_texture,
-            aligned_size,
             max_entities,
-            point_lights_buffer,
-            point_lights_bind_group,
             skinned,
             shadows_enabled: false,
             shadow,
             debug_line_pass,
             sprite_pass,
+            tilemap_pass,
             pbr_enabled: false,
             pbr,
+            pbr_skinned,
             point_lights_cpu: RefCell::new(Vec::new()),
             device: device.clone(),
             mesh_overflow_warned: Cell::new(false),
             skinned_overflow_warned: Cell::new(false),
-            tilemap_pass,
-            pbr_skinned,
         }
     }
 
     /// Enable the full PBR mesh path (Cook-Torrance + multi-light + material
-    /// maps + IBL) instead of the default colored Blinn-Phong pass. Off by
-    /// default; the colored path is byte-identical when disabled. Sprites,
-    /// particles, debug lines, skinned, and shadow passes are unaffected.
+    /// maps + IBL) instead of the default Blinn-Phong pass. Off by default; the
+    /// Blinn-Phong path is byte-identical when disabled. Sprites, particles,
+    /// debug lines and shadow passes are unaffected; skinned meshes switch to
+    /// skinned PBR too.
     pub fn set_pbr_enabled(&mut self, enabled: bool) {
         self.pbr_enabled = enabled;
     }
@@ -242,9 +163,13 @@ impl BasicRenderer {
     /// dropped. Call once per frame (cheap; just a uniform write).
     pub fn set_point_lights(&self, queue: &wgpu::Queue, lights: &[PointLight]) {
         let uniform = PointLightsUniform::from_slice(lights);
-        queue.write_buffer(&self.point_lights_buffer, 0, bytemuck::bytes_of(&uniform));
+        queue.write_buffer(
+            &self.blinn_phong.point_lights_buffer,
+            0,
+            bytemuck::bytes_of(&uniform),
+        );
         // Keep a CPU copy so the PBR pass can fold them into its multi-light
-        // LightsUniform (the colored pass reads only the GPU buffer above).
+        // LightsUniform (the Blinn-Phong pass reads only the GPU buffer above).
         *self.point_lights_cpu.borrow_mut() = lights.to_vec();
     }
 
@@ -286,30 +211,18 @@ impl BasicRenderer {
             None => true,
         });
         warn_overflow_once(&self.mesh_overflow_warned, "mesh entities", items.len(), self.max_entities);
-        let n = items.len().min(self.max_entities);
+        items.truncate(self.max_entities);
 
-        self.shadow_prepass(queue, encoder, world, assets, &items, n, light);
+        self.shadow_prepass(queue, encoder, world, assets, &items, light);
 
         if self.pbr_enabled {
-            // PBR shadow group uses the full ShadowUniform (also carries the sky
-            // direction + zeroed SH → shader falls back to procedural ambient).
-            let su = ShadowUniform {
-                light_view_proj: directional_light_vp(light.direction).cols,
-                shadow_map_size: if self.shadows_enabled { SHADOW_MAP_SIZE as f32 } else { 0.0 },
-                shadow_bias: 0.003,
-                _padding: [0.0; 2],
-                sun_direction: light.direction,
-                turbidity: 3.0,
-                sh_coefficients: [[0.0; 4]; 7],
-            };
-            queue.write_buffer(&self.pbr.shadow_uniform_buffer, 0, bytemuck::bytes_of(&su));
-            self.pbr_color_pass(
-                queue, encoder, target_view, depth_view, clear_color, &items, n, view_proj,
+            self.pbr_mesh_pass(
+                queue, encoder, target_view, depth_view, clear_color, &items, view_proj,
                 cam_pos, light, assets,
             );
         } else {
-            self.colored_color_pass(
-                queue, encoder, target_view, depth_view, clear_color, &items, n, view_proj,
+            self.blinn_phong_mesh_pass(
+                queue, encoder, target_view, depth_view, clear_color, &items, view_proj,
                 cam_pos, light, assets,
             );
         }
@@ -323,86 +236,6 @@ impl BasicRenderer {
             view_proj, cam_pos,
         );
         self.debug_line_pass.render(queue, encoder, target_view, depth_view, view_proj);
-    }
-
-    /// The default colored Blinn-Phong mesh pass (clears the frame). Extracted
-    /// so `render` can pick it or the PBR pass.
-    #[allow(clippy::too_many_arguments)]
-    fn colored_color_pass(
-        &self,
-        queue: &wgpu::Queue,
-        encoder: &mut wgpu::CommandEncoder,
-        target_view: &wgpu::TextureView,
-        depth_view: &wgpu::TextureView,
-        clear_color: wgpu::Color,
-        items: &[crate::items::RenderItem],
-        n: usize,
-        view_proj: Mat4,
-        cam_pos: Vec3,
-        light: LightUniform,
-        assets: &RenderAssets,
-    ) {
-        let aligned = self.aligned_size as usize;
-        let mut staging = vec![0u8; n * aligned];
-        for (i, item) in items.iter().take(n).enumerate() {
-            let uniform = ColoredCameraUniform {
-                view_proj: view_proj.cols,
-                model: item.model.cols,
-                camera_pos: [cam_pos.x, cam_pos.y, cam_pos.z],
-                _padding: 0.0,
-                base_color: item.material.base_color,
-            };
-            let bytes = bytemuck::bytes_of(&uniform);
-            let offset = i * aligned;
-            staging[offset..offset + bytes.len()].copy_from_slice(bytes);
-        }
-        if n > 0 {
-            queue.write_buffer(&self.camera_buffer, 0, &staging);
-        }
-        queue.write_buffer(&self.light_buffer, 0, bytemuck::cast_slice(&[light]));
-
-        let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-            label: Some("BasicRenderer Pass"),
-            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                view: target_view,
-                resolve_target: None,
-                depth_slice: None,
-                ops: wgpu::Operations {
-                    load: wgpu::LoadOp::Clear(clear_color),
-                    store: wgpu::StoreOp::Store,
-                },
-            })],
-            depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
-                view: depth_view,
-                depth_ops: Some(wgpu::Operations {
-                    load: wgpu::LoadOp::Clear(1.0),
-                    store: wgpu::StoreOp::Store,
-                }),
-                stencil_ops: None,
-            }),
-            occlusion_query_set: None,
-            timestamp_writes: None,
-            multiview_mask: None,
-        });
-        pass.set_pipeline(&self.pipeline);
-        pass.set_bind_group(2, &self.point_lights_bind_group, &[]);
-        pass.set_bind_group(3, &self.shadow.main_bind_group, &[]);
-        for (i, item) in items.iter().take(n).enumerate() {
-            let mesh = assets
-                .mesh(item.mesh)
-                .expect("collect_render_items already skipped stale handles");
-            let tex_bg = item
-                .texture
-                .and_then(|h| assets.texture(h))
-                .map(|t| &t.bind_group)
-                .unwrap_or(&self.default_texture.bind_group);
-            pass.set_bind_group(1, tex_bg, &[]);
-            let dynamic_offset = (i as u32) * self.aligned_size;
-            pass.set_bind_group(0, &self.camera_light_bind_group, &[dynamic_offset]);
-            pass.set_vertex_buffer(0, mesh.vertex_buffer.slice(..));
-            pass.set_index_buffer(mesh.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
-            pass.draw_indexed(0..mesh.num_indices, 0, 0..1);
-        }
     }
 }
 
@@ -467,6 +300,23 @@ fn dynamic_uniform_layout(
     })
 }
 
+/// A bind group with one uniform buffer at binding 0.
+fn single_buffer_bind_group(
+    device: &wgpu::Device,
+    label: &str,
+    layout: &wgpu::BindGroupLayout,
+    resource: wgpu::BindingResource<'_>,
+) -> wgpu::BindGroup {
+    device.create_bind_group(&wgpu::BindGroupDescriptor {
+        label: Some(label),
+        layout,
+        entries: &[wgpu::BindGroupEntry {
+            binding: 0,
+            resource,
+        }],
+    })
+}
+
 /// Emit a one-time `eprintln!` the first time a per-frame draw cap is exceeded,
 /// so silently-dropped objects don't read as "everything rendered". `flag` is
 /// flipped after the first warning.
@@ -478,36 +328,6 @@ pub(crate) fn warn_overflow_once(flag: &Cell<bool>, kind: &str, count: usize, ca
              extra {kind} are not drawn (this warning fires once)."
         );
     }
-}
-
-fn camera_light_bind_group_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
-    device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-        label: Some("BasicRenderer Camera+Light BGL"),
-        entries: &[
-            wgpu::BindGroupLayoutEntry {
-                binding: 0,
-                visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
-                ty: wgpu::BindingType::Buffer {
-                    ty: wgpu::BufferBindingType::Uniform,
-                    has_dynamic_offset: true,
-                    min_binding_size: wgpu::BufferSize::new(
-                        std::mem::size_of::<ColoredCameraUniform>() as u64,
-                    ),
-                },
-                count: None,
-            },
-            wgpu::BindGroupLayoutEntry {
-                binding: 1,
-                visibility: wgpu::ShaderStages::FRAGMENT,
-                ty: wgpu::BindingType::Buffer {
-                    ty: wgpu::BufferBindingType::Uniform,
-                    has_dynamic_offset: false,
-                    min_binding_size: None,
-                },
-                count: None,
-            },
-        ],
-    })
 }
 
 #[cfg(test)]

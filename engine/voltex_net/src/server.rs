@@ -135,7 +135,7 @@ impl NetServer {
         }
     }
 
-    /// Returns a slice of all connected clients.
+    /// Iterates over all connected clients.
     pub fn clients(&self) -> impl Iterator<Item = &ClientInfo> {
         self.clients.values()
     }

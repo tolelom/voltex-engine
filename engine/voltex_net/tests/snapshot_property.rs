@@ -1,4 +1,4 @@
-//! Randomized properties for snapshot replication: `apply_diff(old,
+//! Randomized properties for snapshot replication: `apply_snapshot_diff(old,
 //! diff_snapshots(old, new))` reproduces `new` bit-for-bit (adds, removals,
 //! partial field changes), decoders never panic on arbitrary bytes, and the
 //! interpolation buffer's result doesn't depend on the order UDP delivered
@@ -6,7 +6,7 @@
 
 use std::collections::BTreeMap;
 use voltex_net::{
-    apply_diff, deserialize_snapshot, diff_snapshots, serialize_snapshot, EntityState,
+    apply_snapshot_diff, deserialize_snapshot, diff_snapshots, serialize_snapshot, EntityState,
     InterpolationBuffer, Snapshot,
 };
 
@@ -81,7 +81,7 @@ fn diff_then_apply_reproduces_the_new_snapshot_exactly() {
         for step in 0..40 {
             let next = evolve(&mut rng, &snap);
             let diff = diff_snapshots(&snap, &next);
-            let applied = apply_diff(&snap, &diff).unwrap();
+            let applied = apply_snapshot_diff(&snap, &diff).unwrap();
             assert_eq!(applied.tick, next.tick, "chain {chain} step {step}: tick");
             assert_eq!(bits(&applied), bits(&next), "chain {chain} step {step}: entity state");
             let wire = deserialize_snapshot(&serialize_snapshot(&next)).unwrap();
@@ -100,7 +100,7 @@ fn decoders_never_panic_on_arbitrary_bytes() {
         let len = rng.next() as usize % 200;
         let mut bytes: Vec<u8> = (0..len).map(|_| rng.next() as u8).collect();
         let _ = deserialize_snapshot(&bytes);
-        let _ = apply_diff(&base, &bytes);
+        let _ = apply_snapshot_diff(&base, &bytes);
         // Also mutate a valid diff (bit flips + truncation).
         bytes = valid.clone();
         for _ in 0..1 + rng.next() % 4 {
@@ -108,7 +108,7 @@ fn decoders_never_panic_on_arbitrary_bytes() {
             bytes[i] ^= 1 << (rng.next() % 8);
         }
         bytes.truncate(rng.next() as usize % (bytes.len() + 1));
-        let _ = apply_diff(&base, &bytes);
+        let _ = apply_snapshot_diff(&base, &bytes);
     }
 }
 

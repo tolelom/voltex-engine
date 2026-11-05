@@ -231,7 +231,7 @@ impl ApplicationHandler for ModelViewerApp {
                 state.fps_controller.process_movement(&mut state.camera, forward, right, up, dt);
 
                 // 3. Clear per-frame input state for next frame
-                state.input.begin_frame();
+                state.input.clear_frame_edges();
 
                 // 4. Auto-rotate model
                 state.angle += dt * 0.5;

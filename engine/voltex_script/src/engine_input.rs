@@ -145,8 +145,8 @@ fn with_input<R>(default: R, f: impl FnOnce(&ScriptInput) -> R) -> R {
 }
 
 /// Read a string argument at stack slot `idx`, or `None` if absent/non-string.
-unsafe fn read_str_arg(l: *mut ffi::lua_State, idx: c_int) -> Option<String> {
-    let cstr = ffi::lua_tostring(l, idx);
+unsafe fn read_str_arg(L: *mut ffi::lua_State, idx: c_int) -> Option<String> {
+    let cstr = ffi::lua_tostring(L, idx);
     if cstr.is_null() {
         None
     } else {
@@ -157,78 +157,80 @@ unsafe fn read_str_arg(l: *mut ffi::lua_State, idx: c_int) -> Option<String> {
 /// Register the global `input` table into `lua`. Always succeeds; the table's
 /// functions return defaults (`false` / `0`) until a snapshot is published.
 pub fn register_engine_input(lua: &LuaState) {
+    // SAFETY: `lua.raw()` is the live state owned by `lua`; the table pushed
+    // here is consumed by lua_setglobal, leaving the stack balanced.
     unsafe {
-        let l = lua.raw();
-        ffi::lua_createtable(l, 0, 6);
-        set_table_fn(l, "is_key_pressed", lua_is_key_pressed);
-        set_table_fn(l, "is_key_just_pressed", lua_is_key_just_pressed);
-        set_table_fn(l, "mouse_position", lua_mouse_position);
-        set_table_fn(l, "mouse_delta", lua_mouse_delta);
-        set_table_fn(l, "is_mouse_button_pressed", lua_is_mouse_button_pressed);
-        set_table_fn(l, "scroll", lua_scroll);
+        let L = lua.raw();
+        ffi::lua_createtable(L, 0, 6);
+        set_table_fn(L, "is_key_pressed", lua_is_key_pressed);
+        set_table_fn(L, "is_key_just_pressed", lua_is_key_just_pressed);
+        set_table_fn(L, "mouse_position", lua_mouse_position);
+        set_table_fn(L, "mouse_delta", lua_mouse_delta);
+        set_table_fn(L, "is_mouse_button_pressed", lua_is_mouse_button_pressed);
+        set_table_fn(L, "scroll", lua_scroll);
         let name = CString::new("input").unwrap();
-        ffi::lua_setglobal(l, name.as_ptr());
+        ffi::lua_setglobal(L, name.as_ptr());
     }
 }
 
 /// Set `table[name] = f` where the table is on top of the stack (-1). Pops the
 /// pushed function, leaving the table on top.
-unsafe fn set_table_fn(l: *mut ffi::lua_State, name: &str, f: ffi::lua_CFunction) {
-    ffi::lua_pushcclosure(l, f, 0);
+unsafe fn set_table_fn(L: *mut ffi::lua_State, name: &str, f: ffi::lua_CFunction) {
+    ffi::lua_pushcclosure(L, f, 0);
     let key = CString::new(name).unwrap();
-    ffi::lua_setfield(l, -2, key.as_ptr());
+    ffi::lua_setfield(L, -2, key.as_ptr());
 }
 
 /// `input.is_key_pressed(name) -> bool`
-unsafe extern "C" fn lua_is_key_pressed(l: *mut ffi::lua_State) -> c_int {
-    let pressed = match read_str_arg(l, 1) {
+unsafe extern "C" fn lua_is_key_pressed(L: *mut ffi::lua_State) -> c_int {
+    let pressed = match read_str_arg(L, 1) {
         Some(name) => with_input(false, |i| i.key_pressed(&name)),
         None => false,
     };
-    ffi::lua_pushboolean(l, pressed as c_int);
+    ffi::lua_pushboolean(L, pressed as c_int);
     1
 }
 
 /// `input.is_key_just_pressed(name) -> bool`
-unsafe extern "C" fn lua_is_key_just_pressed(l: *mut ffi::lua_State) -> c_int {
-    let pressed = match read_str_arg(l, 1) {
+unsafe extern "C" fn lua_is_key_just_pressed(L: *mut ffi::lua_State) -> c_int {
+    let pressed = match read_str_arg(L, 1) {
         Some(name) => with_input(false, |i| i.key_just_pressed(&name)),
         None => false,
     };
-    ffi::lua_pushboolean(l, pressed as c_int);
+    ffi::lua_pushboolean(L, pressed as c_int);
     1
 }
 
 /// `input.mouse_position() -> x, y`
-unsafe extern "C" fn lua_mouse_position(l: *mut ffi::lua_State) -> c_int {
+unsafe extern "C" fn lua_mouse_position(L: *mut ffi::lua_State) -> c_int {
     let (x, y) = with_input((0.0, 0.0), |i| (i.mouse_x, i.mouse_y));
-    ffi::lua_pushnumber(l, x);
-    ffi::lua_pushnumber(l, y);
+    ffi::lua_pushnumber(L, x);
+    ffi::lua_pushnumber(L, y);
     2
 }
 
 /// `input.mouse_delta() -> dx, dy`
-unsafe extern "C" fn lua_mouse_delta(l: *mut ffi::lua_State) -> c_int {
+unsafe extern "C" fn lua_mouse_delta(L: *mut ffi::lua_State) -> c_int {
     let (dx, dy) = with_input((0.0, 0.0), |i| (i.mouse_dx, i.mouse_dy));
-    ffi::lua_pushnumber(l, dx);
-    ffi::lua_pushnumber(l, dy);
+    ffi::lua_pushnumber(L, dx);
+    ffi::lua_pushnumber(L, dy);
     2
 }
 
 /// `input.is_mouse_button_pressed(button) -> bool` (button: "left"/"right"/"middle")
-unsafe extern "C" fn lua_is_mouse_button_pressed(l: *mut ffi::lua_State) -> c_int {
-    let pressed = match read_str_arg(l, 1) {
+unsafe extern "C" fn lua_is_mouse_button_pressed(L: *mut ffi::lua_State) -> c_int {
+    let pressed = match read_str_arg(L, 1) {
         Some(name) => with_input(false, |i| i.button_pressed(&name)),
         None => false,
     };
-    ffi::lua_pushboolean(l, pressed as c_int);
+    ffi::lua_pushboolean(L, pressed as c_int);
     1
 }
 
 /// `input.scroll() -> number`
-unsafe extern "C" fn lua_scroll(l: *mut ffi::lua_State) -> c_int {
+unsafe extern "C" fn lua_scroll(L: *mut ffi::lua_State) -> c_int {
     let scroll = with_input(0.0_f32, |i| i.scroll);
-    ffi::lua_pushnumber(l, scroll as f64);
+    ffi::lua_pushnumber(L, scroll as f64);
     1
 }
 

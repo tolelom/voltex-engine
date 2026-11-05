@@ -13,9 +13,10 @@ use crate::navmesh::NavMesh;
 pub struct NavMeshBuilder {
     /// XZ voxel size (default 0.3)
     pub cell_size: f32,
-    /// Y voxel size (default 0.2)
+    /// Y voxel size (default 0.2). Not used yet: heights are kept as floats.
     pub cell_height: f32,
-    /// Minimum clearance height for walkable areas (default 2.0)
+    /// Minimum clearance height for walkable areas (default 2.0).
+    /// Not used yet: every cell with geometry is assumed to have clearance.
     pub agent_height: f32,
     /// Agent capsule radius used to erode walkable areas (default 0.5)
     pub agent_radius: f32,
@@ -35,24 +36,53 @@ impl Default for NavMeshBuilder {
     }
 }
 
-/// Heightfield: a 2D grid of min/max height spans for voxelized geometry.
-pub(crate) struct Heightfield {
-    pub(crate) width: usize,  // number of cells along X
-    pub(crate) depth: usize,  // number of cells along Z
+/// XZ cell grid shared by every pipeline stage. Cell `(x, z)` covers
+/// `[min_x + x·cell_size, +cell_size) × [min_z + z·cell_size, +cell_size)`
+/// and is stored at `z * width + x`.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct GridLayout {
+    /// Number of cells along X.
+    pub(crate) width: usize,
+    /// Number of cells along Z.
+    pub(crate) depth: usize,
     pub(crate) min_x: f32,
     pub(crate) min_z: f32,
     pub(crate) cell_size: f32,
+}
+
+/// Offsets of the four edge-adjacent cells.
+pub(crate) const FOUR_NEIGHBORS: [(isize, isize); 4] = [(1, 0), (-1, 0), (0, 1), (0, -1)];
+
+impl GridLayout {
+    pub(crate) fn cell_count(&self) -> usize {
+        self.width * self.depth
+    }
+
+    pub(crate) fn index(&self, x: usize, z: usize) -> usize {
+        z * self.width + x
+    }
+
+    /// Cell at `(x + dx, z + dz)`, or `None` outside the grid.
+    pub(crate) fn offset_cell(&self, x: usize, z: usize, dx: isize, dz: isize) -> Option<(usize, usize)> {
+        let nx = x as isize + dx;
+        let nz = z as isize + dz;
+        if nx < 0 || nz < 0 || nx >= self.width as isize || nz >= self.depth as isize {
+            return None;
+        }
+        Some((nx as usize, nz as usize))
+    }
+}
+
+/// Heightfield: a 2D grid of min/max height spans for voxelized geometry.
+pub(crate) struct Heightfield {
+    pub(crate) grid: GridLayout,
     /// For each cell (x, z), store (min_y, max_y). None if empty.
     pub(crate) cells: Vec<Option<(f32, f32)>>,
 }
 
 /// Map of walkable cells. True if the cell is walkable.
 pub(crate) struct WalkableMap {
-    pub(crate) width: usize,
-    pub(crate) depth: usize,
-    pub(crate) min_x: f32,
-    pub(crate) min_z: f32,
-    pub(crate) cell_size: f32,
+    pub(crate) grid: GridLayout,
     pub(crate) walkable: Vec<bool>,
     /// Height at each walkable cell (top of walkable surface).
     pub(crate) heights: Vec<f32>,
@@ -60,11 +90,7 @@ pub(crate) struct WalkableMap {
 
 /// A region of connected walkable cells (flood-fill result).
 pub(crate) struct RegionMap {
-    pub(crate) width: usize,
-    pub(crate) depth: usize,
-    pub(crate) min_x: f32,
-    pub(crate) min_z: f32,
-    pub(crate) cell_size: f32,
+    pub(crate) grid: GridLayout,
     /// Region ID per cell. 0 = not walkable, 1+ = region ID.
     pub(crate) regions: Vec<u32>,
     pub(crate) heights: Vec<f32>,
@@ -81,10 +107,10 @@ impl NavMeshBuilder {
 
     /// Full pipeline: voxelize, mark walkable, build regions, triangulate.
     pub fn build(&self, vertices: &[Vec3], indices: &[u32]) -> NavMesh {
-        let hf = self.voxelize(vertices, indices);
-        let wm = self.mark_walkable(&hf);
-        let rm = self.build_regions(&wm);
-        self.triangulate(&rm)
+        let heightfield = self.voxelize(vertices, indices);
+        let walkable_map = self.mark_walkable(&heightfield);
+        let region_map = self.build_regions(&walkable_map);
+        self.triangulate(&region_map)
     }
 }
 
@@ -147,14 +173,14 @@ mod tests {
             max_slope: 45.0,
         };
         let (verts, idxs) = flat_plane_geometry();
-        let hf = builder.voxelize(&verts, &idxs);
+        let heightfield = builder.voxelize(&verts, &idxs);
 
         // Should have cells covering the 10x10 area
-        assert!(hf.width > 0);
-        assert!(hf.depth > 0);
+        assert!(heightfield.grid.width > 0);
+        assert!(heightfield.grid.depth > 0);
 
         // Check that some cells are populated
-        let populated = hf.cells.iter().filter(|c| c.is_some()).count();
+        let populated = heightfield.cells.iter().filter(|c| c.is_some()).count();
         assert!(populated > 0, "some cells should be populated");
     }
 
@@ -168,11 +194,11 @@ mod tests {
             max_slope: 45.0,
         };
         let (verts, idxs) = flat_plane_geometry();
-        let hf = builder.voxelize(&verts, &idxs);
-        let wm = builder.mark_walkable(&hf);
-        let rm = builder.build_regions(&wm);
+        let heightfield = builder.voxelize(&verts, &idxs);
+        let walkable_map = builder.mark_walkable(&heightfield);
+        let region_map = builder.build_regions(&walkable_map);
 
-        assert_eq!(rm.num_regions, 1, "flat plane should be a single region");
+        assert_eq!(region_map.num_regions, 1, "flat plane should be a single region");
     }
 
     #[test]
@@ -233,14 +259,14 @@ mod tests {
             Vec3::new(1.0, 10.0, 2.0),
         ];
         let indices = vec![0, 1, 2];
-        let hf = builder.voxelize(&vertices, &indices);
-        let wm = builder.mark_walkable(&hf);
+        let heightfield = builder.voxelize(&vertices, &indices);
+        let walkable_map = builder.mark_walkable(&heightfield);
 
         // Most interior cells should be unwalkable due to steep slope
-        let walkable_count = wm.walkable.iter().filter(|&&w| w).count();
+        let walkable_count = walkable_map.walkable.iter().filter(|&&w| w).count();
         // The bottom edge cells might be walkable (flat), but interior should not
         // Just check that not all cells are walkable
-        let total_cells = hf.cells.iter().filter(|c| c.is_some()).count();
+        let total_cells = heightfield.cells.iter().filter(|c| c.is_some()).count();
         assert!(
             walkable_count < total_cells || total_cells <= 1,
             "steep slope should make most cells unwalkable (walkable={}, total={})",

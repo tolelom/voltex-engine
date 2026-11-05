@@ -7,7 +7,8 @@ wgpu 기반 렌더링 — 메시/PBR/그림자/IBL/디퍼드/RT/post-process. �
 
 ### Core GPU
 - `GpuContext`, `DEPTH_FORMAT` — wgpu 디바이스/큐/surface + `adapter_info`(로그·크래시 리포트용) (src/gpu.rs)
-- `Vertex`, `MeshVertex` — 정점 포맷 (src/vertex.rs)
+- `align_up(value, alignment)` — dynamic-offset UBO stride·텍스처 행 간격용 올림 (src/gpu.rs)
+- `PositionColorVertex`(구 `Vertex`, deprecated alias), `MeshVertex` — 정점 포맷 (src/vertex.rs)
 - `SkinnedMeshVertex`, `BonePalette`, `MAX_BONES` — 스킨드 메시 정점 (src/skinned_vertex.rs)
 - `Skeleton`, `JointPose` — 조인트 계층 + 포즈 → BonePalette (from_skin/apply_animation/compute_palette) (src/skeleton.rs)
 - `create_skinned_mesh_pipeline`, `skinned_camera_bind_group_layout`, `bone_palette_bind_group_layout` — GPU 스키닝 파이프라인 (src/pipeline.rs, src/mesh_skinned.wgsl)
@@ -15,7 +16,7 @@ wgpu 기반 렌더링 — 메시/PBR/그림자/IBL/디퍼드/RT/post-process. �
 - `ColoredCameraUniform`, `create_colored_mesh_pipeline` — per-entity base_color 틴트 Blinn-Phong (BasicRenderer 전용, src/light.rs, src/mesh_colored.wgsl)
 - `Mesh` — 메시 데이터 + `Mesh::from_obj(device, source)` / `Mesh::from_gltf(device, bytes)` 모델 로더 (src/mesh.rs)
 - `Camera`, `FpsController` — 카메라 (src/camera.rs)
-- `GpuTexture`, `pbr_texture_bind_group_layout` 등 — GPU 텍스처 + PBR 바인딩 (src/texture/mod.rs)
+- `GpuTexture` (`white_1x1`/`black_1x1`/`flat_normal_map_1x1` 기본 맵; 구 `flat_normal_1x1` 튜플 반환은 deprecated), `pbr_texture_bind_group_layout` 등 — GPU 텍스처 + PBR 바인딩 (src/texture/mod.rs). `texture::parse_bmp`/`BmpImage` 는 `voltex_image::bmp` 래퍼
 
 ### Image / Model (voltex_image 재export)
 - `parse_png`, `parse_jpg`, `parse_gltf`, `GltfData`, `GltfMesh`, `GltfMaterial`, `MeshVertex` 등 — `voltex_image` crate로 이동; `pub use voltex_image::{...}` 역호환 재export 유지 (src/lib.rs)
@@ -49,7 +50,7 @@ wgpu 기반 렌더링 — 메시/PBR/그림자/IBL/디퍼드/RT/post-process. �
 - `GBuffer` (src/gbuffer.rs)
 - `gbuffer_compress` — 옥타헤드럴 노멀 인코딩 (src/gbuffer_compress.rs)
 - `FullscreenVertex`, `create_fullscreen_vertex_buffer` (src/fullscreen_quad.rs)
-- `create_gbuffer_pipeline`, `create_lighting_pipeline` 등 (src/deferred_pipeline/: gbuffer, lighting, ssgi, rt_shadow, bloom, tonemap)
+- `create_gbuffer_pipeline`, `create_lighting_pipeline` 등 (src/deferred_pipeline/: `*_pipeline.rs` — gbuffer, lighting, ssgi, rt_shadow, bloom, tonemap. 같은 이름의 최상위 리소스 모듈과 구분하려고 접미사)
 
 ### RT (Ray Tracing)
 - `RtAccel`, `RtInstance`, `BlasMeshData` (src/rt_accel.rs)
@@ -81,7 +82,9 @@ wgpu 기반 렌더링 — 메시/PBR/그림자/IBL/디퍼드/RT/post-process. �
 - `DepthOfField` (src/dof.rs)
 
 ### Pipeline
-- `pipeline` — 기본 pipeline 헬퍼 (src/pipeline.rs)
+- `pipeline::create_position_color_pipeline` — `PositionColorVertex` 무조명 파이프라인(triangle 예제, src/position_color.wgsl). 구 이름 `create_render_pipeline` 은 deprecated
+- `pipeline::create_colored_mesh_pipeline` / `create_skinned_mesh_pipeline` / `create_skinned_shadow_pipeline` (src/pipeline.rs)
+- 화면 공간 compute 패스(SSR·TAA·DoF·RT AO 등)는 `compute::dispatch_screen`(crate-private, 16×16 workgroup — 각 .wgsl 의 `@workgroup_size` 와 일치해야 함)으로 디스패치
 
 ### Error
 - `RendererError`, `Result` — thiserror 기반 에러 (Generic/Io) (src/error.rs)
@@ -90,7 +93,7 @@ wgpu 기반 렌더링 — 메시/PBR/그림자/IBL/디퍼드/RT/post-process. �
 
 대분류 (자세한 항목은 lib.rs의 `pub mod`/`pub use` 참조):
 - 코어 GPU: gpu, vertex, mesh, camera, texture, sphere, fullscreen_quad
-- 이미지/모델: voltex_image 재export (png, jpg, progressive_jpeg, deflate, obj, gltf, json_parser — 실제 파일은 voltex_image에 있음)
+- 이미지/모델: voltex_image 재export (png, jpg, progressive_jpeg, deflate, obj, gltf, json_parser, bmp — 실제 파일은 voltex_image에 있음)
 - 머티리얼/조명/그림자: material, light, shadow, csm, point_shadow, spot_shadow, frustum, shadow_pipeline, pbr_pipeline
 - IBL: sh, brdf_lut, ibl
 - 애니메이션: animation, skinned_vertex, skeleton (조인트 계층→bone palette)
@@ -112,9 +115,9 @@ wgpu 기반 렌더링 — 메시/PBR/그림자/IBL/디퍼드/RT/post-process. �
 - deferred_pipeline 하위 모듈에서 WGSL 셰이더 include 경로는 `include_str!("../<name>.wgsl")` (한 단계 깊음)
 - 이미지 디코더/glTF 파서는 `voltex_image`(L0)로 분리 완료 (E1, 2026-05-28). `pub use` 재export로 역호환 유지
 - `RendererError::Image(#[from] voltex_image::ImageError)` variant — 디코더 에러를 렌더러 에러 체인으로 연결
-- Forward pass(mesh_shader.wgsl, Blinn-Phong)와 PBR/Deferred path는 별도 — 기존 예제(triangle, model_viewer)는 forward 사용
+- Blinn-Phong 메시 셰이더는 mesh_shader.wgsl(`create_mesh_pipeline`, model_viewer 등)과 mesh_colored.wgsl(BasicRenderer)이 있다. PBR/Deferred path는 별도. triangle 예제는 position_color.wgsl
 
 ## 테스트
 - 단위 테스트: src/**/*.rs `#[cfg(test)]`
 - 실행: `cargo test -p voltex_renderer --lib`
-- 현재 테스트 개수: 180개 (skeleton +6). 스킨드 GPU 시각 검증은 voltex_capture::scene_skinned (#[ignore] GPU-gated)
+- 현재 테스트 개수: 180개 (skeleton +6). 스킨드 GPU 시각 검증은 voltex_capture::scene::skinned (#[ignore] GPU-gated)

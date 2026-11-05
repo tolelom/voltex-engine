@@ -30,6 +30,16 @@ impl ConvexHull {
         }
         best
     }
+
+    /// Local-space AABB of the hull's vertices (panics on an empty hull,
+    /// like [`ConvexHull::support`]).
+    pub fn local_aabb(&self) -> AABB {
+        let first = self.vertices[0];
+        let (min, max) = self.vertices[1..]
+            .iter()
+            .fold((first, first), |(min, max), &v| (min.min(v), max.max(v)));
+        AABB::new(min, max)
+    }
 }
 
 /// Supported collision shapes.
@@ -72,14 +82,8 @@ impl Collider {
                 AABB::new(position - r, position + r)
             }
             Collider::ConvexHull(hull) => {
-                let mut min = position + hull.vertices[0];
-                let mut max = min;
-                for &v in &hull.vertices[1..] {
-                    let p = position + v;
-                    min = Vec3::new(min.x.min(p.x), min.y.min(p.y), min.z.min(p.z));
-                    max = Vec3::new(max.x.max(p.x), max.y.max(p.y), max.z.max(p.z));
-                }
-                AABB::new(min, max)
+                let local = hull.local_aabb();
+                AABB::new(position + local.min, position + local.max)
             }
         }
     }
@@ -135,6 +139,21 @@ mod tests {
         ]);
         let s = hull.support(Vec3::new(-1.0, 0.0, 0.0));
         assert!((s.x - 0.0).abs() < 1e-6); // origin is farthest in -X
+    }
+
+    #[test]
+    fn convex_hull_aabb_is_local_aabb_moved_to_position() {
+        let hull = ConvexHull::new(vec![
+            Vec3::new(-1.0, 0.0, 2.0),
+            Vec3::new(3.0, -2.0, 0.0),
+            Vec3::new(0.0, 1.0, -1.0),
+        ]);
+        let local = hull.local_aabb();
+        assert_eq!(local.min, Vec3::new(-1.0, -2.0, -1.0));
+        assert_eq!(local.max, Vec3::new(3.0, 1.0, 2.0));
+        let world = Collider::ConvexHull(hull).aabb(Vec3::new(10.0, 0.0, 0.0));
+        assert_eq!(world.min, Vec3::new(9.0, -2.0, -1.0));
+        assert_eq!(world.max, Vec3::new(13.0, 1.0, 2.0));
     }
 
     #[test]

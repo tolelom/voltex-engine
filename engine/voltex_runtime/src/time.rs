@@ -6,7 +6,8 @@
 //! and animation phase need, and previously every game had to accumulate by hand.
 //!
 //! `elapsed_secs` accumulates the same `dt` the runtime steps systems with, so
-//! it is deterministic under a fixed timestep (`RuntimeConfig::with_fixed_dt`).
+//! it is deterministic under a forced frame delta
+//! (`RuntimeConfig::with_fixed_frame_dt`).
 
 /// A snapshot of the runtime clock for the current frame.
 #[derive(Debug, Clone, Copy, Default, PartialEq)]

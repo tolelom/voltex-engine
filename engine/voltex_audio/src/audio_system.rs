@@ -311,7 +311,8 @@ pub(crate) fn apply_command(
 
 /// Main audio thread function.
 ///
-/// On Windows, initializes WasapiDevice and drives playback.
+/// On Windows, initializes `wasapi_ffi::WasapiDevice` and drives playback
+/// (the `backend` module / `make_backend()` are not used here).
 /// On other platforms, runs in a silent "null" mode (processes commands only).
 fn audio_thread(rx: mpsc::Receiver<AudioCommand>, clips: Vec<AudioClip>) {
     #[cfg(target_os = "windows")]
@@ -325,10 +326,15 @@ fn audio_thread(rx: mpsc::Receiver<AudioCommand>, clips: Vec<AudioClip>) {
 // Windows implementation
 // ---------------------------------------------------------------------------
 
+/// Period of one Windows audio-thread iteration: mixer fades advance by this
+/// much and the thread sleeps this long between mix/write passes.
+#[cfg(target_os = "windows")]
+const MIX_TICK: std::time::Duration = std::time::Duration::from_millis(5);
+
 #[cfg(target_os = "windows")]
 fn audio_thread_windows(rx: mpsc::Receiver<AudioCommand>, mut clips: Vec<AudioClip>) {
     use crate::mix_sounds;
-    use crate::wasapi::WasapiDevice;
+    use crate::wasapi_ffi::WasapiDevice;
 
     let device = match WasapiDevice::new() {
         Ok(d) => d,
@@ -349,8 +355,8 @@ fn audio_thread_windows(rx: mpsc::Receiver<AudioCommand>, mut clips: Vec<AudioCl
     let mut mixer = MixerState::new();
 
     loop {
-        // Advance mixer fades (~5 ms per iteration)
-        mixer.tick(0.005);
+        // Advance mixer fades by one iteration period.
+        mixer.tick(MIX_TICK.as_secs_f32());
 
         // Process all pending commands (non-blocking)
         loop {
@@ -388,8 +394,7 @@ fn audio_thread_windows(rx: mpsc::Receiver<AudioCommand>, mut clips: Vec<AudioCl
             let _ = device.write_samples(&silence);
         }
 
-        // Sleep ~5 ms between iterations
-        thread::sleep(std::time::Duration::from_millis(5));
+        thread::sleep(MIX_TICK);
     }
 }
 

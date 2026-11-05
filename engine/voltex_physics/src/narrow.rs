@@ -1,14 +1,19 @@
-//! Narrowphase contact generation between specific shape pairs (sphere-sphere,
-//! sphere-box, capsule-sphere, etc.). Each function returns the contact tuple
-//! `(normal_A_to_B, depth, point_on_a, point_on_b)` or `None`.
+//! Narrowphase contact generation for the shape pairs with a closed-form test
+//! (sphere-sphere, sphere-box, box-box). Each function returns a
+//! [`Penetration`] (normal A→B) or `None` when the shapes don't touch.
+//! Capsules and convex hulls go through [`crate::gjk`].
 
 use voltex_math::Vec3;
+use crate::contact::Penetration;
 
-/// Returns (normal A→B, depth, point_on_a, point_on_b) or None if no collision.
+/// Centre distances (and squared distances) below this count as coincident.
+const COINCIDENT_EPSILON: f32 = 1e-8;
+
+/// Sphere-vs-sphere contact, or `None` if the spheres don't touch.
 pub(crate) fn sphere_vs_sphere(
     pos_a: Vec3, radius_a: f32,
     pos_b: Vec3, radius_b: f32,
-) -> Option<(Vec3, f32, Vec3, Vec3)> {
+) -> Option<Penetration> {
     let diff = pos_b - pos_a;
     let dist_sq = diff.length_squared();
     let sum_r = radius_a + radius_b;
@@ -18,7 +23,7 @@ pub(crate) fn sphere_vs_sphere(
     }
 
     let dist = dist_sq.sqrt();
-    let normal = if dist > 1e-8 {
+    let normal = if dist > COINCIDENT_EPSILON {
         diff * (1.0 / dist)
     } else {
         Vec3::Y
@@ -28,14 +33,14 @@ pub(crate) fn sphere_vs_sphere(
     let point_on_a = pos_a + normal * radius_a;
     let point_on_b = pos_b - normal * radius_b;
 
-    Some((normal, depth, point_on_a, point_on_b))
+    Some(Penetration { normal, depth, point_on_a, point_on_b })
 }
 
-/// Sphere-vs-Box (AABB) contact. Returns `(normal A→B, depth, point_on_a, point_on_b)`.
+/// Sphere-vs-Box (AABB) contact. Returns `None` if they don't touch.
 pub(crate) fn sphere_vs_box(
     sphere_pos: Vec3, radius: f32,
     box_pos: Vec3, half_extents: Vec3,
-) -> Option<(Vec3, f32, Vec3, Vec3)> {
+) -> Option<Penetration> {
     let bmin = box_pos - half_extents;
     let bmax = box_pos + half_extents;
 
@@ -49,7 +54,7 @@ pub(crate) fn sphere_vs_box(
     let dist_sq = diff.length_squared();
 
     // Sphere center outside box
-    if dist_sq > 1e-8 {
+    if dist_sq > COINCIDENT_EPSILON {
         let dist = dist_sq.sqrt();
         if dist > radius {
             return None;
@@ -58,7 +63,7 @@ pub(crate) fn sphere_vs_box(
         let depth = radius - dist;
         let point_on_a = sphere_pos + normal * radius; // sphere surface toward box
         let point_on_b = closest;
-        return Some((normal, depth, point_on_a, point_on_b));
+        return Some(Penetration { normal, depth, point_on_a, point_on_b });
     }
 
     // Sphere center inside box — find nearest face
@@ -106,14 +111,14 @@ pub(crate) fn sphere_vs_box(
     let point_on_a = sphere_pos + normal * radius;
     let point_on_b = closest_face;
 
-    Some((normal, depth, point_on_a, point_on_b))
+    Some(Penetration { normal, depth, point_on_a, point_on_b })
 }
 
-/// Box-vs-Box (AABB) contact. Returns `(normal A→B, depth, point_on_a, point_on_b)`.
+/// Box-vs-Box (AABB) contact. Returns `None` if they don't touch.
 pub(crate) fn box_vs_box(
     pos_a: Vec3, half_a: Vec3,
     pos_b: Vec3, half_b: Vec3,
-) -> Option<(Vec3, f32, Vec3, Vec3)> {
+) -> Option<Penetration> {
     let diff = pos_b - pos_a;
 
     let overlap_x = (half_a.x + half_b.x) - diff.x.abs();
@@ -136,18 +141,10 @@ pub(crate) fn box_vs_box(
         (Vec3::new(0.0, 0.0, sign), overlap_z)
     };
 
-    let point_on_a = pos_a + Vec3::new(
-        normal.x * half_a.x,
-        normal.y * half_a.y,
-        normal.z * half_a.z,
-    );
-    let point_on_b = pos_b - Vec3::new(
-        normal.x * half_b.x,
-        normal.y * half_b.y,
-        normal.z * half_b.z,
-    );
+    let point_on_a = pos_a + normal.mul_elementwise(half_a);
+    let point_on_b = pos_b - normal.mul_elementwise(half_b);
 
-    Some((normal, depth, point_on_a, point_on_b))
+    Some(Penetration { normal, depth, point_on_a, point_on_b })
 }
 
 #[cfg(test)]
@@ -167,7 +164,7 @@ mod tests {
     #[test]
     fn test_sphere_sphere_overlapping() {
         let r = sphere_vs_sphere(Vec3::ZERO, 1.0, Vec3::new(1.5, 0.0, 0.0), 1.0);
-        let (normal, depth, pa, pb) = r.unwrap();
+        let Penetration { normal, depth, point_on_a: pa, point_on_b: pb } = r.unwrap();
         assert!(approx_vec(normal, Vec3::X));
         assert!(approx(depth, 0.5));
         assert!(approx_vec(pa, Vec3::new(1.0, 0.0, 0.0)));
@@ -177,7 +174,7 @@ mod tests {
     #[test]
     fn test_sphere_sphere_touching() {
         let r = sphere_vs_sphere(Vec3::ZERO, 1.0, Vec3::new(2.0, 0.0, 0.0), 1.0);
-        let (normal, depth, _pa, _pb) = r.unwrap();
+        let Penetration { normal, depth, .. } = r.unwrap();
         assert!(approx_vec(normal, Vec3::X));
         assert!(approx(depth, 0.0));
     }
@@ -185,7 +182,7 @@ mod tests {
     #[test]
     fn test_sphere_sphere_coincident() {
         let r = sphere_vs_sphere(Vec3::ZERO, 1.0, Vec3::ZERO, 1.0);
-        let (_normal, depth, _pa, _pb) = r.unwrap();
+        let Penetration { depth, .. } = r.unwrap();
         assert!(approx(depth, 2.0));
     }
 
@@ -199,7 +196,7 @@ mod tests {
     #[test]
     fn test_sphere_box_face_overlap() {
         let r = sphere_vs_box(Vec3::new(1.5, 0.0, 0.0), 1.0, Vec3::ZERO, Vec3::ONE);
-        let (normal, depth, _pa, pb) = r.unwrap();
+        let Penetration { normal, depth, point_on_b: pb, .. } = r.unwrap();
         assert!(approx(normal.x, -1.0));
         assert!(approx(depth, 0.5));
         assert!(approx(pb.x, 1.0));
@@ -209,7 +206,7 @@ mod tests {
     fn test_sphere_box_center_inside() {
         let r = sphere_vs_box(Vec3::ZERO, 0.5, Vec3::ZERO, Vec3::ONE);
         assert!(r.is_some());
-        let (_normal, depth, _pa, _pb) = r.unwrap();
+        let Penetration { depth, .. } = r.unwrap();
         assert!(depth > 0.0);
     }
 
@@ -219,7 +216,7 @@ mod tests {
         // the sphere going up, i.e. the box (B) moving down along the A->B
         // normal. The inside branch used to return the face's outward +Y,
         // so the solver pushed the pair deeper into each other.
-        let (normal, depth, point_on_a, _) =
+        let Penetration { normal, depth, point_on_a, .. } =
             sphere_vs_box(Vec3::new(0.0, 0.8, 0.0), 0.5, Vec3::ZERO, Vec3::ONE).unwrap();
         assert!(approx_vec(normal, Vec3::new(0.0, -1.0, 0.0)), "normal {normal:?}");
         assert!(approx(depth, 0.7));
@@ -236,7 +233,7 @@ mod tests {
     #[test]
     fn test_box_box_overlapping() {
         let r = box_vs_box(Vec3::ZERO, Vec3::ONE, Vec3::new(1.5, 0.0, 0.0), Vec3::ONE);
-        let (normal, depth, _pa, _pb) = r.unwrap();
+        let Penetration { normal, depth, .. } = r.unwrap();
         assert!(approx_vec(normal, Vec3::X));
         assert!(approx(depth, 0.5));
     }
@@ -244,14 +241,14 @@ mod tests {
     #[test]
     fn test_box_box_touching() {
         let r = box_vs_box(Vec3::ZERO, Vec3::ONE, Vec3::new(2.0, 0.0, 0.0), Vec3::ONE);
-        let (_normal, depth, _pa, _pb) = r.unwrap();
+        let Penetration { depth, .. } = r.unwrap();
         assert!(approx(depth, 0.0));
     }
 
     #[test]
     fn test_box_box_y_axis() {
         let r = box_vs_box(Vec3::ZERO, Vec3::ONE, Vec3::new(0.0, 1.5, 0.0), Vec3::ONE);
-        let (normal, depth, _pa, _pb) = r.unwrap();
+        let Penetration { normal, depth, .. } = r.unwrap();
         assert!(approx_vec(normal, Vec3::Y));
         assert!(approx(depth, 0.5));
     }

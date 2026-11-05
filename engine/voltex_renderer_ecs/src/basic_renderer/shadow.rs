@@ -1,5 +1,5 @@
 //! Directional shadow mapping for `BasicRenderer`: the depth map, the depth
-//! pre-pass resources and the group-3 uniform the colored shader samples.
+//! pre-pass resources and the group-3 uniform the Blinn-Phong shader samples.
 
 use voltex_ecs::World;
 use voltex_renderer::{
@@ -7,93 +7,90 @@ use voltex_renderer::{
     LightUniform, ShadowMainUniform, ShadowMap, ShadowPassUniform, SHADOW_MAP_SIZE,
 };
 
-use super::{directional_light_vp, BasicRenderer};
+use super::{
+    directional_light_vp, single_buffer_bind_group, BasicRenderer, SHADOW_BIAS,
+};
 use crate::assets::RenderAssets;
+use crate::dynamic_uniform::DynamicUniformBuffer;
 use crate::items::RenderItem;
+use crate::skinned::SkinnedMeshHandle;
 
 pub(super) struct ShadowResources {
     pub(super) map: ShadowMap,
+    /// Depth-only pipeline that renders static meshes into `map`.
     pub(super) pipeline: wgpu::RenderPipeline,
-    pub(super) pass_buffer: wgpu::Buffer,
+    /// Per-entity `light_vp * model` for the depth pass.
+    pub(super) pass_uniforms: DynamicUniformBuffer<ShadowPassUniform>,
     pub(super) pass_bind_group: wgpu::BindGroup,
-    pub(super) pass_aligned: u32,
+    /// Group-3 layout the Blinn-Phong pipeline is built with (map + sampler +
+    /// `ShadowMainUniform`).
+    pub(super) main_layout: wgpu::BindGroupLayout,
     pub(super) main_buffer: wgpu::Buffer,
     pub(super) main_bind_group: wgpu::BindGroup,
 }
 
 impl ShadowResources {
-    /// Also returns the group-3 layout, which the colored pipeline is built with.
     pub(super) fn new(
         device: &wgpu::Device,
         queue: &wgpu::Queue,
         alignment: u32,
         max_entities: usize,
-    ) -> (Self, wgpu::BindGroupLayout) {
-        let shadow_map = ShadowMap::new(device);
-        let shadow_main_layout = shadow_main_bind_group_layout(device);
-        let shadow_main_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+    ) -> Self {
+        let map = ShadowMap::new(device);
+        let main_layout = shadow_main_bind_group_layout(device);
+        let main_buffer = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("BasicRenderer Shadow Main UBO"),
             size: std::mem::size_of::<ShadowMainUniform>() as u64,
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
         queue.write_buffer(
-            &shadow_main_buffer,
+            &main_buffer,
             0,
             bytemuck::bytes_of(&ShadowMainUniform::disabled()),
         );
-        let shadow_main_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+        let main_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("BasicRenderer Shadow Main BG"),
-            layout: &shadow_main_layout,
+            layout: &main_layout,
             entries: &[
                 wgpu::BindGroupEntry {
                     binding: 0,
-                    resource: wgpu::BindingResource::TextureView(&shadow_map.view),
+                    resource: wgpu::BindingResource::TextureView(&map.view),
                 },
                 wgpu::BindGroupEntry {
                     binding: 1,
-                    resource: wgpu::BindingResource::Sampler(&shadow_map.sampler),
+                    resource: wgpu::BindingResource::Sampler(&map.sampler),
                 },
                 wgpu::BindGroupEntry {
                     binding: 2,
-                    resource: shadow_main_buffer.as_entire_binding(),
+                    resource: main_buffer.as_entire_binding(),
                 },
             ],
         });
 
-        // Shadow depth pass (per-entity light_vp_model dynamic UBO).
-        let shadow_pass_layout = shadow_pass_bind_group_layout(device);
-        let shadow_pipeline = create_shadow_pipeline(device, &shadow_pass_layout);
-        let shadow_pass_aligned =
-            (std::mem::size_of::<ShadowPassUniform>() as u32).div_ceil(alignment) * alignment;
-        let shadow_pass_buffer = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("BasicRenderer Shadow Pass UBO"),
-            size: (shadow_pass_aligned as usize * max_entities) as u64,
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
-        });
-        let shadow_pass_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("BasicRenderer Shadow Pass BG"),
-            layout: &shadow_pass_layout,
-            entries: &[wgpu::BindGroupEntry {
-                binding: 0,
-                resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
-                    buffer: &shadow_pass_buffer,
-                    offset: 0,
-                    size: wgpu::BufferSize::new(std::mem::size_of::<ShadowPassUniform>() as u64),
-                }),
-            }],
-        });
-        let resources = Self {
-            map: shadow_map,
-            pipeline: shadow_pipeline,
-            pass_buffer: shadow_pass_buffer,
-            pass_bind_group: shadow_pass_bind_group,
-            pass_aligned: shadow_pass_aligned,
-            main_buffer: shadow_main_buffer,
-            main_bind_group: shadow_main_bind_group,
-        };
-        (resources, shadow_main_layout)
+        let pass_layout = shadow_pass_bind_group_layout(device);
+        let pipeline = create_shadow_pipeline(device, &pass_layout);
+        let pass_uniforms = DynamicUniformBuffer::<ShadowPassUniform>::new(
+            device,
+            "BasicRenderer Shadow Pass UBO",
+            alignment,
+            max_entities,
+        );
+        let pass_bind_group = single_buffer_bind_group(
+            device,
+            "BasicRenderer Shadow Pass BG",
+            &pass_layout,
+            pass_uniforms.binding(),
+        );
+        Self {
+            map,
+            pipeline,
+            pass_uniforms,
+            pass_bind_group,
+            main_layout,
+            main_buffer,
+            main_bind_group,
+        }
     }
 }
 
@@ -101,7 +98,6 @@ impl BasicRenderer {
     /// Directional shadow depth pre-pass (static meshes, then skinned casters)
     /// and the group-3 uniform upload. With shadows off only the disabled
     /// uniform is written.
-    #[allow(clippy::too_many_arguments)]
     pub(super) fn shadow_prepass(
         &self,
         queue: &wgpu::Queue,
@@ -109,81 +105,92 @@ impl BasicRenderer {
         world: &World,
         assets: &RenderAssets,
         items: &[RenderItem],
-        n: usize,
         light: LightUniform,
     ) {
-        if self.shadows_enabled {
-            let light_vp = directional_light_vp(light.direction);
-            let sp_aligned = self.shadow.pass_aligned as usize;
-            let mut sp_staging = vec![0u8; n * sp_aligned];
-            for (i, item) in items.iter().take(n).enumerate() {
-                let u = ShadowPassUniform {
-                    light_vp_model: (light_vp * item.model).cols,
-                };
-                let o = i * sp_aligned;
-                sp_staging[o..o + std::mem::size_of::<ShadowPassUniform>()]
-                    .copy_from_slice(bytemuck::bytes_of(&u));
-            }
-            if n > 0 {
-                queue.write_buffer(&self.shadow.pass_buffer, 0, &sp_staging);
-            }
-            // Skinned casters: upload light-space camera + shared palette, then
-            // draw into the same depth map after the static meshes.
-            let skinned_casters = self.gather_skinned_shadow(queue, world, light_vp);
-            {
-                let mut dpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                    label: Some("BasicRenderer Shadow Depth Pass"),
-                    color_attachments: &[],
-                    depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
-                        view: &self.shadow.map.view,
-                        depth_ops: Some(wgpu::Operations {
-                            load: wgpu::LoadOp::Clear(1.0),
-                            store: wgpu::StoreOp::Store,
-                        }),
-                        stencil_ops: None,
-                    }),
-                    occlusion_query_set: None,
-                    timestamp_writes: None,
-                    multiview_mask: None,
-                });
-                dpass.set_pipeline(&self.shadow.pipeline);
-                for (i, item) in items.iter().take(n).enumerate() {
-                    let mesh = assets.mesh(item.mesh).expect("collect skipped stale");
-                    let off = (i as u32) * self.shadow.pass_aligned;
-                    dpass.set_bind_group(0, &self.shadow.pass_bind_group, &[off]);
-                    dpass.set_vertex_buffer(0, mesh.vertex_buffer.slice(..));
-                    dpass.set_index_buffer(mesh.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
-                    dpass.draw_indexed(0..mesh.num_indices, 0, 0..1);
-                }
-                if !skinned_casters.is_empty() {
-                    dpass.set_pipeline(&self.skinned.shadow_pipeline);
-                    for (i, handle) in skinned_casters.iter().enumerate() {
-                        let Some(mesh) = assets.skinned_mesh(*handle) else {
-                            continue;
-                        };
-                        let cam_off = (i as u32) * self.skinned.cam_aligned;
-                        let pal_off = (i as u32) * self.skinned.palette_aligned;
-                        dpass.set_bind_group(0, &self.skinned.shadow_cam_bind_group, &[cam_off]);
-                        dpass.set_bind_group(1, &self.skinned.palette_bind_group, &[pal_off]);
-                        dpass.set_vertex_buffer(0, mesh.vertex_buffer.slice(..));
-                        dpass.set_index_buffer(mesh.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
-                        dpass.draw_indexed(0..mesh.num_indices, 0, 0..1);
-                    }
-                }
-            }
-            let su = ShadowMainUniform {
-                light_view_proj: light_vp.cols,
-                shadow_map_size: SHADOW_MAP_SIZE as f32,
-                shadow_bias: 0.003,
-                _pad: [0.0; 2],
-            };
-            queue.write_buffer(&self.shadow.main_buffer, 0, bytemuck::bytes_of(&su));
-        } else {
+        if !self.shadows_enabled {
             queue.write_buffer(
                 &self.shadow.main_buffer,
                 0,
                 bytemuck::bytes_of(&ShadowMainUniform::disabled()),
             );
+            return;
+        }
+        let light_vp = directional_light_vp(light.direction);
+        let pass_uniforms: Vec<ShadowPassUniform> = items
+            .iter()
+            .map(|item| ShadowPassUniform {
+                light_vp_model: (light_vp * item.model).cols,
+            })
+            .collect();
+        self.shadow.pass_uniforms.upload(queue, &pass_uniforms);
+        // Skinned casters: upload light-space camera + shared palette, then
+        // draw into the same depth map after the static meshes.
+        let skinned_casters = self.gather_skinned_shadow(queue, world, light_vp);
+        self.draw_shadow_depth(encoder, assets, items, &skinned_casters);
+
+        let main_uniform = ShadowMainUniform {
+            light_view_proj: light_vp.cols,
+            shadow_map_size: SHADOW_MAP_SIZE as f32,
+            shadow_bias: SHADOW_BIAS,
+            _pad: [0.0; 2],
+        };
+        queue.write_buffer(&self.shadow.main_buffer, 0, bytemuck::bytes_of(&main_uniform));
+    }
+
+    /// Clear the shadow map and render static meshes, then skinned casters,
+    /// into it (uniforms already uploaded).
+    fn draw_shadow_depth(
+        &self,
+        encoder: &mut wgpu::CommandEncoder,
+        assets: &RenderAssets,
+        items: &[RenderItem],
+        skinned_casters: &[SkinnedMeshHandle],
+    ) {
+        let mut depth_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            label: Some("BasicRenderer Shadow Depth Pass"),
+            color_attachments: &[],
+            depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                view: &self.shadow.map.view,
+                depth_ops: Some(wgpu::Operations {
+                    load: wgpu::LoadOp::Clear(1.0),
+                    store: wgpu::StoreOp::Store,
+                }),
+                stencil_ops: None,
+            }),
+            occlusion_query_set: None,
+            timestamp_writes: None,
+            multiview_mask: None,
+        });
+        depth_pass.set_pipeline(&self.shadow.pipeline);
+        for (i, item) in items.iter().enumerate() {
+            let mesh = assets.mesh(item.mesh).expect("collect skipped stale");
+            depth_pass.set_bind_group(
+                0,
+                &self.shadow.pass_bind_group,
+                &[self.shadow.pass_uniforms.offset(i)],
+            );
+            depth_pass.set_vertex_buffer(0, mesh.vertex_buffer.slice(..));
+            depth_pass.set_index_buffer(mesh.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
+            depth_pass.draw_indexed(0..mesh.num_indices, 0, 0..1);
+        }
+        if skinned_casters.is_empty() {
+            return;
+        }
+        let skinned = &self.skinned;
+        depth_pass.set_pipeline(&skinned.shadow_pipeline);
+        for (i, handle) in skinned_casters.iter().enumerate() {
+            let Some(mesh) = assets.skinned_mesh(*handle) else {
+                continue;
+            };
+            depth_pass.set_bind_group(
+                0,
+                &skinned.shadow_camera_bind_group,
+                &[skinned.shadow_cameras.offset(i)],
+            );
+            depth_pass.set_bind_group(1, &skinned.palette_bind_group, &[skinned.palettes.offset(i)]);
+            depth_pass.set_vertex_buffer(0, mesh.vertex_buffer.slice(..));
+            depth_pass.set_index_buffer(mesh.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
+            depth_pass.draw_indexed(0..mesh.num_indices, 0, 0..1);
         }
     }
 }

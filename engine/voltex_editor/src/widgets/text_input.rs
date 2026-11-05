@@ -101,12 +101,7 @@ impl UiContext {
         // Draw text
         let text_x = x + padding;
         let text_y = y + padding;
-        let mut cx = text_x;
-        for ch in buffer.chars() {
-            let (u0, v0, u1, v1) = self.font.glyph_uv(ch);
-            self.draw_list.add_rect_uv(cx, text_y, gw, gh, u0, v0, u1, v1, COLOR_TEXT);
-            cx += gw;
-        }
+        self.draw_list.add_text(&self.font, buffer, text_x, text_y, COLOR_TEXT);
 
         // Draw cursor if focused
         if self.focused_id == Some(id) {
@@ -114,7 +109,7 @@ impl UiContext {
             self.draw_list.add_rect(cursor_x, text_y, 1.0, gh, COLOR_CURSOR);
         }
 
-        self.layout.record(x, y, width);
+        self.layout.record_last_widget(x, y, width);
         self.layout.advance_line();
         changed
     }

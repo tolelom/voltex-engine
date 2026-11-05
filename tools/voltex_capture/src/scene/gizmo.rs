@@ -10,7 +10,7 @@ use voltex_renderer::{Camera, LightUniform, MaterialUniform};
 use voltex_renderer_ecs::{BasicRenderer, RenderAssets};
 
 use crate::headless::HeadlessGpu;
-use crate::scene::unit_cube;
+use super::unit_cube;
 use crate::target::{OffscreenTarget, CAPTURE_FORMAT, DEPTH_FORMAT};
 
 /// Look-at camera: position the camera and orient it toward `target`.

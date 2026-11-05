@@ -17,6 +17,7 @@ use voltex_renderer::{
 };
 use wgpu::util::DeviceExt;
 
+use super::{ground_quad_mesh, matte};
 use crate::headless::HeadlessGpu;
 use crate::target::{OffscreenTarget, CAPTURE_FORMAT};
 
@@ -28,7 +29,7 @@ struct SkinCam {
     model: [[f32; 4]; 4],
 }
 
-const IDENTITY4: [[f32; 4]; 4] = [
+const IDENTITY_MAT4: [[f32; 4]; 4] = [
     [1.0, 0.0, 0.0, 0.0],
     [0.0, 1.0, 0.0, 0.0],
     [0.0, 0.0, 1.0, 0.0],
@@ -76,7 +77,7 @@ pub(crate) fn demo_skeleton() -> Skeleton {
         name: None,
         joints: vec![0, 1],
         inverse_bind_matrices: vec![
-            IDENTITY4,
+            IDENTITY_MAT4,
             // inverse of T(0,1,0) = T(0,-1,0)
             [
                 [1.0, 0.0, 0.0, 0.0],
@@ -90,8 +91,9 @@ pub(crate) fn demo_skeleton() -> Skeleton {
     Skeleton::from_skin(&skin, &nodes)
 }
 
-/// Bend animation: rotate the child joint (node 1) by `angle` radians about Z.
-fn bend_animation(angle: f32) -> GltfAnimation {
+/// Single-keyframe pose: the child joint (node 1) held at `angle` radians
+/// about Z.
+fn static_bend_animation(angle: f32) -> GltfAnimation {
     let q = Quat::from_axis_angle(Vec3::new(0.0, 0.0, 1.0), angle);
     GltfAnimation {
         name: None,
@@ -124,7 +126,7 @@ fn render_with_palette(
     let camera = Camera::new(Vec3::new(0.0, 1.0, 5.0), width as f32 / height as f32);
     let cam = SkinCam {
         view_proj: camera.view_projection().cols,
-        model: IDENTITY4,
+        model: IDENTITY_MAT4,
     };
     let cam_buf = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
         label: Some("skin cam"),
@@ -217,7 +219,7 @@ pub fn render_skinned_rest(gpu: &HeadlessGpu, width: u32, height: u32) -> Vec<u8
 /// Render the strip with the child joint bent `angle` radians about Z.
 pub fn render_skinned_bent(gpu: &HeadlessGpu, width: u32, height: u32, angle: f32) -> Vec<u8> {
     let mut skel = demo_skeleton();
-    skel.apply_animation(&bend_animation(angle), 0.0);
+    skel.apply_animation(&static_bend_animation(angle), 0.0);
     render_with_palette(gpu, width, height, &skel.compute_palette())
 }
 
@@ -228,7 +230,7 @@ pub fn render_skinned_bent_demo(gpu: &HeadlessGpu, width: u32, height: u32) -> V
 
 /// Two-keyframe bend (rest at t=0 → 60° about Z at t=1) so advancing the
 /// animation clock visibly deforms the strip.
-fn bend_animation_2kf() -> GltfAnimation {
+fn bend_from_rest_animation() -> GltfAnimation {
     let s = (std::f32::consts::FRAC_PI_3 * 0.5).sin();
     let c = (std::f32::consts::FRAC_PI_3 * 0.5).cos();
     GltfAnimation {
@@ -306,7 +308,7 @@ pub fn render_skinned_runtime_mode(
     let e = world.spawn();
     world.add(e, Transform::new());
     world.add(e, mesh_h);
-    world.add(e, SkinnedPose::new(demo_skeleton(), bend_animation_2kf()));
+    world.add(e, SkinnedPose::new(demo_skeleton(), bend_from_rest_animation()));
 
     // Advance the pose (dt=0 leaves it at the rest/bind pose).
     update_skinned_poses(&mut world, anim_time);
@@ -347,7 +349,7 @@ pub fn render_skinned_shadow_scene(
     hide_caster: bool,
 ) -> Vec<u8> {
     use voltex_ecs::{propagate_transforms, MaterialHandle, MeshHandle, Transform, World};
-    use voltex_renderer::{LightUniform, MaterialUniform, MeshVertex, SkinnedMesh};
+    use voltex_renderer::{LightUniform, SkinnedMesh};
     use voltex_renderer_ecs::{update_skinned_poses, BasicRenderer, Hidden, RenderAssets, SkinnedPose};
 
     let device = &gpu.device;
@@ -359,16 +361,8 @@ pub fn render_skinned_shadow_scene(
     let mut assets = RenderAssets::new();
 
     // Up-facing ground quad (receiver).
-    let mk = |x: f32, z: f32| MeshVertex {
-        position: [x, 0.0, z],
-        normal: [0.0, 1.0, 0.0],
-        uv: [0.0, 0.0],
-        tangent: [1.0, 0.0, 0.0, 1.0],
-    };
-    let gverts = [mk(-12.0, -12.0), mk(12.0, -12.0), mk(12.0, 12.0), mk(-12.0, 12.0)];
-    let gidx = [0u32, 2, 1, 0, 3, 2];
-    let ground_mesh = assets.add_mesh(voltex_renderer::Mesh::new(device, &gverts, &gidx));
-    let gray = assets.add_material(MaterialUniform::with_params([0.7, 0.7, 0.7, 1.0], 0.0, 1.0));
+    let ground_mesh = assets.add_mesh(ground_quad_mesh(device, 12.0, 0.0));
+    let gray = assets.add_material(matte([0.7, 0.7, 0.7, 1.0]));
 
     // Skinned strip (caster), scaled up and lifted above the ground, bent so it
     // is clearly a deformed shape.
@@ -386,7 +380,7 @@ pub fn render_skinned_shadow_scene(
     st.scale = Vec3::new(3.0, 3.0, 3.0);
     world.add(strip, st);
     world.add(strip, mesh_h);
-    world.add(strip, SkinnedPose::new(demo_skeleton(), bend_animation_2kf()));
+    world.add(strip, SkinnedPose::new(demo_skeleton(), bend_from_rest_animation()));
     if hide_caster {
         world.add(strip, Hidden);
     }

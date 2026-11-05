@@ -243,14 +243,14 @@ impl TtfParser {
 
         let (offset, next_offset) = if self.loca_format == 0 {
             // Short format: u16 * 2
-            let o = read_u16(&self.data, loca_off + glyph_id as usize * 2) as usize * 2;
-            let n = read_u16(&self.data, loca_off + (glyph_id as usize + 1) * 2) as usize * 2;
-            (o, n)
+            let glyph_start = read_u16(&self.data, loca_off + glyph_id as usize * 2) as usize * 2;
+            let glyph_end = read_u16(&self.data, loca_off + (glyph_id as usize + 1) * 2) as usize * 2;
+            (glyph_start, glyph_end)
         } else {
             // Long format: u32
-            let o = read_u32(&self.data, loca_off + glyph_id as usize * 4) as usize;
-            let n = read_u32(&self.data, loca_off + (glyph_id as usize + 1) * 4) as usize;
-            (o, n)
+            let glyph_start = read_u32(&self.data, loca_off + glyph_id as usize * 4) as usize;
+            let glyph_end = read_u32(&self.data, loca_off + (glyph_id as usize + 1) * 4) as usize;
+            (glyph_start, glyph_end)
         };
 
         // Empty glyph (e.g., space) — or a corrupt loca with a backwards range.

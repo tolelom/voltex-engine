@@ -11,8 +11,12 @@ use crate::collision::detect_collisions;
 use crate::integrator::{integrate, inertia_tensor, inv_inertia};
 use crate::ccd;
 
+/// Penetration depth the solver tolerates before pushing bodies apart.
 const POSITION_SLOP: f32 = 0.01;
+/// Fraction of the remaining penetration corrected per step (Baumgarte factor).
 const POSITION_PERCENT: f32 = 0.4;
+/// Below this tangential slip speed no friction impulse is applied.
+const MIN_SLIP_SPEED: f32 = 1e-6;
 
 /// Runs `iterations` rounds of sequential-impulse resolution over `contacts`,
 /// updating velocities and applying positional correction (Baumgarte-style).
@@ -20,130 +24,172 @@ pub fn resolve_collisions(world: &mut World, contacts: &[ContactPoint], iteratio
     // Wake sleeping bodies that are in contact
     wake_colliding_bodies(world, contacts);
 
-    for _iter in 0..iterations {
-        let mut velocity_changes: Vec<(Entity, Vec3, Vec3)> = Vec::new(); // (entity, dv_linear, dv_angular)
+    for iteration in 0..iterations {
+        // Every contact in a round reads the same pre-round state; the changes
+        // are applied together at the end of the round.
+        let mut velocity_changes: Vec<VelocityChange> = Vec::new();
         let mut position_changes: Vec<(Entity, Vec3)> = Vec::new();
 
         for contact in contacts {
-            let rb_a = world.get::<RigidBody>(contact.entity_a).copied();
-            let rb_b = world.get::<RigidBody>(contact.entity_b).copied();
-            let col_a = world.get::<Collider>(contact.entity_a).cloned();
-            let col_b = world.get::<Collider>(contact.entity_b).cloned();
-            let pos_a = world.get::<Transform>(contact.entity_a).map(|t| t.position);
-            let pos_b = world.get::<Transform>(contact.entity_b).map(|t| t.position);
-
-            let (rb_a, rb_b) = match (rb_a, rb_b) {
-                (Some(a), Some(b)) => (a, b),
-                _ => continue,
-            };
-
-            let inv_mass_a = rb_a.inv_mass();
-            let inv_mass_b = rb_b.inv_mass();
-            let inv_mass_sum = inv_mass_a + inv_mass_b;
-
-            if inv_mass_sum == 0.0 {
+            let Some(bodies) = ContactBodies::gather(world, contact) else {
                 continue;
-            }
-
-            // Compute lever arms for angular impulse
-            let center_a = pos_a.unwrap_or(Vec3::ZERO);
-            let center_b = pos_b.unwrap_or(Vec3::ZERO);
-            let r_a = contact.point_on_a - center_a;
-            let r_b = contact.point_on_b - center_b;
-
-            // Compute inverse inertia
-            let inv_i_a = col_a.map(|c| inv_inertia(inertia_tensor(&c, rb_a.mass)))
-                .unwrap_or(Vec3::ZERO);
-            let inv_i_b = col_b.map(|c| inv_inertia(inertia_tensor(&c, rb_b.mass)))
-                .unwrap_or(Vec3::ZERO);
-
-            // Relative velocity at contact point (including angular contribution)
-            let v_a = rb_a.velocity + rb_a.angular_velocity.cross(r_a);
-            let v_b = rb_b.velocity + rb_b.angular_velocity.cross(r_b);
-            let v_rel = v_a - v_b;
-            let v_rel_n = v_rel.dot(contact.normal);
-
-            let effective_mass = effective_mass_along(contact.normal, inv_mass_sum, r_a, inv_i_a, r_b, inv_i_b);
-
-            // normal points A→B; v_rel_n > 0 means A approaches B → apply impulse
-            let j = if v_rel_n > 0.0 {
-                let e = rb_a.restitution.min(rb_b.restitution);
-                (1.0 + e) * v_rel_n / effective_mass
-            } else {
-                0.0
             };
-            let dv_rel = push_impulse(&mut velocity_changes, contact, contact.normal * j, r_a, inv_mass_a, inv_i_a, r_b, inv_mass_b, inv_i_b);
-
-            // Coulomb friction: only on a contact that is pushing (j > 0), sized
-            // with the tangent's own effective mass, from the slip left *after*
-            // the normal impulse. The old version used the normal's effective
-            // mass, the pre-impulse slip, and a depth-derived j on separating
-            // contacts — each of which could overshoot and inject energy.
-            let v_rel = v_rel + dv_rel;
-            let v_rel_tangent = v_rel - contact.normal * v_rel.dot(contact.normal);
-            let tangent_len = v_rel_tangent.length();
-
-            if j > 0.0 && tangent_len > 1e-6 {
-                let tangent = v_rel_tangent * (1.0 / tangent_len);
-                let mu = (rb_a.friction + rb_b.friction) * 0.5;
-                let tangent_mass = effective_mass_along(tangent, inv_mass_sum, r_a, inv_i_a, r_b, inv_i_b);
-                // Impulse on B along +tangent that would cancel the slip, clamped to the friction cone.
-                let jt = (tangent_len / tangent_mass).min(j * mu);
-                push_impulse(&mut velocity_changes, contact, tangent * jt, r_a, inv_mass_a, inv_i_a, r_b, inv_mass_b, inv_i_b);
-            }
-
+            solve_contact_velocity(&bodies, contact, &mut velocity_changes);
             // Position correction only on first iteration
-            if _iter == 0 {
-                let correction_mag = (contact.depth - POSITION_SLOP).max(0.0) * POSITION_PERCENT / inv_mass_sum;
-                if correction_mag > 0.0 {
-                    let correction = contact.normal * correction_mag;
-                    position_changes.push((contact.entity_a, correction * (-inv_mass_a)));
-                    position_changes.push((contact.entity_b, correction * inv_mass_b));
-                }
+            if iteration == 0 {
+                push_position_correction(&bodies, contact, &mut position_changes);
             }
         }
 
-        // Apply velocity changes
-        for (entity, dv, dw) in velocity_changes {
-            if let Some(rb) = world.get_mut::<RigidBody>(entity) {
-                rb.velocity = rb.velocity + dv;
-                rb.angular_velocity = rb.angular_velocity + dw;
-            }
+        apply_velocity_changes(world, velocity_changes);
+        apply_position_changes(world, position_changes);
+    }
+}
+
+/// `(entity, linear velocity delta, angular velocity delta)`.
+type VelocityChange = (Entity, Vec3, Vec3);
+
+/// The two bodies of one contact, as the solver needs them.
+struct ContactBodies {
+    body_a: RigidBody,
+    body_b: RigidBody,
+    inv_mass_a: f32,
+    inv_mass_b: f32,
+    /// Lever arm from A's centre to its contact point.
+    lever_a: Vec3,
+    /// Lever arm from B's centre to its contact point.
+    lever_b: Vec3,
+    /// Diagonal inverse inertia of A (zero without a collider).
+    inv_inertia_a: Vec3,
+    /// Diagonal inverse inertia of B (zero without a collider).
+    inv_inertia_b: Vec3,
+}
+
+impl ContactBodies {
+    /// `None` when either entity has no `RigidBody` or both are immovable.
+    fn gather(world: &World, contact: &ContactPoint) -> Option<Self> {
+        let body_a = *world.get::<RigidBody>(contact.entity_a)?;
+        let body_b = *world.get::<RigidBody>(contact.entity_b)?;
+        let inv_mass_a = body_a.inv_mass();
+        let inv_mass_b = body_b.inv_mass();
+        if inv_mass_a + inv_mass_b == 0.0 {
+            return None;
         }
 
-        // Apply position corrections
-        for (entity, dp) in position_changes {
-            if let Some(t) = world.get_mut::<Transform>(entity) {
-                t.position = t.position + dp;
-            }
+        let center_a = world.get::<Transform>(contact.entity_a).map_or(Vec3::ZERO, |t| t.position);
+        let center_b = world.get::<Transform>(contact.entity_b).map_or(Vec3::ZERO, |t| t.position);
+        let inv_inertia_of = |entity: Entity, body: &RigidBody| {
+            world
+                .get::<Collider>(entity)
+                .map_or(Vec3::ZERO, |collider| inv_inertia(inertia_tensor(collider, body.mass)))
+        };
+
+        Some(Self {
+            inv_inertia_a: inv_inertia_of(contact.entity_a, &body_a),
+            inv_inertia_b: inv_inertia_of(contact.entity_b, &body_b),
+            lever_a: contact.point_on_a - center_a,
+            lever_b: contact.point_on_b - center_b,
+            body_a,
+            body_b,
+            inv_mass_a,
+            inv_mass_b,
+        })
+    }
+
+    fn inv_mass_sum(&self) -> f32 {
+        self.inv_mass_a + self.inv_mass_b
+    }
+
+    /// Velocity of A's contact point minus B's (linear + angular).
+    fn relative_contact_velocity(&self) -> Vec3 {
+        let v_a = self.body_a.velocity + self.body_a.angular_velocity.cross(self.lever_a);
+        let v_b = self.body_b.velocity + self.body_b.angular_velocity.cross(self.lever_b);
+        v_a - v_b
+    }
+
+    /// Inverse effective mass of the contact along `dir` (linear + rotational):
+    /// the change in relative velocity along `dir` per unit impulse.
+    fn inverse_effective_mass_along(&self, dir: Vec3) -> f32 {
+        self.inv_mass_sum()
+            + self.lever_a.cross(dir).mul_elementwise(self.inv_inertia_a).cross(self.lever_a).dot(dir)
+            + self.lever_b.cross(dir).mul_elementwise(self.inv_inertia_b).cross(self.lever_b).dot(dir)
+    }
+
+    /// Queues `impulse` on B and `-impulse` on A, linear and angular. Returns
+    /// the resulting change of the relative contact velocity `v_a - v_b`.
+    fn push_impulse(&self, contact: &ContactPoint, impulse: Vec3, changes: &mut Vec<VelocityChange>) -> Vec3 {
+        let dv_a = impulse * -self.inv_mass_a;
+        let dw_a = self.lever_a.cross(-impulse).mul_elementwise(self.inv_inertia_a);
+        let dv_b = impulse * self.inv_mass_b;
+        let dw_b = self.lever_b.cross(impulse).mul_elementwise(self.inv_inertia_b);
+        changes.push((contact.entity_a, dv_a, dw_a));
+        changes.push((contact.entity_b, dv_b, dw_b));
+        (dv_a + dw_a.cross(self.lever_a)) - (dv_b + dw_b.cross(self.lever_b))
+    }
+}
+
+/// Queues the normal (restitution) impulse and then the Coulomb friction
+/// impulse for one contact.
+fn solve_contact_velocity(bodies: &ContactBodies, contact: &ContactPoint, changes: &mut Vec<VelocityChange>) {
+    let v_rel = bodies.relative_contact_velocity();
+    let v_rel_n = v_rel.dot(contact.normal);
+    let inverse_effective_mass = bodies.inverse_effective_mass_along(contact.normal);
+
+    // normal points A→B; v_rel_n > 0 means A approaches B → apply impulse
+    let normal_impulse = if v_rel_n > 0.0 {
+        let restitution = bodies.body_a.restitution.min(bodies.body_b.restitution);
+        (1.0 + restitution) * v_rel_n / inverse_effective_mass
+    } else {
+        0.0
+    };
+    let dv_rel = bodies.push_impulse(contact, contact.normal * normal_impulse, changes);
+
+    // Coulomb friction: only on a contact that is pushing (normal_impulse > 0),
+    // sized with the tangent's own effective mass, from the slip left *after*
+    // the normal impulse. The old version used the normal's effective mass,
+    // the pre-impulse slip, and a depth-derived impulse on separating
+    // contacts — each of which could overshoot and inject energy.
+    let v_rel = v_rel + dv_rel;
+    let v_rel_tangent = v_rel - contact.normal * v_rel.dot(contact.normal);
+    let slip_speed = v_rel_tangent.length();
+
+    if normal_impulse > 0.0 && slip_speed > MIN_SLIP_SPEED {
+        let tangent = v_rel_tangent * (1.0 / slip_speed);
+        let mu = (bodies.body_a.friction + bodies.body_b.friction) * 0.5;
+        let inverse_tangent_mass = bodies.inverse_effective_mass_along(tangent);
+        // Impulse on B along +tangent that would cancel the slip, clamped to the friction cone.
+        let friction_impulse = (slip_speed / inverse_tangent_mass).min(normal_impulse * mu);
+        bodies.push_impulse(contact, tangent * friction_impulse, changes);
+    }
+}
+
+/// Queues a push-apart along the normal, split by inverse mass, for the part
+/// of the penetration beyond [`POSITION_SLOP`].
+fn push_position_correction(bodies: &ContactBodies, contact: &ContactPoint, changes: &mut Vec<(Entity, Vec3)>) {
+    let correction_mag =
+        (contact.depth - POSITION_SLOP).max(0.0) * POSITION_PERCENT / bodies.inv_mass_sum();
+    if correction_mag > 0.0 {
+        let correction = contact.normal * correction_mag;
+        changes.push((contact.entity_a, correction * (-bodies.inv_mass_a)));
+        changes.push((contact.entity_b, correction * bodies.inv_mass_b));
+    }
+}
+
+fn apply_velocity_changes(world: &mut World, changes: Vec<VelocityChange>) {
+    for (entity, dv, dw) in changes {
+        if let Some(rb) = world.get_mut::<RigidBody>(entity) {
+            rb.velocity = rb.velocity + dv;
+            rb.angular_velocity = rb.angular_velocity + dw;
         }
     }
 }
 
-/// Component-wise product (diagonal inverse inertia applied to a vector).
-fn scale(v: Vec3, inv_i: Vec3) -> Vec3 {
-    Vec3::new(v.x * inv_i.x, v.y * inv_i.y, v.z * inv_i.z)
-}
-
-/// Inverse effective mass of the contact along `dir` (linear + rotational).
-fn effective_mass_along(dir: Vec3, inv_mass_sum: f32, r_a: Vec3, inv_i_a: Vec3, r_b: Vec3, inv_i_b: Vec3) -> f32 {
-    inv_mass_sum
-        + scale(r_a.cross(dir), inv_i_a).cross(r_a).dot(dir)
-        + scale(r_b.cross(dir), inv_i_b).cross(r_b).dot(dir)
-}
-
-/// Queues `impulse` on B and `-impulse` on A, linear and angular. Returns the
-/// resulting change of the relative contact velocity `v_a - v_b`.
-#[allow(clippy::too_many_arguments)]
-fn push_impulse(
-    changes: &mut Vec<(Entity, Vec3, Vec3)>, contact: &ContactPoint, impulse: Vec3,
-    r_a: Vec3, inv_mass_a: f32, inv_i_a: Vec3, r_b: Vec3, inv_mass_b: f32, inv_i_b: Vec3,
-) -> Vec3 {
-    let (dv_a, dw_a) = (impulse * -inv_mass_a, scale(r_a.cross(-impulse), inv_i_a));
-    let (dv_b, dw_b) = (impulse * inv_mass_b, scale(r_b.cross(impulse), inv_i_b));
-    changes.push((contact.entity_a, dv_a, dw_a));
-    changes.push((contact.entity_b, dv_b, dw_b));
-    (dv_a + dw_a.cross(r_a)) - (dv_b + dw_b.cross(r_b))
+fn apply_position_changes(world: &mut World, changes: Vec<(Entity, Vec3)>) {
+    for (entity, dp) in changes {
+        if let Some(t) = world.get_mut::<Transform>(entity) {
+            t.position = t.position + dp;
+        }
+    }
 }
 
 fn wake_colliding_bodies(world: &mut World, contacts: &[ContactPoint]) {
@@ -172,9 +218,9 @@ fn wake_colliding_bodies(world: &mut World, contacts: &[ContactPoint]) {
 pub fn physics_step(world: &mut World, config: &PhysicsConfig) {
     // CCD sweeps each fast body from where it was to where integration put
     // it, so it has to bracket the integrate call.
-    let before = ccd::snapshot_positions(world);
+    let positions_before_integration = ccd::snapshot_positions(world);
     integrate(world, config);
-    ccd::clamp_tunnelling(world, &before);
+    ccd::clamp_tunnelling(world, &positions_before_integration);
     let contacts = detect_collisions(world);
     resolve_collisions(world, &contacts, config.solver_iterations);
 }
@@ -242,7 +288,7 @@ mod tests {
         let floor = world.spawn();
         world.add(floor, Transform::from_position(Vec3::new(0.0, -1.0, 0.0)));
         world.add(floor, Collider::Box { half_extents: Vec3::new(10.0, 1.0, 10.0) });
-        world.add(floor, RigidBody::statik());
+        world.add(floor, RigidBody::fixed());
 
         let contacts = detect_collisions(&world);
         assert_eq!(contacts.len(), 1);
@@ -298,7 +344,7 @@ mod tests {
         let floor = world.spawn();
         world.add(floor, Transform::from_position(Vec3::new(0.0, -1.0, 0.0)));
         world.add(floor, Collider::Box { half_extents: Vec3::new(10.0, 1.0, 10.0) });
-        world.add(floor, RigidBody::statik());
+        world.add(floor, RigidBody::fixed());
 
         let config = PhysicsConfig::default();
 
@@ -336,7 +382,7 @@ mod tests {
         let floor = world.spawn();
         world.add(floor, Transform::from_position(Vec3::new(0.0, -0.5, 0.0)));
         world.add(floor, Collider::Box { half_extents: Vec3::new(10.0, 0.5, 10.0) });
-        let mut floor_rb = RigidBody::statik();
+        let mut floor_rb = RigidBody::fixed();
         floor_rb.friction = 0.5;
         world.add(floor, floor_rb);
 
@@ -356,12 +402,12 @@ mod tests {
         let a = world.spawn();
         world.add(a, Transform::from_position(Vec3::ZERO));
         world.add(a, Collider::Sphere { radius: 1.0 });
-        world.add(a, RigidBody::statik());
+        world.add(a, RigidBody::fixed());
 
         let b = world.spawn();
         world.add(b, Transform::from_position(Vec3::new(0.5, 0.0, 0.0)));
         world.add(b, Collider::Sphere { radius: 1.0 });
-        world.add(b, RigidBody::statik());
+        world.add(b, RigidBody::fixed());
 
         let contacts = detect_collisions(&world);
         resolve_collisions(&mut world, &contacts, 1);
@@ -426,7 +472,7 @@ mod tests {
         let floor = world.spawn();
         world.add(floor, Transform::from_position(Vec3::new(0.0, -0.5, 0.0)));
         world.add(floor, Collider::Box { half_extents: Vec3::new(10.0, 0.5, 10.0) });
-        world.add(floor, RigidBody::statik());
+        world.add(floor, RigidBody::fixed());
 
         let mut boxes = Vec::new();
         for i in 0..3 {

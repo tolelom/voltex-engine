@@ -10,7 +10,7 @@ pub(crate) const SLEEP_TIME_THRESHOLD: f32 = 0.5;
 
 /// Rigid body state attached to an entity by the physics solver.
 ///
-/// Set `mass = 0` for kinematic / static bodies (see [`RigidBody::statik`]).
+/// Set `mass = 0` for kinematic / static bodies (see [`RigidBody::fixed`]).
 #[derive(Debug, Clone, Copy)]
 pub struct RigidBody {
     /// Linear velocity in world space.
@@ -48,7 +48,7 @@ impl RigidBody {
 
     /// Creates an immovable body (mass 0, gravity scale 0). Useful for
     /// terrain, level geometry, kinematic platforms.
-    pub fn statik() -> Self {
+    pub fn fixed() -> Self {
         Self {
             velocity: Vec3::ZERO,
             angular_velocity: Vec3::ZERO,
@@ -59,6 +59,12 @@ impl RigidBody {
             is_sleeping: false,
             sleep_timer: 0.0,
         }
+    }
+
+    /// Old name of [`RigidBody::fixed`].
+    #[deprecated(note = "use `fixed`")]
+    pub fn statik() -> Self {
+        Self::fixed()
     }
 
     /// `1.0 / mass`, or `0.0` for static bodies (mass == 0).
@@ -117,7 +123,7 @@ mod tests {
 
     #[test]
     fn test_static_body() {
-        let rb = RigidBody::statik();
+        let rb = RigidBody::fixed();
         assert_eq!(rb.mass, 0.0);
         assert!(rb.is_static());
         assert_eq!(rb.inv_mass(), 0.0);

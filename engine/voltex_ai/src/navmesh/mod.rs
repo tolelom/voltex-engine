@@ -2,6 +2,11 @@
 
 use voltex_math::Vec3;
 
+mod format;
+pub use format::{deserialize_navmesh_headerless, serialize_navmesh_headerless};
+#[allow(deprecated)]
+pub use format::{deserialize_navmesh, serialize_navmesh};
+
 /// A triangle in the navigation mesh, defined by vertex indices and neighbor triangle indices.
 #[derive(Debug, Clone)]
 pub struct NavTriangle {
@@ -76,158 +81,6 @@ impl NavMesh {
         )
     }
 
-    /// Serialize the NavMesh to a binary format with header.
-    ///
-    /// Format:
-    /// - Magic: "VNAV" (4 bytes)
-    /// - Version: u32 (little-endian)
-    /// - num_vertices: u32
-    /// - vertices: [f32; 3] * num_vertices
-    /// - num_triangles: u32
-    /// - triangles: for each triangle: indices [u32; 3] + neighbors [i32; 3] (-1 for None)
-    pub fn serialize(&self) -> Vec<u8> {
-        let mut data = Vec::new();
-        // Magic
-        data.extend_from_slice(b"VNAV");
-        // Version
-        data.extend_from_slice(&1u32.to_le_bytes());
-
-        // Vertices
-        data.extend_from_slice(&(self.vertices.len() as u32).to_le_bytes());
-        for v in &self.vertices {
-            data.extend_from_slice(&v.x.to_le_bytes());
-            data.extend_from_slice(&v.y.to_le_bytes());
-            data.extend_from_slice(&v.z.to_le_bytes());
-        }
-
-        // Triangles
-        data.extend_from_slice(&(self.triangles.len() as u32).to_le_bytes());
-        for tri in &self.triangles {
-            for &idx in &tri.indices {
-                data.extend_from_slice(&(idx as u32).to_le_bytes());
-            }
-            for &nb in &tri.neighbors {
-                let val: i32 = match nb {
-                    Some(i) => i as i32,
-                    None => -1,
-                };
-                data.extend_from_slice(&val.to_le_bytes());
-            }
-        }
-
-        data
-    }
-
-    /// Deserialize a NavMesh from binary data with header validation.
-    pub fn deserialize(data: &[u8]) -> crate::Result<Self> {
-        if data.len() < 8 {
-            return Err("data too short for header".into());
-        }
-
-        // Validate magic
-        if &data[0..4] != b"VNAV" {
-            return Err(format!(
-                "invalid magic: expected VNAV, got {:?}",
-                &data[0..4]
-            ).into());
-        }
-
-        // Read version
-        let version = u32::from_le_bytes([data[4], data[5], data[6], data[7]]);
-        if version != 1 {
-            return Err(format!("unsupported version: {}", version).into());
-        }
-
-        // Delegate rest to offset-based reading
-        let mut offset = 8usize;
-
-        let read_u32 = |off: &mut usize| -> crate::Result<u32> {
-            if *off + 4 > data.len() {
-                return Err("unexpected end of data".into());
-            }
-            let val = u32::from_le_bytes([data[*off], data[*off + 1], data[*off + 2], data[*off + 3]]);
-            *off += 4;
-            Ok(val)
-        };
-
-        let read_i32 = |off: &mut usize| -> crate::Result<i32> {
-            if *off + 4 > data.len() {
-                return Err("unexpected end of data".into());
-            }
-            let val = i32::from_le_bytes([data[*off], data[*off + 1], data[*off + 2], data[*off + 3]]);
-            *off += 4;
-            Ok(val)
-        };
-
-        let read_f32 = |off: &mut usize| -> crate::Result<f32> {
-            if *off + 4 > data.len() {
-                return Err("unexpected end of data".into());
-            }
-            let val = f32::from_le_bytes([data[*off], data[*off + 1], data[*off + 2], data[*off + 3]]);
-            *off += 4;
-            Ok(val)
-        };
-
-        let vc = read_u32(&mut offset)? as usize;
-        if vc > MAX_NAVMESH_VERTICES {
-            return Err(format!(
-                "navmesh vertex count {} exceeds limit {}",
-                vc, MAX_NAVMESH_VERTICES
-            ).into());
-        }
-        let mut vertices = Vec::with_capacity(vc);
-        for _ in 0..vc {
-            let x = read_f32(&mut offset)?;
-            let y = read_f32(&mut offset)?;
-            let z = read_f32(&mut offset)?;
-            vertices.push(Vec3::new(x, y, z));
-        }
-
-        let tc = read_u32(&mut offset)? as usize;
-        if tc > MAX_NAVMESH_TRIANGLES {
-            return Err(format!(
-                "navmesh triangle count {} exceeds limit {}",
-                tc, MAX_NAVMESH_TRIANGLES
-            ).into());
-        }
-        let mut triangles = Vec::with_capacity(tc);
-        for _ in 0..tc {
-            let i0 = read_u32(&mut offset)? as usize;
-            let i1 = read_u32(&mut offset)? as usize;
-            let i2 = read_u32(&mut offset)? as usize;
-            if i0 >= vc || i1 >= vc || i2 >= vc {
-                return Err(format!(
-                    "navmesh triangle vertex index out of range (vertices={})",
-                    vc
-                ).into());
-            }
-            let n0 = read_i32(&mut offset)?;
-            let n1 = read_i32(&mut offset)?;
-            let n2 = read_i32(&mut offset)?;
-            let to_opt = |v: i32, tc: usize| -> crate::Result<Option<usize>> {
-                if v < 0 {
-                    Ok(None)
-                } else {
-                    let idx = v as usize;
-                    if idx >= tc {
-                        Err(format!(
-                            "navmesh neighbour triangle index {} out of range (triangles={})",
-                            idx, tc
-                        ).into())
-                    } else {
-                        Ok(Some(idx))
-                    }
-                }
-            };
-            triangles.push(NavTriangle {
-                indices: [i0, i1, i2],
-                neighbors: [to_opt(n0, tc)?, to_opt(n1, tc)?, to_opt(n2, tc)?],
-            });
-        }
-
-        Ok(NavMesh::new(vertices, triangles))
-    }
-
     /// Return the shared edge (portal) vertices between two adjacent triangles.
     /// Returns (left, right) vertices of the portal edge as seen from `from_tri` looking toward `to_tri`.
     /// Returns None if the triangles are not adjacent.
@@ -248,166 +101,25 @@ impl NavMesh {
     }
 }
 
+/// Barycentric weights `(u, v, w)` of `(px, pz)` for triangle `(a, b, c)` in
+/// the XZ plane (`u` on `a`, `v` on `b`, `w` on `c`; all ≥ 0 inside), or
+/// `None` for a degenerate triangle.
+pub(crate) fn barycentric_xz(px: f32, pz: f32, a: Vec3, b: Vec3, c: Vec3) -> Option<(f32, f32, f32)> {
+    let denom = (b.z - c.z) * (a.x - c.x) + (c.x - b.x) * (a.z - c.z);
+    if denom.abs() < f32::EPSILON {
+        return None;
+    }
+    let u = ((b.z - c.z) * (px - c.x) + (c.x - b.x) * (pz - c.z)) / denom;
+    let v = ((c.z - a.z) * (px - c.x) + (a.x - c.x) * (pz - c.z)) / denom;
+    Some((u, v, 1.0 - u - v))
+}
+
 /// Test whether `point` lies inside or on the triangle (a, b, c) using XZ barycentric coordinates.
 pub(crate) fn point_in_triangle_xz(point: Vec3, a: Vec3, b: Vec3, c: Vec3) -> bool {
-    // Compute barycentric coordinates using XZ plane
-    let px = point.x;
-    let pz = point.z;
-    let ax = a.x; let az = a.z;
-    let bx = b.x; let bz = b.z;
-    let cx = c.x; let cz = c.z;
-
-    let denom = (bz - cz) * (ax - cx) + (cx - bx) * (az - cz);
-    if denom.abs() < f32::EPSILON {
-        return false; // degenerate triangle
+    match barycentric_xz(point.x, point.z, a, b, c) {
+        Some((u, v, w)) => u >= 0.0 && v >= 0.0 && w >= 0.0,
+        None => false, // degenerate triangle
     }
-
-    let u = ((bz - cz) * (px - cx) + (cx - bx) * (pz - cz)) / denom;
-    let v = ((cz - az) * (px - cx) + (ax - cx) * (pz - cz)) / denom;
-    let w = 1.0 - u - v;
-
-    u >= 0.0 && v >= 0.0 && w >= 0.0
-}
-
-/// Serialize a NavMesh to binary format.
-/// Format: vertex_count(u32) + vertices(f32*3 each) + triangle_count(u32) + triangles(indices u32*3 + neighbors i32*3 each)
-pub fn serialize_navmesh(navmesh: &NavMesh) -> Vec<u8> {
-    let mut data = Vec::new();
-
-    // Vertex count
-    let vc = navmesh.vertices.len() as u32;
-    data.extend_from_slice(&vc.to_le_bytes());
-
-    // Vertices
-    for v in &navmesh.vertices {
-        data.extend_from_slice(&v.x.to_le_bytes());
-        data.extend_from_slice(&v.y.to_le_bytes());
-        data.extend_from_slice(&v.z.to_le_bytes());
-    }
-
-    // Triangle count
-    let tc = navmesh.triangles.len() as u32;
-    data.extend_from_slice(&tc.to_le_bytes());
-
-    // Triangles: indices(u32*3) + neighbors(i32*3, -1 for None)
-    for tri in &navmesh.triangles {
-        for &idx in &tri.indices {
-            data.extend_from_slice(&(idx as u32).to_le_bytes());
-        }
-        for &nb in &tri.neighbors {
-            let val: i32 = match nb {
-                Some(i) => i as i32,
-                None => -1,
-            };
-            data.extend_from_slice(&val.to_le_bytes());
-        }
-    }
-
-    data
-}
-
-/// Maximum vertex / triangle count we accept in a single VNAV file. Real
-/// navmeshes have at most a few hundred thousand polygons; this limit
-/// catches adversarial headers without restricting realistic use.
-const MAX_NAVMESH_VERTICES: usize = 1_000_000;
-const MAX_NAVMESH_TRIANGLES: usize = 1_000_000;
-
-/// Deserialize a NavMesh from binary data.
-///
-/// Validation: vertex/triangle counts are capped at 1M each. Triangle
-/// vertex indices are validated to be inside the vertex array, and
-/// neighbour indices (when present) are validated to be inside the
-/// triangle array. This means downstream consumers
-/// (`NavMesh::shared_edge`, `point_in_triangle_xz`) can use these
-/// indices without re-checking.
-pub fn deserialize_navmesh(data: &[u8]) -> crate::Result<NavMesh> {
-    let mut offset = 0;
-
-    let read_u32 = |off: &mut usize| -> crate::Result<u32> {
-        if *off + 4 > data.len() {
-            return Err("unexpected end of data".into());
-        }
-        let val = u32::from_le_bytes([data[*off], data[*off + 1], data[*off + 2], data[*off + 3]]);
-        *off += 4;
-        Ok(val)
-    };
-
-    let read_i32 = |off: &mut usize| -> crate::Result<i32> {
-        if *off + 4 > data.len() {
-            return Err("unexpected end of data".into());
-        }
-        let val = i32::from_le_bytes([data[*off], data[*off + 1], data[*off + 2], data[*off + 3]]);
-        *off += 4;
-        Ok(val)
-    };
-
-    let read_f32 = |off: &mut usize| -> crate::Result<f32> {
-        if *off + 4 > data.len() {
-            return Err("unexpected end of data".into());
-        }
-        let val = f32::from_le_bytes([data[*off], data[*off + 1], data[*off + 2], data[*off + 3]]);
-        *off += 4;
-        Ok(val)
-    };
-
-    let vc = read_u32(&mut offset)? as usize;
-    if vc > MAX_NAVMESH_VERTICES {
-        return Err(format!(
-            "navmesh vertex count {} exceeds limit {}",
-            vc, MAX_NAVMESH_VERTICES
-        ).into());
-    }
-    let mut vertices = Vec::with_capacity(vc);
-    for _ in 0..vc {
-        let x = read_f32(&mut offset)?;
-        let y = read_f32(&mut offset)?;
-        let z = read_f32(&mut offset)?;
-        vertices.push(Vec3::new(x, y, z));
-    }
-
-    let tc = read_u32(&mut offset)? as usize;
-    if tc > MAX_NAVMESH_TRIANGLES {
-        return Err(format!(
-            "navmesh triangle count {} exceeds limit {}",
-            tc, MAX_NAVMESH_TRIANGLES
-        ).into());
-    }
-    let mut triangles = Vec::with_capacity(tc);
-    for _ in 0..tc {
-        let i0 = read_u32(&mut offset)? as usize;
-        let i1 = read_u32(&mut offset)? as usize;
-        let i2 = read_u32(&mut offset)? as usize;
-        if i0 >= vc || i1 >= vc || i2 >= vc {
-            return Err(format!(
-                "navmesh triangle vertex index out of range (vertices={})",
-                vc
-            ).into());
-        }
-        let n0 = read_i32(&mut offset)?;
-        let n1 = read_i32(&mut offset)?;
-        let n2 = read_i32(&mut offset)?;
-        let to_opt = |v: i32, tc: usize| -> crate::Result<Option<usize>> {
-            if v < 0 {
-                Ok(None)
-            } else {
-                let idx = v as usize;
-                if idx >= tc {
-                    Err(format!(
-                        "navmesh neighbour triangle index {} out of range (triangles={})",
-                        idx, tc
-                    ).into())
-                } else {
-                    Ok(Some(idx))
-                }
-            }
-        };
-        triangles.push(NavTriangle {
-            indices: [i0, i1, i2],
-            neighbors: [to_opt(n0, tc)?, to_opt(n1, tc)?, to_opt(n2, tc)?],
-        });
-    }
-
-    Ok(NavMesh::new(vertices, triangles))
 }
 
 #[cfg(test)]

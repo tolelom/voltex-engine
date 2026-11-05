@@ -27,17 +27,17 @@ pub fn script_start_all(world: &mut World, pool: &mut ScriptInstancePool) {
         .collect();
 
     for (entity, path, cached_id) in entries {
-        let mut iid = cached_id;
-        if iid == ScriptComponent::UNBOUND || pool.get(iid).is_none() {
-            iid = match pool.get_or_create(&path, world_ptr) {
+        let mut instance_id = cached_id;
+        if instance_id == ScriptComponent::UNBOUND || pool.get(instance_id).is_none() {
+            instance_id = match pool.get_or_create(&path, world_ptr) {
                 Ok(id) => id,
                 Err(_) => continue,
             };
             if let Some(s) = world.get_mut::<ScriptComponent>(entity) {
-                s.instance_id = iid;
+                s.instance_id = instance_id;
             }
         }
-        let Some(inst) = pool.get_mut(iid) else { continue };
+        let Some(inst) = pool.get_mut(instance_id) else { continue };
         if inst.started {
             continue;
         }
@@ -55,8 +55,8 @@ pub fn script_update_all(world: &mut World, pool: &mut ScriptInstancePool, dt: f
         .map(|(e, s)| (e, s.instance_id))
         .collect();
 
-    for (entity, iid) in entries {
-        let Some(inst) = pool.get_mut(iid) else { continue };
+    for (entity, instance_id) in entries {
+        let Some(inst) = pool.get_mut(instance_id) else { continue };
         if !inst.started {
             continue;
         }
@@ -64,30 +64,35 @@ pub fn script_update_all(world: &mut World, pool: &mut ScriptInstancePool, dt: f
     }
 }
 
+/// Call the global Lua function `fn_name(id, gen[, dt])` if the script defines
+/// one. A missing function is a no-op; a Lua error is popped and dropped.
 fn invoke_callback(lua: &LuaState, fn_name: &str, entity: Entity, dt: Option<f32>) {
+    // SAFETY: `lua.raw()` is the live state owned by `lua`; `fn_name_c`
+    // outlives the getglobal call; every push is balanced by the pcall (which
+    // pops function + args) or by the explicit pops below.
     unsafe {
-        let l = lua.raw();
-        let c = match CString::new(fn_name) {
+        let L = lua.raw();
+        let fn_name_c = match CString::new(fn_name) {
             Ok(c) => c,
             Err(_) => return,
         };
-        let ty = ffi::lua_getglobal(l, c.as_ptr());
+        let ty = ffi::lua_getglobal(L, fn_name_c.as_ptr());
         if ty != ffi::LUA_TFUNCTION {
-            ffi::lua_pop(l, 1);
+            ffi::lua_pop(L, 1);
             return;
         }
-        ffi::lua_pushnumber(l, entity.id as f64);
-        ffi::lua_pushnumber(l, entity.generation as f64);
+        ffi::lua_pushnumber(L, entity.id as f64);
+        ffi::lua_pushnumber(L, entity.generation as f64);
         let nargs = if let Some(dt) = dt {
-            ffi::lua_pushnumber(l, dt as f64);
+            ffi::lua_pushnumber(L, dt as f64);
             3
         } else {
             2
         };
-        let rc = ffi::lua_pcall(l, nargs, 0, 0);
+        let rc = ffi::lua_pcall(L, nargs, 0, 0);
         if rc != ffi::LUA_OK {
             // best-effort: pop the error message left on the stack
-            ffi::lua_pop(l, 1);
+            ffi::lua_pop(L, 1);
         }
     }
 }

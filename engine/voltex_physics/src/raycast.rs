@@ -2,11 +2,11 @@
 //! narrowphase. Returns the closest hit or every hit sorted by distance.
 
 use voltex_ecs::{World, Entity};
-use voltex_ecs::Transform;
-use voltex_math::{Vec3, Ray};
+use voltex_math::{Vec3, Ray, AABB};
 
 use crate::collider::Collider;
-use crate::ray as ray_tests;
+use crate::collision::{placed_colliders, PlacedCollider};
+use crate::ray_shapes;
 
 /// One ray hit produced by [`raycast`] / [`raycast_all`].
 #[derive(Debug, Clone, Copy)]
@@ -14,71 +14,36 @@ pub struct RayHit {
     /// Entity whose collider was hit.
     pub entity: Entity,
     /// Distance along the ray to the hit point.
-    pub t: f32,
+    pub distance: f32,
     /// Hit point in world space.
     pub point: Vec3,
     /// Surface normal at the hit point.
     pub normal: Vec3,
 }
 
-/// Casts `ray` against every entity with a [`Transform`] + [`Collider`] and
-/// returns the closest hit within `max_dist`, or `None`.
+/// Casts `ray` against every entity with a [`voltex_ecs::Transform`] +
+/// [`Collider`] and returns the closest hit within `max_dist`, or `None`.
 pub fn raycast(world: &World, ray: &Ray, max_dist: f32) -> Option<RayHit> {
-    let entities: Vec<(Entity, Vec3, Collider)> = world
-        .query2::<Transform, Collider>()
-        .map(|(e, t, c)| (e, t.position, c.clone()))
-        .collect();
-
-    if entities.is_empty() {
-        return None;
-    }
-
     let mut closest: Option<RayHit> = None;
 
-    for (entity, pos, collider) in &entities {
-        let aabb = collider.aabb(*pos);
+    for body in placed_colliders(world) {
+        let aabb = body.collider.aabb(body.position);
 
         // Broad phase: ray vs AABB
-        let aabb_t = match ray_tests::ray_vs_aabb(ray, &aabb) {
-            Some(t) if t <= max_dist => t,
+        let aabb_distance = match ray_shapes::ray_vs_aabb(ray, &aabb) {
+            Some(distance) if distance <= max_dist => distance,
             _ => continue,
         };
 
         // Early skip if we already have a closer hit
-        if let Some(ref hit) = closest {
-            if aabb_t >= hit.t {
-                continue;
-            }
+        if closest.is_some_and(|hit| aabb_distance >= hit.distance) {
+            continue;
         }
 
-        // Narrow phase
-        let result = match collider {
-            Collider::Sphere { radius } => {
-                ray_tests::ray_vs_sphere(ray, *pos, *radius)
+        if let Some(hit) = ray_vs_collider(ray, &body, &aabb) {
+            if hit.distance <= max_dist && closest.is_none_or(|best| hit.distance < best.distance) {
+                closest = Some(hit);
             }
-            Collider::Box { half_extents } => {
-                ray_tests::ray_vs_box(ray, *pos, *half_extents)
-            }
-            Collider::Capsule { radius, half_height } => {
-                ray_tests::ray_vs_capsule(ray, *pos, *radius, *half_height)
-            }
-            Collider::ConvexHull(_) => {
-                // Approximated by the hull's AABB (exact for box-shaped hulls);
-                // the normal is that box's face normal, not a fixed +Y.
-                ray_tests::ray_vs_box(ray, aabb.center(), aabb.half_extents())
-            }
-        };
-
-        if let Some((t, normal)) = result {
-            if t <= max_dist
-                && (closest.is_none() || t < closest.as_ref().unwrap().t) {
-                    closest = Some(RayHit {
-                        entity: *entity,
-                        t,
-                        point: ray.at(t),
-                        normal,
-                    });
-                }
         }
     }
 
@@ -87,58 +52,50 @@ pub fn raycast(world: &World, ray: &Ray, max_dist: f32) -> Option<RayHit> {
 
 /// Cast a ray and return ALL hits sorted by distance.
 pub fn raycast_all(world: &World, ray: &Ray, max_dist: f32) -> Vec<RayHit> {
-    let entities: Vec<(Entity, Vec3, Collider)> = world
-        .query2::<Transform, Collider>()
-        .map(|(e, t, c)| (e, t.position, c.clone()))
-        .collect();
-
-    if entities.is_empty() {
-        return Vec::new();
-    }
-
     let mut hits = Vec::new();
 
-    for (entity, pos, collider) in &entities {
-        let aabb = collider.aabb(*pos);
+    for body in placed_colliders(world) {
+        let aabb = body.collider.aabb(body.position);
 
         // Broad phase: ray vs AABB
-        match ray_tests::ray_vs_aabb(ray, &aabb) {
-            Some(t) if t <= max_dist => {}
+        match ray_shapes::ray_vs_aabb(ray, &aabb) {
+            Some(distance) if distance <= max_dist => {}
             _ => continue,
         };
 
-        // Narrow phase
-        let result = match collider {
-            Collider::Sphere { radius } => {
-                ray_tests::ray_vs_sphere(ray, *pos, *radius)
-            }
-            Collider::Box { half_extents } => {
-                ray_tests::ray_vs_box(ray, *pos, *half_extents)
-            }
-            Collider::Capsule { radius, half_height } => {
-                ray_tests::ray_vs_capsule(ray, *pos, *radius, *half_height)
-            }
-            Collider::ConvexHull(_) => {
-                // Approximated by the hull's AABB (exact for box-shaped hulls);
-                // the normal is that box's face normal, not a fixed +Y.
-                ray_tests::ray_vs_box(ray, aabb.center(), aabb.half_extents())
-            }
-        };
-
-        if let Some((t, normal)) = result {
-            if t <= max_dist {
-                hits.push(RayHit {
-                    entity: *entity,
-                    t,
-                    point: ray.at(t),
-                    normal,
-                });
+        if let Some(hit) = ray_vs_collider(ray, &body, &aabb) {
+            if hit.distance <= max_dist {
+                hits.push(hit);
             }
         }
     }
 
-    hits.sort_by(|a, b| a.t.partial_cmp(&b.t).unwrap_or(std::cmp::Ordering::Equal));
+    hits.sort_by(|a, b| a.distance.partial_cmp(&b.distance).unwrap_or(std::cmp::Ordering::Equal));
     hits
+}
+
+/// Narrow phase for one collider; `aabb` is its world AABB (already computed
+/// for the broad phase).
+fn ray_vs_collider(ray: &Ray, body: &PlacedCollider, aabb: &AABB) -> Option<RayHit> {
+    let position = body.position;
+    let (distance, normal) = match &body.collider {
+        Collider::Sphere { radius } => ray_shapes::ray_vs_sphere(ray, position, *radius),
+        Collider::Box { half_extents } => ray_shapes::ray_vs_box(ray, position, *half_extents),
+        Collider::Capsule { radius, half_height } => {
+            ray_shapes::ray_vs_capsule(ray, position, *radius, *half_height)
+        }
+        Collider::ConvexHull(_) => {
+            // Approximated by the hull's AABB (exact for box-shaped hulls);
+            // the normal is that box's face normal, not a fixed +Y.
+            ray_shapes::ray_vs_box(ray, aabb.center(), aabb.half_extents())
+        }
+    }?;
+    Some(RayHit {
+        entity: body.entity,
+        distance,
+        point: ray.at(distance),
+        normal,
+    })
 }
 
 #[cfg(test)]
@@ -171,7 +128,7 @@ mod tests {
         let hit = raycast(&world, &ray, 100.0).unwrap();
 
         assert_eq!(hit.entity, e);
-        assert!(approx(hit.t, 4.0));
+        assert!(approx(hit.distance, 4.0));
         assert!(approx(hit.point.x, 4.0));
     }
 
@@ -191,7 +148,7 @@ mod tests {
         let hit = raycast(&world, &ray, 100.0).unwrap();
 
         assert_eq!(hit.entity, near);
-        assert!(approx(hit.t, 2.0));
+        assert!(approx(hit.distance, 2.0));
     }
 
     #[test]
@@ -216,7 +173,7 @@ mod tests {
         let hit = raycast(&world, &ray, 100.0).unwrap();
 
         assert_eq!(hit.entity, e);
-        assert!(approx(hit.t, 4.0));
+        assert!(approx(hit.distance, 4.0));
     }
 
     // --- raycast_all tests ---
@@ -244,8 +201,8 @@ mod tests {
         assert_eq!(hits[0].entity, near);
         assert_eq!(hits[1].entity, mid);
         assert_eq!(hits[2].entity, far);
-        assert!(hits[0].t < hits[1].t);
-        assert!(hits[1].t < hits[2].t);
+        assert!(hits[0].distance < hits[1].distance);
+        assert!(hits[1].distance < hits[2].distance);
     }
 
     #[test]
@@ -291,7 +248,7 @@ mod tests {
         let hit = raycast(&world, &ray, 100.0).unwrap();
 
         assert_eq!(hit.entity, box_e);
-        assert!(approx(hit.t, 2.0));
+        assert!(approx(hit.distance, 2.0));
     }
 
     #[test]

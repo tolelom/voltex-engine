@@ -2,9 +2,14 @@
 #![allow(missing_docs)] // 1:1 Win32 FFI bindings — Microsoft's MSDN is the canonical reference.
 #![allow(clippy::upper_case_acronyms)] // Win32 type names must match the Windows API exactly.
 
-//! WASAPI FFI bindings for Windows audio output.
+//! WASAPI FFI bindings for Windows audio output, plus [`WasapiDevice`], the
+//! safe-API wrapper `AudioSystem`'s audio thread writes PCM through.
 //!
 //! This module is only compiled on Windows (`#[cfg(target_os = "windows")]`).
+//!
+//! COM calls go through hand-written vtables: `*(obj as *mut *const Vtbl)`
+//! reads the vtable pointer stored at the start of every COM object, so it
+//! is only valid on a non-null interface pointer of exactly that interface.
 
 use std::ffi::c_void;
 
@@ -273,12 +278,22 @@ pub struct WasapiDevice {
     is_float: bool,
 }
 
+// SAFETY: the two COM pointers are owned exclusively by this struct (never
+// copied out), and every call goes through `&self`/`Drop`, so they are never
+// used concurrently. The engine creates, uses and drops the device on the
+// audio thread. Note COM was initialised apartment-threaded on the creating
+// thread; moving a live device to another thread relies on WASAPI tolerating
+// that and is not exercised by the engine.
 unsafe impl Send for WasapiDevice {}
 
 impl WasapiDevice {
     /// Initialize WASAPI: COM, default endpoint, IAudioClient, mix format,
     /// Initialize shared mode (50 ms buffer), GetBufferSize, GetService, Start.
     pub fn new() -> crate::Result<Self> {
+        // SAFETY: each step only dereferences an interface pointer after the
+        // call that produced it succeeded and returned non-null (checked
+        // below), casts it to that interface's vtable, and releases it on
+        // every early-return path. Out-pointers are valid locals.
         unsafe {
             // 1. CoInitializeEx
             let hr = CoInitializeEx(std::ptr::null_mut(), COINIT_APARTMENTTHREADED);
@@ -342,6 +357,8 @@ impl WasapiDevice {
                 }
             }
 
+            // Copy out the header before CoTaskMemFree below; the remaining
+            // WAVEFORMATEXTENSIBLE tail (if any) is not read.
             let mix_format = *mix_format_ptr;
             let sample_rate = mix_format.nSamplesPerSec;
             let channels = mix_format.nChannels;
@@ -428,6 +445,11 @@ impl WasapiDevice {
     /// Write f32 samples to the audio device.
     /// Returns the number of frames actually written.
     pub fn write_samples(&self, samples: &[f32]) -> crate::Result<usize> {
+        // SAFETY: client/render_client are the live interfaces set up by
+        // `new`. GetBuffer hands out room for `frames_to_write * channels`
+        // samples of the mix format (f32 when `is_float`, else assumed i16),
+        // which is exactly the slice length built below; the buffer is only
+        // touched between GetBuffer and ReleaseBuffer.
         unsafe {
             // GetCurrentPadding
             let mut padding: UINT32 = 0;
@@ -505,6 +527,8 @@ impl WasapiDevice {
 
 impl Drop for WasapiDevice {
     fn drop(&mut self) {
+        // SAFETY: both interfaces were acquired in `new` and are released
+        // exactly once here; CoUninitialize balances new's CoInitializeEx.
         unsafe {
             // Stop the audio stream
             let client_vtbl = *(self.client as *mut *const IAudioClientVtbl);
