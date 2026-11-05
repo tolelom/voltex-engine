@@ -99,6 +99,7 @@ impl ScriptInstancePool {
                 lua,
                 path: path.to_string(),
                 started: false,
+                last_error: None,
             },
         );
         self.path_to_id.insert(key, id);
@@ -142,6 +143,7 @@ impl ScriptInstancePool {
         };
         inst.lua.reload_file(path)?;
         inst.started = false;
+        inst.last_error = None;
         Ok(true)
     }
 

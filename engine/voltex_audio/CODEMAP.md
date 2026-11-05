@@ -16,7 +16,7 @@
 - `EffectChain`, `Reverb`, `EchoDelay` — 이펙트 (src/effect_chain.rs, src/reverb.rs)
 - spatial — `distance_attenuation`, `stereo_pan`, `doppler_shift`, HRTF (src/spatial.rs, src/hrtf.rs)
 - `Occlusion` — 레이 기반 차폐 (src/occlusion.rs)
-- `AudioBackend` trait + impls (P1+B3): `WasapiBackend` (Windows), `AlsaBackend` (Linux), `CoreAudioBackend` (macOS, B3), `NullBackend` (헤드리스/CI), `make_backend()` (OS 자동 분기) (src/backend/). **`AudioSystem` 오디오 스레드는 아직 이 trait 를 쓰지 않는다** — Windows 는 `wasapi_ffi::WasapiDevice` 직접 구동, 그 외 OS 는 무음
+- `AudioBackend` trait + impls (P1+B3): `WasapiBackend` (Windows), `AlsaBackend` (Linux), `CoreAudioBackend` (macOS, B3), `NullBackend` (헤드리스/CI), `make_backend()` (OS 자동 분기) (src/backend/). `AudioSystem` 오디오 스레드는 Linux·macOS 에서 `open_device_backend()` 로 이 trait 를 통해 재생하고, Windows 는 `wasapi_ffi::WasapiDevice` 를 직접 구동한다. 장치가 없으면(헤드리스/CI) 무음 모드
 - `BackendError` — backend-level error type
 - `AudioError`, `Result` — thiserror 기반 에러 (Generic/Io) (src/error.rs)
 
@@ -40,9 +40,9 @@
 - 재생 중 클립 교체는 안전: 믹서가 out-of-range `clip_index` skip + `position >= frame_count` 시 자연 종료/루프 (mixing.rs 가드, 회귀 테스트 있음)
 - WASAPI 는 Windows 전용 FFI — `backend::WasapiBackend` 가 trait impl 로 래핑
 - ALSA 는 Linux 전용 FFI — `backend::AlsaBackend` (cfg(target_os = "linux") only). `#[link(name = "asound")]` → 사용자 시스템에 `libasound2` (apt) 또는 `alsa-lib` (pacman) 설치 필요.
-- ALSA / CoreAudio 초기화 실패 시 `make_backend()` 가 stderr 에 경고 출력 후 `NullBackend` 로 fallback (단, 현재 `make_backend()` 호출부 없음).
+- ALSA / CoreAudio 초기화 실패 시 `open_device_backend()` 가 stderr 에 경고를 출력하고 `None` → `AudioSystem` 은 무음 모드, `make_backend()` 는 `NullBackend` 로 fallback.
 - CoreAudio (`backend::CoreAudioBackend`, cfg(target_os = "macos") only): AudioToolbox 의 AudioQueue API 사용. `#[link(name = "AudioToolbox", kind = "framework")]` — macOS 표준 framework 라 별도 설치 불필요. f32 LE stereo @48kHz 고정. 4 buffer × 1024 frame Condvar 동기화로 push-style trait 에 wrap.
-- 명령 적용(`apply_command`)과 믹싱은 Windows 오디오 스레드만 한다 — `apply_command` 와 그 테스트는 `cfg(target_os = "windows")`. 비-Windows `AudioSystem` 스레드는 `AddClip`/`ReplaceClip`/`Shutdown` 만 처리하는 무음 모드라 `AudioCommand` 에 `cfg_attr(not(windows), expect(dead_code))`. 비-Windows 쪽 컴파일 경고는 Windows 호스트에서 보이지 않으니 `scripts/check_linux_clippy.sh` 로 확인한다 (pre-push 가 target 설치 시 실행)
+- 명령 적용(`apply_command`)과 믹싱은 모든 OS 의 오디오 스레드가 한다(Windows: WASAPI 루프, Linux·macOS: `audio_thread_backend`). 장치가 없을 때의 무음 모드는 `AddClip`/`ReplaceClip`/`Shutdown` 만 처리한다. `audio_thread_backend` 는 백엔드의 블로킹 `write` 로 속도를 맞추므로 따로 sleep 하지 않는다. 비-Windows 쪽 컴파일 경고는 Windows 호스트에서 보이지 않으니 `scripts/check_linux_clippy.sh` 로 확인한다 (pre-push 가 target 설치 시 실행)
 - ALSA / CoreAudio 둘 다 Windows dev 머신에서 작성됨 → 각 OS 에서 실제 cargo build + audio_demo 검증은 향후 (P1 spec § 8.1, B3 spec § 6).
 - `parse_ogg_pages` 는 페이지마다 CRC 를 검증하고 불일치는 **에러** — 깨진 바이트를 Vorbis 디코더에 넘기면 손상 프레임이 무음으로 degrade 돼 "파일 손상" 이 "코덱 실패" 로 오진된다. CRC 는 OGG 전용 파라미터(poly 0x04c11db7, init 0, 무반사, xorout 없음)라 zlib/PNG CRC 와 다르다 — 실 libvorbis 파일 9 페이지로 검증, `crc32_matches_the_reference_vector` 가 상시 가드
 - vorbis는 src/vorbis/ 디렉토리로 분리됨 (bit_reader, codebook, floor, residue, headers, imdct, decoder)

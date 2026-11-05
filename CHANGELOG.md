@@ -94,6 +94,18 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ### Fix
 
+- **Linux·macOS 오디오 무음**: `AudioSystem` 오디오 스레드가 Windows가 아니면 명령만 받는 무음 루프를 돌아, 구현돼
+  있던 ALSA·CoreAudio 백엔드가 쓰이지 않았다. 이제 `open_device_backend()`로 장치를 열어 한 버퍼씩 믹싱해 쓴다.
+  장치가 없으면(헤드리스·CI) 전처럼 무음. ALSA `snd_pcm_writei`의 `size`를 헤더대로 `c_ulong`으로 고쳤다(F6a).
+  확인: ALSA file 플러그인으로 440Hz 클립 출력 기록. macOS는 미확인.
+- **voltex_net Disconnect 위조**: 서버가 `Disconnect`의 `client_id`만 보고 클라이언트를 지워, 아무 주소에서나 남의
+  연결을 끊을 수 있었다. 보낸 주소가 그 클라이언트일 때만 처리한다. 회귀 테스트 2개.
+- **Lua 콜백 에러 무시**: `on_start`/`on_update`의 Lua 에러를 스택에서 꺼내 버리고 있었다. `script_start_all`/
+  `script_update_all`이 새 에러를 `Vec<ScriptCallbackError>`로 돌려주고 런타임이 에러 로그로 남긴다. 같은 에러는
+  인스턴스당 한 번만 보고하고 스크립트를 다시 불러오면 기록을 비운다(`ScriptInstance::last_error` 필드 추가).
+- **`build_trs` 비균일 스케일**: column-major 행렬에서 R·S 대신 S·R을 만들어, 회전과 비균일 스케일을 함께 쓰는
+  본 애니메이션이 틀어졌다. 균일 스케일 결과는 같다(capture PNG 동일). 회귀 테스트 추가.
+
 - **voltex_audio Linux 빌드**: Gitea CI(aarch64 Linux)의 `RUSTFLAGS=-D warnings` 빌드가 첫 실행부터
   실패하던 원인을 없앴다. 명령 적용(`apply_command`)·믹싱 import·그 테스트를 `cfg(target_os = "windows")`
   로 묶고, 무음 모드가 payload를 버리는 `AudioCommand` 에 비-Windows 한정 `expect(dead_code)` 를 달았다.
