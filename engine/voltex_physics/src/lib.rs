@@ -4,13 +4,15 @@
 //!
 //! - Broadphase: [`BvhTree`].
 //! - Colliders: [`Collider`] (Sphere/Box/Capsule/ConvexHull) +
-//!   [`ConvexHull`]. [`MeshCollider`] answers ray queries only.
+//!   [`ConvexHull`].
 //! - Narrowphase: [`narrow`] + [`gjk`] + [`contact::ContactPoint`].
 //! - Solver: [`physics_step`] / [`resolve_collisions`] (Sequential Impulse).
 //! - Integration: [`integrate`], [`inertia_tensor`], [`inv_inertia`].
 //! - Raycasting: [`raycast`] / [`raycast_all`] + [`ray_vs_triangle`] /
 //!   [`ray_vs_plane`].
 //! - CCD: [`swept_sphere_vs_aabb`].
+//! - [`experimental`] — triangle `MeshCollider` (ray queries only); implemented
+//!   but not used by the engine runtime.
 
 #![warn(missing_docs)]
 
@@ -32,7 +34,8 @@ pub mod integrator;
 pub mod solver;
 pub mod raycast;
 pub mod ccd;
-pub mod mesh_collider;
+// Not used by the engine runtime yet
+pub mod experimental;
 
 pub use bvh::BvhTree;
 pub use collider::{Collider, ConvexHull};
@@ -45,4 +48,9 @@ pub use grid2d::{move_and_collide_2d, MoveResult2D};
 pub use raycast::{RayHit, raycast, raycast_all};
 pub use ray_shapes::{ray_vs_triangle, ray_vs_plane};
 pub use ccd::swept_sphere_vs_aabb;
-pub use mesh_collider::{MeshCollider, MeshHit, ray_vs_mesh, ray_vs_mesh_all};
+
+// Old paths of modules/items moved to `experimental` (deprecated). Nothing in
+// the engine uses them.
+mod deprecated_paths;
+#[allow(deprecated)]
+pub use deprecated_paths::*;

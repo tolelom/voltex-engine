@@ -63,7 +63,7 @@
 ## Phase 5-3
 
 - ~~**Ray vs Triangle**~~ ✅ Möller–Trumbore 완료.
-- ~~**Ray vs Mesh**~~ ✅ MeshCollider + ray_vs_mesh + ray_vs_mesh_all 완료. ~~**Ray vs Plane**~~ ✅ 완료.
+- ~~**Ray vs Mesh**~~ ✅ MeshCollider + ray_vs_mesh + ray_vs_mesh_all 완료. ~~**Ray vs Plane**~~ ✅ 완료. 현재 `voltex_physics::experimental::mesh_collider` (엔진 미사용).
 - ~~**raycast_all (다중 hit)**~~ ✅ 거리순 정렬 완료.
 - ~~**BVH 조기 종료 최적화**~~ ✅ 재귀 트리 순회 + query_ray 완료.
 
