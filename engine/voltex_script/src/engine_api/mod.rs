@@ -13,6 +13,14 @@
 //! set_position(id, gen, 5.0, 10.0, 15.0)
 //! local x, y, z = get_position(id, gen)
 //! ```
+//!
+//! ## Safety model of the `lua_*` callbacks
+//!
+//! Every `unsafe extern "C" fn lua_*` below is only called by the Lua VM with
+//! the live `L` of the state it was registered on, so the raw `ffi::lua_*`
+//! calls on `L` are valid. World access goes through [`get_world`], which
+//! trusts the `__voltex_world` pointer stored by [`register_engine_api`]
+//! (see the invariant there).
 
 use crate::ffi;
 use crate::state::LuaState;
@@ -23,8 +31,15 @@ use voltex_math::{Quat, Vec3};
 use std::os::raw::c_int;
 
 /// Register engine API functions into the Lua state.
-/// The World pointer is stored in a global "__voltex_world" as a light userdata.
+///
+/// The World pointer is stored in the plain Lua global `__voltex_world` as a
+/// light userdata (not the registry, so a script could overwrite it — the
+/// callbacks then become no-ops). **Pointer invariant** (not checked, this fn
+/// only stores it): `world` must be valid and not otherwise borrowed whenever
+/// a script on `lua` calls one of these functions.
 pub fn register_engine_api(lua: &LuaState, world: *mut World) {
+    // SAFETY: `lua.raw()` is the live state owned by `lua`; the pushed value
+    // is consumed by lua_setglobal.
     unsafe {
         ffi::lua_pushlightuserdata(lua.raw(), world as *mut std::ffi::c_void);
         let name = std::ffi::CString::new("__voltex_world").unwrap();
@@ -57,13 +72,18 @@ pub fn register_engine_api(lua: &LuaState, world: *mut World) {
     lua.register_fn("audio_stop", lua_audio_stop);
 }
 
-/// Helper to retrieve the World pointer from the Lua registry global.
+/// Fetch the World pointer from the plain Lua global `__voltex_world`.
 ///
-/// Returns `None` if the `__voltex_world` global is missing or not a light
-/// userdata. Pre-fix this dereferenced a null pointer (UB → SIGSEGV) any
-/// time a script ran before `register_engine_api` or accidentally
-/// reassigned the global.
-unsafe fn get_world(L: *mut ffi::lua_State) -> Option<&'static mut World> {
+/// Returns `None` if the global is missing or not a light userdata. Pre-fix
+/// this dereferenced a null pointer (UB → SIGSEGV) any time a script ran
+/// before `register_engine_api` or accidentally reassigned the global.
+///
+/// # Safety
+/// `L` must be a live state. The returned lifetime `'a` is unbounded (picked
+/// by the caller): the reference is only sound for the duration of the
+/// current Lua callback, while the invariant on [`register_engine_api`]
+/// holds. Never store it.
+unsafe fn get_world<'a>(L: *mut ffi::lua_State) -> Option<&'a mut World> {
     let name = std::ffi::CString::new("__voltex_world").unwrap();
     ffi::lua_getglobal(L, name.as_ptr());
     let ptr = ffi::lua_touserdata(L, -1) as *mut World;
