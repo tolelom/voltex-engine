@@ -7,22 +7,32 @@ use std::path::{Path, PathBuf};
 use crate::error::{AssetError, Result};
 use crate::vpkg::{VpkgEntry, VpkgReader};
 
+/// Canonical `Vfs` / `.vpkg` key spelling of `path`: backslashes become `/`.
+/// Archive entries are always stored with forward slashes, so callers turn a
+/// platform path into a key with this before [`Vfs::read`] / [`Vfs::exists`].
+/// Nothing else (e.g. a leading `./`) is rewritten.
+pub fn vfs_key(path: &str) -> String {
+    path.replace('\\', "/")
+}
+
 /// Read-through abstraction over an on-disk root or an embedded `.vpkg` archive.
 pub enum Vfs {
     /// Files are resolved relative to this base directory on real disk.
     Filesystem(PathBuf),
     /// Files come from an embedded archive (e.g. `include_bytes!`).
-    Archive(VpkgReaderOwned),
+    Archive(StaticVpkgReader),
 }
 
-/// Owning version of `VpkgReader` so the runtime can drop the original byte
-/// source (a `&'static [u8]` from `include_bytes!`) and keep reading.
-pub struct VpkgReaderOwned {
+/// `.vpkg` reader over `'static` bytes (an `include_bytes!` blob or a
+/// `Box::leak`ed buffer). Unlike the borrowed [`VpkgReader`], it owns its
+/// parsed entry table, so it can be stored in [`Vfs`] without a lifetime
+/// parameter. The archive bytes themselves are borrowed, never copied.
+pub struct StaticVpkgReader {
     bytes: &'static [u8],
     entries: Vec<VpkgEntry>,
 }
 
-impl VpkgReaderOwned {
+impl StaticVpkgReader {
     fn from_static(bytes: &'static [u8]) -> Result<Self> {
         // Reuse the borrowed parser then materialise the entries.
         let reader = VpkgReader::parse(bytes)?;
@@ -44,6 +54,10 @@ impl VpkgReaderOwned {
     }
 }
 
+/// Old name of [`StaticVpkgReader`] — it never owned the archive bytes.
+#[deprecated(note = "use `StaticVpkgReader`")]
+pub type VpkgReaderOwned = StaticVpkgReader;
+
 impl Vfs {
     /// Constructs a filesystem-backed VFS rooted at `base`.
     pub fn fs(base: impl Into<PathBuf>) -> Self {
@@ -52,7 +66,7 @@ impl Vfs {
 
     /// Constructs an archive-backed VFS over an embedded `.vpkg` byte slice.
     pub fn archive_from_bytes(bytes: &'static [u8]) -> Result<Self> {
-        Ok(Vfs::Archive(VpkgReaderOwned::from_static(bytes)?))
+        Ok(Vfs::Archive(StaticVpkgReader::from_static(bytes)?))
     }
 
     /// Reads the file at `path` into a `Vec<u8>`. Returns `Err` on missing
@@ -95,7 +109,7 @@ fn list_dir_recursive(base: &Path, dir: &Path) -> Vec<String> {
                 out.extend(list_dir_recursive(base, &path));
             } else if ty.is_file() {
                 if let Ok(rel) = path.strip_prefix(base) {
-                    out.push(rel.to_string_lossy().replace('\\', "/"));
+                    out.push(vfs_key(&rel.to_string_lossy()));
                 }
             }
         }

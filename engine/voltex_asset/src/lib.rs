@@ -9,7 +9,7 @@
 //! - [`Assets`] — type-erased aggregate over many `AssetStorage<T>` keyed by
 //!   `TypeId`.
 //! - [`AssetLoader`] — background worker thread that reads bytes from disk and
-//!   hands typed assets back to the main thread.
+//!   hands typed assets back to the main thread (not wired into the runtime).
 //! - [`FileWatcher`] — mtime polling for hot reload triggers.
 //! - [`Vfs`] — read-through abstraction over either a filesystem root or an
 //!   embedded `.vpkg` archive (see [`vpkg`]).
@@ -34,4 +34,6 @@ pub use assets::Assets;
 pub use watcher::FileWatcher;
 pub use loader::{AssetLoader, LoadState};
 pub use vpkg::{write_vpkg, VpkgEntry, VpkgReader, VPKG_MAGIC, VPKG_VERSION};
-pub use vfs::{Vfs, VpkgReaderOwned};
+pub use vfs::{vfs_key, StaticVpkgReader, Vfs};
+#[allow(deprecated)]
+pub use vfs::VpkgReaderOwned;
