@@ -4,18 +4,18 @@
 표준 부트스트랩 + 메인 루프 + 기본 시스템 등록 + winit 통합. 외부 사용자가 다섯 줄 이내의 main 으로 게임을 띄우게 한다.
 
 ## 공개 API 진입점
-- `RuntimeApp` — 모든 subsystem 보관 + winit ApplicationHandler 통합 (src/app.rs)
+- `RuntimeApp` — 모든 subsystem 보관 + winit ApplicationHandler 통합 (src/app/mod.rs)
 - `RuntimeConfig` — 빌더 패턴 설정 (window, scene, callbacks) (src/config.rs)
 - `RuntimeError`, `RuntimeResult` — thiserror 기반 에러 (src/error.rs)
 
 ## 모듈 구조
-- `app` — RuntimeApp (모든 subsystem 보관 + `tick_systems_only` + `set_hud_fn` + Lua `script_input` 발행) (src/app.rs)
+- `app` — RuntimeApp (모든 subsystem 보관 + `tick_systems_only` + `set_hud_fn` + Lua `script_input` 발행) (src/app/mod.rs; 시스템·콜백 등록 `add_*_system`/`set_*_fn`은 src/app/hooks.rs, Lua 입력 키 표는 src/app/script_input.rs)
 - `config` — RuntimeConfig + builder 메서드 + 4개 callback 타입 (RegistrySetupFn, SceneBuilderFn, SystemSetupFn, GpuInitFn). `with_asset_root(dir)` — 상대 에셋 경로(TexturePath/MeshPath/AudioPath, audio_files)의 루트; 상대 루트는 boot 시 exe 디렉토리 기준 해석 (`resolved_asset_root`/`resolve_asset_root_with`) — cwd 무관 배포 exe (friction #6) (src/config.rs)
 - `error` — RuntimeError enum + Result alias (src/error.rs)
 - `asset_paths` — `AssetPathCache`(경로별 핸들 공유 + 실패 None 캐시) + `resolve_asset_paths_with`(주입 로더 코어, GPU 무관 테스트 가능) + `resolve_asset_paths`(**Vfs 우선 + fs fallback** read → 업로드 실 래퍼; 키 = forward-slash 경로 = 에디터 영속 형식 = `.vpkg` 엔트리). 씬 영속 TexturePath/MeshPath → 핸들. handler 가 materialize 직후 매 프레임 호출(멱등), load_scene 이 clear_failures (v1.0.98~100). resolve 성공 시 1회 `resolved N texture path(s)` log_info — dist exe E2E 의 양성 증거 (v1.0.102). read_asset 순서: Vfs → asset_root(상대 경로만) → cwd fs (src/asset_paths.rs)
 - `audio_sync` — `audio_sync_system(world, audio, listener, &mut AudioVoiceTracker)` (AudioSource→AudioSystem 브릿지) + 순수 `decide_action` 엣지 로직 + `AudioVoiceTracker`(entity→VoiceId; play 엣지 등록, stop 엣지는 해당 voice 만 정지, entity 소멸(despawn/clear/컴포넌트 제거) 시 orphan voice 자동 stop — friction #9 해소, 수동 `src.stop()` 후 despawn 불필요) + `poll_audio_hot_reload(watcher, watched, audio)` (변경 파일 재디코드 → replace_clip; v1.0.90) (src/audio_sync/mod.rs)
 - `audio_paths` — `AudioPath(String)` 컴포넌트(NAME `audio_path`, `path_component!` impl, 앱 registry 자동 등록) + `AudioClipCache`(경로별 ClipId 공유 + 실패 None 캐시) + `resolve_audio_paths_with`(주입 로더 코어) + `resolve_audio_paths`(Vfs 우선 read → `decode_clip_bytes` → `add_clip`). AudioSource 없으면 stopped 로 부착, 있으면 stale clip_id 재바인딩 — **AudioPath 보유 엔티티의 clip_id 는 resolver 소유** (수동 제어는 AudioPath 제거 후). tick audio 단계 첫머리 호출(멱등), load_scene 이 clear_failures. 성공 시 1회 `resolved N audio path(s)` log_info (v1.0.103). `AudioClipCache::seed(path, id)`/`get` — RuntimeApp 부트가 `with_audio_files` 매핑(설정된 경로 형태 그대로)을 시드해 같은 파일의 AudioPath 가 기존 클립 재사용 (이중 디코드 제거, 핫리로드 공유 — friction #5) (src/audio_paths.rs)
-- `RuntimeApp::watch_audio_clip(path, clip_index)` — 오디오 파일 감시 등록 (전용 `audio_watcher`, script watcher 와 분리 — 그쪽은 pool 이 변경을 전부 소비). tick 의 audio 단계에서 자동 폴링 + 로그 (src/app.rs)
+- `RuntimeApp::watch_audio_clip(path, clip_index)` — 오디오 파일 감시 등록 (전용 `audio_watcher`, script watcher 와 분리 — 그쪽은 pool 이 변경을 전부 소비). tick 의 audio 단계에서 자동 폴링 + 로그 (src/app/hooks.rs)
 - `handler` (crate-private) — winit ApplicationHandler 구현. 창 생성 직후(`resumed`) + `Resized` 이벤트에서 `app.input.set_window_size(물리 픽셀)` 주입 — 게임 시스템이 `input.window_size()`로 DPI/리사이즈 무관 screen→NDC 변환 가능 (0x0 최소화 이벤트는 skip, 마지막 유효 크기 유지) (src/handler.rs)
 
 ## 의존성

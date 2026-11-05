@@ -73,7 +73,7 @@ RuntimeApp::new(
 
 1. 시간: 타이머를 진행하고 이번 프레임의 `dt`를 정한다.
 2. 카메라 조작: 마우스 오른쪽 버튼을 누르고 있을 때만 기본 자유 카메라가 움직인다.
-3. 게임 로직(`RuntimeApp::tick_systems_only`, `app.rs`)
+3. 게임 로직(`RuntimeApp::tick_systems_only`, `app/mod.rs`)
    1. 부모·자식 transform 전파
    2. 스켈레톤 애니메이션, 파티클, 스프라이트 애니메이션
    3. 물리 한 스텝
@@ -90,6 +90,6 @@ RuntimeApp::new(
 
 1. `examples/runtime_demo/src/main.rs`: `RuntimeApp`을 쓰는 가장 짧은 프로그램
 2. `engine/voltex_runtime/src/handler.rs`의 `redraw`: 위 "한 프레임"의 실제 코드
-3. `engine/voltex_runtime/src/app.rs`의 `tick_systems_only`: 게임 로직 순서
+3. `engine/voltex_runtime/src/app/mod.rs`의 `tick_systems_only`: 게임 로직 순서
 4. 관심 있는 층의 crate. 각 crate 폴더의 `CODEMAP.md`에 책임, 공개 API, 고칠 때 주의할 점이 있다.
 5. 게임: Lua로 만든 예는 `games/survivor`, Rust로 만든 예는 `games/depths`

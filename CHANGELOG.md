@@ -49,6 +49,17 @@ recent on top. v0.x entries are organised by Cycle (see
 - **voltex_capture `scene`**: 인라인 테스트를 `scene/tests.rs`로 옮겼다(`scene.rs` → `scene/mod.rs` 1140줄 +
   `scene/tests.rs` 704줄). 코드는 바꾸지 않았고 형제 모듈 재노출과 `scene::render_*` 경로는 그대로다.
   확인: 1762 통과·76 무시, GPU 캡처 47 통과(skip 0), 캡처 29장 분할 전과 픽셀 단위로 같음.
+- **voltex_capture `scene/mod.rs` 분할 (1140 → 346줄)**: 장면 함수를 주제별 하위 모듈로 옮겼다. 선언형 씬과
+  `render_world`·`render_world_ortho`는 `scene/declarative.rs`, PBR 씬 3개는 `scene/pbr.rs`, 그림자·점광원·스포트라이트
+  씬은 `scene/lighting.rs`. 공용 헬퍼(`unit_cube`, `draw_and_read`, `camera_light_bgl`)는 `mod.rs`에 남겼다. 함수 본문은
+  바꾸지 않았고 `pub use`로 다시 내보내 `scene::render_*` 경로는 그대로다. 704줄이던 `scene/tests.rs`도
+  `scene/tests/mod.rs`(507줄)와 선언형 씬 테스트 `scene/tests/declarative.rs`로 나눴다.
+- **voltex_runtime `app.rs` 분할 (1378줄 → `app/` 4개 파일)**: `app/mod.rs`(구조체·`new`·`tick_systems_only`·`run`·씬
+  저장/로드, 526줄), `app/hooks.rs`(`add_*_system`·`set_*_fn` 등록 API와 콜백 타입), `app/script_input.rs`(Lua 입력 키 표와
+  `fill_script_input`), `app/tests.rs`. 공개 API와 필드 순서(drop 순서)는 그대로다. 이로써 examples 밖에서 600줄을
+  넘는 파일이 없다.
+  확인: build·clippy(`-D warnings`)·`cargo test --workspace --tests` 1757 통과, GPU 캡처 테스트 43개 통과(lavapipe),
+  `capture` bin 결과 PNG 14장이 분할 전과 바이트 단위로 같음.
 
 ### Fix
 
