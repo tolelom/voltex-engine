@@ -4,6 +4,7 @@
 //! conversion lives in `png_pixels`. Adam7 interlacing is rejected.
 
 use crate::deflate;
+use crate::DecodedImage;
 
 /// Hard cap on either PNG dimension we'll decode. Matches the typical GPU
 /// texture limit (`max_texture_dimension_2d = 16384`) and prevents adversarial
@@ -11,12 +12,11 @@ use crate::deflate;
 /// computation.
 const PNG_MAX_DIMENSION: u32 = 16_384;
 
-/// Decode a PNG file from raw bytes.
+/// Decode a PNG file from raw bytes into packed RGBA8 pixels.
 ///
-/// Returns `(rgba_pixels, width, height)` where `rgba_pixels` is a packed
-/// RGBA8 byte buffer. 16-bit samples keep their high byte; Adam7-interlaced
-/// images return an error.
-pub fn parse_png(data: &[u8]) -> crate::Result<(Vec<u8>, u32, u32)> {
+/// 16-bit samples keep their high byte; Adam7-interlaced images return an
+/// error.
+pub fn decode_png(data: &[u8]) -> crate::Result<DecodedImage> {
     let chunks = read_chunks(data)?;
     let header = chunks.header;
     let decompressed = deflate::inflate(&chunks.idat)?;
@@ -32,7 +32,14 @@ pub fn parse_png(data: &[u8]) -> crate::Result<(Vec<u8>, u32, u32)> {
         chunks.palette.as_deref(),
         chunks.trns.as_deref(),
     )?;
-    Ok((rgba, header.width, header.height))
+    Ok(DecodedImage { width: header.width, height: header.height, rgba })
+}
+
+/// Old form of [`decode_png`] that returns an unnamed
+/// `(rgba_pixels, width, height)` tuple.
+#[deprecated(note = "use `decode_png`, which returns a named `DecodedImage`")]
+pub fn parse_png(data: &[u8]) -> crate::Result<(Vec<u8>, u32, u32)> {
+    decode_png(data).map(|img| (img.rgba, img.width, img.height))
 }
 
 /// The 8-byte magic every PNG file starts with.
@@ -368,7 +375,7 @@ mod tests {
             0, 0, 255, 255, 255, 255, 0, 255, // row 1: blue, yellow
         ];
         let png_data = create_test_png(2, 2, &pixels);
-        let (result, w, h) = parse_png(&png_data).unwrap();
+        let DecodedImage { rgba: result, width: w, height: h } = decode_png(&png_data).unwrap();
         assert_eq!(w, 2);
         assert_eq!(h, 2);
         assert_eq!(result.len(), 16);
@@ -401,7 +408,7 @@ mod tests {
             0, 0, 255, 255, 255, 0, // row 1: blue, yellow
         ];
         let png_data = create_test_png_rgb(2, 2, &pixels);
-        let (result, w, h) = parse_png(&png_data).unwrap();
+        let DecodedImage { rgba: result, width: w, height: h } = decode_png(&png_data).unwrap();
         assert_eq!(w, 2);
         assert_eq!(h, 2);
         assert_eq!(result.len(), 16); // converted to RGBA
@@ -415,7 +422,7 @@ mod tests {
     fn test_parse_1x1_png() {
         let pixels = [128, 64, 32, 200];
         let png_data = create_test_png(1, 1, &pixels);
-        let (result, w, h) = parse_png(&png_data).unwrap();
+        let DecodedImage { rgba: result, width: w, height: h } = decode_png(&png_data).unwrap();
         assert_eq!(w, 1);
         assert_eq!(h, 1);
         assert_eq!(result, vec![128, 64, 32, 200]);
@@ -424,7 +431,7 @@ mod tests {
     #[test]
     fn test_invalid_signature() {
         let data = [0u8; 100];
-        assert!(parse_png(&data).is_err());
+        assert!(decode_png(&data).is_err());
     }
 
     #[test]
@@ -479,7 +486,7 @@ mod tests {
             }
         }
         let png_data = create_test_png(8, 8, &pixels);
-        let (result, w, h) = parse_png(&png_data).unwrap();
+        let DecodedImage { rgba: result, width: w, height: h } = decode_png(&png_data).unwrap();
         assert_eq!(w, 8);
         assert_eq!(h, 8);
         assert_eq!(result, pixels);
@@ -487,7 +494,7 @@ mod tests {
 
     // ── Panic-resistance fuzz tests ────────────────────────────────
     //
-    // parse_png must always return Result, never panic, on any input.
+    // decode_png must always return Result, never panic, on any input.
     // Truncated, corrupted, or random byte sequences must surface as
     // Err — never as an index-out-of-bounds / unwrap / slice panic.
 
@@ -507,35 +514,35 @@ mod tests {
     }
 
     #[test]
-    fn fuzz_parse_png_no_panic_on_empty() {
-        let _ = parse_png(&[]);
+    fn fuzz_decode_png_no_panic_on_empty() {
+        let _ = decode_png(&[]);
     }
 
     #[test]
-    fn fuzz_parse_png_no_panic_on_truncated_signature() {
+    fn fuzz_decode_png_no_panic_on_truncated_signature() {
         let signature: [u8; 8] = [137, 80, 78, 71, 13, 10, 26, 10];
         for n in 0..=signature.len() {
-            let _ = parse_png(&signature[..n]);
+            let _ = decode_png(&signature[..n]);
         }
     }
 
     #[test]
-    fn fuzz_parse_png_no_panic_on_random_bytes() {
+    fn fuzz_decode_png_no_panic_on_random_bytes() {
         for seed in 1..=128u32 {
             for &len in &[0usize, 1, 8, 13, 64, 256, 1024] {
-                let _ = parse_png(&fuzz_bytes(seed, len));
+                let _ = decode_png(&fuzz_bytes(seed, len));
             }
         }
     }
 
     #[test]
-    fn fuzz_parse_png_no_panic_on_valid_signature_random_tail() {
+    fn fuzz_decode_png_no_panic_on_valid_signature_random_tail() {
         let signature: [u8; 8] = [137, 80, 78, 71, 13, 10, 26, 10];
         for seed in 1..=128u32 {
             for &tail_len in &[0usize, 1, 16, 64, 256, 1024] {
                 let mut data = signature.to_vec();
                 data.extend_from_slice(&fuzz_bytes(seed, tail_len));
-                let _ = parse_png(&data);
+                let _ = decode_png(&data);
             }
         }
     }
@@ -559,19 +566,19 @@ mod tests {
     }
 
     #[test]
-    fn parse_png_rejects_zero_dimensions() {
+    fn decode_png_rejects_zero_dimensions() {
         // Zero dimensions used to silently allocate an empty vec and then
         // attempt to slice into a non-existent row.
-        assert!(parse_png(&make_png_with_dims(0, 4)).is_err());
-        assert!(parse_png(&make_png_with_dims(4, 0)).is_err());
+        assert!(decode_png(&make_png_with_dims(0, 4)).is_err());
+        assert!(decode_png(&make_png_with_dims(4, 0)).is_err());
     }
 
     #[test]
-    fn parse_png_rejects_huge_dimensions() {
+    fn decode_png_rejects_huge_dimensions() {
         // Adversarial IHDR with extreme dims used to overflow `width * height * 4`
         // before the size cap was added.
-        assert!(parse_png(&make_png_with_dims(50_000, 50_000)).is_err());
-        assert!(parse_png(&make_png_with_dims(u32::MAX, 1)).is_err());
-        assert!(parse_png(&make_png_with_dims(1, u32::MAX)).is_err());
+        assert!(decode_png(&make_png_with_dims(50_000, 50_000)).is_err());
+        assert!(decode_png(&make_png_with_dims(u32::MAX, 1)).is_err());
+        assert!(decode_png(&make_png_with_dims(1, u32::MAX)).is_err());
     }
 }

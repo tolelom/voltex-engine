@@ -191,9 +191,9 @@ impl RenderAssets {
         png_bytes: &[u8],
     ) -> crate::Result<TextureHandle> {
         let layout = GpuTexture::bind_group_layout(device);
-        let (pixels, w, h) =
-            voltex_renderer::parse_png(png_bytes).map_err(|e| crate::RendererEcsError::from(e.to_string()))?;
-        let tex = GpuTexture::from_rgba_linear(device, queue, w, h, &pixels, &layout);
+        let img = voltex_renderer::decode_png(png_bytes)
+            .map_err(|e| crate::RendererEcsError::from(e.to_string()))?;
+        let tex = GpuTexture::from_rgba_linear(device, queue, img.width, img.height, &img.rgba, &layout);
         Ok(self.add_texture(tex))
     }
 

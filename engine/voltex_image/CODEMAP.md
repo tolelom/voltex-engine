@@ -5,8 +5,10 @@ GPU 무의존(L0) asset codecs — PNG/JPG/glTF/OBJ/JSON 디코더 + PNG 인코�
 
 ## 공개 API 진입점
 
-- `parse_png(data: &[u8]) -> Result<(Vec<u8>, u32, u32)>` — PNG → RGBA8 `(pixels, width, height)`. 그레이/RGB/팔레트/그레이+알파/RGBA 전 비트 깊이 + tRNS, Adam7은 에러 (src/png.rs, src/png_pixels.rs)
-- `parse_jpg(data: &[u8]) -> Result<(u32, u32, Vec<u8>)>` — JPEG Baseline + Progressive → RGBA8 (src/jpg/, src/progressive_jpeg.rs)
+- `DecodedImage { width, height, rgba }` — PNG/JPEG 디코더 공통 결과: top-down RGBA8 (src/decoded_image.rs)
+- `decode_png(data: &[u8]) -> Result<DecodedImage>` — PNG → RGBA8. 그레이/RGB/팔레트/그레이+알파/RGBA 전 비트 깊이 + tRNS, Adam7은 에러 (src/png.rs, src/png_pixels.rs)
+- `decode_jpg(data: &[u8]) -> Result<DecodedImage>` — JPEG Baseline(SOF0) → RGBA8, progressive는 에러 (src/jpg/, src/progressive_jpeg.rs)
+- `parse_png` / `parse_jpg` — deprecated: 같은 결과를 이름 없는 `(rgba, width, height)` 튜플로 반환하는 구 API
 - `parse_gltf(data: &[u8]) -> Result<GltfData>` — glTF 2.0 / GLB 파서 (src/gltf/). 정점 속성은 `bufferView.byteStride`(인터리브, v1.0.132)와 정규화 정수 componentType(v1.0.133, `gltf/component.rs`) 지원. 노드 `matrix`는 TRS로 분해(v1.0.137)
 - `parse_bmp(data: &[u8]) -> Result<BmpImage>` — 무압축 24/32bpp BMP → RGBA8 (`BMP_MAX_DIMENSION`=16384) (src/bmp/, voltex_renderer 에서 이관)
 - `encode_rgba8(w: u32, h: u32, rgba: &[u8]) -> Vec<u8>` — RGBA8 → PNG (zlib stored block, 무압축) (src/png_encode.rs)
@@ -22,7 +24,7 @@ GPU 무의존(L0) asset codecs — PNG/JPG/glTF/OBJ/JSON 디코더 + PNG 인코�
 - `vertex` — `MeshVertex` POD struct; 위치/법선/UV/탄젠트 (src/vertex.rs)
 - `checksum` — CRC32/Adler32 구현 (**crate-private** — `mod checksum;`로만 선언, 외부 노출 금지) (src/checksum.rs)
 - `deflate` — zlib/DEFLATE inflate (src/deflate.rs)
-- `png` — PNG 디코더: IHDR 검증, 필터 재구성, `parse_png` (src/png.rs)
+- `png` — PNG 디코더: IHDR 검증, 필터 재구성, `decode_png` (src/png.rs)
 - `png_pixels` (crate-private) — 언필터된 스캔라인 → RGBA8 (색 유형·비트 깊이·tRNS) (src/png_pixels.rs)
 - `png_encode` — PNG 인코더: `encode_rgba8` (stored deflate, CRC32/Adler32 사용) (src/png_encode.rs)
 - `jpg` — JPEG Baseline 8-bit RGB→RGBA 디코더 (src/jpg/)
@@ -41,8 +43,8 @@ GPU 무의존(L0) asset codecs — PNG/JPG/glTF/OBJ/JSON 디코더 + PNG 인코�
 - `MeshVertex` 필드 추가/제거 시 renderer의 `MESH_VERTEX_LAYOUT` offsets/stride 동기화 필요 (현재: offset 0/12/24/32, stride = `size_of::<MeshVertex>()`).
 - `checksum` 모듈은 crate-private(`mod checksum;` — `pub mod` 아님). 외부에 노출 금지. PNG 인코더 내부 전용.
 - 모든 파서는 panic 금지 — 잘못된 입력에는 `ImageError::Generic` 반환 (fuzz 가드).
-- `parse_png`/`parse_jpg`는 dimension 0 및 과대 dimension을 거부 (v1.0.40 보강 상속).
-- `voltex_renderer`는 역호환을 위해 `pub use voltex_image::{parse_png, parse_jpg, parse_gltf, MeshVertex, ...}` 재export를 유지 — 기존 코드는 `voltex_renderer::parse_png` 경로로도 동작.
+- `decode_png`/`decode_jpg`는 dimension 0 및 과대 dimension을 거부 (v1.0.40 보강 상속).
+- `voltex_renderer`는 역호환을 위해 `pub use voltex_image::{decode_png, decode_jpg, DecodedImage, parse_gltf, MeshVertex, ...}` 재export를 유지 — 기존 코드는 `voltex_renderer::decode_png` 경로로도 동작.
 
 ## 테스트
 - 단위 테스트: src/**/*.rs `#[cfg(test)]`

@@ -203,4 +203,6 @@ pub use tonemap::{aces_tonemap, TonemapUniform};
 // 에셋 디코더는 GPU 무관 crate `voltex_image` 에 있다. 기존 경로
 // (`voltex_renderer::parse_png`, `voltex_renderer::gltf::*` 등) 역호환 재export.
 pub use voltex_image::{deflate, gltf, jpg, json_parser, obj, png, progressive_jpeg};
+#[allow(deprecated)]
 pub use voltex_image::{parse_gltf, parse_jpg, parse_png, GltfData, GltfMaterial, GltfMesh};
+pub use voltex_image::{decode_jpg, decode_png, DecodedImage};

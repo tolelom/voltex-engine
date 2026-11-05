@@ -9,14 +9,14 @@
 //! decoder replicates samples, so subsampled variants legitimately differ
 //! right at the block's chroma edges and are compared away from them.
 
-use voltex_image::parse_jpg;
+use voltex_image::decode_jpg;
 
 const W: usize = 37;
 
 fn decode(jpg: &[u8]) -> Vec<u8> {
-    let (rgba, w, h) = parse_jpg(jpg).expect("decodes");
-    assert_eq!((w, h), (37, 29));
-    rgba
+    let img = decode_jpg(jpg).expect("decodes");
+    assert_eq!((img.width, img.height), (37, 29));
+    img.rgba
 }
 
 /// Largest per-channel difference vs. Pillow's decode, over pixels that
@@ -86,7 +86,7 @@ fn progressive_jpeg_is_rejected_not_misdecoded() {
     // SOF2 is detected (progressive_jpeg::is_progressive_jpeg) but not decoded.
     let jpg = include_bytes!("fixtures/jpg_progressive.jpg");
     assert!(voltex_image::progressive_jpeg::is_progressive_jpeg(jpg));
-    assert!(parse_jpg(jpg).is_err(), "progressive must be an error, not garbage pixels");
+    assert!(decode_jpg(jpg).is_err(), "progressive must be an error, not garbage pixels");
 }
 
 #[test]
@@ -94,5 +94,5 @@ fn cmyk_jpeg_is_rejected_not_misdecoded() {
     // Pillow CMYK (4 components, Adobe APP14). Not supported; must be an
     // error rather than three of the four channels read as YCbCr.
     let jpg = include_bytes!("fixtures/jpg_cmyk.jpg");
-    assert!(parse_jpg(jpg).is_err());
+    assert!(decode_jpg(jpg).is_err());
 }

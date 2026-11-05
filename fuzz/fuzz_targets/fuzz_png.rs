@@ -2,5 +2,5 @@
 use libfuzzer_sys::fuzz_target;
 
 fuzz_target!(|data: &[u8]| {
-    let _ = voltex_image::parse_png(data);
+    let _ = voltex_image::decode_png(data);
 });

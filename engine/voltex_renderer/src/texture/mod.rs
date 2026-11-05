@@ -143,7 +143,7 @@ impl GpuTexture {
     }
 
     /// Decode a PNG byte buffer and upload it as a GPU texture. Convenience
-    /// over [`parse_png`](crate::parse_png) + [`Self::from_rgba`]. Returns the
+    /// over [`decode_png`](crate::decode_png) + [`Self::from_rgba`]. Returns the
     /// decoder error message on failure.
     pub fn from_png(
         device: &wgpu::Device,
@@ -151,8 +151,8 @@ impl GpuTexture {
         png_bytes: &[u8],
         layout: &wgpu::BindGroupLayout,
     ) -> Result<Self, String> {
-        let (pixels, width, height) = crate::parse_png(png_bytes).map_err(|e| e.to_string())?;
-        Ok(Self::from_rgba(device, queue, width, height, &pixels, layout))
+        let img = crate::decode_png(png_bytes).map_err(|e| e.to_string())?;
+        Ok(Self::from_rgba(device, queue, img.width, img.height, &img.rgba, layout))
     }
 
     /// Create a 1x1 white texture (sRGB 255,255,255,255). Used as the default

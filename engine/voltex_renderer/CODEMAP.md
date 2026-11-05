@@ -19,7 +19,7 @@ wgpu 기반 렌더링 — 메시/PBR/그림자/IBL/디퍼드/RT/post-process. �
 - `GpuTexture` (`white_1x1`/`black_1x1`/`flat_normal_map_1x1` 기본 맵; 구 `flat_normal_1x1` 튜플 반환은 deprecated), `pbr_texture_bind_group_layout` 등 — GPU 텍스처 + PBR 바인딩 (src/texture/mod.rs). `texture::parse_bmp`/`BmpImage` 는 `voltex_image::bmp` 래퍼
 
 ### Image / Model (voltex_image 재export)
-- `parse_png`, `parse_jpg`, `parse_gltf`, `GltfData`, `GltfMesh`, `GltfMaterial`, `MeshVertex` 등 — `voltex_image` crate로 이동; `pub use voltex_image::{...}` 역호환 재export 유지 (src/lib.rs)
+- `decode_png`, `decode_jpg`, `DecodedImage`, `parse_gltf`, `GltfData`, `GltfMesh`, `GltfMaterial`, `MeshVertex` 등 — `voltex_image` crate로 이동; `pub use voltex_image::{...}` 역호환 재export 유지 (src/lib.rs). deprecated `parse_png`/`parse_jpg` 도 재export
 - `obj` — OBJ 파서 모듈 재export (`voltex_image::obj`) (src/obj.rs → voltex_image)
 - `deflate` — zlib/deflate inflate 모듈 재export (`voltex_image::deflate`)
 - `json_parser` — glTF JSON 파서 모듈 재export (`voltex_image::json_parser`)
