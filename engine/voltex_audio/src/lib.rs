@@ -13,34 +13,74 @@
 //!   [`AudioBus`] routing.
 //! - Effects: [`Reverb`] / [`Echo`] / [`DelayLine`] / [`EffectChain`] /
 //!   [`LowPassFilter`] occlusion / fade curves.
-//! - Backends: [`AudioBackend`] trait with [`NullBackend`] always available;
-//!   WASAPI on Windows.
+//! - Backends: [`AudioBackend`] trait with [`NullBackend`] always available
+//!   plus WASAPI / ALSA / CoreAudio impls and [`make_backend`]. Note that
+//!   [`AudioSystem`]'s thread does not go through this trait yet: it drives
+//!   `wasapi_ffi::WasapiDevice` directly on Windows and is silent elsewhere.
 
 #![warn(missing_docs)]
 
+// ── Modules ──────────────────────────────────────────────────────────────
 pub mod error;
+// Decoders
 pub mod audio_clip;
 pub mod wav;
 pub mod ogg;
 pub mod vorbis;
-pub mod mixing;
-#[cfg(target_os = "windows")]
-pub mod wasapi;
-pub mod backend;
+// Playback + mixing
+pub mod audio_source;
 pub mod audio_system;
+pub mod mixing;
+pub mod mix_group;
+pub mod dynamic_groups;
+pub mod audio_bus;
+pub mod async_loader;
+// 3D audio
 pub mod spatial;
 pub mod hrtf;
-pub mod mix_group;
-pub mod audio_source;
-pub mod reverb;
 pub mod occlusion;
+// Effects
+pub mod reverb;
+pub mod effect_chain;
+pub mod fade_curves;
+// Output
+pub mod backend;
+/// Raw WASAPI COM bindings + `WasapiDevice` (Windows only). The
+/// `AudioBackend` adapter over it lives in [`backend`].
+#[cfg(target_os = "windows")]
+pub mod wasapi_ffi;
+/// Former path of [`wasapi_ffi`], kept so `voltex_audio::wasapi::*` paths
+/// still resolve.
+#[cfg(target_os = "windows")]
+pub use wasapi_ffi as wasapi;
 
+// ── Re-exports ───────────────────────────────────────────────────────────
 pub use error::{AudioError, Result};
 pub use audio_clip::AudioClip;
 pub use audio_source::{AudioSource, ClipId};
 pub use wav::{parse_wav, generate_wav_bytes};
 pub use ogg::parse_ogg;
 pub use vorbis::decode_vorbis;
+pub use mixing::{PlayingSound, VoiceId, mix_sounds};
+pub use audio_system::AudioSystem;
+pub use spatial::{Listener, SpatialParams, distance_attenuation, stereo_pan, compute_spatial_gains};
+pub use mix_group::{MixGroup, MixerState};
+pub use reverb::{Reverb, Echo, DelayLine};
+pub use occlusion::{OcclusionResult, LowPassFilter, calculate_occlusion};
+pub use fade_curves::{FadeCurve, apply_fade};
+pub use dynamic_groups::MixGroupManager;
+pub use audio_bus::AudioBus;
+pub use async_loader::{AsyncAudioLoader, AudioLoadState};
+#[allow(deprecated)]
+pub use async_loader::LoadState;
+pub use effect_chain::{AudioEffect, EffectChain};
+pub use backend::{AudioBackend, BackendError, NullBackend, make_backend};
+#[cfg(target_os = "windows")]
+pub use backend::WasapiBackend;
+#[cfg(target_os = "linux")]
+pub use backend::AlsaBackend;
+
+// ── Clip decoding entry points ───────────────────────────────────────────
 
 /// Decode an in-memory OGG/Vorbis byte slice into an [`AudioClip`].
 ///
@@ -80,27 +120,6 @@ pub fn load_clip_file(path: &std::path::Path) -> Result<AudioClip> {
     let bytes = std::fs::read(path)?;
     decode_clip_bytes(path, &bytes)
 }
-pub use mixing::{PlayingSound, VoiceId, mix_sounds};
-pub use audio_system::AudioSystem;
-pub use spatial::{Listener, SpatialParams, distance_attenuation, stereo_pan, compute_spatial_gains};
-pub use mix_group::{MixGroup, MixerState};
-pub use reverb::{Reverb, Echo, DelayLine};
-pub use occlusion::{OcclusionResult, LowPassFilter, calculate_occlusion};
-pub mod fade_curves;
-pub use fade_curves::{FadeCurve, apply_fade};
-pub mod dynamic_groups;
-pub use dynamic_groups::MixGroupManager;
-pub mod audio_bus;
-pub use audio_bus::AudioBus;
-pub mod async_loader;
-pub use async_loader::AsyncAudioLoader;
-pub mod effect_chain;
-pub use effect_chain::{AudioEffect, EffectChain};
-pub use backend::{AudioBackend, BackendError, NullBackend, make_backend};
-#[cfg(target_os = "windows")]
-pub use backend::WasapiBackend;
-#[cfg(target_os = "linux")]
-pub use backend::AlsaBackend;
 
 #[cfg(test)]
 mod lib_tests {

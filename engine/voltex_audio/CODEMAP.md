@@ -8,7 +8,7 @@
 - `VoiceId(u64)` — 재생 인스턴스(voice) 핸들, `VoiceId(0)` = 익명 기본값 (src/mixing.rs)
 - `AudioClip` — PCM 데이터 (src/audio_clip.rs)
 - `AudioSource` / `ClipId` — per-entity 재생 디스크립터 + 타입화된 clip 식별자. ECS 컴포넌트로 등록 가능하나 audio crate 자체는 ECS 무의존 (src/audio_source.rs)
-- `AsyncAudioLoader` — 비동기 로딩 (src/async_loader.rs)
+- `AsyncAudioLoader` + `AudioLoadState` (구 `LoadState`, deprecated alias — `voltex_asset::LoadState` 와 이름 충돌 회피) — 비동기 "읽기 가능 여부" 확인만 (바이트는 버림, 클립 등록 안 함; 엔진 미사용) (src/async_loader.rs)
 - WAV/OGG 디코더 — `parse_wav`(PCM 8/16/24/32·float32·EXTENSIBLE, v1.0.144), `parse_ogg`(컨테이너) + `decode_vorbis`(코덱), 합본 진입점 `decode_ogg_vorbis_bytes` (src/wav.rs, src/ogg.rs, src/vorbis/)
 - `load_clip_file(path) -> Result<AudioClip>` — 파일 read + `decode_clip_bytes` 원콜 디코드 (src/lib.rs; 에디터/핫리로드 공용)
 - `decode_clip_bytes(path, bytes) -> Result<AudioClip>` — in-memory bytes 를 path 확장자(wav/ogg) 분기로 디코드. 경로는 확장자/에러 메시지에만 사용 — Vfs(.vpkg) 소스 지원 (v1.0.103) (src/lib.rs)
@@ -16,7 +16,7 @@
 - `EffectChain`, `Reverb`, `EchoDelay` — 이펙트 (src/effect_chain.rs, src/reverb.rs)
 - spatial — `distance_attenuation`, `stereo_pan`, `doppler_shift`, HRTF (src/spatial.rs, src/hrtf.rs)
 - `Occlusion` — 레이 기반 차폐 (src/occlusion.rs)
-- `AudioBackend` trait + impls (P1+B3): `WasapiBackend` (Windows), `AlsaBackend` (Linux), `CoreAudioBackend` (macOS, B3), `NullBackend` (헤드리스/CI), `make_backend()` (OS 자동 분기) (src/backend/)
+- `AudioBackend` trait + impls (P1+B3): `WasapiBackend` (Windows), `AlsaBackend` (Linux), `CoreAudioBackend` (macOS, B3), `NullBackend` (헤드리스/CI), `make_backend()` (OS 자동 분기) (src/backend/). **`AudioSystem` 오디오 스레드는 아직 이 trait 를 쓰지 않는다** — Windows 는 `wasapi_ffi::WasapiDevice` 직접 구동, 그 외 OS 는 무음
 - `BackendError` — backend-level error type
 - `AudioError`, `Result` — thiserror 기반 에러 (Generic/Io) (src/error.rs)
 
@@ -28,7 +28,7 @@
 - `mixing`, `mix_group`, `dynamic_groups`, `audio_bus` — 믹서 (src/mixing.rs 등)
 - `effect_chain`, `reverb`, `fade_curves` — 이펙트 (src/effect_chain.rs 등)
 - `spatial`, `hrtf`, `occlusion` — 3D 오디오 (src/spatial.rs 등)
-- `wasapi` — Windows 백엔드 FFI (src/wasapi.rs)
+- `wasapi_ffi` — Windows WASAPI COM FFI + `WasapiDevice` (src/wasapi_ffi.rs; 구 경로 `voltex_audio::wasapi` 는 re-export 로 유지)
 - `backend` — `AudioBackend` trait + `null.rs` + `wasapi.rs` (windows) + `alsa.rs` (linux) + `coreaudio.rs` (macos, B3) + `make_backend` (P1+B3)
 
 ## 의존성
@@ -40,14 +40,14 @@
 - 재생 중 클립 교체는 안전: 믹서가 out-of-range `clip_index` skip + `position >= frame_count` 시 자연 종료/루프 (mixing.rs 가드, 회귀 테스트 있음)
 - WASAPI 는 Windows 전용 FFI — `backend::WasapiBackend` 가 trait impl 로 래핑
 - ALSA 는 Linux 전용 FFI — `backend::AlsaBackend` (cfg(target_os = "linux") only). `#[link(name = "asound")]` → 사용자 시스템에 `libasound2` (apt) 또는 `alsa-lib` (pacman) 설치 필요.
-- ALSA / CoreAudio 초기화 실패 시 `make_backend()` 가 stderr 에 경고 출력 후 `NullBackend` 로 fallback — 헤드리스 환경에서도 audio 스레드 panic 없음.
+- ALSA / CoreAudio 초기화 실패 시 `make_backend()` 가 stderr 에 경고 출력 후 `NullBackend` 로 fallback (단, 현재 `make_backend()` 호출부 없음).
 - CoreAudio (`backend::CoreAudioBackend`, cfg(target_os = "macos") only): AudioToolbox 의 AudioQueue API 사용. `#[link(name = "AudioToolbox", kind = "framework")]` — macOS 표준 framework 라 별도 설치 불필요. f32 LE stereo @48kHz 고정. 4 buffer × 1024 frame Condvar 동기화로 push-style trait 에 wrap.
 - 명령 적용(`apply_command`)과 믹싱은 Windows 오디오 스레드만 한다 — `apply_command` 와 그 테스트는 `cfg(target_os = "windows")`. 비-Windows `AudioSystem` 스레드는 `AddClip`/`ReplaceClip`/`Shutdown` 만 처리하는 무음 모드라 `AudioCommand` 에 `cfg_attr(not(windows), expect(dead_code))`. 비-Windows 쪽 컴파일 경고는 Windows 호스트에서 보이지 않으니 `scripts/check_linux_clippy.sh` 로 확인한다 (pre-push 가 target 설치 시 실행)
 - ALSA / CoreAudio 둘 다 Windows dev 머신에서 작성됨 → 각 OS 에서 실제 cargo build + audio_demo 검증은 향후 (P1 spec § 8.1, B3 spec § 6).
 - `parse_ogg_pages` 는 페이지마다 CRC 를 검증하고 불일치는 **에러** — 깨진 바이트를 Vorbis 디코더에 넘기면 손상 프레임이 무음으로 degrade 돼 "파일 손상" 이 "코덱 실패" 로 오진된다. CRC 는 OGG 전용 파라미터(poly 0x04c11db7, init 0, 무반사, xorout 없음)라 zlib/PNG CRC 와 다르다 — 실 libvorbis 파일 9 페이지로 검증, `crc32_matches_the_reference_vector` 가 상시 가드
 - vorbis는 src/vorbis/ 디렉토리로 분리됨 (bit_reader, codebook, floor, residue, headers, imdct, decoder)
 - `decode_vorbis` 는 개별 audio 패킷 디코드 실패를 **건너뛰지만**(손상된 한 프레임이 클립 전체를 날리지 않도록), 모든 audio 패킷이 실패하면 첫 에러를 `Err` 로 반환한다 — 빈 클립은 호출부에서 "의도된 무음" 과 구분이 안 되기 때문. 패킷 내부의 floor/residue 실패는 여전히 해당 채널 무음으로 degrade (`decoder.rs`)
-- wasapi.rs는 521줄 (spec 만족, 분리 대상 아님)
+- wasapi_ffi.rs는 ~550줄 (600줄 제한 이내, 분리 대상 아님)
 - AudioSource 컴포넌트는 ECS와 함께 사용
 
 ## 테스트

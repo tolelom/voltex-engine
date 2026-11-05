@@ -20,6 +20,14 @@ pub fn calculate_occlusion(occlusion_factor: f32) -> OcclusionResult {
     }
 }
 
+/// Smoothing factor of a one-pole RC low-pass at `cutoff_hz`, sampled at
+/// `sample_rate`: `alpha = dt / (RC + dt)` with `RC = 1 / (2π·cutoff)`.
+fn one_pole_alpha(cutoff_hz: f32, sample_rate: u32) -> f32 {
+    let rc_time_constant = 1.0 / (2.0 * std::f32::consts::PI * cutoff_hz);
+    let dt = 1.0 / sample_rate as f32;
+    dt / (rc_time_constant + dt)
+}
+
 /// Simple low-pass filter (one-pole IIR).
 pub struct LowPassFilter {
     prev_output: f32,
@@ -29,17 +37,12 @@ pub struct LowPassFilter {
 impl LowPassFilter {
     /// Creates a one-pole low-pass filter with the given cutoff frequency.
     pub fn new(cutoff_hz: f32, sample_rate: u32) -> Self {
-        let rc = 1.0 / (2.0 * std::f32::consts::PI * cutoff_hz);
-        let dt = 1.0 / sample_rate as f32;
-        let alpha = dt / (rc + dt);
-        LowPassFilter { prev_output: 0.0, alpha }
+        LowPassFilter { prev_output: 0.0, alpha: one_pole_alpha(cutoff_hz, sample_rate) }
     }
 
     /// Recomputes the filter coefficient for a new cutoff frequency.
     pub fn set_cutoff(&mut self, cutoff_hz: f32, sample_rate: u32) {
-        let rc = 1.0 / (2.0 * std::f32::consts::PI * cutoff_hz);
-        let dt = 1.0 / sample_rate as f32;
-        self.alpha = dt / (rc + dt);
+        self.alpha = one_pole_alpha(cutoff_hz, sample_rate);
     }
 
     /// Pushes one sample through the filter; returns the smoothed output.
