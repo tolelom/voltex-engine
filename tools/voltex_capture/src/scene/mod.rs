@@ -1,35 +1,78 @@
-//! Reusable demo scenes rendered through the *real* ECS render path
-//! (`voltex_renderer_ecs::BasicRenderer`). Each returns a tightly-packed
-//! RGBA8 buffer so a bin can save a PNG and a (GPU-gated) test can assert the
-//! frame isn't blank.
+//! Reusable demo scenes. Each returns a tightly-packed RGBA8 buffer so a bin
+//! can save a PNG and a (GPU-gated) test can assert the frame isn't blank.
+//!
+//! 렌더 경로별 구성:
+//! - `BasicRenderer` 경로 (런타임과 같은 ECS 렌더러): 이 파일의 기본 큐브 씬과
+//!   [`declarative`], [`lighting`], [`pbr`], [`texture`], [`sprite`],
+//!   [`hot_reload`], [`playthrough`], [`skinned`] 의 런타임 씬. 모두 `scene::` 로
+//!   평평하게 다시 내보낸다.
+//! - 손으로 조립한 wgpu PBR 파이프라인: [`raw_pbr`] (`scene::raw_pbr::*`).
+//! - 에디터 렌더러: [`gizmo`] (`GizmoRenderer`), [`ui`] (`UiRenderer`).
+//! - 스킨드 전용 파이프라인: [`skinned`] 의 `render_skinned_rest`/`render_skinned_bent`.
 
 use voltex_ecs::{Bounds, MaterialHandle, MeshHandle, Transform, World};
 use voltex_math::{Mat4, Quat, Vec3, AABB};
-use voltex_renderer::{Camera, CameraUniform, LightUniform, MaterialUniform, Mesh};
+use voltex_renderer::{Camera, LightUniform, MaterialUniform, Mesh, MeshVertex};
 use voltex_renderer_ecs::{BasicRenderer, RenderAssets};
 
 use crate::headless::HeadlessGpu;
 use crate::target::{OffscreenTarget, CAPTURE_FORMAT};
 
-pub use crate::scene_hot_reload::{render_mesh_hot_reload, render_texture_hot_reload};
-pub use crate::scene_sprite::{render_billboard_sprite, render_particle_burst, render_sprite_sheet_frame};
-pub use crate::scene_texture::{
-    render_cube_with_png, render_cube_with_texture, render_obj_model, render_textured_cube,
-};
-
 mod declarative;
+mod gizmo;
+mod hot_reload;
 mod lighting;
 mod pbr;
+mod playthrough;
+pub mod raw_pbr;
+mod skinned;
+mod sprite;
+mod texture;
+mod ui;
 
 pub use declarative::{
-    render_boids_swarm, render_data_authored_scene, render_declarative_colored_scene,
-    render_materialized_primitives, render_world, render_world_ortho,
+    render_boids_swarm, render_data_authored_scene, render_materialized_primitives,
+    render_survivor_seed_scene, render_world, render_world_ortho,
 };
-pub use lighting::{render_cube_point_lit, render_shadow_demo, render_spot_lit};
-pub use pbr::{render_pbr_basic_renderer, render_pbr_grid, render_pbr_sphere_normalmap};
+pub use gizmo::{render_gizmo_rotate, render_gizmo_scale, render_gizmo_translate};
+pub use hot_reload::{render_mesh_hot_reload, render_texture_hot_reload};
+pub use lighting::{render_sphere_point_lit, render_shadow_demo, render_spot_lit};
+pub use pbr::{render_pbr_basic_renderer, render_pbr_sphere_normalmap};
+pub use playthrough::{render_demo_frame, render_demo_frame_mode};
+pub use skinned::{
+    render_skinned_bent, render_skinned_bent_demo, render_skinned_rest, render_skinned_runtime,
+    render_skinned_runtime_mode, render_skinned_shadow_scene,
+};
+pub use sprite::{render_billboard_sprite, render_particle_burst, render_sprite_sheet_frame};
+pub use texture::{
+    render_cube_with_png, render_cube_with_texture, render_obj_model, render_textured_cube,
+};
+pub use ui::{render_editor_ui, render_ui_image_widget};
 
-fn align_up(size: u32, alignment: u32) -> u32 {
-    size.div_ceil(alignment) * alignment
+/// 무광 유전체 머티리얼 (metallic 0, roughness 1) — 색만 보면 되는 씬용.
+pub(crate) fn matte(base_color: [f32; 4]) -> MaterialUniform {
+    MaterialUniform::with_params(base_color, 0.0, 1.0)
+}
+
+/// Up-facing (+Y normal) ground quad on y=0 spanning `±half_extent` on X/Z,
+/// wound CCW when seen from above so an overhead light lights it via N·L.
+/// Corner UVs run 0..`uv_span` (pass 0.0 when the material has no texture).
+pub(crate) fn ground_quad_mesh(device: &wgpu::Device, half_extent: f32, uv_span: f32) -> Mesh {
+    let corner = |x: f32, z: f32, u: f32, v: f32| MeshVertex {
+        position: [x, 0.0, z],
+        normal: [0.0, 1.0, 0.0],
+        uv: [u * uv_span, v * uv_span],
+        tangent: [1.0, 0.0, 0.0, 1.0],
+    };
+    let h = half_extent;
+    let vertices = [
+        corner(-h, -h, 0.0, 0.0),
+        corner(h, -h, 1.0, 0.0),
+        corner(h, h, 1.0, 1.0),
+        corner(-h, h, 0.0, 1.0),
+    ];
+    let indices = [0u32, 2, 1, 0, 3, 2];
+    Mesh::new(device, &vertices, &indices)
 }
 
 /// Build a unit cube mesh (24 verts, 36 indices, outward normals).
@@ -172,91 +215,6 @@ pub fn render_single_cube(gpu: &HeadlessGpu, width: u32, height: u32) -> Vec<u8>
     )
 }
 
-pub(crate) fn camera_light_bgl(device: &wgpu::Device) -> wgpu::BindGroupLayout {
-    device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-        label: Some("Camera+Light BGL"),
-        entries: &[
-            wgpu::BindGroupLayoutEntry {
-                binding: 0,
-                visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
-                ty: wgpu::BindingType::Buffer {
-                    ty: wgpu::BufferBindingType::Uniform,
-                    has_dynamic_offset: true,
-                    min_binding_size: wgpu::BufferSize::new(
-                        std::mem::size_of::<CameraUniform>() as u64
-                    ),
-                },
-                count: None,
-            },
-            wgpu::BindGroupLayoutEntry {
-                binding: 1,
-                visibility: wgpu::ShaderStages::FRAGMENT,
-                ty: wgpu::BindingType::Buffer {
-                    ty: wgpu::BufferBindingType::Uniform,
-                    has_dynamic_offset: false,
-                    min_binding_size: None,
-                },
-                count: None,
-            },
-        ],
-    })
-}
-
-/// DEBUG: replicate `examples/game_ready_demo` (ground + player + chaser cubes)
-/// rendered with the *runtime's* fixed camera (`(0,10,20)`, pitch -0.4) to see
-/// what the user actually sees. Returns RGBA8.
-pub fn render_demo_like_cam(
-    gpu: &HeadlessGpu,
-    width: u32,
-    height: u32,
-    cam_pos: Vec3,
-    yaw: f32,
-    pitch: f32,
-    include_ground: bool,
-) -> Vec<u8> {
-    let target = OffscreenTarget::new(&gpu.device, width, height);
-    let renderer = BasicRenderer::new(&gpu.device, &gpu.queue, CAPTURE_FORMAT, 1024);
-    let mut assets = RenderAssets::new();
-    let mesh_h = assets.add_mesh(unit_cube(&gpu.device));
-    // Distinct per-role colors (exercises BasicRenderer's base_color path).
-    let gray = assets.add_material(MaterialUniform::with_params([0.35, 0.37, 0.40, 1.0], 0.0, 1.0));
-    let blue = assets.add_material(MaterialUniform::with_params([0.20, 0.50, 1.00, 1.0], 0.0, 1.0));
-    let red = assets.add_material(MaterialUniform::with_params([1.00, 0.30, 0.20, 1.0], 0.0, 1.0));
-    let mut world = World::new();
-    let all = [
-        (Vec3::new(0.0, -0.1, 0.0), Vec3::new(40.0, 0.2, 40.0), gray), // ground
-        (Vec3::new(0.0, 0.5, 0.0), Vec3::ONE, blue),                   // player
-        (Vec3::new(10.0, 0.5, 10.0), Vec3::new(0.8, 0.8, 0.8), red),   // chaser
-    ];
-    let specs: &[(Vec3, Vec3, MaterialHandle)] = if include_ground { &all } else { &all[1..] };
-    for &(pos, scale, mat) in specs {
-        let e = world.spawn();
-        let mut t = Transform::from_position(pos);
-        t.scale = scale;
-        world.add(e, t);
-        world.add(e, MeshHandle(mesh_h.0));
-        world.add(e, MaterialHandle(mat.0));
-    }
-    voltex_ecs::propagate_transforms(&mut world);
-    let mut camera = Camera::new(cam_pos, width as f32 / height as f32);
-    camera.yaw = yaw;
-    camera.pitch = pitch;
-    let view_proj = camera.view_projection();
-    let light = LightUniform::new();
-    draw_and_read(
-        gpu,
-        &target,
-        &renderer,
-        "demo_like_cam",
-        wgpu::Color { r: 0.02, g: 0.02, b: 0.05, a: 1.0 },
-        &mut world,
-        &assets,
-        view_proj,
-        camera.position,
-        light,
-    )
-}
-
 /// Render one white cube at world `depth` (more negative = farther from the
 /// camera at z=8) under either an orthographic or perspective projection.
 /// Returns RGBA8. Used to show that orthographic footprints are
@@ -272,7 +230,7 @@ pub fn render_cube_at_depth(
     let renderer = BasicRenderer::new(&gpu.device, &gpu.queue, CAPTURE_FORMAT, 8);
     let mut assets = RenderAssets::new();
     let cube = assets.add_mesh(unit_cube(&gpu.device));
-    let mat = assets.add_material(MaterialUniform::with_params([1.0, 1.0, 1.0, 1.0], 0.0, 1.0));
+    let mat = assets.add_material(matte([1.0, 1.0, 1.0, 1.0]));
 
     let mut world = World::new();
     let e = world.spawn();

@@ -3,10 +3,10 @@
 
 use voltex_ecs::{MaterialHandle, MeshHandle, Transform, World};
 use voltex_math::Vec3;
-use voltex_renderer::{Camera, LightUniform, MaterialUniform, MeshVertex};
+use voltex_renderer::{Camera, LightUniform, MaterialUniform};
 use voltex_renderer_ecs::{BasicRenderer, RenderAssets};
 
-use super::{draw_and_read, unit_cube};
+use super::{draw_and_read, ground_quad_mesh, matte, unit_cube};
 use crate::headless::HeadlessGpu;
 use crate::target::{OffscreenTarget, CAPTURE_FORMAT};
 
@@ -19,26 +19,11 @@ pub fn render_shadow_demo(gpu: &HeadlessGpu, width: u32, height: u32, shadows: b
     let target = OffscreenTarget::new(&gpu.device, width, height);
     let mut assets = RenderAssets::new();
     let cube = assets.add_mesh(unit_cube(&gpu.device));
-    let gray = assets.add_material(MaterialUniform::with_params([0.7, 0.7, 0.7, 1.0], 0.0, 1.0));
-    let occ = assets.add_material(MaterialUniform::with_params([0.8, 0.5, 0.3, 1.0], 0.0, 1.0));
+    let gray = assets.add_material(matte([0.7, 0.7, 0.7, 1.0]));
+    let occluder_material = assets.add_material(matte([0.8, 0.5, 0.3, 1.0]));
 
-    // Up-facing ground quad (correct +Y normal + CCW-from-above winding) so the
-    // overhead light actually lits it and the shadow is visible.
-    let n = [0.0f32, 1.0, 0.0];
-    let mk = |x: f32, z: f32, u: f32, v: f32| MeshVertex {
-        position: [x, 0.0, z],
-        normal: n,
-        uv: [u, v],
-        tangent: [1.0, 0.0, 0.0, 1.0],
-    };
-    let gverts = [
-        mk(-12.0, -12.0, 0.0, 0.0),
-        mk(12.0, -12.0, 1.0, 0.0),
-        mk(12.0, 12.0, 1.0, 1.0),
-        mk(-12.0, 12.0, 0.0, 1.0),
-    ];
-    let gidx = [0u32, 2, 1, 0, 3, 2];
-    let ground_mesh = assets.add_mesh(voltex_renderer::Mesh::new(&gpu.device, &gverts, &gidx));
+    // Up-facing ground quad so the overhead light lights it and the shadow is visible.
+    let ground_mesh = assets.add_mesh(ground_quad_mesh(&gpu.device, 12.0, 1.0));
 
     let mut world = World::new();
     let ground = world.spawn();
@@ -51,7 +36,7 @@ pub fn render_shadow_demo(gpu: &HeadlessGpu, width: u32, height: u32, shadows: b
     ot.scale = Vec3::new(1.5, 1.5, 1.5);
     world.add(occluder, ot);
     world.add(occluder, MeshHandle(cube.0));
-    world.add(occluder, MaterialHandle(occ.0));
+    world.add(occluder, MaterialHandle(occluder_material.0));
     voltex_ecs::propagate_transforms(&mut world);
 
     let mut camera = Camera::new(Vec3::new(7.0, 7.0, 7.0), width as f32 / height as f32);
@@ -76,9 +61,9 @@ pub fn render_shadow_demo(gpu: &HeadlessGpu, width: u32, height: u32, shadows: b
     )
 }
 
-/// Render a white cube under a dim directional light + the given additive
+/// Render a white sphere under a dim directional light + the given additive
 /// point lights (via `BasicRenderer::set_point_lights`). Returns RGBA8.
-pub fn render_cube_point_lit(
+pub fn render_sphere_point_lit(
     gpu: &HeadlessGpu,
     width: u32,
     height: u32,
@@ -89,8 +74,12 @@ pub fn render_cube_point_lit(
     let mut assets = RenderAssets::new();
     // Sphere — radial outward normals, so the hemisphere facing a light has an
     // unambiguous positive N·L (no winding/normal quirks).
-    let (sv, si) = voltex_renderer::generate_sphere(1.0, 32, 16);
-    let mesh_h = assets.add_mesh(voltex_renderer::Mesh::new(&gpu.device, &sv, &si));
+    let (sphere_vertices, sphere_indices) = voltex_renderer::generate_sphere(1.0, 32, 16);
+    let mesh_h = assets.add_mesh(voltex_renderer::Mesh::new(
+        &gpu.device,
+        &sphere_vertices,
+        &sphere_indices,
+    ));
     let mat_h = assets.add_material(MaterialUniform::new());
 
     let mut world = World::new();
@@ -136,24 +125,10 @@ pub fn render_spot_lit(
     let renderer = BasicRenderer::new(&gpu.device, &gpu.queue, CAPTURE_FORMAT, 8);
     let mut assets = RenderAssets::new();
 
-    // Up-facing ground quad (+Y normal, CCW-from-above) so an overhead spot lits
-    // it via N·L. Spans the full view so the cone footprint sits inside it.
-    let n = [0.0f32, 1.0, 0.0];
-    let mk = |x: f32, z: f32| MeshVertex {
-        position: [x, 0.0, z],
-        normal: n,
-        uv: [0.0, 0.0],
-        tangent: [1.0, 0.0, 0.0, 1.0],
-    };
-    let gverts = [
-        mk(-10.0, -10.0),
-        mk(10.0, -10.0),
-        mk(10.0, 10.0),
-        mk(-10.0, 10.0),
-    ];
-    let gidx = [0u32, 2, 1, 0, 3, 2];
-    let mesh_h = assets.add_mesh(voltex_renderer::Mesh::new(&gpu.device, &gverts, &gidx));
-    let mat_h = assets.add_material(MaterialUniform::with_params([1.0, 1.0, 1.0, 1.0], 0.0, 1.0));
+    // Up-facing ground quad so an overhead spot lights it via N·L. Spans the
+    // full view so the cone footprint sits inside it.
+    let mesh_h = assets.add_mesh(ground_quad_mesh(&gpu.device, 10.0, 0.0));
+    let mat_h = assets.add_material(matte([1.0, 1.0, 1.0, 1.0]));
 
     let mut world = World::new();
     let ground = world.spawn();

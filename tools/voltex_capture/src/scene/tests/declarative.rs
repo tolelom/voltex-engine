@@ -57,7 +57,7 @@ fn declarative_scene_renders_distinct_per_object_colors() {
             return;
         }
     };
-    let rgba = render_declarative_colored_scene(&gpu, 320, 200);
+    let rgba = render_survivor_seed_scene(&gpu, 320, 200);
     let stats = ImageStats::analyze(&rgba);
     assert!(
         stats.distinct_colors >= 3,

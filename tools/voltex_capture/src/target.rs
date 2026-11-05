@@ -7,7 +7,9 @@ pub const CAPTURE_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8UnormS
 /// Depth format matching [`voltex_renderer::DEPTH_FORMAT`].
 pub const DEPTH_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth32Float;
 
-fn align_up(value: u32, alignment: u32) -> u32 {
+/// Round `value` up to the next multiple of `alignment` (row pitch, uniform
+/// offsets).
+pub(crate) fn align_up(value: u32, alignment: u32) -> u32 {
     value.div_ceil(alignment) * alignment
 }
 

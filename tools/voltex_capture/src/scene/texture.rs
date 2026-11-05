@@ -7,7 +7,7 @@ use voltex_renderer::{Camera, LightUniform, MaterialUniform};
 use voltex_renderer_ecs::{BasicRenderer, RenderAssets};
 
 use crate::headless::HeadlessGpu;
-use crate::scene::{draw_and_read, unit_cube};
+use super::{draw_and_read, unit_cube};
 use crate::target::{OffscreenTarget, CAPTURE_FORMAT};
 
 /// Render a single cube with a pre-built [`GpuTexture`](voltex_renderer::GpuTexture) via a runtime
@@ -157,7 +157,7 @@ mod tests {
     use crate::ImageStats;
 
     /// The repo's `assets/cube.obj`, embedded for the loader regression.
-    const CUBE_OBJ: &str = include_str!("../../../assets/cube.obj");
+    const CUBE_OBJ: &str = include_str!("../../../../assets/cube.obj");
 
     #[test]
     #[ignore = "requires a GPU adapter"]

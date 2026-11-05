@@ -54,7 +54,7 @@ fn load_skinned_gltf_builds_mesh_and_pose() {
         skins: vec![GltfSkin {
             name: None,
             joints: vec![0, 1],
-            inverse_bind_matrices: vec![IDENTITY4, IDENTITY4],
+            inverse_bind_matrices: vec![IDENTITY_MAT4, IDENTITY_MAT4],
             skeleton: None,
         }],
         animations: vec![],

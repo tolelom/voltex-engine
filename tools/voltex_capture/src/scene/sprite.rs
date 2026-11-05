@@ -6,7 +6,7 @@ use voltex_renderer::{Camera, LightUniform};
 use voltex_renderer_ecs::{BasicRenderer, RenderAssets};
 
 use crate::headless::HeadlessGpu;
-use crate::scene::draw_and_read;
+use super::draw_and_read;
 use crate::target::{OffscreenTarget, CAPTURE_FORMAT};
 
 /// Spawn an orange particle burst at the origin, advance it `ticks` times by

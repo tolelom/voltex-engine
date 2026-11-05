@@ -294,7 +294,7 @@ fn render_world_impl(
 /// `PrimitiveMesh` + `MaterialDesc`, materialized, and drawn with the runtime's
 /// elevated camera. Proves the flagship's per-object colors survive
 /// materialize→render (they were all white before the modernization). RGBA8.
-pub fn render_declarative_colored_scene(gpu: &HeadlessGpu, width: u32, height: u32) -> Vec<u8> {
+pub fn render_survivor_seed_scene(gpu: &HeadlessGpu, width: u32, height: u32) -> Vec<u8> {
     use voltex_renderer_ecs::{MaterialDesc, PrimitiveMesh};
 
     let mut world = World::new();
