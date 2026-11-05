@@ -130,7 +130,7 @@ pub fn log(level: Level, target: &str, message: &fmt::Arguments<'_>) {
     if level > st.level {
         return;
     }
-    let line = format_record(crate::crash::unix_seconds_now_for_log(), level, target, message);
+    let line = format_record(crate::utc_time::unix_seconds_now(), level, target, message);
     // stderr — best effort, never panic.
     let _ = writeln!(std::io::stderr(), "{}", line.trim_end());
     if let Some(file) = &st.file {
@@ -149,7 +149,7 @@ pub fn format_record(
     target: &str,
     message: &fmt::Arguments<'_>,
 ) -> String {
-    let (y, mo, d, h, mi, s) = crate::crash::unix_to_ymd_hms_for_log(unix_seconds);
+    let (y, mo, d, h, mi, s) = crate::utc_time::unix_to_ymd_hms(unix_seconds);
     format!(
         "{:04}-{:02}-{:02}T{:02}:{:02}:{:02}Z [{}] {}: {}",
         y,

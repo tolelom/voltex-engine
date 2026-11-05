@@ -31,24 +31,24 @@ const SCRIPT_KEY_NAMES: &[(&str, winit::keyboard::KeyCode)] = {
 
 /// Translate the platform [`InputState`] into the windowing-agnostic
 /// [`voltex_script::ScriptInput`] snapshot read by Lua.
-pub(super) fn fill_script_input(si: &mut voltex_script::ScriptInput, input: &InputState) {
+pub(super) fn fill_script_input(script_input: &mut voltex_script::ScriptInput, input: &InputState) {
     use winit::event::MouseButton;
-    si.clear();
+    script_input.clear();
     for (name, code) in SCRIPT_KEY_NAMES {
         if input.is_key_pressed(*code) {
-            si.set_key_pressed(name);
+            script_input.set_key_pressed(name);
         }
         if input.is_key_just_pressed(*code) {
-            si.set_key_just_pressed(name);
+            script_input.set_key_just_pressed(name);
         }
     }
     let (mx, my) = input.mouse_position();
     let (dx, dy) = input.mouse_delta();
-    si.set_mouse(mx, my, dx, dy);
-    si.set_buttons(
+    script_input.set_mouse(mx, my, dx, dy);
+    script_input.set_buttons(
         input.is_mouse_button_pressed(MouseButton::Left),
         input.is_mouse_button_pressed(MouseButton::Right),
         input.is_mouse_button_pressed(MouseButton::Middle),
     );
-    si.set_scroll(input.mouse_scroll());
+    script_input.set_scroll(input.mouse_scroll());
 }

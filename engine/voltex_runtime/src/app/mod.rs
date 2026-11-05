@@ -7,14 +7,15 @@
 //! Field declaration order below is the actual drop order Rust uses
 //! (top-down). It is deliberately:
 //!
-//! 1. `runtime_state` (GPU + window + renderer) — must release wgpu resources
+//! 1. `gpu_window` (GPU + window + renderer) — must release wgpu resources
 //!    before the device they belong to is dropped.
-//! 2. `user_systems` — closures that may capture handles into the World.
-//! 3. `file_watcher`, `timer`, `input`, `physics_config` — pure data.
+//! 2. `user_systems` and the other callbacks — closures that may capture
+//!    handles into the World.
+//! 3. `file_watcher`, `frame_timer`, `input`, `physics_config` — pure data.
 //! 4. `script_pool` — LuaState holds a raw `*mut World`; pool must drop
 //!    before the World it points at.
 //! 5. `assets`, `registry`, `world` — destroyed last.
-//! 6. `config` — last, no resource cleanup.
+//! 6. `hud`, `config` — last, no resource cleanup.
 
 use std::time::Duration;
 
@@ -33,21 +34,33 @@ use crate::config::RuntimeConfig;
 use crate::debug_draw::DebugLines;
 use crate::error::{RuntimeError, RuntimeResult};
 
+mod boot;
 mod hooks;
 mod script_input;
 #[cfg(test)]
 mod tests;
 
+use boot::load_scene_via_vfs_or_disk;
+pub(crate) use hooks::HudFn;
 use hooks::{
-    ActionSystem, CameraFn, CollisionFn, DebugFn, HudFn, InputSystem, LightFn,
-    PointLightsFn, TimedSystem, UserSystem,
+    ActionSystem, CameraFn, CollisionFn, DebugDrawFn, InputSystem, LightFn, PointLightsFn,
+    TimedSystem, UserSystem,
 };
 use script_input::fill_script_input;
 
-/// Live GPU state initialised in winit's `resumed` callback. Held in an
-/// `Option<RuntimeState>` so the rest of `RuntimeApp` can exist (and be unit
+/// Poll interval of [`RuntimeApp::file_watcher`] (script hot reload).
+const SCRIPT_WATCH_INTERVAL: Duration = Duration::from_millis(500);
+/// Poll interval of the audio-clip hot-reload watcher.
+const AUDIO_WATCH_INTERVAL: Duration = Duration::from_millis(300);
+/// Rate handed to [`GameTimer::new`]. The runtime only reads the timer's
+/// wallclock `frame_dt()`, never its fixed-update accumulator, so this value
+/// does not affect any engine behaviour.
+const FRAME_TIMER_FIXED_HZ: u32 = 60;
+
+/// GPU + OS-window state created in winit's `resumed` callback. Held in an
+/// `Option<GpuWindowState>` so the rest of `RuntimeApp` can exist (and be unit
 /// tested) before any window is open.
-pub(crate) struct RuntimeState {
+pub(crate) struct GpuWindowState {
     pub window: voltex_platform::VoltexWindow,
     pub gpu: voltex_renderer::GpuContext,
     pub renderer: voltex_renderer_ecs::BasicRenderer,
@@ -66,7 +79,8 @@ pub(crate) struct RuntimeState {
 /// The runtime's top-level application object. Owns the ECS world, asset
 /// stores, schedulers, and the main loop integration with `winit`/`wgpu`.
 pub struct RuntimeApp {
-    pub(crate) runtime_state: Option<RuntimeState>,
+    /// `None` until the first winit `resumed` (see [`GpuWindowState`]).
+    pub(crate) gpu_window: Option<GpuWindowState>,
     user_systems: Vec<UserSystem>,
     input_systems: Vec<InputSystem>,
     /// Optional per-frame HUD draw callback (see [`Self::set_hud_fn`]). Only
@@ -79,17 +93,22 @@ pub struct RuntimeApp {
     /// Optional per-frame collision/trigger callback (see [`Self::set_collision_fn`]).
     collision_fn: Option<CollisionFn>,
     /// Optional per-frame debug-draw callback (see [`Self::set_debug_draw_fn`]).
-    pub(crate) debug_fn: Option<DebugFn>,
-    /// Reused debug-line buffer (cleared + refilled by `debug_fn` each frame).
+    pub(crate) debug_draw_fn: Option<DebugDrawFn>,
+    /// Reused debug-line buffer (cleared + refilled by `debug_draw_fn` each frame).
     pub(crate) debug_lines: DebugLines,
     /// Additive point lights uploaded to the renderer each frame.
     pub(crate) point_lights: Vec<PointLight>,
     /// Optional per-frame point/spot-light updater (see [`Self::set_point_lights_fn`]).
     pub(crate) point_lights_fn: Option<PointLightsFn>,
-    /// Polling file watcher used for script / scene hot reload.
+    /// Watcher the script pool drains every frame (`poll_reload`) for Lua hot
+    /// reload. The runtime registers no paths on it — call
+    /// `app.file_watcher.watch(path)` for each script that should reload.
     pub file_watcher: FileWatcher,
-    /// Fixed-step timer driving update / render dt.
-    pub timer: GameTimer,
+    /// Wallclock frame timer. The runtime calls `tick()` once per redraw and
+    /// feeds its `frame_dt()` (clamped to 250 ms) to the systems, unless
+    /// [`RuntimeConfig::fixed_frame_dt`] overrides it. Its fixed-update
+    /// accumulator (`should_fixed_update`) is not used by the runtime.
+    pub frame_timer: GameTimer,
     /// Aggregated input state (keyboard + mouse + scroll), refreshed each frame.
     pub input: InputState,
     /// Semantic action/axis bindings (see [`Self::add_action_system`]). Empty
@@ -176,120 +195,28 @@ impl RuntimeApp {
             config.window.height
         );
 
-        let mut registry = ComponentRegistry::new();
-        registry.register_defaults();
-        // AudioSource lives in voltex_audio (no ECS dep), so it is registered
-        // here via the register_raw escape hatch rather than register_defaults.
-        crate::audio_sync::register_audio_source(&mut registry);
-        // AudioPath (scene-persisted clip file path) is runtime-owned.
-        registry.register::<crate::audio_paths::AudioPath>();
-        // Lifetime — 미등록이면 저장 씬에서 소멸 조건만 떨어져 나가
-        // 로드 시 one-shot 엔티티가 불멸이 된다 (감사 발견).
-        registry.register::<crate::lifetime::Lifetime>();
-        // Declarative renderables (PrimitiveMesh / MaterialDesc) live in
-        // voltex_renderer_ecs (L3), so they register here rather than in the
-        // L1 register_defaults. Materialized to GPU resources in gpu_init.
-        voltex_renderer_ecs::register_renderable_components(&mut registry);
-        if let Some(setup) = config.register_components.take() {
-            setup(&mut registry);
-        }
-
-        let mut world = World::new();
-        if let Some(scene_path) = config.initial_scene.as_ref() {
-            crate::crash::set_crash_scene(scene_path.as_str());
-            // A broken initial scene degrades to an empty world (the scene
-            // builder below may still populate it), but never silently — the
-            // dist-exe E2E reads these lines as its load evidence.
-            match load_scene_via_vfs_or_disk(
-                &mut world,
-                &registry,
-                scene_path,
-                config.vfs.as_ref(),
-            ) {
-                Ok(()) => crate::log_info!(
-                    "voltex_runtime: initial scene `{}` loaded ({} entities)",
-                    scene_path,
-                    world.entity_count()
-                ),
-                Err(e) => crate::log_error!(
-                    "voltex_runtime: initial scene `{}` failed to load: {e}",
-                    scene_path
-                ),
-            }
-        }
-        let scene_builder = config.build_scene.take();
-        if let Some(build) = scene_builder {
-            build(&mut world, &mut registry);
-        }
-
+        let mut registry = boot::build_registry(config.register_components.take());
+        let world = boot::load_initial_world(&mut config, &mut registry);
         // Resolve the configured asset root once (exe-dir anchoring involves a
         // syscall); every relative asset read below and per-frame goes through it.
         let asset_root = config.resolved_asset_root();
-
-        // Build the audio mixer up front (it only spawns a thread, no GPU /
-        // window needed). Failure degrades to silent rather than aborting boot.
-        // `with_audio_files` paths are decoded here, appended after the
-        // pre-loaded clips (ClipId = clip count + file position), and queued
-        // for hot-reload watching (registered once the app struct exists).
-        let mut audio_watch_pairs: Vec<(std::path::PathBuf, usize)> = Vec::new();
-        // (as-configured path, clip index) — seeds the AudioPath resolver cache
-        // below so scene `AudioPath`s reuse these clips instead of re-decoding.
-        let mut audio_seed_pairs: Vec<(std::path::PathBuf, usize)> = Vec::new();
-        let audio = if config.enable_audio {
-            let mut clips = std::mem::take(&mut config.audio_clips);
-            for (i, orig_path) in std::mem::take(&mut config.audio_files).into_iter().enumerate() {
-                let index = clips.len();
-                // Relative paths anchor at the asset root (when configured and
-                // the rooted file exists) — same contract as read_asset.
-                let path = match asset_root.as_deref() {
-                    Some(root) if orig_path.is_relative() && root.join(&orig_path).is_file() => {
-                        root.join(&orig_path)
-                    }
-                    _ => orig_path.clone(),
-                };
-                audio_seed_pairs.push((orig_path, index));
-                match voltex_audio::load_clip_file(&path) {
-                    Ok(clip) => clips.push(clip),
-                    Err(e) => {
-                        // Silent placeholder keeps every later file's ClipId
-                        // stable; fixing the file hot-reloads it in place.
-                        crate::log_error!(
-                            "voltex_runtime: audio file {} failed to decode ({e}); \
-                             clip {} is a silent placeholder until the file is fixed",
-                            path.display(),
-                            i
-                        );
-                        clips.push(voltex_audio::AudioClip::new(vec![0.0], 44_100, 1));
-                    }
-                }
-                audio_watch_pairs.push((path, index));
-            }
-            match AudioSystem::new(clips) {
-                Ok(a) => Some(a),
-                Err(e) => {
-                    crate::log_error!("voltex_runtime: audio init failed: {e}");
-                    None
-                }
-            }
-        } else {
-            None
-        };
+        let configured_audio = boot::load_configured_audio(&mut config, asset_root.as_deref());
 
         let hud = crate::Hud::new(config.window.title.clone());
         let mut app = Self {
-            runtime_state: None,
+            gpu_window: None,
             user_systems: Vec::new(),
             input_systems: Vec::new(),
             hud_fn: None,
             camera_fn: None,
             light_fn: None,
             collision_fn: None,
-            debug_fn: None,
+            debug_draw_fn: None,
             debug_lines: DebugLines::new(),
             point_lights: Vec::new(),
             point_lights_fn: None,
-            file_watcher: FileWatcher::new(Duration::from_millis(500)),
-            timer: GameTimer::new(60),
+            file_watcher: FileWatcher::new(SCRIPT_WATCH_INTERVAL),
+            frame_timer: GameTimer::new(FRAME_TIMER_FIXED_HZ),
             input: InputState::new(),
             input_map: config.input_map.take().unwrap_or_default(),
             action_systems: Vec::new(),
@@ -298,12 +225,12 @@ impl RuntimeApp {
             physics_config: PhysicsConfig::default(),
             script_pool: ScriptInstancePool::new(),
             script_input: voltex_script::ScriptInput::new(),
-            audio,
+            audio: configured_audio.system,
             audio_voices: crate::audio_sync::AudioVoiceTracker::default(),
             asset_root,
             asset_path_cache: crate::asset_paths::AssetPathCache::new(),
             audio_clip_cache: crate::audio_paths::AudioClipCache::new(),
-            audio_watcher: FileWatcher::new(Duration::from_millis(300)),
+            audio_watcher: FileWatcher::new(AUDIO_WATCH_INTERVAL),
             watched_audio_clips: std::collections::HashMap::new(),
             audio_listener: None,
             assets: RenderAssets::new(),
@@ -314,38 +241,18 @@ impl RuntimeApp {
         };
         // Register hot-reload watches for `with_audio_files` paths (decode
         // already happened above; this only wires the file watcher).
-        for (path, index) in audio_watch_pairs {
-            app.watch_audio_clip(path, index);
+        for (path, clip_index) in configured_audio.hot_reload_watches {
+            app.watch_audio_clip(path, clip_index);
         }
         // Seed the AudioPath resolver with the with_audio_files mapping —
         // a scene AudioPath naming the same file binds to the existing clip
         // (no duplicate decode, shared hot-reload). Keyed by the path as
         // configured (the form scenes are expected to carry).
-        for (path, index) in audio_seed_pairs {
-            app.audio_clip_cache.seed(path, index as u32);
+        for (path, clip_index) in configured_audio.path_cache_seeds {
+            app.audio_clip_cache.seed(path, clip_index as u32);
         }
-        // Vfs(.vpkg)의 Lua 스크립트를 풀에 시드 — 씬/텍스처/오디오와 달리
-        // 스크립트만 Vfs를 우회해 dist exe가 루즈 .lua 없이는 무동작이던
-        // 출하 격차 해소 (감사 발견).
-        if app.config.enable_scripts {
-            if let Some(vfs) = app.config.vfs.as_ref() {
-                let mut seeded = 0usize;
-                for key in vfs.list() {
-                    if key.ends_with(".lua") {
-                        if let Ok(bytes) = vfs.read(&key) {
-                            app.script_pool
-                                .seed_source(&key, String::from_utf8_lossy(&bytes).into_owned());
-                            seeded += 1;
-                        }
-                    }
-                }
-                if seeded > 0 {
-                    crate::log_info!("voltex_runtime: seeded {seeded} Lua script(s) from Vfs");
-                }
-            }
-        }
-        let system_setup = app.config.setup_systems.take();
-        if let Some(setup) = system_setup {
+        app.seed_scripts_from_vfs();
+        if let Some(setup) = app.config.setup_systems.take() {
             setup(&mut app);
         }
         Ok(app)
@@ -405,21 +312,13 @@ impl RuntimeApp {
         }
         // Collision/trigger events: detect contacts and hand them to the game.
         // Runs even without physics dynamics, so it works as a trigger detector.
-        if let Some(mut cf) = self.collision_fn.take() {
+        if let Some(mut collision_fn) = self.collision_fn.take() {
             let contacts = detect_collisions(&self.world);
-            cf(&contacts, &mut self.world, dt);
-            self.collision_fn = Some(cf);
+            collision_fn(&contacts, &mut self.world, dt);
+            self.collision_fn = Some(collision_fn);
         }
         if self.config.enable_scripts {
-            // Publish the current frame's input so the `input` Lua table reads
-            // live state. Re-derive the pointer every frame (the app may have
-            // moved) and clear it after, mirroring the `__voltex_world` rule.
-            fill_script_input(&mut self.script_input, &self.input);
-            voltex_script::set_current_input(&self.script_input as *const _);
-            voltex_script::script_start_all(&mut self.world, &mut self.script_pool);
-            voltex_script::script_update_all(&mut self.world, &mut self.script_pool, dt);
-            voltex_script::set_current_input(std::ptr::null());
-            let _ = self.script_pool.poll_reload(&mut self.file_watcher);
+            self.run_scripts(dt);
         }
         for sys in self.user_systems.iter_mut() {
             sys(&mut self.world, dt);
@@ -435,54 +334,72 @@ impl RuntimeApp {
         }
         // Audio runs last so it observes playback toggles / listener moves made
         // by user systems this same frame (lowest latency).
-        if let Some(audio) = self.audio.as_mut() {
-            // Scene-persisted AudioPath → clip ids first, so a source bound
-            // this frame can already play this frame. Idempotent +
-            // failure-cached (mirrors the texture/mesh resolver in handler).
-            crate::audio_paths::resolve_audio_paths(
-                &mut self.world,
-                audio,
-                &mut self.audio_clip_cache,
-                self.config.vfs.as_ref(),
-                self.asset_root.as_deref(),
-            );
-            let audio = &*audio;
-            crate::audio_sync::audio_sync_system(
-                &mut self.world,
-                audio,
-                self.audio_listener,
-                &mut self.audio_voices,
-            );
-            for (path, outcome) in crate::audio_sync::poll_audio_hot_reload(
-                &mut self.audio_watcher,
-                &self.watched_audio_clips,
-                audio,
-            ) {
-                match outcome {
-                    Ok(()) => crate::log_info!(
-                        "voltex_runtime: hot-reloaded audio clip: {}",
-                        path.display()
-                    ),
-                    Err(e) => crate::log_error!(
-                        "voltex_runtime: audio hot-reload failed for {}: {e}",
-                        path.display()
-                    ),
-                }
-            }
-        }
+        self.tick_audio();
         // Despawn expired-lifetime entities after user systems have observed
         // them on their final frame (no-op if no Lifetime entities).
         crate::lifetime::update_lifetimes(&mut self.world, dt);
+    }
+
+    /// Lua step of [`Self::tick_systems_only`]: publish input, run
+    /// `on_start` / `on_update`, then poll script hot reload.
+    fn run_scripts(&mut self, dt: f32) {
+        // Publish the current frame's input so the `input` Lua table reads
+        // live state. Re-derive the pointer every frame (the app may have
+        // moved) and clear it after, mirroring the `__voltex_world` rule.
+        fill_script_input(&mut self.script_input, &self.input);
+        voltex_script::set_current_input(&self.script_input as *const _);
+        voltex_script::script_start_all(&mut self.world, &mut self.script_pool);
+        voltex_script::script_update_all(&mut self.world, &mut self.script_pool, dt);
+        voltex_script::set_current_input(std::ptr::null());
+        let _ = self.script_pool.poll_reload(&mut self.file_watcher);
+    }
+
+    /// Audio step of [`Self::tick_systems_only`] (no-op without a mixer):
+    /// bind `AudioPath`s, sync `AudioSource` edges to the mixer, then poll
+    /// clip hot reload.
+    fn tick_audio(&mut self) {
+        let Some(audio) = self.audio.as_mut() else { return };
+        // Scene-persisted AudioPath → clip ids first, so a source bound
+        // this frame can already play this frame. Idempotent +
+        // failure-cached (mirrors the texture/mesh resolver in handler).
+        crate::audio_paths::resolve_audio_paths(
+            &mut self.world,
+            audio,
+            &mut self.audio_clip_cache,
+            self.config.vfs.as_ref(),
+            self.asset_root.as_deref(),
+        );
+        let audio = &*audio;
+        crate::audio_sync::audio_sync_system(
+            &mut self.world,
+            audio,
+            self.audio_listener,
+            &mut self.audio_voices,
+        );
+        for (path, outcome) in crate::audio_sync::poll_audio_hot_reload(
+            &mut self.audio_watcher,
+            &self.watched_audio_clips,
+            audio,
+        ) {
+            match outcome {
+                Ok(()) => crate::log_info!(
+                    "voltex_runtime: hot-reloaded audio clip: {}",
+                    path.display()
+                ),
+                Err(e) => crate::log_error!(
+                    "voltex_runtime: audio hot-reload failed for {}: {e}",
+                    path.display()
+                ),
+            }
+        }
     }
 
     /// Take over the calling thread with a winit event loop until the window
     /// is closed. GPU resources are constructed lazily on the first `resumed`
     /// callback, so `tick_systems_only` may be called before this.
     ///
-    /// Side-effect: when the config's `enable_crash_log` is true (default),
-    /// installs a `std::panic::set_hook` that writes
-    /// `<window_title>-crash-<UTC>.txt` alongside the default stderr panic.
-    /// Idempotent across multiple `run` calls in the same process.
+    /// The crash-log panic hook and env logger are installed by [`Self::new`]
+    /// (see there), not here.
     pub fn run(self) -> RuntimeResult<()> {
         // The panic hook + logger were installed in `new`; both are
         // OnceLock-guarded so re-installing here would be a no-op. We do
@@ -500,27 +417,4 @@ impl RuntimeApp {
         }
         result
     }
-}
-
-
-fn load_scene_via_vfs_or_disk(
-    world: &mut World,
-    registry: &ComponentRegistry,
-    path: &str,
-    vfs: Option<&voltex_asset::Vfs>,
-) -> RuntimeResult<()> {
-    let data = match vfs {
-        Some(v) if v.exists(path) => v
-            .read(path)
-            .map_err(|e| RuntimeError::SceneLoad(format!("{}", e)))?,
-        _ => std::fs::read(path).map_err(|e| RuntimeError::SceneLoad(e.to_string()))?,
-    };
-    // Try binary first, then JSON.
-    if voltex_ecs::deserialize_scene_binary(world, &data, registry).is_ok() {
-        return Ok(());
-    }
-    let text = std::str::from_utf8(&data).map_err(|e| RuntimeError::SceneLoad(e.to_string()))?;
-    voltex_ecs::deserialize_scene_json(world, text, registry)
-        .map_err(|e| RuntimeError::SceneLoad(format!("{}", e)))?;
-    Ok(())
 }

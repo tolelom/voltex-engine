@@ -11,48 +11,48 @@ use super::RuntimeApp;
 use crate::debug_draw::DebugLines;
 use crate::time::Time;
 
-pub(super) type UserSystem = Box<dyn FnMut(&mut World, f32) + 'static>;
+pub(crate) type UserSystem = Box<dyn FnMut(&mut World, f32) + 'static>;
 /// User system that also gets read-only access to the per-frame InputState.
 /// Added in D3 so a flagship game can drive entities from keyboard / mouse
 /// without requiring a full `InputState as ECS resource` abstraction (v1.1).
-pub(super) type InputSystem = Box<dyn FnMut(&mut World, &InputState, f32) + 'static>;
+pub(crate) type InputSystem = Box<dyn FnMut(&mut World, &InputState, f32) + 'static>;
 /// User system that reads semantic actions/axes via the [`InputMap`] layer in
 /// addition to the raw [`InputState`]. Lets a game rebind controls in one place
 /// (`app.input_map`) and drive entities by action name.
-pub(super) type ActionSystem = Box<dyn FnMut(&mut World, &InputState, &InputMap, f32) + 'static>;
+pub(crate) type ActionSystem = Box<dyn FnMut(&mut World, &InputState, &InputMap, f32) + 'static>;
 /// User system that receives the runtime [`Time`] (accumulated elapsed seconds,
 /// per-frame delta, frame counter) instead of just a bare `dt`. For timers,
 /// cooldowns, and animation phase that need wallclock-since-start.
-pub(super) type TimedSystem = Box<dyn FnMut(&mut World, &Time) + 'static>;
+pub(crate) type TimedSystem = Box<dyn FnMut(&mut World, &Time) + 'static>;
 /// HUD callback invoked each frame between the 3D pass and present, with the
 /// immediate-mode [`UiContext`] (already inside `begin_frame`/`end_frame`) and
 /// read-only access to the World. Draw text / bars / panels here.
-pub(super) type HudFn = Box<dyn FnMut(&mut UiContext, &World) + 'static>;
+pub(crate) type HudFn = Box<dyn FnMut(&mut UiContext, &World) + 'static>;
 /// Per-frame camera updater (see [`RuntimeApp::set_camera_fn`]). Runs after the
 /// systems tick, with the live [`Camera`] and read-only World, so games can
 /// implement follow / orbit / cinematic cameras. Overrides the default RMB
 /// fly-camera for the frame.
-pub(super) type CameraFn = Box<dyn FnMut(&mut Camera, &World, f32) + 'static>;
+pub(crate) type CameraFn = Box<dyn FnMut(&mut Camera, &World, f32) + 'static>;
 /// Per-frame directional-light updater (see [`RuntimeApp::set_light_fn`]). Runs
 /// after the systems tick with the live [`LightUniform`] and read-only World,
 /// for day/night cycles, flicker, etc.
-pub(super) type LightFn = Box<dyn FnMut(&mut LightUniform, &World, f32) + 'static>;
+pub(crate) type LightFn = Box<dyn FnMut(&mut LightUniform, &World, f32) + 'static>;
 /// Per-frame point/spot-light updater (see [`RuntimeApp::set_point_lights_fn`]).
 /// Runs after the systems tick with the live point-light `Vec` and read-only
 /// World, for moving torches, flickering lamps, projectile glows, etc. The
 /// resulting set is uploaded to the renderer (capped at `MAX_LIGHTS`) the same
 /// way a static [`RuntimeApp::set_point_lights`] call would be.
-pub(super) type PointLightsFn = Box<dyn FnMut(&mut Vec<PointLight>, &World, f32) + 'static>;
+pub(crate) type PointLightsFn = Box<dyn FnMut(&mut Vec<PointLight>, &World, f32) + 'static>;
 /// Per-frame collision callback (see [`RuntimeApp::set_collision_fn`]). Receives
 /// the frame's contact pairs (between entities carrying a
 /// [`Collider`](voltex_physics::Collider) and a Transform) plus the mutable
 /// World, for trigger/hit reactions. Runs regardless of `enable_physics`, so it
 /// doubles as a trigger-zone detector.
-pub(super) type CollisionFn = Box<dyn FnMut(&[ContactPoint], &mut World, f32) + 'static>;
+pub(crate) type CollisionFn = Box<dyn FnMut(&[ContactPoint], &mut World, f32) + 'static>;
 /// Per-frame debug-draw callback (see [`RuntimeApp::set_debug_draw_fn`]). The
 /// passed [`DebugLines`] is cleared each frame before the call; whatever the
 /// game queues is rendered as `LineList` gizmos over the 3D scene.
-pub(super) type DebugFn = Box<dyn FnMut(&mut DebugLines, &World, f32) + 'static>;
+pub(crate) type DebugDrawFn = Box<dyn FnMut(&mut DebugLines, &World, f32) + 'static>;
 
 impl RuntimeApp {
     /// Register a per-frame user system. Systems run in registration order
@@ -245,12 +245,18 @@ impl RuntimeApp {
     where
         F: FnMut(&mut DebugLines, &World, f32) + 'static,
     {
-        self.debug_fn = Some(Box::new(f));
+        self.debug_draw_fn = Some(Box::new(f));
     }
 
     /// `true` if a debug-draw callback has been registered.
+    pub fn has_debug_draw_fn(&self) -> bool {
+        self.debug_draw_fn.is_some()
+    }
+
+    /// Old name of [`Self::has_debug_draw_fn`] (matches `set_debug_draw_fn`).
+    #[deprecated(note = "use `has_debug_draw_fn`")]
     pub fn has_debug_fn(&self) -> bool {
-        self.debug_fn.is_some()
+        self.has_debug_draw_fn()
     }
 
     /// Replace the additive point lights (uploaded to the renderer each frame).

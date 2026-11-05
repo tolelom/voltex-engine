@@ -71,8 +71,8 @@ RuntimeApp::new(
 
 `RuntimeApp::run()`은 winit 이벤트 루프를 돌린다. 창이 다시 그려질 때마다 `engine/voltex_runtime/src/handler.rs`의 `redraw`가 한 프레임을 처리한다.
 
-1. 시간: 타이머를 진행하고 이번 프레임의 `dt`를 정한다.
-2. 카메라 조작: 마우스 오른쪽 버튼을 누르고 있을 때만 기본 자유 카메라가 움직인다.
+1. 시간: 타이머를 진행하고 이번 프레임의 `dt`를 정한다 (`advance_frame_clock`).
+2. 카메라 조작: 마우스 오른쪽 버튼을 누르고 있을 때만 기본 자유 카메라가 움직인다 (`update_fly_camera`).
 3. 게임 로직(`RuntimeApp::tick_systems_only`, `app/mod.rs`)
    1. 부모·자식 transform 전파
    2. 스켈레톤 애니메이션, 파티클, 스프라이트 애니메이션
@@ -81,10 +81,10 @@ RuntimeApp::new(
    5. Lua 스크립트: 입력 상태를 넘기고 `on_start`, `on_update` 호출, 바뀐 스크립트 다시 불러오기
    6. 게임이 등록한 시스템
    7. 오디오: 엔티티의 소리 상태를 오디오 장치에 반영
-4. GPU 자원 준비: 이번 프레임에 생긴 엔티티의 메시·재질을 GPU에 올리고, 씬 파일의 텍스처·메시 경로를 불러온다.
-5. 게임 콜백: 카메라, 조명, 디버그 선을 게임이 정한 대로 갱신한다.
-6. 입력 정리: 이번 프레임의 "막 눌림" 상태를 지운다. 게임 로직이 본 뒤라서 여기서 지운다.
-7. 렌더: 렌더러가 World를 그리고, HUD를 켰으면 그 위에 UI를 그린 뒤 화면에 내보낸다.
+4. GPU 자원 준비: 이번 프레임에 생긴 엔티티의 메시·재질을 GPU에 올리고, 씬 파일의 텍스처·메시 경로를 불러온다 (`sync_gpu_resources`).
+5. 게임 콜백: 카메라, 조명, 디버그 선을 게임이 정한 대로 갱신한다 (`run_frame_callbacks`). 이어서 창 제목의 FPS를 갱신한다 (`update_window_title`).
+6. 입력 정리: 이번 프레임의 "막 눌림" 상태를 지운다 (`InputState::clear_frame_edges`). 게임 로직이 본 뒤라서 여기서 지운다.
+7. 렌더: 렌더러가 World를 그리고, HUD를 켰으면 그 위에 UI를 그린 뒤 화면에 내보낸다 (`render_frame`, `draw_hud_overlay`).
 
 ## 코드 읽는 순서
 
