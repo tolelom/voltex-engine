@@ -82,6 +82,22 @@ impl Vec3 {
         self + (other - self) * t
     }
 
+    /// Component-wise minimum.
+    pub fn min(self, other: Vec3) -> Vec3 {
+        Vec3::new(self.x.min(other.x), self.y.min(other.y), self.z.min(other.z))
+    }
+
+    /// Component-wise maximum.
+    pub fn max(self, other: Vec3) -> Vec3 {
+        Vec3::new(self.x.max(other.x), self.y.max(other.y), self.z.max(other.z))
+    }
+
+    /// Component-wise product `(x·x', y·y', z·z')` — e.g. a diagonal inertia
+    /// tensor applied to a vector, or per-axis scaling.
+    pub fn mul_elementwise(self, other: Vec3) -> Vec3 {
+        Vec3::new(self.x * other.x, self.y * other.y, self.z * other.z)
+    }
+
     /// Returns a unit-length vector pointing in the same direction.
     ///
     /// **Beware**: dividing an `f32` by 0 does not panic — it produces
@@ -175,6 +191,15 @@ mod tests {
         assert_eq!(a.lerp(b, 0.0), a);
         assert_eq!(a.lerp(b, 1.0), b);
         assert_eq!(a.lerp(b, 0.5), Vec3::new(5.0, 5.0, 0.0));
+    }
+
+    #[test]
+    fn min_max_mul_elementwise_work_per_component() {
+        let a = Vec3::new(1.0, -2.0, 3.0);
+        let b = Vec3::new(-1.0, 4.0, 2.0);
+        assert_eq!(a.min(b), Vec3::new(-1.0, -2.0, 2.0));
+        assert_eq!(a.max(b), Vec3::new(1.0, 4.0, 3.0));
+        assert_eq!(a.mul_elementwise(b), Vec3::new(-1.0, -8.0, 6.0));
     }
 
     #[test]

@@ -78,7 +78,7 @@ pub fn integrate(world: &mut World, config: &PhysicsConfig) {
             let new_position = transform.position + new_velocity * config.fixed_dt;
             let new_rotation = transform
                 .rotation
-                .integrate(rb.angular_velocity, config.fixed_dt);
+                .integrate_angular_velocity(rb.angular_velocity, config.fixed_dt);
             (entity, new_velocity, new_position, new_rotation)
         })
         .collect();

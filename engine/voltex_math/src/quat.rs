@@ -33,6 +33,9 @@ pub struct Quat {
     pub w: f32,
 }
 
+/// `|sin(pitch)|` above `1 - GIMBAL_LOCK_EPSILON` is treated as gimbal lock.
+const GIMBAL_LOCK_EPSILON: f32 = 1e-5;
+
 impl Quat {
     /// Identity rotation `(0, 0, 0, 1)`.
     pub const IDENTITY: Self = Self {
@@ -188,32 +191,32 @@ impl Quat {
     /// `Quat::from_euler_yxz(q.to_euler_yxz())` reproduces the same rotation
     /// modulo gimbal lock at `|pitch| = π/2`.
     ///
-    /// Derivation: for `R = RotY(b) * RotX(a) * RotZ(c)` the matrix entry
-    /// `M[1][2] = -sin(a)`. Outside gimbal lock the remaining angles come
-    /// from `atan2` on stable pairs of matrix elements. At gimbal lock
-    /// `cos(a) ≈ 0` we collapse `b` to 0 and put the combined yaw+roll
-    /// into `c` (consistent, lossy convention shared with the inspector).
+    /// Derivation: for `R = RotY(yaw) * RotX(pitch) * RotZ(roll)` the matrix
+    /// entry `M[1][2] = -sin(pitch)`. Outside gimbal lock the remaining angles
+    /// come from `atan2` on stable pairs of matrix elements. At gimbal lock
+    /// `cos(pitch) ≈ 0` we collapse yaw to 0 and put the combined yaw+roll
+    /// into roll (consistent, lossy convention shared with the inspector).
     pub fn to_euler_yxz(self) -> Vec3 {
         let (x, y, z, w) = (self.x, self.y, self.z, self.w);
-        // M[1][2] = 2(yz - wx)   →   sin(a) = -M[1][2] = 2(wx - yz)
-        let sin_x = (2.0 * (w * x - y * z)).clamp(-1.0, 1.0);
-        let a = sin_x.asin();
-        // Threshold chosen generously: floating-point drift can leave `sin_x`
-        // a few ULP away from ±1 even when the input came from a true
-        // gimbal-lock Euler. Using a tight `cos_x > 1e-6` falls through to
-        // the atan2 branch, where both numerator and denominator are near
-        // zero and the recovered (b, c) lose all information.
-        if sin_x.abs() > 1.0 - 1e-5 {
-            // Gimbal: collapse b → 0, put everything into c via M[0][1]/M[0][0].
+        // M[1][2] = 2(yz - wx)   →   sin(pitch) = -M[1][2] = 2(wx - yz)
+        let sin_pitch = (2.0 * (w * x - y * z)).clamp(-1.0, 1.0);
+        let pitch = sin_pitch.asin();
+        // Threshold chosen generously: floating-point drift can leave
+        // `sin_pitch` a few ULP away from ±1 even when the input came from a
+        // true gimbal-lock Euler. Using a tight `cos_pitch > 1e-6` falls
+        // through to the atan2 branch, where both numerator and denominator
+        // are near zero and the recovered (yaw, roll) lose all information.
+        if sin_pitch.abs() > 1.0 - GIMBAL_LOCK_EPSILON {
+            // Gimbal: collapse yaw → 0, put everything into roll via M[0][1]/M[0][0].
             // M[0][1] = 2(xy - wz), M[0][0] = 1 - 2(y² + z²)
-            let c = (-2.0 * (x * y - w * z)).atan2(1.0 - 2.0 * (y * y + z * z));
-            Vec3::new(a, 0.0, c)
+            let roll = (-2.0 * (x * y - w * z)).atan2(1.0 - 2.0 * (y * y + z * z));
+            Vec3::new(pitch, 0.0, roll)
         } else {
-            // b = atan2(M[0][2], M[2][2])  with M[0][2] = 2(xz + wy), M[2][2] = 1 - 2(x² + y²)
-            // c = atan2(M[1][0], M[1][1])  with M[1][0] = 2(xy + wz), M[1][1] = 1 - 2(x² + z²)
-            let b = (2.0 * (x * z + w * y)).atan2(1.0 - 2.0 * (x * x + y * y));
-            let c = (2.0 * (x * y + w * z)).atan2(1.0 - 2.0 * (x * x + z * z));
-            Vec3::new(a, b, c)
+            // yaw  = atan2(M[0][2], M[2][2])  with M[0][2] = 2(xz + wy), M[2][2] = 1 - 2(x² + y²)
+            // roll = atan2(M[1][0], M[1][1])  with M[1][0] = 2(xy + wz), M[1][1] = 1 - 2(x² + z²)
+            let yaw = (2.0 * (x * z + w * y)).atan2(1.0 - 2.0 * (x * x + y * y));
+            let roll = (2.0 * (x * y + w * z)).atan2(1.0 - 2.0 * (x * x + z * z));
+            Vec3::new(pitch, yaw, roll)
         }
     }
 
@@ -223,7 +226,7 @@ impl Quat {
     /// Uses the standard `dq/dt = 0.5 * ω̃ · q` formula where `ω̃ = (ω, 0)`
     /// is the pure-imaginary quaternion of the angular velocity. Drift is
     /// bounded by the final `normalize()`.
-    pub fn integrate(self, omega: Vec3, dt: f32) -> Self {
+    pub fn integrate_angular_velocity(self, omega: Vec3, dt: f32) -> Self {
         let omega_q = Self::new(omega.x, omega.y, omega.z, 0.0);
         let dq = omega_q.mul_quat(self);
         let half_dt = 0.5 * dt;
@@ -234,6 +237,22 @@ impl Quat {
             w: self.w + dq.w * half_dt,
         }
         .normalize()
+    }
+
+    /// Old name of [`Quat::integrate_angular_velocity`].
+    #[deprecated(note = "use `integrate_angular_velocity`")]
+    pub fn integrate(self, omega: Vec3, dt: f32) -> Self {
+        self.integrate_angular_velocity(omega, dt)
+    }
+
+    /// Build from `[x, y, z, w]` (the layout scenes and network snapshots store).
+    pub const fn from_array(xyzw: [f32; 4]) -> Self {
+        Self::new(xyzw[0], xyzw[1], xyzw[2], xyzw[3])
+    }
+
+    /// Components as `[x, y, z, w]`.
+    pub const fn to_array(self) -> [f32; 4] {
+        [self.x, self.y, self.z, self.w]
     }
 
     /// Spherical linear interpolation between two unit quaternions.
@@ -330,15 +349,22 @@ mod tests {
     }
 
     #[test]
+    fn array_round_trips_in_xyzw_order() {
+        let q = Quat::new(0.1, 0.2, 0.3, 0.9);
+        assert_eq!(q.to_array(), [0.1, 0.2, 0.3, 0.9]);
+        assert_eq!(Quat::from_array(q.to_array()), q);
+    }
+
+    #[test]
     fn identity_to_mat4_is_identity() {
-        let m = Quat::identity().to_mat4();
+        let m = Quat::IDENTITY.to_mat4();
         assert_mat4_close(&m, &Mat4::IDENTITY, 1e-6, "identity quat → mat");
     }
 
     #[test]
     fn from_axis_angle_zero_axis_returns_identity() {
         let q = Quat::from_axis_angle(Vec3::ZERO, 1.5);
-        assert_eq!(q, Quat::identity());
+        assert_eq!(q, Quat::IDENTITY);
     }
 
     #[test]
@@ -373,8 +399,8 @@ mod tests {
     #[test]
     fn multiplication_with_identity_is_noop() {
         let q = Quat::from_axis_angle(Vec3::new(1.0, 2.0, 3.0).normalize(), 1.2);
-        assert_quat_eq(q * Quat::identity(), q, 1e-6, "q * I");
-        assert_quat_eq(Quat::identity() * q, q, 1e-6, "I * q");
+        assert_quat_eq(q * Quat::IDENTITY, q, 1e-6, "q * I");
+        assert_quat_eq(Quat::IDENTITY * q, q, 1e-6, "I * q");
     }
 
     #[test]
@@ -383,19 +409,19 @@ mod tests {
         // Unit quaternion: conjugate equals inverse.
         assert_quat_eq(q.conjugate(), q.inverse(), 1e-6, "unit conj = inv");
         // q * q⁻¹ = identity.
-        assert_quat_eq(q * q.inverse(), Quat::identity(), 1e-6, "q · q⁻¹");
+        assert_quat_eq(q * q.inverse(), Quat::IDENTITY, 1e-6, "q · q⁻¹");
     }
 
     #[test]
     fn inverse_handles_zero_quat() {
         let z = Quat::new(0.0, 0.0, 0.0, 0.0);
-        assert_eq!(z.inverse(), Quat::identity());
+        assert_eq!(z.inverse(), Quat::IDENTITY);
     }
 
     #[test]
     fn normalize_handles_zero_quat() {
         let z = Quat::new(0.0, 0.0, 0.0, 0.0);
-        assert_eq!(z.normalize(), Quat::identity());
+        assert_eq!(z.normalize(), Quat::IDENTITY);
     }
 
     #[test]
@@ -437,7 +463,7 @@ mod tests {
 
     #[test]
     fn slerp_clamps_t_to_zero_one() {
-        let a = Quat::identity();
+        let a = Quat::IDENTITY;
         let b = Quat::from_axis_angle(Vec3::new(0.0, 1.0, 0.0), FRAC_PI_2);
         assert_quat_eq(Quat::slerp(a, b, -1.0), a, 1e-6, "t<0 clamps to a");
         assert_quat_eq(Quat::slerp(a, b, 2.0), b, 1e-6, "t>1 clamps to b");
@@ -465,7 +491,7 @@ mod tests {
     #[test]
     fn from_euler_yxz_zero_is_identity() {
         let q = Quat::from_euler_yxz(Vec3::ZERO);
-        assert_quat_eq(q, Quat::identity(), 1e-6, "0 euler = identity");
+        assert_quat_eq(q, Quat::IDENTITY, 1e-6, "0 euler = identity");
     }
 
     #[test]
@@ -488,7 +514,7 @@ mod tests {
 
     #[test]
     fn to_euler_yxz_returns_zero_for_identity() {
-        let e = Quat::identity().to_euler_yxz();
+        let e = Quat::IDENTITY.to_euler_yxz();
         assert!(e.x.abs() < 1e-6 && e.y.abs() < 1e-6 && e.z.abs() < 1e-6, "got {e:?}");
     }
 
@@ -514,7 +540,7 @@ mod tests {
     #[test]
     fn integrate_zero_omega_is_identity() {
         let q = Quat::from_axis_angle(Vec3::new(0.0, 1.0, 0.0), 0.4);
-        let after = q.integrate(Vec3::ZERO, 1.0 / 60.0);
+        let after = q.integrate_angular_velocity(Vec3::ZERO, 1.0 / 60.0);
         assert_quat_eq(after, q, 1e-6, "ω=0 noop");
     }
 
@@ -524,7 +550,7 @@ mod tests {
         // is approximate, so verify direction/magnitude rather than exact
         // equality against a closed-form rotation.
         let q = Quat::IDENTITY;
-        let after = q.integrate(Vec3::new(0.0, PI, 0.0), 1.0);
+        let after = q.integrate_angular_velocity(Vec3::new(0.0, PI, 0.0), 1.0);
         // Quaternion should be unit.
         assert!((after.length() - 1.0).abs() < 1e-5, "unit: {}", after.length());
         // Should have non-trivial Y component (the rotation axis).
@@ -537,7 +563,7 @@ mod tests {
         let omega = Vec3::new(1.0, 2.0, 0.5);
         let dt = 1.0 / 240.0;
         for _ in 0..10_000 {
-            q = q.integrate(omega, dt);
+            q = q.integrate_angular_velocity(omega, dt);
         }
         assert!((q.length() - 1.0).abs() < 1e-4, "drift: {}", q.length());
     }
