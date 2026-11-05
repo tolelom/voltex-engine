@@ -7,7 +7,7 @@ use voltex_renderer::{Camera, LightUniform, MaterialUniform};
 use voltex_renderer_ecs::{BasicRenderer, RenderAssets};
 
 use crate::headless::HeadlessGpu;
-use super::{draw_and_read, unit_cube};
+use super::{draw_and_read, FrameSpec, unit_cube};
 use crate::target::{OffscreenTarget, CAPTURE_FORMAT};
 
 /// Render a single cube with a pre-built [`GpuTexture`](voltex_renderer::GpuTexture) via a runtime
@@ -45,13 +45,14 @@ pub fn render_cube_with_texture(
         gpu,
         &target,
         &renderer,
-        "capture tex",
-        wgpu::Color { r: 0.05, g: 0.05, b: 0.08, a: 1.0 },
         &mut world,
         &assets,
-        camera.view_projection(),
-        camera.position,
-        LightUniform::new(),
+        FrameSpec {
+            label: "capture tex",
+            clear_color: wgpu::Color { r: 0.05, g: 0.05, b: 0.08, a: 1.0 },
+            camera: &camera,
+            light: LightUniform::new(),
+        },
     )
 }
 
@@ -94,13 +95,14 @@ pub fn render_cube_with_png(
         gpu,
         &target,
         &renderer,
-        "capture png tex",
-        wgpu::Color { r: 0.05, g: 0.05, b: 0.08, a: 1.0 },
         &mut world,
         &assets,
-        camera.view_projection(),
-        camera.position,
-        LightUniform::new(),
+        FrameSpec {
+            label: "capture png tex",
+            clear_color: wgpu::Color { r: 0.05, g: 0.05, b: 0.08, a: 1.0 },
+            camera: &camera,
+            light: LightUniform::new(),
+        },
     ))
 }
 
@@ -141,13 +143,14 @@ pub fn render_obj_model(gpu: &HeadlessGpu, width: u32, height: u32, obj_src: &st
         gpu,
         &target,
         &renderer,
-        "capture obj",
-        wgpu::Color { r: 0.05, g: 0.05, b: 0.08, a: 1.0 },
         &mut world,
         &assets,
-        camera.view_projection(),
-        camera.position,
-        light,
+        FrameSpec {
+            label: "capture obj",
+            clear_color: wgpu::Color { r: 0.05, g: 0.05, b: 0.08, a: 1.0 },
+            camera: &camera,
+            light,
+        },
     )
 }
 

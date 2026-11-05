@@ -2,7 +2,7 @@
 //! is rotated 90° about Z renders tall with the flag on and stays a wide
 //! upright billboard with it off (the default).
 
-use voltex_capture::HeadlessGpu;
+use voltex_capture::{render_world_from, CameraPose, HeadlessGpu, Projection};
 use voltex_ecs::{Transform, World};
 use voltex_math::{Quat, Vec3};
 use voltex_renderer_ecs::Sprite;
@@ -18,7 +18,8 @@ fn render(gpu: &HeadlessGpu, roll: bool) -> Vec<u8> {
     let mut world = World::new();
     world.spawn_bundle((t, sprite));
     // 4x4 world units across 200 px: 50 px per unit, origin at pixel (100, 100).
-    voltex_capture::render_world_ortho(gpu, W, H, &mut world, Vec3::new(0.0, 0.0, 10.0), 0.0, 0.0, 4.0)
+    let pose = CameraPose { position: Vec3::new(0.0, 0.0, 10.0), yaw: 0.0, pitch: 0.0 };
+    render_world_from(gpu, W, H, &mut world, pose, Projection::Orthographic { height: 4.0 })
 }
 
 fn is_red(rgba: &[u8], x: u32, y: u32) -> bool {

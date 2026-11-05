@@ -23,15 +23,13 @@ fn dungeon_scene_renders_walls_player_enemies() {
     .unwrap();
     let mut w = World::new();
     build_level(&mut w, &m);
-    let rgba = voltex_capture::render_world(
-        &gpu,
-        320,
-        240,
-        &mut w,
-        Vec3::new(0.0, 16.0, 9.0),
-        0.0,
-        -1.05,
-    );
+    let pose = voltex_capture::CameraPose {
+        position: Vec3::new(0.0, 16.0, 9.0),
+        yaw: 0.0,
+        pitch: -1.05,
+    };
+    let projection = voltex_capture::Projection::Perspective;
+    let rgba = voltex_capture::render_world_from(&gpu, 320, 240, &mut w, pose, projection);
     let stats = ImageStats::analyze(&rgba);
     eprintln!("dungeon frame stats: {stats:?}");
     assert!(!stats.looks_blank(), "dungeon frame blank: {stats:?}");

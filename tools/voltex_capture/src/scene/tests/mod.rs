@@ -450,19 +450,19 @@ fn render_game_ready_demo_from_camera(
     let mut camera = Camera::new(cam_pos, width as f32 / height as f32);
     camera.yaw = yaw;
     camera.pitch = pitch;
-    let view_proj = camera.view_projection();
     let light = LightUniform::new();
     draw_and_read(
         gpu,
         &target,
         &renderer,
-        "demo_like_cam",
-        wgpu::Color { r: 0.02, g: 0.02, b: 0.05, a: 1.0 },
         &mut world,
         &assets,
-        view_proj,
-        camera.position,
-        light,
+        FrameSpec {
+            label: "demo_like_cam",
+            clear_color: wgpu::Color { r: 0.02, g: 0.02, b: 0.05, a: 1.0 },
+            camera: &camera,
+            light,
+        },
     )
 }
 

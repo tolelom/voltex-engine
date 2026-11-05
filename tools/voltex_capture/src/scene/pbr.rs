@@ -6,7 +6,7 @@ use voltex_math::Vec3;
 use voltex_renderer::{generate_sphere_mesh, Camera, LightUniform, MaterialUniform};
 use voltex_renderer_ecs::{BasicRenderer, RenderAssets};
 
-use super::draw_and_read;
+use super::{draw_and_read, FrameSpec};
 use crate::headless::HeadlessGpu;
 use crate::target::{OffscreenTarget, CAPTURE_FORMAT};
 
@@ -44,13 +44,14 @@ pub fn render_pbr_basic_renderer(gpu: &HeadlessGpu, width: u32, height: u32, pbr
         gpu,
         &target,
         &renderer,
-        "capture pbr-br",
-        wgpu::Color { r: 0.05, g: 0.05, b: 0.08, a: 1.0 },
         &mut world,
         &assets,
-        camera.view_projection(),
-        camera.position,
-        light,
+        FrameSpec {
+            label: "capture pbr-br",
+            clear_color: wgpu::Color { r: 0.05, g: 0.05, b: 0.08, a: 1.0 },
+            camera: &camera,
+            light,
+        },
     )
 }
 
@@ -97,12 +98,13 @@ pub fn render_pbr_sphere_normalmap(
         gpu,
         &target,
         &renderer,
-        "capture pbr-nm",
-        wgpu::Color { r: 0.02, g: 0.02, b: 0.04, a: 1.0 },
         &mut world,
         &assets,
-        camera.view_projection(),
-        camera.position,
-        light,
+        FrameSpec {
+            label: "capture pbr-nm",
+            clear_color: wgpu::Color { r: 0.02, g: 0.02, b: 0.04, a: 1.0 },
+            camera: &camera,
+            light,
+        },
     )
 }

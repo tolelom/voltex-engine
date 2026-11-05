@@ -34,16 +34,13 @@ fn tilemap_fills_set_cells_and_leaves_empty_ones() {
     // Ortho view 4 high x 8 wide centred on (3, 1): x in [-1, 7], y in [-1, 3].
     // 50 px per world unit. Cell 0 = x[0,2] -> px 50..150, cell 1 = px 150..250,
     // cell 2 = px 250..350; row y[0,2] -> px rows 50..150.
-    let rgba = voltex_capture::render_world_ortho(
-        &gpu,
-        W,
-        H,
-        &mut world,
-        Vec3::new(3.0, 1.0, 10.0),
-        0.0,
-        0.0,
-        4.0,
-    );
+    let pose = voltex_capture::CameraPose {
+        position: Vec3::new(3.0, 1.0, 10.0),
+        yaw: 0.0,
+        pitch: 0.0,
+    };
+    let projection = voltex_capture::Projection::Orthographic { height: 4.0 };
+    let rgba = voltex_capture::render_world_from(&gpu, W, H, &mut world, pose, projection);
 
     let red = |p: [u8; 4]| p[0] > 150 && p[1] < 60 && p[2] < 60;
     let c0 = pixel(&rgba, 100, 100);

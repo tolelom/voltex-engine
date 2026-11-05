@@ -6,7 +6,7 @@ use voltex_renderer::{Camera, LightUniform};
 use voltex_renderer_ecs::{BasicRenderer, RenderAssets};
 
 use crate::headless::HeadlessGpu;
-use super::draw_and_read;
+use super::{draw_and_read, FrameSpec};
 use crate::target::{OffscreenTarget, CAPTURE_FORMAT};
 
 /// Spawn an orange particle burst at the origin, advance it `ticks` times by
@@ -48,13 +48,14 @@ pub fn render_particle_burst(
         gpu,
         &target,
         &renderer,
-        "capture parts",
-        wgpu::Color { r: 0.0, g: 0.0, b: 0.0, a: 1.0 },
         &mut world,
         &assets,
-        camera.view_projection(),
-        camera.position,
-        light,
+        FrameSpec {
+            label: "capture parts",
+            clear_color: wgpu::Color { r: 0.0, g: 0.0, b: 0.0, a: 1.0 },
+            camera: &camera,
+            light,
+        },
     )
 }
 
@@ -108,13 +109,14 @@ pub fn render_sprite_sheet_frame(gpu: &HeadlessGpu, width: u32, height: u32, fra
         gpu,
         &target,
         &renderer,
-        "capture sheet",
-        wgpu::Color { r: 0.0, g: 0.0, b: 0.0, a: 1.0 },
         &mut world,
         &assets,
-        camera.view_projection(),
-        camera.position,
-        light,
+        FrameSpec {
+            label: "capture sheet",
+            clear_color: wgpu::Color { r: 0.0, g: 0.0, b: 0.0, a: 1.0 },
+            camera: &camera,
+            light,
+        },
     )
 }
 
@@ -148,13 +150,14 @@ pub fn render_billboard_sprite(
         gpu,
         &target,
         &renderer,
-        "capture sprite",
-        wgpu::Color { r: 0.0, g: 0.0, b: 0.0, a: 1.0 },
         &mut world,
         &assets,
-        camera.view_projection(),
-        camera.position,
-        light,
+        FrameSpec {
+            label: "capture sprite",
+            clear_color: wgpu::Color { r: 0.0, g: 0.0, b: 0.0, a: 1.0 },
+            camera: &camera,
+            light,
+        },
     )
 }
 

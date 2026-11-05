@@ -11,7 +11,7 @@
 //! - 스킨드 전용 파이프라인: [`skinned`] 의 `render_skinned_rest`/`render_skinned_bent`.
 
 use voltex_ecs::{Bounds, MaterialHandle, MeshHandle, Transform, World};
-use voltex_math::{Mat4, Quat, Vec3, AABB};
+use voltex_math::{Quat, Vec3, AABB};
 use voltex_renderer::{Camera, LightUniform, MaterialUniform, Mesh, MeshVertex};
 use voltex_renderer_ecs::{BasicRenderer, RenderAssets};
 
@@ -32,13 +32,14 @@ mod ui;
 
 pub use declarative::{
     render_boids_swarm, render_data_authored_scene, render_materialized_primitives,
-    render_survivor_seed_scene, render_world, render_world_ortho,
+    render_survivor_seed_scene, render_world, render_world_from, render_world_ortho, CameraPose,
+    Projection,
 };
 pub use gizmo::{render_gizmo_rotate, render_gizmo_scale, render_gizmo_translate};
 pub use hot_reload::{render_mesh_hot_reload, render_texture_hot_reload};
 pub use lighting::{render_sphere_point_lit, render_shadow_demo, render_spot_lit};
 pub use pbr::{render_pbr_basic_renderer, render_pbr_sphere_normalmap};
-pub use playthrough::{render_demo_frame, render_demo_frame_mode};
+pub use playthrough::{render_demo_frame, render_demo_frame_mode, DemoMoment, DemoShading};
 pub use skinned::{
     render_skinned_bent, render_skinned_bent_demo, render_skinned_rest, render_skinned_runtime,
     render_skinned_runtime_mode, render_skinned_shadow_scene,
@@ -80,21 +81,33 @@ pub(crate) fn unit_cube(device: &wgpu::Device) -> Mesh {
     Mesh::cube(device, 1.0)
 }
 
+/// What one captured frame looks like: encoder label, background, viewpoint and
+/// directional light. The drawn content comes from the world and its assets.
+pub(crate) struct FrameSpec<'a> {
+    pub label: &'a str,
+    pub clear_color: wgpu::Color,
+    pub camera: &'a Camera,
+    pub light: LightUniform,
+}
+
 /// Record one `BasicRenderer::render` into a fresh encoder, submit it and read
 /// the target back as RGBA8 (the shared tail of the scene functions below).
-#[allow(clippy::too_many_arguments)]
 pub(crate) fn draw_and_read(
     gpu: &HeadlessGpu,
     target: &OffscreenTarget,
     renderer: &BasicRenderer,
-    label: &str,
-    clear_color: wgpu::Color,
     world: &mut World,
     assets: &RenderAssets,
-    view_proj: Mat4,
-    cam_pos: Vec3,
-    light: LightUniform,
+    frame: FrameSpec,
 ) -> Vec<u8> {
+    let FrameSpec {
+        label,
+        clear_color,
+        camera,
+        light,
+    } = frame;
+    let view_proj = camera.view_projection();
+    let cam_pos = camera.position;
     let mut encoder = gpu
         .device
         .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some(label) });
@@ -145,25 +158,20 @@ pub fn render_cube_grid(gpu: &HeadlessGpu, width: u32, height: u32) -> Vec<u8> {
     // Camera looks down and forward at the grid.
     let mut camera = Camera::new(Vec3::new(0.0, 4.0, 8.0), width as f32 / height as f32);
     camera.pitch = -0.45;
-    let view_proj = camera.view_projection();
     let light = LightUniform::new();
 
     draw_and_read(
         gpu,
         &target,
         &renderer,
-        "capture cube_grid",
-        wgpu::Color {
-            r: 0.1,
-            g: 0.12,
-            b: 0.18,
-            a: 1.0,
-        },
         &mut world,
         &assets,
-        view_proj,
-        camera.position,
-        light,
+        FrameSpec {
+            label: "capture cube_grid",
+            clear_color: wgpu::Color { r: 0.1, g: 0.12, b: 0.18, a: 1.0 },
+            camera: &camera,
+            light,
+        },
     )
 }
 
@@ -189,7 +197,6 @@ pub fn render_single_cube(gpu: &HeadlessGpu, width: u32, height: u32) -> Vec<u8>
     let mut camera = Camera::new(Vec3::new(2.2, 1.8, 2.6), width as f32 / height as f32);
     camera.yaw = -0.7;
     camera.pitch = -0.45;
-    let view_proj = camera.view_projection();
 
     // Asymmetric light so each face receives a distinct diffuse term
     // (the default (0,-1,-1) lights +Y and +Z identically).
@@ -200,18 +207,14 @@ pub fn render_single_cube(gpu: &HeadlessGpu, width: u32, height: u32) -> Vec<u8>
         gpu,
         &target,
         &renderer,
-        "capture single_cube",
-        wgpu::Color {
-            r: 0.05,
-            g: 0.05,
-            b: 0.08,
-            a: 1.0,
-        },
         &mut world,
         &assets,
-        view_proj,
-        camera.position,
-        light,
+        FrameSpec {
+            label: "capture single_cube",
+            clear_color: wgpu::Color { r: 0.05, g: 0.05, b: 0.08, a: 1.0 },
+            camera: &camera,
+            light,
+        },
     )
 }
 
@@ -253,13 +256,14 @@ pub fn render_cube_at_depth(
         gpu,
         &target,
         &renderer,
-        "capture proj",
-        wgpu::Color { r: 0.0, g: 0.0, b: 0.0, a: 1.0 },
         &mut world,
         &assets,
-        camera.view_projection(),
-        camera.position,
-        light,
+        FrameSpec {
+            label: "capture proj",
+            clear_color: wgpu::Color { r: 0.0, g: 0.0, b: 0.0, a: 1.0 },
+            camera: &camera,
+            light,
+        },
     )
 }
 
@@ -285,13 +289,14 @@ pub fn render_debug_lines(
         gpu,
         &target,
         &renderer,
-        "capture lines",
-        wgpu::Color { r: 0.0, g: 0.0, b: 0.0, a: 1.0 },
         &mut world,
         &assets,
-        camera.view_projection(),
-        camera.position,
-        light,
+        FrameSpec {
+            label: "capture lines",
+            clear_color: wgpu::Color { r: 0.0, g: 0.0, b: 0.0, a: 1.0 },
+            camera: &camera,
+            light,
+        },
     )
 }
 

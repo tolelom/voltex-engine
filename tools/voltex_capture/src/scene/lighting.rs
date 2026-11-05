@@ -6,7 +6,7 @@ use voltex_math::Vec3;
 use voltex_renderer::{Camera, LightUniform, MaterialUniform};
 use voltex_renderer_ecs::{BasicRenderer, RenderAssets};
 
-use super::{draw_and_read, ground_quad_mesh, matte, unit_cube};
+use super::{draw_and_read, FrameSpec, ground_quad_mesh, matte, unit_cube};
 use crate::headless::HeadlessGpu;
 use crate::target::{OffscreenTarget, CAPTURE_FORMAT};
 
@@ -51,13 +51,14 @@ pub fn render_shadow_demo(gpu: &HeadlessGpu, width: u32, height: u32, shadows: b
         gpu,
         &target,
         &renderer,
-        "shadow demo",
-        wgpu::Color { r: 0.1, g: 0.1, b: 0.15, a: 1.0 },
         &mut world,
         &assets,
-        camera.view_projection(),
-        camera.position,
-        light,
+        FrameSpec {
+            label: "shadow demo",
+            clear_color: wgpu::Color { r: 0.1, g: 0.1, b: 0.15, a: 1.0 },
+            camera: &camera,
+            light,
+        },
     )
 }
 
@@ -96,13 +97,14 @@ pub fn render_sphere_point_lit(
         gpu,
         &target,
         &renderer,
-        "capture plight",
-        wgpu::Color { r: 0.0, g: 0.0, b: 0.0, a: 1.0 },
         &mut world,
         &assets,
-        camera.view_projection(),
-        camera.position,
-        light,
+        FrameSpec {
+            label: "capture plight",
+            clear_color: wgpu::Color { r: 0.0, g: 0.0, b: 0.0, a: 1.0 },
+            camera: &camera,
+            light,
+        },
     )
 }
 
@@ -147,12 +149,13 @@ pub fn render_spot_lit(
         gpu,
         &target,
         &renderer,
-        "capture spot",
-        wgpu::Color { r: 0.0, g: 0.0, b: 0.0, a: 1.0 },
         &mut world,
         &assets,
-        camera.view_projection(),
-        camera.position,
-        light,
+        FrameSpec {
+            label: "capture spot",
+            clear_color: wgpu::Color { r: 0.0, g: 0.0, b: 0.0, a: 1.0 },
+            camera: &camera,
+            light,
+        },
     )
 }
