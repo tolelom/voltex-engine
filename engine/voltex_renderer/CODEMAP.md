@@ -19,7 +19,7 @@ wgpu 기반 렌더링 — 메시/PBR/그림자/IBL/디퍼드/RT/post-process. �
 - `GpuTexture` (`white_1x1`/`black_1x1`/`flat_normal_map_1x1` 기본 맵; 구 `flat_normal_1x1` 튜플 반환은 deprecated), `pbr_texture_bind_group_layout` 등 — GPU 텍스처 + PBR 바인딩 (src/texture/mod.rs). `texture::parse_bmp`/`BmpImage` 는 `voltex_image::bmp` 래퍼
 
 ### Image / Model (voltex_image 재export)
-- `parse_png`, `parse_jpg`, `parse_gltf`, `GltfData`, `GltfMesh`, `GltfMaterial`, `MeshVertex` 등 — `voltex_image` crate로 이동; `pub use voltex_image::{...}` 역호환 재export 유지 (src/lib.rs)
+- `decode_png`, `decode_jpg`, `DecodedImage`, `parse_gltf`, `GltfData`, `GltfMesh`, `GltfMaterial`, `MeshVertex` 등 — `voltex_image` crate로 이동; `pub use voltex_image::{...}` 역호환 재export 유지 (src/lib.rs). deprecated `parse_png`/`parse_jpg` 도 재export
 - `obj` — OBJ 파서 모듈 재export (`voltex_image::obj`) (src/obj.rs → voltex_image)
 - `deflate` — zlib/deflate inflate 모듈 재export (`voltex_image::deflate`)
 - `json_parser` — glTF JSON 파서 모듈 재export (`voltex_image::json_parser`)
@@ -35,12 +35,14 @@ wgpu 기반 렌더링 — 메시/PBR/그림자/IBL/디퍼드/RT/post-process. �
 - `PointShadowMap`, `SpotShadowMap` (src/point_shadow.rs, src/spot_shadow.rs)
 - `Plane`, `Frustum`, `extract_frustum`, `cull_lights` (src/frustum.rs)
 - `create_pbr_pipeline`, `create_shadow_pipeline` (src/pbr_pipeline.rs, src/shadow_pipeline.rs)
-- `generate_sphere` — UV sphere generator (src/sphere.rs)
-- `generate_cube` / `generate_plane` / `generate_quad` — primitive mesh generators → `(Vec<MeshVertex>, Vec<u32>)` for `Mesh::new` (src/primitives.rs). 올바른 per-face normal/UV/tangent (PBR 노멀맵 호환)
+- `MeshData { vertices, indices }` — CPU 메시 데이터, `upload(device) -> Mesh` (src/primitives.rs)
+- `generate_sphere_mesh` — UV sphere generator → `MeshData` (src/sphere.rs)
+- `generate_cube_mesh` / `generate_plane_mesh` / `generate_quad_mesh` — primitive mesh generators → `MeshData` (src/primitives.rs). 올바른 per-face normal/UV/tangent (PBR 노멀맵 호환)
+- `generate_sphere` / `generate_cube` / `generate_plane` / `generate_quad` — deprecated: `(vertices, indices)` 튜플을 반환하는 구 API
 
 ### IBL
 - `IblResources` (src/ibl.rs)
-- SH irradiance — `compute_sh_coefficients`, `pack_sh_coefficients`, `evaluate_sh_cpu` (src/sh.rs)
+- SH irradiance — `compute_sh_coefficients`, `pack_sh_coefficients`, `evaluate_sh_cpu` (src/sh.rs). `evaluate_sh_cpu` 는 CPU 참조 구현으로 테스트에서만 호출된다
 - BRDF LUT compute (src/brdf_lut.rs + brdf_lut_compute.wgsl)
 
 ### Animation / Skinning
@@ -48,38 +50,42 @@ wgpu 기반 렌더링 — 메시/PBR/그림자/IBL/디퍼드/RT/post-process. �
 
 ### Deferred
 - `GBuffer` (src/gbuffer.rs)
-- `gbuffer_compress` — 옥타헤드럴 노멀 인코딩 (src/gbuffer_compress.rs)
 - `FullscreenVertex`, `create_fullscreen_vertex_buffer` (src/fullscreen_quad.rs)
 - `create_gbuffer_pipeline`, `create_lighting_pipeline` 등 (src/deferred_pipeline/: `*_pipeline.rs` — gbuffer, lighting, ssgi, rt_shadow, bloom, tonemap. 같은 이름의 최상위 리소스 모듈과 구분하려고 접미사)
 
 ### RT (Ray Tracing)
 - `RtAccel`, `RtInstance`, `BlasMeshData` (src/rt_accel.rs)
 - `RtShadowResources`, `RT_SHADOW_FORMAT` (src/rt_shadow.rs)
-- `RtReflections`, `RtAo`, `RtPointShadow`, `soft_rt_shadow` (src/rt_*.rs)
-- `BlasTracker` — dirty mesh 추적 (src/blas_update.rs)
-- `RtCapabilities`, `RenderMode` — fallback (src/rt_fallback.rs)
+- `RtReflections`, `RtAo`, `RtPointShadow` (src/rt_*.rs)
 
-### SSGI / Light Volumes / Probes
+### SSGI
 - `SsgiResources`, `SsgiUniform`, `SSGI_OUTPUT_FORMAT` (src/ssgi.rs)
-- `half_res_ssgi` (src/half_res_ssgi.rs)
-- `stencil_opt` — 스텐실 최적화 (src/stencil_opt.rs)
-- `LightVolume` — Sphere/Cone/Fullscreen (src/light_volumes.rs)
-- `LightProbe`, `LightProbeGrid` (src/light_probes.rs)
 
 ### Post-process
 - `HdrTarget`, `HDR_FORMAT` (src/hdr.rs)
 - `BloomResources`, `BloomUniform`, `mip_sizes`, `BLOOM_MIP_COUNT` (src/bloom.rs)
-- `bilateral_bloom` (src/bilateral_bloom.rs)
 - `TonemapUniform`, `aces_tonemap` (src/tonemap.rs)
-- `ForwardPass`, `sort_transparent_back_to_front` (src/forward_pass.rs)
 - `AutoExposure` (src/auto_exposure.rs)
-- `InstanceData`, `InstanceBuffer`, `create_instanced_pipeline` (src/instancing.rs)
-- `BilateralBlur` (src/bilateral_blur.rs)
-- `TemporalAccumulation` (src/temporal_accum.rs)
 - `Taa` (src/taa.rs)
 - `Ssr` (src/ssr.rs)
 - `MotionBlur` (src/motion_blur.rs)
 - `DepthOfField` (src/dof.rs)
+
+### Experimental (`experimental::*`, src/experimental/)
+구현·단위 테스트는 되어 있지만 엔진 렌더러(BasicRenderer, 예제, voltex_capture)가 아직 쓰지 않는 모듈. API가 바뀌거나 없어질 수 있다. 옛 경로(`voltex_renderer::light_probes`, `voltex_renderer::ForwardPass` 등)는 src/deprecated_paths.rs 의 deprecated 별칭으로 남아 있다.
+- `forward_pass` — `ForwardPass`(알파 블렌딩 투명 패스, HDR 타겟, depth read-only) + `sort_transparent_back_to_front` (+ forward_shader.wgsl)
+- `instancing` — `InstanceData`, `InstanceBuffer`, `create_instanced_pipeline` (+ instanced_shader.wgsl)
+- `gbuffer_compress` — 옥타헤드럴 노멀 인코딩 + depth 기반 위치 복원
+- `light_volumes` — `LightVolume` (Sphere/Cone/Fullscreen)
+- `stencil_opt` — 라이트 볼륨 스텐실 mark/test 상태
+- `light_probes` — `LightProbe`, `LightProbeGrid` (SH 평가 + nearest)
+- `blas_update` — `BlasTracker` (dirty mesh 추적)
+- `rt_fallback` — `RtCapabilities`, `RenderMode`, `select_render_mode`
+- `soft_rt_shadow` — `SoftShadowParams`, `penumbra_size`
+- `bilateral_bloom` — luminance 기반 bilateral bloom weight
+- `bilateral_blur` — `BilateralBlur` 컴퓨트 패스 (+ bilateral_blur.wgsl)
+- `half_res_ssgi` — 반해상도 + depth-aware 업스케일 가중치
+- `temporal_accum` — `TemporalAccumulation` 컴퓨트 패스 (+ temporal_accum.wgsl)
 
 ### Pipeline
 - `pipeline::create_position_color_pipeline` — `PositionColorVertex` 무조명 파이프라인(triangle 예제, src/position_color.wgsl). 구 이름 `create_render_pipeline` 은 deprecated
@@ -97,11 +103,12 @@ wgpu 기반 렌더링 — 메시/PBR/그림자/IBL/디퍼드/RT/post-process. �
 - 머티리얼/조명/그림자: material, light, shadow, csm, point_shadow, spot_shadow, frustum, shadow_pipeline, pbr_pipeline
 - IBL: sh, brdf_lut, ibl
 - 애니메이션: animation, skinned_vertex, skeleton (조인트 계층→bone palette)
-- 디퍼드: gbuffer, gbuffer_compress, deferred_pipeline
-- RT: rt_accel, rt_shadow, rt_reflections, rt_ao, rt_point_shadow, soft_rt_shadow, blas_update, rt_fallback
-- SSGI/Probes/Volumes: ssgi, half_res_ssgi, stencil_opt, light_volumes, light_probes
-- 포스트: hdr, bloom, bilateral_bloom, tonemap, forward_pass, auto_exposure, instancing, bilateral_blur, temporal_accum, taa, ssr, motion_blur, dof
-- 셰이더: 각종 .wgsl 파일 (mesh, pbr, shadow, deferred, ssgi, rt, bloom, taa, ssr, motion_blur, dof, bilateral_blur, auto_exposure, brdf_lut_compute, instanced, forward, skinned, sprite, tilemap)
+- 디퍼드: gbuffer, deferred_pipeline
+- RT: rt_accel, rt_shadow, rt_reflections, rt_ao, rt_point_shadow
+- SSGI: ssgi
+- 포스트: hdr, bloom, tonemap, auto_exposure, taa, ssr, motion_blur, dof
+- experimental (엔진 미사용): forward_pass, instancing, gbuffer_compress, light_volumes, stencil_opt, light_probes, blas_update, rt_fallback, soft_rt_shadow, bilateral_bloom, bilateral_blur, half_res_ssgi, temporal_accum
+- 셰이더: 각종 .wgsl 파일 (mesh, pbr, shadow, deferred, ssgi, rt, bloom, taa, ssr, motion_blur, dof, auto_exposure, brdf_lut_compute, sprite, tilemap, skinned). experimental 셰이더(forward, instanced, bilateral_blur, temporal_accum)는 src/experimental/ 에 있다
 
 ## 의존성
 - voltex crate: voltex_math, voltex_platform, voltex_image

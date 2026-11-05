@@ -1,3 +1,6 @@
+//! Deferred lighting pass: bind group layouts for G-buffer inputs, lights and
+//! shadow/IBL resources, and `create_lighting_pipeline` (fullscreen, writes HDR).
+
 use crate::fullscreen_quad::FullscreenVertex;
 
 /// Bind group layout for the lighting pass G-Buffer textures + sampler (group 0).

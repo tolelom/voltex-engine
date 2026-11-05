@@ -1,3 +1,5 @@
+//! Screen-space reflections compute pass: `Ssr` ray-marches reflected rays against
+//! the G-buffer position/normal textures using `SsrParams`.
 #![allow(missing_docs)]
 
 use bytemuck::{Pod, Zeroable};

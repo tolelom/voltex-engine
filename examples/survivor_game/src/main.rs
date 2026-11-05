@@ -16,7 +16,7 @@ use voltex::prelude::*;
 use voltex::ecs::{MaterialHandle, MeshHandle, Transform};
 use voltex::renderer::{
     align_up, create_pbr_full_texture_bind_group, create_pbr_pipeline, create_shadow_pipeline,
-    generate_sphere, pbr_full_texture_bind_group_layout, shadow_pass_bind_group_layout,
+    generate_sphere_mesh, pbr_full_texture_bind_group_layout, shadow_pass_bind_group_layout,
     CameraUniform, GpuContext, GpuTexture, IblResources, LightData, LightsUniform,
     MaterialUniform, Mesh, ShadowMap, ShadowPassUniform, ShadowUniform, SHADOW_MAP_SIZE,
 };
@@ -156,8 +156,7 @@ impl ApplicationHandler for SurvivorApp {
         }
 
         // Shared sphere mesh for player/projectile/enemy
-        let (sphere_verts, sphere_indices) = generate_sphere(0.4, 16, 16);
-        let sphere_mesh_h = render_assets.add_mesh(Mesh::new(&gpu.device, &sphere_verts, &sphere_indices));
+        let sphere_mesh_h = render_assets.add_mesh(generate_sphere_mesh(0.4, 16, 16).upload(&gpu.device));
         let player_mat_h = render_assets
             .add_material(MaterialUniform::with_params([0.2, 0.4, 1.0, 1.0], 0.3, 0.5));
         let projectile_mat_h = render_assets

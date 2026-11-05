@@ -1,3 +1,5 @@
+//! PBR mesh render pipelines: `create_pbr_pipeline` (static meshes) and
+//! `create_pbr_skinned_pipeline` (GPU vertex skinning).
 #![allow(missing_docs)]
 
 use crate::gpu::DEPTH_FORMAT;

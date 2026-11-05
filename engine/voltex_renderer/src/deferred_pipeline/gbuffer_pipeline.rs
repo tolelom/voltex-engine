@@ -1,3 +1,6 @@
+//! G-buffer geometry pass: camera bind group layout and `create_gbuffer_pipeline`,
+//! which writes position/normal/albedo/material targets plus depth.
+
 use crate::gbuffer::{
     GBUFFER_ALBEDO_FORMAT, GBUFFER_MATERIAL_FORMAT, GBUFFER_NORMAL_FORMAT, GBUFFER_POSITION_FORMAT,
 };

@@ -1,3 +1,5 @@
+//! CPU keyframe animation: `sample_channel` interpolates a glTF animation channel at a
+//! time, `AnimationPlayer` tracks playback time, and `build_trs` / `mat4_mul` build joint matrices.
 #![allow(missing_docs)]
 
 use crate::gltf::{AnimationPath, GltfChannel, Interpolation};

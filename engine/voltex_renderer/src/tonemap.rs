@@ -1,3 +1,5 @@
+//! Tonemapping: `TonemapUniform` for the final pass and `aces_tonemap`, a CPU copy
+//! of the ACES filmic curve.
 #![allow(missing_docs)]
 
 use bytemuck::{Pod, Zeroable};

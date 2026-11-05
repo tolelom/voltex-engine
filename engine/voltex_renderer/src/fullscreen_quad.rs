@@ -1,3 +1,5 @@
+//! Fullscreen triangle used by post-process passes: `FullscreenVertex`, the
+//! oversized 3-vertex triangle, and `create_fullscreen_vertex_buffer`.
 #![allow(missing_docs)]
 
 use bytemuck::{Pod, Zeroable};

@@ -1,3 +1,5 @@
+//! Tracks which meshes need their bottom-level acceleration structure (BLAS)
+//! rebuilt.
 #![allow(missing_docs)]
 
 /// Tracks which meshes need BLAS rebuild.

@@ -1,7 +1,6 @@
-// ---------------------------------------------------------------------------
-// Codebook (scalar + VQ decode + setup parsing)
-// ---------------------------------------------------------------------------
-//
+//! Vorbis codebooks: `decode_codebook` parses one from the setup header, and
+//! `Codebook::decode_scalar` / `decode_vq` read entries from an audio packet.
+
 // Vorbis spec § 3.2 uses indexed equations on parallel arrays (lengths +
 // codewords + values). Iterator translations sacrifice spec line-by-line
 // traceability without measurable benefit — keep index loops.

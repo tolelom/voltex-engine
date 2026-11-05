@@ -1,3 +1,6 @@
+//! Ray-tracing acceleration structures: builds one BLAS per mesh and a TLAS
+//! over [`RtInstance`] transforms for the hardware ray-query passes.
+
 #![allow(missing_docs)]
 
 use crate::vertex::MeshVertex;

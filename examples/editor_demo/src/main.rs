@@ -333,13 +333,14 @@ fn make_thumbnail(
         .extension()
         .and_then(|e| e.to_str())
         .map(|e| e.to_ascii_lowercase());
-    let (pixels, w, h) = match ext.as_deref() {
-        Some("png") => voltex_renderer::parse_png(&bytes).map_err(|e| e.to_string())?,
-        Some("jpg" | "jpeg") => voltex_renderer::parse_jpg(&bytes).map_err(|e| e.to_string())?,
+    let img = match ext.as_deref() {
+        Some("png") => voltex_renderer::decode_png(&bytes).map_err(|e| e.to_string())?,
+        Some("jpg" | "jpeg") => voltex_renderer::decode_jpg(&bytes).map_err(|e| e.to_string())?,
         _ => return Err(format!("unsupported image extension: {}", path.display())),
     };
     let layout = voltex_renderer::GpuTexture::bind_group_layout(device);
-    let tex = voltex_renderer::GpuTexture::from_rgba(device, queue, w, h, &pixels, &layout);
+    let tex =
+        voltex_renderer::GpuTexture::from_rgba(device, queue, img.width, img.height, &img.rgba, &layout);
     Ok(ui_renderer.register_texture(device, &tex.view))
 }
 

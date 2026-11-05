@@ -1,3 +1,5 @@
+//! Deferred G-buffer render targets: `GBuffer` owns the position, normal, albedo,
+//! material and depth views (formats in the `GBUFFER_*_FORMAT` constants).
 #![allow(missing_docs)]
 
 use crate::gpu::DEPTH_FORMAT;

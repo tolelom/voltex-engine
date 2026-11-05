@@ -1,3 +1,6 @@
+//! glTF material extraction: `extract_material` reads the `pbrMetallicRoughness`
+//! factors (base color, metallic, roughness) into a `GltfMaterial`.
+
 use super::types::GltfMaterial;
 use crate::json_parser::JsonValue;
 

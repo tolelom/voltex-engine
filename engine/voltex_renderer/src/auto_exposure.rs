@@ -1,3 +1,6 @@
+//! Auto exposure (eye adaptation): `AutoExposure` holds the luminance compute pass and
+//! adapts `exposure` toward a target. GPU readback is not wired yet (`update_exposure` always
+//! returns `false`); `set_average_luminance` is the working CPU path.
 #![allow(missing_docs)]
 
 /// Pure CPU exposure calculation logic (testable).

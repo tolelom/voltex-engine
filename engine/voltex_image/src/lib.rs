@@ -3,7 +3,7 @@
 //! Dependency-free (no GPU) asset codecs for the Voltex engine: PNG/JPG/BMP
 //! decoders, a minimal PNG encoder, raw DEFLATE inflation, OBJ + glTF mesh
 //! parsing, and a small JSON parser. Decoders return CPU pixel/geometry
-//! buffers; GPU upload stays in `voltex_renderer`.
+//! buffers ([`DecodedImage`] for PNG/JPEG); GPU upload stays in `voltex_renderer`.
 //!
 //! This is an L0 crate (no `voltex_*` dependencies) so the codecs can be
 //! reused without pulling in wgpu.
@@ -12,6 +12,7 @@
 
 pub mod bmp;
 mod checksum;
+mod decoded_image;
 pub mod deflate;
 pub mod error;
 pub mod gltf;
@@ -25,9 +26,14 @@ pub mod progressive_jpeg;
 pub mod vertex;
 
 pub use bmp::{parse_bmp, BmpImage};
+pub use decoded_image::DecodedImage;
 pub use error::{ImageError, Result};
 pub use gltf::{parse_gltf, GltfData, GltfMaterial, GltfMesh};
+pub use jpg::decode_jpg;
+#[allow(deprecated)]
 pub use jpg::parse_jpg;
+pub use png::decode_png;
+#[allow(deprecated)]
 pub use png::parse_png;
 pub use png_encode::encode_rgba8;
 pub use vertex::MeshVertex;

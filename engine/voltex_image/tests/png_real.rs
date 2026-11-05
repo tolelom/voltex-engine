@@ -13,11 +13,12 @@
 //! - `png_interlaced.png`: the all-filters image with the Adam7 flag set —
 //!   still unsupported, must be an error rather than garbage.
 
-use voltex_image::parse_png;
+use voltex_image::decode_png;
 
 fn assert_exact(name: &str, png: &[u8], expected_rgba: &[u8]) {
-    let (rgba, w, h) = parse_png(png).unwrap_or_else(|e| panic!("{name}: {e}"));
-    assert_eq!((w, h), (23, 17), "{name}");
+    let img = decode_png(png).unwrap_or_else(|e| panic!("{name}: {e}"));
+    assert_eq!((img.width, img.height), (23, 17), "{name}");
+    let rgba = img.rgba;
     if rgba != expected_rgba {
         let first = rgba
             .iter()
@@ -61,5 +62,5 @@ exact!(rgba_16bit_takes_high_bytes, "png_rgba16.png");
 
 #[test]
 fn adam7_interlaced_is_still_rejected() {
-    assert!(parse_png(include_bytes!("fixtures/png_interlaced.png")).is_err());
+    assert!(decode_png(include_bytes!("fixtures/png_interlaced.png")).is_err());
 }

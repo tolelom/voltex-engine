@@ -1,3 +1,6 @@
+//! Public glTF output types: `GltfData` and the mesh, material, node, skin and
+//! animation records it holds, plus string parsers for animation path / interpolation.
+
 use crate::vertex::MeshVertex;
 
 /// All geometry, nodes, skins, and animations extracted from a glTF/GLB file.

@@ -1,3 +1,6 @@
+//! Container widgets on `UiContext`: plain panels (`begin_panel` / `end_panel`) and
+//! scrollable, scissor-clipped panels with a scrollbar (`begin_scroll_panel` / `end_scroll_panel`).
+
 use crate::ui_context::UiContext;
 
 // Color palette

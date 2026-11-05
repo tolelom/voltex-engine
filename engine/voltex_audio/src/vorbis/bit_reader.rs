@@ -1,6 +1,6 @@
-// ---------------------------------------------------------------------------
-// Bitstream reader and small numeric utilities used across vorbis sub-modules.
-// ---------------------------------------------------------------------------
+//! Vorbis bitstream reader (`BitReader`, LSB-first) plus small numeric helpers
+//! shared by the other Vorbis sub-modules (`ilog`, `float32_unpack`,
+//! `lookup1_values`, `bit_reverse`).
 
 pub(super) struct BitReader<'a> {
     data: &'a [u8],

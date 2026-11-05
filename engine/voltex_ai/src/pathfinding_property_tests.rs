@@ -8,7 +8,8 @@
 
 use std::collections::{HashMap, VecDeque};
 use crate::navmesh::{NavMesh, NavTriangle};
-use crate::pathfinding::{find_path, find_path_triangles, funnel_smooth};
+use crate::experimental::funnel::funnel_smooth;
+use crate::pathfinding::{find_path, find_path_triangles};
 use voltex_math::Vec3;
 
 struct XorShift(u32);

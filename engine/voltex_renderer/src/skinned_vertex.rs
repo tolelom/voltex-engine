@@ -1,3 +1,5 @@
+//! Skinned mesh data: `SkinnedMeshVertex` (vertex + joints/weights), building it from
+//! glTF, the GPU `SkinnedMesh`, `SkinnedCameraUniform`, and the `BonePalette` joint-matrix UBO.
 #![allow(missing_docs)]
 
 use bytemuck::{Pod, Zeroable};

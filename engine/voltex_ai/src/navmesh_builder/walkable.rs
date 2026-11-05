@@ -1,3 +1,6 @@
+//! Navmesh build step 2: `NavMeshBuilder::mark_walkable` keeps heightfield
+//! cells whose slope is under `max_slope`, then erodes them by `agent_radius`.
+
 use super::{Heightfield, NavMeshBuilder, WalkableMap, FOUR_NEIGHBORS};
 
 impl NavMeshBuilder {

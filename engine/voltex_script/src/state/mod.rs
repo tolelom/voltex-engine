@@ -57,6 +57,9 @@ impl LuaState {
     /// Execute a Lua code string.
     pub fn exec(&self, code: &str) -> crate::Result<()> {
         let c_code = CString::new(code).map_err(|e| crate::ScriptError::from(e.to_string()))?;
+        // SAFETY: `self.state` is valid (see impl comment) and `c_code` outlives the
+        // call. A failed load/pcall leaves exactly one error value on top, which
+        // `pop_error` requires.
         unsafe {
             let result = ffi::luaL_loadstring(self.state, c_code.as_ptr());
             if result != ffi::LUA_OK {
@@ -75,6 +78,8 @@ impl LuaState {
     /// Execute a Lua file.
     pub fn exec_file(&self, path: &str) -> crate::Result<()> {
         let c_path = CString::new(path).map_err(|e| crate::ScriptError::from(e.to_string()))?;
+        // SAFETY: as in `exec` — valid state, `c_path` outlives the call, and the
+        // error value is on top whenever `pop_error` runs. A NULL `mode` means "bt".
         unsafe {
             let result = ffi::luaL_loadfilex(self.state, c_path.as_ptr(), std::ptr::null());
             if result != ffi::LUA_OK {
@@ -93,6 +98,8 @@ impl LuaState {
     /// Register a Rust function as a global Lua function.
     pub fn register_fn(&self, name: &str, f: ffi::lua_CFunction) {
         let c_name = CString::new(name).unwrap();
+        // SAFETY: valid state; `c_name` outlives the call. Lua may later call `f`
+        // with this state, so `f` itself must follow the Lua C-function protocol.
         unsafe {
             ffi::lua_pushcclosure(self.state, f, 0);
             ffi::lua_setglobal(self.state, c_name.as_ptr());
@@ -102,6 +109,8 @@ impl LuaState {
     /// Reads a global Lua number, or `None` if `name` is unset / non-numeric.
     pub fn get_global_number(&self, name: &str) -> Option<f64> {
         let c_name = CString::new(name).ok()?;
+        // SAFETY: valid state; `c_name` outlives the call. Each branch pops the one
+        // value `lua_getglobal` pushed, keeping the stack balanced.
         unsafe {
             let ty = ffi::lua_getglobal(self.state, c_name.as_ptr());
             if ty != ffi::LUA_TNUMBER {
@@ -118,6 +127,8 @@ impl LuaState {
     /// Reads a global Lua string, or `None` if `name` is unset / non-string.
     pub fn get_global_string(&self, name: &str) -> Option<String> {
         let c_name = CString::new(name).ok()?;
+        // SAFETY: valid state; `c_name` outlives the call. The string returned by
+        // `lua_tostring` is copied before its value is popped.
         unsafe {
             let ty = ffi::lua_getglobal(self.state, c_name.as_ptr());
             if ty != ffi::LUA_TSTRING {
@@ -134,6 +145,8 @@ impl LuaState {
     /// Writes a global Lua number.
     pub fn set_global_number(&self, name: &str, value: f64) {
         let c_name = CString::new(name).unwrap();
+        // SAFETY: valid state; `c_name` outlives the call. `lua_setglobal` pops the
+        // pushed number.
         unsafe {
             ffi::lua_pushnumber(self.state, value);
             ffi::lua_setglobal(self.state, c_name.as_ptr());
@@ -144,6 +157,8 @@ impl LuaState {
     pub fn set_global_string(&self, name: &str, value: &str) {
         let c_name = CString::new(name).unwrap();
         let c_value = CString::new(value).unwrap();
+        // SAFETY: valid state; `c_name`/`c_value` outlive the call (Lua copies the
+        // string on push), and `lua_setglobal` pops the pushed value.
         unsafe {
             ffi::lua_pushstring(self.state, c_value.as_ptr());
             ffi::lua_setglobal(self.state, c_name.as_ptr());
@@ -152,6 +167,9 @@ impl LuaState {
 
     /// Push a LuaValue onto the Lua stack.
     pub fn push_value(&self, value: &LuaValue) {
+        // SAFETY: valid state; each arm pushes exactly one value, and the temporary
+        // `CString` lives until after `lua_pushstring` copies it. Relies on the Lua
+        // stack having room (no `lua_checkstack` call).
         unsafe {
             match value {
                 LuaValue::Nil => ffi::lua_pushnil(self.state),
@@ -173,6 +191,9 @@ impl LuaState {
 
     /// Push a Rust slice of key-value pairs as a Lua table onto the stack.
     pub fn push_table(&self, pairs: &[(&str, LuaValue)]) {
+        // SAFETY: valid state; the new table stays at -2 while each value is pushed
+        // on top and `lua_setfield` pops it. Nested tables recurse without
+        // `lua_checkstack`, so very deep nesting relies on spare stack slots.
         unsafe {
             ffi::lua_createtable(self.state, 0, pairs.len() as i32);
             for (key, val) in pairs {
@@ -185,6 +206,10 @@ impl LuaState {
 
     /// Read a Lua table at the given stack index into key-value pairs.
     pub fn read_table(&self, index: i32) -> crate::Result<Vec<(String, LuaValue)>> {
+        // SAFETY: valid state; `index` is made absolute before `lua_next` pushes, and
+        // each iteration pops only the value so the key stays for the next
+        // `lua_next`. Number keys are read with `lua_tonumberx`, never
+        // `lua_tostring`, so the key is not converted in place.
         unsafe {
             if ffi::lua_type(self.state, index) != ffi::LUA_TTABLE {
                 return Err("expected table".into());
@@ -221,6 +246,9 @@ impl LuaState {
     /// or `{[1]=, [2]=, [3]=}` array-style fields (escape the brackets to keep
     /// rustdoc happy).
     pub fn read_vec3(&self, index: i32) -> crate::Result<[f32; 3]> {
+        // SAFETY: valid state; the table index is made absolute before any push, every
+        // `lua_getfield`/`lua_rawgeti` result is popped before the next read or an
+        // early return, and the field-name `CString`s outlive the calls.
         unsafe {
             if ffi::lua_type(self.state, index) != ffi::LUA_TTABLE {
                 return Err("expected table for vec3".into());
@@ -279,6 +307,8 @@ impl LuaState {
 
     /// Read a value from the Lua stack at the given index.
     pub fn read_stack_value(&self, index: i32) -> LuaValue {
+        // SAFETY: valid state; reads at `index` push nothing (`read_table` restores
+        // the stack itself), and string data is copied before returning.
         unsafe {
             match ffi::lua_type(self.state, index) {
                 ffi::LUA_TNIL => LuaValue::Nil,
@@ -309,6 +339,8 @@ impl LuaState {
 
     /// Read the stack value at index as a string key (for table iteration).
     fn read_stack_as_string(&self, index: i32) -> String {
+        // SAFETY: valid state; only reads the value at `index`. Strings are copied
+        // immediately and numbers use `lua_tonumberx`, which does not modify the key.
         unsafe {
             match ffi::lua_type(self.state, index) {
                 ffi::LUA_TSTRING => {
@@ -368,228 +400,4 @@ impl Drop for LuaState {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_create_and_drop() {
-        let _lua = LuaState::new();
-    }
-
-    #[test]
-    fn test_exec_simple() {
-        let lua = LuaState::new();
-        lua.exec("x = 1 + 2").unwrap();
-        assert_eq!(lua.get_global_number("x"), Some(3.0));
-    }
-
-    #[test]
-    fn test_exec_error() {
-        let lua = LuaState::new();
-        assert!(lua.exec("this is not valid lua!!!").is_err());
-    }
-
-    #[test]
-    fn test_global_number_roundtrip() {
-        let lua = LuaState::new();
-        lua.set_global_number("myval", 42.5);
-        assert_eq!(lua.get_global_number("myval"), Some(42.5));
-    }
-
-    #[test]
-    fn test_global_string() {
-        let lua = LuaState::new();
-        lua.exec("greeting = 'hello from lua'").unwrap();
-        assert_eq!(lua.get_global_string("greeting"), Some("hello from lua".to_string()));
-    }
-
-    #[test]
-    fn test_global_string_roundtrip() {
-        let lua = LuaState::new();
-        lua.set_global_string("name", "voltex");
-        assert_eq!(lua.get_global_string("name"), Some("voltex".to_string()));
-    }
-
-    #[test]
-    fn test_missing_global() {
-        let lua = LuaState::new();
-        assert_eq!(lua.get_global_number("nonexistent"), None);
-    }
-
-    #[test]
-    fn test_register_fn() {
-        unsafe extern "C" fn lua_add_ten(L: *mut crate::ffi::lua_State) -> std::os::raw::c_int {
-            let mut isnum = 0;
-            let val = crate::ffi::lua_tonumberx(L, 1, &mut isnum);
-            crate::ffi::lua_pushnumber(L, val + 10.0);
-            1
-        }
-        let lua = LuaState::new();
-        lua.register_fn("add_ten", lua_add_ten);
-        lua.exec("result = add_ten(5)").unwrap();
-        assert_eq!(lua.get_global_number("result"), Some(15.0));
-    }
-
-    #[test]
-    fn test_push_read_table_roundtrip() {
-        let lua = LuaState::new();
-        let pairs: Vec<(&str, LuaValue)> = vec![
-            ("name", LuaValue::String("test".into())),
-            ("value", LuaValue::Number(42.0)),
-            ("active", LuaValue::Bool(true)),
-        ];
-        lua.push_table(&pairs);
-        unsafe { crate::ffi::lua_setglobal(lua.state, c"tbl".as_ptr()); }
-        lua.exec("result_name = tbl.name; result_val = tbl.value").unwrap();
-        assert_eq!(lua.get_global_string("result_name"), Some("test".to_string()));
-        assert_eq!(lua.get_global_number("result_val"), Some(42.0));
-    }
-
-    #[test]
-    fn test_read_table_from_lua() {
-        let lua = LuaState::new();
-        lua.exec("test_table = { greeting = 'hello', count = 7 }").unwrap();
-        unsafe {
-            let name = std::ffi::CString::new("test_table").unwrap();
-            crate::ffi::lua_getglobal(lua.state, name.as_ptr());
-            let table = lua.read_table(-1).unwrap();
-            crate::ffi::lua_pop(lua.state, 1);
-
-            let has_greeting = table.iter().any(|(k, v)| {
-                k == "greeting" && *v == LuaValue::String("hello".into())
-            });
-            let has_count = table.iter().any(|(k, v)| {
-                k == "count" && *v == LuaValue::Number(7.0)
-            });
-            assert!(has_greeting, "table should contain greeting='hello'");
-            assert!(has_count, "table should contain count=7");
-        }
-    }
-
-    #[test]
-    fn test_nested_table() {
-        let lua = LuaState::new();
-        lua.exec("nested = { inner = { val = 99 } }").unwrap();
-        unsafe {
-            let name = std::ffi::CString::new("nested").unwrap();
-            crate::ffi::lua_getglobal(lua.state, name.as_ptr());
-            let table = lua.read_table(-1).unwrap();
-            crate::ffi::lua_pop(lua.state, 1);
-
-            let inner = table.iter().find(|(k, _)| k == "inner");
-            assert!(inner.is_some());
-            if let Some((_, LuaValue::Table(inner_pairs))) = inner {
-                let has_val = inner_pairs.iter().any(|(k, v)| {
-                    k == "val" && *v == LuaValue::Number(99.0)
-                });
-                assert!(has_val);
-            } else {
-                panic!("inner should be a table");
-            }
-        }
-    }
-
-    #[test]
-    fn test_vec3_named_roundtrip() {
-        let lua = LuaState::new();
-        lua.push_vec3([1.0, 2.5, 3.0]);
-        unsafe { crate::ffi::lua_setglobal(lua.state, c"v".as_ptr()); }
-
-        // Read it back
-        unsafe {
-            crate::ffi::lua_getglobal(lua.state, c"v".as_ptr());
-            let v = lua.read_vec3(-1).unwrap();
-            crate::ffi::lua_pop(lua.state, 1);
-            assert_eq!(v, [1.0, 2.5, 3.0]);
-        }
-    }
-
-    #[test]
-    fn test_vec3_from_lua_named() {
-        let lua = LuaState::new();
-        lua.exec("v = { x = 10, y = 20, z = 30 }").unwrap();
-        unsafe {
-            crate::ffi::lua_getglobal(lua.state, c"v".as_ptr());
-            let v = lua.read_vec3(-1).unwrap();
-            crate::ffi::lua_pop(lua.state, 1);
-            assert_eq!(v, [10.0, 20.0, 30.0]);
-        }
-    }
-
-    #[test]
-    fn test_vec3_named_missing_field_is_error() {
-        // x present but y/z missing → malformed vec3. The named path must not
-        // silently coerce the missing fields to 0.0 (the array path already
-        // rejects non-numeric elements; the named path was inconsistent).
-        let lua = LuaState::new();
-        lua.exec("v = { x = 1.0 }").unwrap();
-        unsafe {
-            crate::ffi::lua_getglobal(lua.state, c"v".as_ptr());
-            let result = lua.read_vec3(-1);
-            crate::ffi::lua_pop(lua.state, 1);
-            assert!(result.is_err(), "vec3 missing y/z must error, got {result:?}");
-        }
-    }
-
-    #[test]
-    fn test_vec3_named_non_numeric_field_is_error() {
-        let lua = LuaState::new();
-        lua.exec("v = { x = 1.0, y = 'foo', z = 3.0 }").unwrap();
-        unsafe {
-            crate::ffi::lua_getglobal(lua.state, c"v".as_ptr());
-            let result = lua.read_vec3(-1);
-            crate::ffi::lua_pop(lua.state, 1);
-            assert!(result.is_err(), "vec3 with non-numeric y must error, got {result:?}");
-        }
-    }
-
-    #[test]
-    fn test_vec3_named_error_leaves_stack_balanced() {
-        // A malformed-vec3 read must not leak Lua stack slots — repeated reads
-        // would otherwise overflow the stack over time.
-        let lua = LuaState::new();
-        lua.exec("v = { x = 1.0 }").unwrap();
-        let before = unsafe { crate::ffi::lua_gettop(lua.state) };
-        for _ in 0..50 {
-            unsafe {
-                crate::ffi::lua_getglobal(lua.state, c"v".as_ptr());
-                let _ = lua.read_vec3(-1);
-                crate::ffi::lua_pop(lua.state, 1);
-            }
-        }
-        let after = unsafe { crate::ffi::lua_gettop(lua.state) };
-        assert_eq!(before, after, "read_vec3 error path leaked stack slots");
-    }
-
-    #[test]
-    fn test_vec3_from_lua_array() {
-        let lua = LuaState::new();
-        lua.exec("v = { 4, 5, 6 }").unwrap();
-        unsafe {
-            crate::ffi::lua_getglobal(lua.state, c"v".as_ptr());
-            let v = lua.read_vec3(-1).unwrap();
-            crate::ffi::lua_pop(lua.state, 1);
-            assert_eq!(v, [4.0, 5.0, 6.0]);
-        }
-    }
-
-    #[test]
-    fn test_hot_reload() {
-        let dir = std::env::temp_dir().join("voltex_script_reload_test");
-        let _ = std::fs::create_dir_all(&dir);
-        let path = dir.join("reload_test.lua");
-
-        // Initial script
-        std::fs::write(&path, "counter = 1").unwrap();
-        let mut lua = LuaState::new();
-        lua.exec_file(path.to_str().unwrap()).unwrap();
-        assert_eq!(lua.get_global_number("counter"), Some(1.0));
-
-        // Modified script
-        std::fs::write(&path, "counter = counter + 10").unwrap();
-        lua.reload_file(path.to_str().unwrap()).unwrap();
-        assert_eq!(lua.get_global_number("counter"), Some(11.0));
-
-        let _ = std::fs::remove_dir_all(&dir);
-    }
-}
+mod tests;

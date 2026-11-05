@@ -30,8 +30,8 @@ mod asset_tests {
             let bytes = std::fs::read(&path).unwrap_or_else(|e| {
                 panic!("{path}: {e} — `cargo run -p leap --bin gen_assets` 먼저")
             });
-            let (_, pw, ph) = voltex::image::parse_png(&bytes).expect(file);
-            assert_eq!((pw, ph), (w, 32), "{file}");
+            let img = voltex::image::decode_png(&bytes).expect(file);
+            assert_eq!((img.width, img.height), (w, 32), "{file}");
         }
     }
 }

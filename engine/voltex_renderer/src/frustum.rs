@@ -1,3 +1,5 @@
+//! View-frustum culling: `extract_frustum` builds six planes from a view-projection
+//! matrix, with sphere tests and light culling helpers built on them.
 #![allow(missing_docs)]
 
 use crate::light::{LightsUniform, LIGHT_DIRECTIONAL, LIGHT_POINT};

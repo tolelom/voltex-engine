@@ -1,3 +1,6 @@
+//! Drag-and-drop on `UiContext`: `begin_drag` starts carrying a `u64` payload,
+//! `drop_target` returns it when released over a region, `end_drag` finishes the drag.
+
 use crate::ui_context::UiContext;
 
 const DRAG_THRESHOLD: f32 = 5.0;

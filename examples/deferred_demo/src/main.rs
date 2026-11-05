@@ -9,7 +9,7 @@ use voltex_math::{Vec3, Mat4};
 use voltex_platform::{VoltexWindow, WindowConfig, InputState, GameTimer};
 use voltex_renderer::{
     align_up, GpuContext, Camera, FpsController, CameraUniform, LightsUniform, LightData,
-    Mesh, GpuTexture, MaterialUniform, generate_sphere,
+    Mesh, GpuTexture, MaterialUniform, generate_sphere_mesh,
     ShadowMap, ShadowUniform, IblResources,
     GBuffer, create_fullscreen_vertex_buffer,
     create_gbuffer_pipeline, create_lighting_pipeline,
@@ -149,12 +149,12 @@ impl ApplicationHandler for DeferredDemoApp {
         let mat_aligned_size = align_up(std::mem::size_of::<MaterialUniform>() as u32, alignment);
 
         // Generate sphere mesh (with BLAS_INPUT usage for ray tracing)
-        let (vertices, indices) = generate_sphere(0.4, 32, 16);
-        let vertex_count = vertices.len() as u32;
+        let sphere = generate_sphere_mesh(0.4, 32, 16);
+        let vertex_count = sphere.vertices.len() as u32;
         let mesh = Mesh::new_with_usage(
             &gpu.device,
-            &vertices,
-            &indices,
+            &sphere.vertices,
+            &sphere.indices,
             wgpu::BufferUsages::BLAS_INPUT,
         );
 

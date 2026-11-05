@@ -1,3 +1,6 @@
+//! Ray-traced directional shadow compute pipeline: G-buffer input layout, TLAS +
+//! output-texture layout, and `create_rt_shadow_pipeline` (ray queries in `rt_shadow_shader.wgsl`).
+
 use crate::rt_shadow::{RtShadowUniform, RT_SHADOW_FORMAT};
 
 // ── RT Shadow pipeline ────────────────────────────────────────────────────────

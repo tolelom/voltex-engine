@@ -19,7 +19,7 @@
 //! - 렌더링: [`renderer`] + [`renderer_ecs`] — GPU + ECS 브릿지
 //! - 런타임: [`runtime`] — `RuntimeApp` 부트스트랩
 //! - 에디터: [`editor`] — `EditorSession`, `EditorCommand`
-//! - 이미지 코덱: [`image`] — `parse_png`, `parse_jpg`, `parse_gltf`, `MeshVertex` (GPU 무의존 L0)
+//! - 이미지 코덱: [`image`] — `decode_png`, `decode_jpg`, `parse_gltf`, `MeshVertex` (GPU 무의존 L0)
 //! - 물리/오디오/AI/네트워킹/스크립트: [`physics`], [`audio`], [`ai`],
 //!   [`net`], [`script`]
 

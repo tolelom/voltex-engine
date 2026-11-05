@@ -1,13 +1,13 @@
 # voltex_ai
 
 ## 책임 (한 줄)
-AI 기초 — NavMesh (수동 + 자동 voxelization), A* + Funnel, steering, 동적 장애물 회피.
+AI 기초 — NavMesh (수동 + 자동 voxelization), A*, steering, 동적 장애물 회피. 엔진이 쓰지 않는 Funnel 경로 다듬기는 `experimental`.
 
 ## 공개 API 진입점
 - `NavMesh` — 폴리곤 기반 내비메시 (src/navmesh/mod.rs)
 - 내비메시 바이너리 (src/navmesh/format.rs) — 두 포맷이 같은 본문을 쓴다. VNAV 파일: `NavMesh::to_vnav_bytes`/`from_vnav_bytes`(옛 이름 `serialize`/`deserialize`, deprecated). 헤더 없는 포맷: `serialize_navmesh_headerless`/`deserialize_navmesh_headerless`(옛 이름 `serialize_navmesh`/`deserialize_navmesh`, deprecated)
 - `NavMeshBuilder` — voxelization 기반 자동 생성 (src/navmesh_builder/). `max_slope`는 도(degree) 단위. `agent_height`/`cell_height`는 아직 쓰이지 않는 설정
-- `find_path` — A* + String Pulling (Funnel) (src/pathfinding/mod.rs)
+- `find_path` — A* (경유점 = 삼각형 중심, Funnel 다듬기 없음) (src/pathfinding/mod.rs)
 - Steering — `seek`, `flee`, `arrive`, `wander`, `follow_path` (src/steering.rs). `follow_path` 는 평면(XZ) — waypoint 를 에이전트 y 평면에 투영해 도달 판정/조향 (게임플레이 y 유지, navmesh 평면으로 침하 없음)
 - Flocking (boid) — `separation`, `cohesion`, `alignment` 순수 함수 + `Boid` 컴포넌트 + `BoidParams` + `flocking_system(world, &params, dt)` ECS 시스템 (src/flocking.rs). 시스템이 `SpatialGrid` 로 이웃 수집(~O(n)) 후 3법칙 가중합 → 속도/위치 적분(max_speed clamp). 스냅샷 후 일괄 기록(순서 무관)
 - `NavAgent` — ECS 컴포넌트 (src/nav_agent.rs). `target` 직접 대입도 동작 — 시스템이 `planned_target`(crate 내부)과 비교해 변경 감지 후 스스로 repath
@@ -18,12 +18,14 @@ AI 기초 — NavMesh (수동 + 자동 voxelization), A* + Funnel, steering, 동
 ## 모듈 구조
 - `navmesh` — NavMesh 데이터 구조 + XZ 무게중심 좌표 헬퍼 `barycentric_xz`(crate 내부) (src/navmesh/mod.rs) + 직렬화 (src/navmesh/format.rs)
 - `navmesh_builder` — voxelization (src/navmesh_builder/: mod, voxelize, walkable, regions, triangulate). 세 단계 결과(Heightfield/WalkableMap/RegionMap)가 같은 `GridLayout`(셀 격자 + 4-이웃 범위 검사)을 공유
-- `pathfinding` — A* + Funnel (src/pathfinding/mod.rs)
+- `pathfinding` — A* (src/pathfinding/mod.rs; 테스트 src/pathfinding/tests.rs, src/pathfinding_property_tests.rs — funnel 테스트도 여기)
 - `steering` — steering behaviors (src/steering.rs)
 - `flocking` — boid separation/cohesion/alignment (SpatialGrid 로 이웃 수집) (src/flocking.rs)
 - `nav_agent` — ECS 컴포넌트 (src/nav_agent.rs)
 - `nav_agent_system` — NavAgent 경로 추적 시스템 (src/nav_agent_system.rs)
 - `obstacle` — 동적 장애물 회피 (velocity obstacle) (src/obstacle.rs)
+- `experimental` — 구현·단위 테스트는 되어 있지만 엔진(`find_path`, `nav_agent_system`)이 쓰지 않는 모듈. API가 바뀌거나 없어질 수 있다 (src/experimental/)
+  - `funnel` — `funnel_smooth`(SSF string pulling, apex-restart 수정 반영). 입력 삼각형 경로는 crate 내부 `find_path_triangles` 가 만든다. 옛 경로 `pathfinding::funnel_smooth` 는 deprecated 전달 함수
 
 ## 의존성
 - voltex crate: voltex_math, voltex_ecs

@@ -1,3 +1,5 @@
+//! Depth of field compute pass: `DepthOfField` blurs the color target by a
+//! circle of confusion derived from depth and `DofParams` (focus distance/range, max blur).
 #![allow(missing_docs)]
 
 use bytemuck::{Pod, Zeroable};

@@ -1,3 +1,5 @@
+//! Soft RT shadow parameters (`SoftShadowParams` uniform) and the PCSS-style
+//! `penumbra_size` estimate for area-light ray-traced shadows.
 #![allow(missing_docs)]
 
 use bytemuck::{Pod, Zeroable};

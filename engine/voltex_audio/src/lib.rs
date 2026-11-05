@@ -8,15 +8,15 @@
 //! - Playback model: [`AudioClip`] holds samples, [`AudioSource`] is the per
 //!   ECS instance, [`mixing::PlayingSound`] + [`mix_sounds`] do per-frame mix.
 //! - Spatialisation: [`Listener`] + [`SpatialParams`] +
-//!   [`compute_spatial_gains`], 3D distance/pan/HRTF helpers.
-//! - Mixer: [`MixGroup`] / [`MixerState`] + dynamic [`MixGroupManager`] +
-//!   [`AudioBus`] routing.
-//! - Effects: [`Reverb`] / [`Echo`] / [`DelayLine`] / [`EffectChain`] /
-//!   [`LowPassFilter`] occlusion / fade curves.
+//!   [`compute_spatial_gains`], 3D distance attenuation + stereo pan.
+//! - Mixer: [`MixGroup`] / [`MixerState`] per-group volumes.
 //! - Backends: [`AudioBackend`] trait with [`NullBackend`] always available
 //!   plus WASAPI / ALSA / CoreAudio impls and [`make_backend`]. [`AudioSystem`]
 //!   plays through ALSA / CoreAudio via this trait; on Windows it drives
 //!   `wasapi_ffi::WasapiDevice` directly. Without a device it runs silently.
+//! - [`experimental`] — async loader, dynamic mix groups, buses, effects
+//!   (reverb/echo/chain/fades), HRTF and occlusion. Implemented but not used by
+//!   the engine runtime.
 
 #![warn(missing_docs)]
 
@@ -32,19 +32,12 @@ pub mod audio_source;
 pub mod audio_system;
 pub mod mixing;
 pub mod mix_group;
-pub mod dynamic_groups;
-pub mod audio_bus;
-pub mod async_loader;
 // 3D audio
 pub mod spatial;
-pub mod hrtf;
-pub mod occlusion;
-// Effects
-pub mod reverb;
-pub mod effect_chain;
-pub mod fade_curves;
 // Output
 pub mod backend;
+// Not used by the engine runtime yet
+pub mod experimental;
 /// Raw WASAPI COM bindings + `WasapiDevice` (Windows only). The
 /// `AudioBackend` adapter over it lives in [`backend`].
 #[cfg(target_os = "windows")]
@@ -65,20 +58,17 @@ pub use mixing::{PlayingSound, VoiceId, mix_sounds};
 pub use audio_system::AudioSystem;
 pub use spatial::{Listener, SpatialParams, distance_attenuation, stereo_pan, compute_spatial_gains};
 pub use mix_group::{MixGroup, MixerState};
-pub use reverb::{Reverb, Echo, DelayLine};
-pub use occlusion::{OcclusionResult, LowPassFilter, calculate_occlusion};
-pub use fade_curves::{FadeCurve, apply_fade};
-pub use dynamic_groups::MixGroupManager;
-pub use audio_bus::AudioBus;
-pub use async_loader::{AsyncAudioLoader, AudioLoadState};
-#[allow(deprecated)]
-pub use async_loader::LoadState;
-pub use effect_chain::{AudioEffect, EffectChain};
 pub use backend::{AudioBackend, BackendError, NullBackend, make_backend};
 #[cfg(target_os = "windows")]
 pub use backend::WasapiBackend;
 #[cfg(target_os = "linux")]
 pub use backend::AlsaBackend;
+
+// Old paths of modules/items moved to `experimental` (deprecated). Nothing in
+// the engine uses them.
+mod deprecated_paths;
+#[allow(deprecated)]
+pub use deprecated_paths::*;
 
 // ── Clip decoding entry points ───────────────────────────────────────────
 

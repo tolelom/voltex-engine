@@ -1,7 +1,7 @@
 # voltex_ecs
 
 ## 책임 (한 줄)
-ECS 코어 — Entity/Component/World/Query + Hierarchy + Scene 직렬화 + System Scheduler.
+ECS 코어 — Entity/Component/World/Query + Hierarchy + Scene 직렬화. 엔진이 쓰지 않는 Archetype 저장소·스케줄러는 `experimental`.
 
 ## 공개 API 진입점
 - `World` — type-erased 저장소 + query, `clear()` 로 전체 리셋 — 슬롯은 generation bump로 해제해 clear 전 핸들은 재spawn 뒤에도 stale (v1.0.120, src/world/mod.rs). `advance_change_tick()`(옛 이름 `clear_changed`, deprecated)는 프레임 끝에 변경 tick만 올린다 — `query_changed`가 이전 변경을 더 이상 보지 않음
@@ -28,8 +28,6 @@ ECS 코어 — Entity/Component/World/Query + Hierarchy + Scene 직렬화 + Syst
 - `ComponentRegistry::register::<T>()` — Component trait 기반 표준 등록 (src/component_registry.rs)
 - `ComponentRegistry::register_raw` — trait 구현 불가 타입용 escape hatch (src/component_registry.rs)
 - `path_component!(Ty, "name")` — `struct Ty(pub String)` 경로 컴포넌트의 Component impl 생성 매크로 (UTF-8 round-trip). TexturePath/MeshPath(renderer_ecs)/AudioPath(runtime) 가 사용 (src/component_registry.rs)
-- `Scheduler`, `DependencyScheduler` — 시스템 실행 (src/scheduler.rs, src/dependency_scheduler.rs)
-- `Archetype` — signature 기반 그룹 저장소 (src/archetype.rs)
 - `EcsError`, `Result` — thiserror 기반 에러 (Generic/Io) (src/error.rs)
 
 ## 모듈 구조
@@ -45,10 +43,13 @@ ECS 코어 — Entity/Component/World/Query + Hierarchy + Scene 직렬화 + Syst
 - `world_transform` — 변환 propagation (src/world_transform.rs)
 - `scene`, `json`, `binary_scene` — 씬 직렬화 (src/scene/mod.rs, src/json.rs, src/binary_scene.rs)
 - `component_registry` — Component trait + 제네릭 register::<T>() + raw escape hatch (src/component_registry.rs)
-- `scheduler`, `dependency_scheduler` — 시스템 스케줄링 (src/scheduler.rs, src/dependency_scheduler.rs)
-- `archetype` — Archetype 저장 (src/archetype.rs)
 - `render_components` — Mesh/Material handle + Bounds + phantom marker (src/render_components.rs)
 - `script_component` — ScriptComponent (script_path + instance_id) + Component impl (src/script_component.rs)
+- `experimental` — 구현·단위 테스트는 되어 있지만 엔진(World, RuntimeApp)이 쓰지 않는 모듈. API가 바뀌거나 없어질 수 있다 (src/experimental/)
+  - `archetype` — `ArchetypeSignature`, `Archetype`, `ArchetypeRegistry` (signature 기반 그룹 저장소; World 는 SparseSet 사용)
+  - `scheduler` — `System` trait + `Scheduler` (순서대로 실행)
+  - `dependency_scheduler` — `SystemAccess`, `DependencyScheduler` (읽기/쓰기 충돌 분석 + 그룹 빌드; 병렬 실행은 안 함, AUDIT-BACKLOG B1)
+  - 옛 경로(`voltex_ecs::Scheduler`, `voltex_ecs::archetype` 등)는 src/deprecated_paths.rs 의 deprecated 별칭
 
 ## 의존성
 - voltex crate: voltex_math (Vec3, Mat4, AABB), voltex_asset (Handle<T>)

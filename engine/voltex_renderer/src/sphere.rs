@@ -1,18 +1,18 @@
 //! Procedural UV sphere generator — primary use is PBR demo + IBL preview.
 
+use crate::primitives::MeshData;
 use crate::vertex::MeshVertex;
 use std::f32::consts::PI;
 
 /// Generate a UV sphere with Y-up coordinate system.
-/// Returns (vertices, indices).
 ///
 /// **Input clamping**: `sectors`, `stacks`, and `radius` are all clamped to
 /// minimum sensible values (3 sectors, 2 stacks, radius `f32::MIN_POSITIVE`)
-/// to avoid div-by-zero on degenerate inputs. Pre-clamp, `generate_sphere(0.0,
+/// to avoid div-by-zero on degenerate inputs. Pre-clamp, `generate_sphere_mesh(0.0,
 /// 0, 0)` produced a NaN-filled vertex buffer (every position/normal/UV had
 /// `/0`) and 0 indices — which then panicked downstream when a renderer tried
 /// to upload the NaN data.
-pub fn generate_sphere(radius: f32, sectors: u32, stacks: u32) -> (Vec<MeshVertex>, Vec<u32>) {
+pub fn generate_sphere_mesh(radius: f32, sectors: u32, stacks: u32) -> MeshData {
     let sectors = sectors.max(3);
     let stacks = stacks.max(2);
     let radius = if radius.is_finite() && radius > f32::MIN_POSITIVE {
@@ -79,7 +79,15 @@ pub fn generate_sphere(radius: f32, sectors: u32, stacks: u32) -> (Vec<MeshVerte
         }
     }
 
-    (vertices, indices)
+    MeshData { vertices, indices }
+}
+
+/// Old form of [`generate_sphere_mesh`] that returns an unnamed
+/// `(vertices, indices)` tuple.
+#[deprecated(note = "use `generate_sphere_mesh`, which returns a named `MeshData`")]
+pub fn generate_sphere(radius: f32, sectors: u32, stacks: u32) -> (Vec<MeshVertex>, Vec<u32>) {
+    let m = generate_sphere_mesh(radius, sectors, stacks);
+    (m.vertices, m.indices)
 }
 
 #[cfg(test)]
@@ -90,7 +98,7 @@ mod tests {
     fn test_sphere_vertex_count() {
         let sectors = 36u32;
         let stacks = 18u32;
-        let (vertices, _) = generate_sphere(1.0, sectors, stacks);
+        let vertices = generate_sphere_mesh(1.0, sectors, stacks).vertices;
         assert_eq!(vertices.len(), ((stacks + 1) * (sectors + 1)) as usize);
     }
 
@@ -98,13 +106,13 @@ mod tests {
     fn test_sphere_index_count() {
         let sectors = 36u32;
         let stacks = 18u32;
-        let (_, indices) = generate_sphere(1.0, sectors, stacks);
+        let indices = generate_sphere_mesh(1.0, sectors, stacks).indices;
         assert_eq!(indices.len(), (stacks * sectors * 6) as usize);
     }
 
     #[test]
     fn test_sphere_normals_unit_length() {
-        let (vertices, _) = generate_sphere(1.0, 12, 8);
+        let vertices = generate_sphere_mesh(1.0, 12, 8).vertices;
         for v in &vertices {
             let n = v.normal;
             let len = (n[0] * n[0] + n[1] * n[1] + n[2] * n[2]).sqrt();
@@ -117,12 +125,12 @@ mod tests {
     }
 
     #[test]
-    fn generate_sphere_with_degenerate_inputs_produces_finite_mesh() {
-        // Pre-fix: generate_sphere(0.0, 0, 0) produced a vertex buffer
+    fn generate_sphere_mesh_with_degenerate_inputs_produces_finite_mesh() {
+        // Pre-fix: generate_sphere_mesh(0.0, 0, 0) produced a vertex buffer
         // full of NaN (every position/normal/UV had `/0`). The clamp
         // makes the result a finite, drawable mesh even on degenerate
         // input.
-        let (vertices, indices) = generate_sphere(0.0, 0, 0);
+        let MeshData { vertices, indices } = generate_sphere_mesh(0.0, 0, 0);
         assert!(!vertices.is_empty());
         assert!(!indices.is_empty());
         for v in &vertices {
@@ -139,10 +147,10 @@ mod tests {
     }
 
     #[test]
-    fn generate_sphere_with_negative_radius_clamps() {
+    fn generate_sphere_mesh_with_negative_radius_clamps() {
         // Negative or NaN radius would have produced flipped normals or
         // NaN normals. Clamped to a sensible positive minimum.
-        let (vertices, _) = generate_sphere(f32::NAN, 12, 8);
+        let vertices = generate_sphere_mesh(f32::NAN, 12, 8).vertices;
         for v in &vertices {
             for &c in &v.normal {
                 assert!(c.is_finite());

@@ -5,7 +5,7 @@
 //! - UI: [`UiContext`] + [`DrawList`] + [`UiRenderer`] (host-side commands,
 //!   wgpu pipeline). [`widgets`] provides text/button/slider/checkbox/panel
 //!   primitives.
-//! - Layout: [`DockTree`] binary-split layout + [`FloatingPanel`].
+//! - Layout: [`DockTree`] binary-split layout.
 //! - 3D scene: [`OrbitCamera`], [`ViewportRenderer`] + [`ViewportTexture`],
 //!   [`pick_entity`] ray picking (Bounds AABB, sphere fallback), [`gizmo`]
 //!   translate/rotate/scale handles.
@@ -80,8 +80,13 @@ pub mod ttf_font;
 mod test_font;
 pub use ttf_font::TtfFont;
 
-pub mod floating_panel;
-pub use floating_panel::{FloatingPanel, FloatingPanelManager};
+// Not used by the editor yet
+pub mod experimental;
+// Old paths of modules/items moved to `experimental` (deprecated). Nothing in
+// the engine uses them.
+mod deprecated_paths;
+#[allow(deprecated)]
+pub use deprecated_paths::*;
 
 pub use command::EditorCommand;
 pub use session::{EditorMode, EditorSession};

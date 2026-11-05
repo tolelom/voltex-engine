@@ -1,3 +1,5 @@
+//! Light probes storing L2 spherical-harmonic irradiance, plus a grid that
+//! finds the nearest probe to a position.
 #![allow(missing_docs)]
 
 pub struct LightProbe {

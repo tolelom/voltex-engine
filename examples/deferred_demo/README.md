@@ -28,9 +28,11 @@ cargo run -p deferred_demo --release
 
 ## Notes
 
-Requires a wgpu adapter advertising ray tracing acceleration structures.
-On adapters without it, the fallback path (`voltex_renderer::rt_fallback`)
-uses CSM instead — the demo still launches.
+Requires a wgpu adapter advertising ray query support
+(`wgpu::Features::EXPERIMENTAL_RAY_QUERY`). There is no fallback path: on
+adapters without it, GPU initialization fails and the demo exits.
+(`voltex_renderer::experimental::rt_fallback` has a capability check, but
+nothing uses it yet.)
 
 ## Next step
 

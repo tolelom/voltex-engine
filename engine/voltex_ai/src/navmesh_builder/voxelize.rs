@@ -1,3 +1,6 @@
+//! Navmesh build step 1: `NavMeshBuilder::voxelize` rasterizes the input
+//! triangles into an XZ `Heightfield`, recording the min/max surface height per cell.
+
 use super::{GridLayout, Heightfield, NavMeshBuilder};
 use voltex_math::Vec3;
 

@@ -1,35 +1,39 @@
 # voltex_audio
 
 ## 책임 (한 줄)
-오디오 — WAV/OGG 디코더, AudioBackend (WASAPI/ALSA/CoreAudio/Null), 3D 사운드, 믹서, 이펙트.
+오디오 — WAV/OGG 디코더, AudioBackend (WASAPI/ALSA/CoreAudio/Null), 3D 사운드(거리 감쇠 + 스테레오 팬), 믹스 그룹. 엔진이 쓰지 않는 로더·버스·이펙트·HRTF·차폐는 `experimental`.
 
 ## 공개 API 진입점
-- `AudioSystem` — 메인 오디오 시스템. `add_clip(&mut, AudioClip) -> usize`(런타임 핫로드, FIFO 로 인덱스 lockstep) / `replace_clip(idx, AudioClip)`(핫리로드, out-of-range 는 무시) / `play`/`play_3d` → `VoiceId` 반환(AtomicU64 발급) + `stop_voice(VoiceId)` 로 해당 인스턴스만 정지 — clip-index `stop` 은 그 클립의 전 인스턴스 정지 (src/audio_system.rs)
+- `AudioSystem` — 메인 오디오 시스템. `add_clip(&mut, AudioClip) -> usize`(런타임 핫로드, FIFO 로 인덱스 lockstep) / `replace_clip(idx, AudioClip)`(핫리로드, out-of-range 는 무시) / `play`/`play_3d` → `VoiceId` 반환(AtomicU64 발급) + `stop_voice(VoiceId)` 로 해당 인스턴스만 정지 — clip-index `stop` 은 그 클립의 전 인스턴스 정지 (src/audio_system/mod.rs)
 - `VoiceId(u64)` — 재생 인스턴스(voice) 핸들, `VoiceId(0)` = 익명 기본값 (src/mixing.rs)
 - `AudioClip` — PCM 데이터 (src/audio_clip.rs)
 - `AudioSource` / `ClipId` — per-entity 재생 디스크립터 + 타입화된 clip 식별자. ECS 컴포넌트로 등록 가능하나 audio crate 자체는 ECS 무의존 (src/audio_source.rs)
-- `AsyncAudioLoader` + `AudioLoadState` (구 `LoadState`, deprecated alias — `voltex_asset::LoadState` 와 이름 충돌 회피) — 비동기 "읽기 가능 여부" 확인만 (바이트는 버림, 클립 등록 안 함; 엔진 미사용) (src/async_loader.rs)
 - WAV/OGG 디코더 — `parse_wav`(PCM 8/16/24/32·float32·EXTENSIBLE, v1.0.144), `parse_ogg`(컨테이너) + `decode_vorbis`(코덱), 합본 진입점 `decode_ogg_vorbis_bytes` (src/wav.rs, src/ogg.rs, src/vorbis/)
 - `load_clip_file(path) -> Result<AudioClip>` — 파일 read + `decode_clip_bytes` 원콜 디코드 (src/lib.rs; 에디터/핫리로드 공용)
 - `decode_clip_bytes(path, bytes) -> Result<AudioClip>` — in-memory bytes 를 path 확장자(wav/ogg) 분기로 디코드. 경로는 확장자/에러 메시지에만 사용 — Vfs(.vpkg) 소스 지원 (v1.0.103) (src/lib.rs)
-- `MixGroup`, `MixGroupManager`, `AudioBus` — 믹싱 (src/mix_group.rs, src/dynamic_groups.rs, src/audio_bus.rs)
-- `EffectChain`, `Reverb`, `EchoDelay` — 이펙트 (src/effect_chain.rs, src/reverb.rs)
-- spatial — `distance_attenuation`, `stereo_pan`, `doppler_shift`, HRTF (src/spatial.rs, src/hrtf.rs)
-- `Occlusion` — 레이 기반 차폐 (src/occlusion.rs)
+- `MixGroup`, `MixerState` — 그룹별 볼륨 믹싱 (src/mix_group.rs)
+- spatial — `Listener`, `SpatialParams`, `distance_attenuation`, `stereo_pan`, `compute_spatial_gains` (src/spatial.rs)
 - `AudioBackend` trait + impls (P1+B3): `WasapiBackend` (Windows), `AlsaBackend` (Linux), `CoreAudioBackend` (macOS, B3), `NullBackend` (헤드리스/CI), `make_backend()` (OS 자동 분기) (src/backend/). `AudioSystem` 오디오 스레드는 Linux·macOS 에서 `open_device_backend()` 로 이 trait 를 통해 재생하고, Windows 는 `wasapi_ffi::WasapiDevice` 를 직접 구동한다. 장치가 없으면(헤드리스/CI) 무음 모드
 - `BackendError` — backend-level error type
 - `AudioError`, `Result` — thiserror 기반 에러 (Generic/Io) (src/error.rs)
 
 ## 모듈 구조
-- `audio_system` — 메인 시스템 (src/audio_system.rs)
+- `audio_system` — 메인 시스템 (src/audio_system/mod.rs: 명령·`AudioSystem`·`apply_command`, src/audio_system/output_thread.rs: OS별 재생 스레드 루프)
 - `audio_clip`, `audio_source` — 데이터 + 컴포넌트 (src/audio_clip.rs, src/audio_source.rs)
-- `async_loader` — 비동기 로더 (src/async_loader.rs)
 - `wav`, `ogg`, `vorbis` — 디코더 (src/wav.rs, src/ogg.rs, src/vorbis/)
-- `mixing`, `mix_group`, `dynamic_groups`, `audio_bus` — 믹서 (src/mixing.rs 등)
-- `effect_chain`, `reverb`, `fade_curves` — 이펙트 (src/effect_chain.rs 등)
-- `spatial`, `hrtf`, `occlusion` — 3D 오디오 (src/spatial.rs 등)
+- `mixing`, `mix_group` — 믹서 (src/mixing.rs, src/mix_group.rs)
+- `spatial` — 3D 오디오 (src/spatial.rs)
 - `wasapi_ffi` — Windows WASAPI COM FFI + `WasapiDevice` (src/wasapi_ffi.rs; 구 경로 `voltex_audio::wasapi` 는 re-export 로 유지)
 - `backend` — `AudioBackend` trait + `null.rs` + `wasapi.rs` (windows) + `alsa.rs` (linux) + `coreaudio.rs` (macos, B3) + `make_backend` (P1+B3)
+- `experimental` — 구현·단위 테스트는 되어 있지만 `AudioSystem` 믹서가 쓰지 않는 모듈. API가 바뀌거나 없어질 수 있다 (src/experimental/). 옛 경로(`voltex_audio::Reverb`, `voltex_audio::hrtf` 등)는 src/deprecated_paths.rs 의 deprecated 별칭
+  - `async_loader` — `AsyncAudioLoader` + `AudioLoadState` (구 `LoadState`, deprecated alias — `voltex_asset::LoadState` 와 이름 충돌 회피). 비동기 "읽기 가능 여부" 확인만 (바이트는 버림, 클립 등록 안 함)
+  - `dynamic_groups` — `MixGroupManager`, `MixGroupConfig` (런타임 생성 믹스 그룹 트리)
+  - `audio_bus` — `AudioBus`, `BusInput` (gain 가중 입력 합산)
+  - `effect_chain` — `AudioEffect` trait, `EffectChain`, `GainEffect`
+  - `reverb` — `Reverb` (Schroeder), `Echo`, `DelayLine`
+  - `fade_curves` — `FadeCurve`, `apply_fade`
+  - `hrtf` — `calculate_hrtf`, `azimuth_from_positions`, `HrtfResult` (Woodworth ITD + cosine ILD)
+  - `occlusion` — `calculate_occlusion`(차폐 계수 → 볼륨·컷오프), `OcclusionResult`, `LowPassFilter`
 
 ## 의존성
 - voltex crate: voltex_math (3D 사운드 좌표)

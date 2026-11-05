@@ -1,7 +1,6 @@
-// ---------------------------------------------------------------------------
-// Audio packet decode (per-frame, post-headers)
-// ---------------------------------------------------------------------------
-//
+//! Per-packet Vorbis audio decode: `decode_audio_packet` runs mode select →
+//! floor → residue → inverse MDCT → windowing → overlap-add and returns PCM samples.
+
 // Vorbis spec § 4.3 uses cross-channel index loops (per-channel arrays
 // addressed by the same index). Iterator translation hides the parallel
 // addressing — keep index loops.

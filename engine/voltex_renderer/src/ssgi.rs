@@ -1,3 +1,5 @@
+//! Screen-space global illumination resources: `SsgiUniform`, `SsgiResources`
+//! (output target, hemisphere kernel, noise texture) and the kernel/noise generators.
 #![allow(missing_docs)]
 
 use bytemuck::{Pod, Zeroable};

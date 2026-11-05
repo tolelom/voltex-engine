@@ -10,8 +10,8 @@
 
 ## Phase 3a
 
-- **Archetype 기반 스토리지** → SparseSet 사용 중. 대규모 씬에서 성능 이슈 시 전환.
-- ~~**시스템 스케줄러**~~ ✅ 순서 기반 Scheduler 완료.
+- **Archetype 기반 스토리지** → SparseSet 사용 중. 대규모 씬에서 성능 이슈 시 전환. (`ArchetypeRegistry` 시험 구현은 `voltex_ecs::experimental::archetype`, World 와 연결 안 됨.)
+- ~~**시스템 스케줄러**~~ ✅ 순서 기반 Scheduler 완료. 현재 `voltex_ecs::experimental::scheduler` (엔진 미사용 — RuntimeApp 은 자체 시스템 목록을 돈다).
 - ~~**쿼리 필터**~~ ✅ With/Without 완료.
 - ~~**query3+**~~ ✅ query3, query4 완료.
 - ~~**Changed 필터**~~ ✅ tick 기반 변경 감지, query_changed, clear_changed 완료.
@@ -25,7 +25,7 @@
 
 ## Phase 3c
 
-- ~~**비동기 로딩**~~ ✅ AssetLoader (워커 스레드) 완료. **v1.0.55 버그 fix**: `load()` 가 반환하는 handle 은 전역 load 카운터 기반 *ticket* 인데 `Assets::insert` 의 per-type 슬롯과 달라, real≠ticket (다른 타입 로드 / 기존 에셋 존재) 시 `process_loaded` 의 remap 이 ticket 키를 지워 `state(ticket)` 이 Loading 오보 + caller 의 handle 이 엉뚱한 슬롯을 가리킴 (fresh 단일-로드에서만 우연히 동작). remap 제거 (handle_to_load 를 안정적 ticket 키로 유지) + `resolved_handle(ticket)` 추가 — Ready 후 실제 `Handle<T>` 반환. +1 회귀 테스트.
+- ~~**비동기 로딩**~~ ✅ AssetLoader (워커 스레드) 완료. **v1.0.55 버그 fix**: `load()` 가 반환하는 handle 은 전역 load 카운터 기반 *ticket* 인데 `Assets::insert` 의 per-type 슬롯과 달라, real≠ticket (다른 타입 로드 / 기존 에셋 존재) 시 `process_loaded` 의 remap 이 ticket 키를 지워 `state(ticket)` 이 Loading 오보 + caller 의 handle 이 엉뚱한 슬롯을 가리킴 (fresh 단일-로드에서만 우연히 동작). remap 제거 (handle_to_load 를 안정적 ticket 키로 유지) + `resolved_handle(ticket)` 추가 — Ready 후 실제 `Handle<T>` 반환. +1 회귀 테스트. 현재 `voltex_asset::experimental::loader` (엔진 미사용).
 - ~~**핫 리로드**~~ ✅ FileWatcher (mtime 폴링) + replace_in_place 완료.
 
 ## Phase 4a
@@ -63,7 +63,7 @@
 ## Phase 5-3
 
 - ~~**Ray vs Triangle**~~ ✅ Möller–Trumbore 완료.
-- ~~**Ray vs Mesh**~~ ✅ MeshCollider + ray_vs_mesh + ray_vs_mesh_all 완료. ~~**Ray vs Plane**~~ ✅ 완료.
+- ~~**Ray vs Mesh**~~ ✅ MeshCollider + ray_vs_mesh + ray_vs_mesh_all 완료. ~~**Ray vs Plane**~~ ✅ 완료. 현재 `voltex_physics::experimental::mesh_collider` (엔진 미사용).
 - ~~**raycast_all (다중 hit)**~~ ✅ 거리순 정렬 완료.
 - ~~**BVH 조기 종료 최적화**~~ ✅ 재귀 트리 순회 + query_ray 완료.
 
@@ -73,44 +73,44 @@
 - ~~**OGG/Vorbis 디코더**~~ ✅ OGG 컨테이너 + Vorbis 디코더 완료.
 - ~~**24-bit/32-bit WAV**~~ ✅ 완료.
 - ~~**ECS 통합**~~ ✅ AudioSource 컴포넌트 완료. ~~audio_sync_system 미구현~~ ✅ 2026-06-03 — `voltex_runtime::audio_sync_system` 가 AudioSource→AudioSystem 브릿지 (playing 엣지에서 play/play_3d/stop, listener Transform 동기화). 한계: SpatialParams min/max 고정. ~~씬 직렬화 미등록 — v1.1.~~ ✅ 2026-06-03 (v1.0.61) — `voltex_runtime::audio_sync::register_audio_source` 가 `register_raw` escape hatch 로 AudioSource 직렬화 등록 (clip_id+volume+spatial/looping/playing 11바이트; transient played_once/active 는 미저장). RuntimeApp 이 `register_defaults()` 직후 자동 등록. JSON/binary 씬 round-trip.
-- ~~**비동기 로딩**~~ ✅ AsyncAudioLoader (스레드 기반) 완료.
+- ~~**비동기 로딩**~~ ✅ AsyncAudioLoader (스레드 기반) 완료. 현재 `voltex_audio::experimental::async_loader` (엔진 미사용).
 
 ## Phase 6-2
 
 - ~~**도플러 효과**~~ ✅ doppler_shift 완료.
-- ~~**HRTF**~~ ✅ ITD/ILD 기반 간소화 HRTF 완료.
-- ~~**Reverb/Echo**~~ ✅ Schroeder reverb (4 comb + 2 allpass) + Echo delay line 완료.
-- ~~**Occlusion**~~ ✅ 레이 기반 차폐 + 로우패스 필터 완료.
+- ~~**HRTF**~~ ✅ ITD/ILD 기반 간소화 HRTF 완료. 현재 `voltex_audio::experimental::hrtf` (엔진 미사용).
+- ~~**Reverb/Echo**~~ ✅ Schroeder reverb (4 comb + 2 allpass) + Echo delay line 완료. 현재 `voltex_audio::experimental::reverb` (엔진 미사용).
+- ~~**Occlusion**~~ ✅ 차폐 계수 → 볼륨·로우패스 컷오프 + 로우패스 필터 완료 (레이캐스트는 호출부 몫). 현재 `voltex_audio::experimental::occlusion` (엔진 미사용).
 
 ## Phase 6-3
 
-- ~~**동적 그룹 생성**~~ ✅ MixGroupManager 동적 생성/삭제 완료.
-- ~~**그룹 간 라우팅/버스**~~ ✅ AudioBus 믹싱 완료.
-- ~~**이펙트 체인**~~ ✅ EffectChain (trait 기반 파이프라인) 완료.
-- ~~**비선형 페이드 커브**~~ ✅ Exponential/Logarithmic/SCurve 완료.
+- ~~**동적 그룹 생성**~~ ✅ MixGroupManager 동적 생성/삭제 완료. 현재 `voltex_audio::experimental::dynamic_groups` (엔진 미사용).
+- ~~**그룹 간 라우팅/버스**~~ ✅ AudioBus 믹싱 완료. 현재 `voltex_audio::experimental::audio_bus` (엔진 미사용).
+- ~~**이펙트 체인**~~ ✅ EffectChain (trait 기반 파이프라인) 완료. 현재 `voltex_audio::experimental::effect_chain` (엔진 미사용).
+- ~~**비선형 페이드 커브**~~ ✅ Exponential/Logarithmic/SCurve 완료. 현재 `voltex_audio::experimental::fade_curves` (엔진 미사용).
 
 ## Phase 7-1
 
-- ~~**투명 오브젝트**~~ ✅ ForwardPass (알파 블렌딩, HDR 타겟, depth read-only) + back-to-front 정렬 완료. deferred_demo 통합 미완료.
-- ~~**G-Buffer 압축**~~ ✅ 옥타헤드럴 노멀 인코딩 + depth 기반 위치 복원 완료.
-- ~~**Light Volumes**~~ ✅ Sphere/Cone/Fullscreen 볼륨 + contains_point 완료.
-- ~~**Stencil 최적화**~~ ✅ 라이트 볼륨 스텐실 mark/test 완료.
+- ~~**투명 오브젝트**~~ ✅ ForwardPass (알파 블렌딩, HDR 타겟, depth read-only) + back-to-front 정렬 완료. deferred_demo 통합 미완료. 현재 `voltex_renderer::experimental::forward_pass` (엔진 미사용).
+- ~~**G-Buffer 압축**~~ ✅ 옥타헤드럴 노멀 인코딩 + depth 기반 위치 복원 완료. 현재 `voltex_renderer::experimental::gbuffer_compress` (엔진 미사용).
+- ~~**Light Volumes**~~ ✅ Sphere/Cone/Fullscreen 볼륨 + contains_point 완료. 현재 `voltex_renderer::experimental::light_volumes` (엔진 미사용).
+- ~~**Stencil 최적화**~~ ✅ 라이트 볼륨 스텐실 mark/test 완료. 현재 `voltex_renderer::experimental::stencil_opt` (엔진 미사용).
 
 ## Phase 7-2
 
-- ~~**Bilateral Blur**~~ ✅ depth/normal edge-aware 컴퓨트 셰이더 완료.
-- ~~**반해상도 렌더링**~~ ✅ half_resolution + depth-aware 업스케일 완료.
-- ~~**Temporal Accumulation**~~ ✅ 히스토리 블렌딩 컴퓨트 셰이더 완료.
-- ~~**Light Probes**~~ ✅ SH 평가 + LightProbeGrid nearest 완료.
+- ~~**Bilateral Blur**~~ ✅ depth/normal edge-aware 컴퓨트 셰이더 완료. 현재 `voltex_renderer::experimental::bilateral_blur` (엔진 미사용).
+- ~~**반해상도 렌더링**~~ ✅ half_resolution + depth-aware 업스케일 완료. 현재 `voltex_renderer::experimental::half_res_ssgi` (엔진 미사용).
+- ~~**Temporal Accumulation**~~ ✅ 히스토리 블렌딩 컴퓨트 셰이더 완료. 현재 `voltex_renderer::experimental::temporal_accum` (엔진 미사용).
+- ~~**Light Probes**~~ ✅ SH 평가 + LightProbeGrid nearest 완료. 현재 `voltex_renderer::experimental::light_probes` (엔진 미사용).
 
 ## Phase 7-3
 
 - ~~**RT Reflections**~~ ✅ 컴퓨트 셰이더 (G-Buffer 기반 반사 레이 마칭) 완료.
 - ~~**RT AO**~~ ✅ 컴퓨트 셰이더 (코사인 가중 반구 샘플링) 완료.
 - ~~**Point/Spot Light RT shadows**~~ ✅ 인프라 + 컴퓨트 셰이더 완료.
-- ~~**Soft RT shadows**~~ ✅ 멀티 레이 + penumbra 크기 계산 완료.
-- ~~**BLAS 업데이트**~~ ✅ BlasTracker (dirty mesh 추적) 완료.
-- ~~**Fallback**~~ ✅ RtCapabilities + RenderMode 선택 완료.
+- ~~**Soft RT shadows**~~ ✅ 멀티 레이 + penumbra 크기 계산 완료. 현재 `voltex_renderer::experimental::soft_rt_shadow` (엔진 미사용).
+- ~~**BLAS 업데이트**~~ ✅ BlasTracker (dirty mesh 추적) 완료. 현재 `voltex_renderer::experimental::blas_update` (엔진 미사용).
+- ~~**Fallback**~~ ✅ RtCapabilities + RenderMode 선택 완료. 현재 `voltex_renderer::experimental::rt_fallback` (엔진 미사용).
 
 ## Phase 7-4
 
@@ -119,12 +119,12 @@
 - ~~**Motion Blur**~~ ✅ 카메라 속도 기반 컴퓨트 셰이더 완료.
 - ~~**DOF**~~ ✅ Circle-of-confusion 기반 컴퓨트 셰이더 완료.
 - ~~**Auto Exposure**~~ ✅ 컴퓨트 셰이더 luminance + 적응형 노출 계산 완료. deferred_demo 통합 미완료.
-- ~~**Bilateral Bloom Blur**~~ ✅ luminance 기반 bilateral bloom weight 완료.
+- ~~**Bilateral Bloom Blur**~~ ✅ luminance 기반 bilateral bloom weight 완료. 현재 `voltex_renderer::experimental::bilateral_bloom` (엔진 미사용).
 
 ## Phase 8-1
 
 - ~~**자동 내비메시 생성**~~ ✅ 복셀화 기반 NavMeshBuilder 완료.
-- ~~**String Pulling (Funnel)**~~ ✅ SSF 알고리즘 완료. **apex-restart 버그 fix (확인됨, 수정 완료)**: apex 갱신 시 현 구현이 현재 인덱스에서 `continue` 만 해 정석 SSF (Mononen) 의 `i = apex_idx` 재시작을 누락 → 지그재그 corridor 에서 내부 코너 절단. randomized corridor + max-penetration oracle 로 재현 확인 (3-band 지그재그에서 경로가 corridor 밖 ~0.41 단위 이탈). `funnel_smooth` 를 `for` → `while` 루프로 바꾸고 apex 갱신 시 `i = apex_idx` 재시작으로 fix (공개 시그니처 불변, `find_path` 영향 없음). 회귀 테스트 `test_funnel_zigzag_stays_inside_corridor` 추가 (max-penetration < 1e-3 검증, fix 전 코드에서 fail 확인). 기존 funnel/path 테스트도 정확한 삼각형 시퀀스·waypoint·corner 검증으로 강화 (endpoint/len 만 검증하던 한계 해소).
+- ~~**String Pulling (Funnel)**~~ ✅ SSF 알고리즘 완료. **apex-restart 버그 fix (확인됨, 수정 완료)**: apex 갱신 시 현 구현이 현재 인덱스에서 `continue` 만 해 정석 SSF (Mononen) 의 `i = apex_idx` 재시작을 누락 → 지그재그 corridor 에서 내부 코너 절단. randomized corridor + max-penetration oracle 로 재현 확인 (3-band 지그재그에서 경로가 corridor 밖 ~0.41 단위 이탈). `funnel_smooth` 를 `for` → `while` 루프로 바꾸고 apex 갱신 시 `i = apex_idx` 재시작으로 fix (공개 시그니처 불변, `find_path` 영향 없음). 회귀 테스트 `test_funnel_zigzag_stays_inside_corridor` 추가 (max-penetration < 1e-3 검증, fix 전 코드에서 fail 확인). 기존 funnel/path 테스트도 정확한 삼각형 시퀀스·waypoint·corner 검증으로 강화 (endpoint/len 만 검증하던 한계 해소). 현재 `voltex_ai::experimental::funnel` (엔진 미사용).
 - ~~**동적 장애물 회피**~~ ✅ velocity obstacle 기반 완료.
 - ~~**ECS 통합**~~ ✅ NavAgent 컴포넌트 완료. ~~nav_agent_system 미구현~~ ✅ 2026-06-03 — `voltex_ai::nav_agent_system(world, navmesh, dt)` 가 find_path + follow_path 로 NavAgent 엔티티 이동 (kinematic, reached 처리). NavMesh 호출자 주입.
 - ~~**내비메시 직렬화**~~ ✅ VNAV 바이너리 포맷 serialize/deserialize 완료.
@@ -152,14 +152,14 @@
 - ~~**에셋 브라우저**~~ ✅ 파일 목록 + 디렉토리 탐색 완료. 에셋 로딩/프리뷰 미구현.
 - ~~**텍스트 입력**~~ ✅ text_input 위젯 완료.
 - ~~**스크롤, 드래그앤드롭**~~ ✅ scroll_panel + drag/drop 완료.
-- ~~**도킹, 탭**~~ ✅ DockTree + ~~**플로팅 윈도우**~~ ✅ FloatingPanelManager 완료. 탭 드래그 이동 미구현.
+- ~~**도킹, 탭**~~ ✅ DockTree + ~~**플로팅 윈도우**~~ ✅ FloatingPanelManager 완료. 탭 드래그 이동 미구현. 현재 `voltex_editor::experimental::floating_panel` (엔진 미사용).
 - ~~**TTF 폰트**~~ ✅ 자체 TTF 파서 + 래스터라이저 + 온디맨드 캐시 + 렌더러 아틀라스 교체 완료.
 
 ## 렌더링 한계
 
 - ~~**런타임 그림자 없음**~~ ✅ 2026-06-03 — BasicRenderer directional shadow mapping (`RuntimeConfig::with_shadows(true)`): shadow depth pre-pass + mesh_colored 3x3 PCF (group 3). 기본 off. 한계: ortho 고정(30), 바닥 접촉 오브젝트 self-occlusion. 캡처 검증 docs/visual/shadow_on.png. ~~스킨드 메시 caster 아님~~ ✅ 2026-06-03 (v1.0.61) — `create_skinned_shadow_pipeline` + `skinned_shadow_shader.wgsl`(depth-only GPU 스키닝, 기존 skinned camera/palette 레이아웃 재사용, light-space cam UBO만 추가). BasicRenderer shadow pre-pass가 정적 메시 후 스킨드 메시도 깊이에 렌더. 캡처 회귀 `skinned_mesh_casts_shadow`(strip이 바닥에 그림자 투사, Hidden 대조군 대비 압도) + docs/visual/skinned_shadow.png.
 
-- ~~**per-entity dynamic UBO**~~ ✅ GPU 인스턴싱 (InstanceData, InstanceBuffer, instanced pipeline) 완료.
+- ~~**per-entity dynamic UBO**~~ ✅ GPU 인스턴싱 (InstanceData, InstanceBuffer, instanced pipeline) 완료. 현재 `voltex_renderer::experimental::instancing` (엔진 미사용).
 - **max_bind_groups=4** — 리소스 합치기로 해결 중.
 - ~~**BasicRenderer 가 머티리얼 색상 무시**~~ ✅ 2026-06-03 — 런타임 Blinn-Phong 경로(BasicRenderer)가 `MaterialUniform.base_color` 를 무시하고 흰색 기본 텍스처만 써 모든 오브젝트가 같은 회색 → 같은 색 바닥에 묻힘("박스 안 보임" 2차 원인). `ColoredCameraUniform`(per-entity base_color) + `mesh_colored.wgsl` + `create_colored_mesh_pipeline` 로 BasicRenderer 만 격리 수정 (shared CameraUniform/mesh_shader/PBR/4개 레거시 예제 무영향). voltex_capture `basic_renderer_applies_material_base_color` 회귀. 한계: 텍스처/노멀맵 등 풀 PBR 머티리얼은 여전히 PBR 파이프라인 전용 — 런타임 PBR 통합은 후속.
 

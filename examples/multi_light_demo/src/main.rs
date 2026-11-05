@@ -9,7 +9,7 @@ use voltex_math::{Vec3, Mat4};
 use voltex_platform::{VoltexWindow, WindowConfig, InputState, GameTimer};
 use voltex_renderer::{
     align_up, GpuContext, Camera, FpsController, CameraUniform, LightsUniform, LightData,
-    Mesh, GpuTexture, MaterialUniform, generate_sphere, create_pbr_pipeline, obj,
+    Mesh, GpuTexture, MaterialUniform, generate_sphere_mesh, create_pbr_pipeline, obj,
     ShadowMap, ShadowUniform,
     IblResources, pbr_full_texture_bind_group_layout, create_pbr_full_texture_bind_group,
 };
@@ -96,8 +96,7 @@ impl ApplicationHandler for MultiLightApp {
         let mat_aligned_size = align_up(std::mem::size_of::<MaterialUniform>() as u32, alignment);
 
         // Generate sphere mesh (shared by all 5 spheres)
-        let (vertices, indices) = generate_sphere(0.5, 32, 16);
-        let sphere_mesh = Mesh::new(&gpu.device, &vertices, &indices);
+        let sphere_mesh = generate_sphere_mesh(0.5, 32, 16).upload(&gpu.device);
 
         // Ground plane: cube.obj scaled to (10, 0.1, 10)
         let obj_src = include_str!("../../../assets/cube.obj");

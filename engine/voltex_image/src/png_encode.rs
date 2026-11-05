@@ -3,7 +3,7 @@
 //! Emits 8-bit RGBA (color type 6) using zlib *stored* (uncompressed) deflate
 //! blocks. No compression — capture PNGs are short-lived verification
 //! artifacts, so simplicity and zero deps win over file size. The output is a
-//! fully valid PNG: it round-trips through [`crate::parse_png`].
+//! fully valid PNG: it round-trips through [`crate::decode_png`].
 
 use crate::checksum::{adler32, crc32};
 
@@ -141,7 +141,7 @@ mod tests {
             src.extend_from_slice(&[v, 255 - v, v.wrapping_add(7), 255]);
         }
         let png = encode_rgba8(w, h, &src);
-        let (decoded, dw, dh) = crate::parse_png(&png).expect("decode");
+        let crate::DecodedImage { rgba: decoded, width: dw, height: dh } = crate::decode_png(&png).expect("decode");
         assert_eq!((dw, dh), (w, h));
         assert_eq!(decoded, src);
     }
@@ -158,7 +158,7 @@ mod tests {
             src.extend_from_slice(&[v, v.wrapping_mul(3), v.wrapping_add(99), 255]);
         }
         let png = encode_rgba8(w, h, &src);
-        let (decoded, dw, dh) = crate::parse_png(&png).expect("decode");
+        let crate::DecodedImage { rgba: decoded, width: dw, height: dh } = crate::decode_png(&png).expect("decode");
         assert_eq!((dw, dh), (w, h));
         assert_eq!(decoded, src);
     }

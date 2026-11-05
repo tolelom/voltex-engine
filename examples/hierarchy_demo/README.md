@@ -26,4 +26,5 @@ cargo run -p hierarchy_demo --release
 
 ## Next step
 
-→ [`asset_demo`](../asset_demo) — adds the `voltex_asset` loader + file watcher.
+→ [`asset_demo`](../asset_demo) — shares one mesh across many entities through
+`voltex_asset::Assets` handles.

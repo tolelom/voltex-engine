@@ -1,3 +1,6 @@
+//! Basic control widgets on `UiContext`: `text`, `button`, `image`, `slider`
+//! and `checkbox`. Each draws at the layout cursor and returns the interaction result.
+
 use crate::ui_context::UiContext;
 
 // Color palette

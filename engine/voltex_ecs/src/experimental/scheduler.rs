@@ -1,4 +1,4 @@
-//! Simple in-order system scheduler. See [`DependencyScheduler`](crate::DependencyScheduler)
+//! Simple in-order system scheduler. See [`DependencyScheduler`](super::dependency_scheduler::DependencyScheduler)
 //! for the parallel variant.
 
 use crate::World;

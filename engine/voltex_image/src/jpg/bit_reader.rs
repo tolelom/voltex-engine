@@ -1,8 +1,7 @@
-use super::headers::HuffTable;
+//! JPEG entropy-coded data reader: `BitReader` reads MSB-first bits, skips 0xFF00
+//! byte stuffing, decodes Huffman symbols and resynchronises at restart markers.
 
-// ---------------------------------------------------------------------------
-// BitReader — MSB-first bit reading with JPEG byte stuffing
-// ---------------------------------------------------------------------------
+use super::headers::HuffTable;
 
 pub(super) struct BitReader<'a> {
     data: &'a [u8],

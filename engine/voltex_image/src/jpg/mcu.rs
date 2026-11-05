@@ -1,8 +1,7 @@
-use super::headers::JpegComponent;
+//! MCU assembly: `assemble_mcu` upsamples subsampled components and converts
+//! YCbCr (or grayscale) blocks into RGB pixels of the output image.
 
-// ---------------------------------------------------------------------------
-// MCU assembly + color conversion
-// ---------------------------------------------------------------------------
+use super::headers::JpegComponent;
 
 #[allow(clippy::too_many_arguments)]
 pub(super) fn assemble_mcu(

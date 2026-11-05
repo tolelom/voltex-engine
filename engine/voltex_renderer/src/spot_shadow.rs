@@ -1,3 +1,5 @@
+//! Spot-light shadows: `SpotShadowMap` and `spot_shadow_matrix`, the perspective
+//! light view-projection covering the spot cone.
 #![allow(missing_docs)]
 
 use crate::shadow::{SHADOW_FORMAT, SHADOW_MAP_SIZE};

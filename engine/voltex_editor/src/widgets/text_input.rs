@@ -1,3 +1,6 @@
+//! Single-line editable text box on `UiContext` (`text_input`): focus on click,
+//! keyboard editing with a cursor, returns `true` when the buffer changed.
+
 use crate::ui_context::{Key, UiContext};
 
 // Color palette

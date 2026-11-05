@@ -1,3 +1,5 @@
+//! Ray-tracing capability check and render-mode selection (RT vs. raster
+//! fallback) from device limits.
 #![allow(missing_docs)]
 
 /// Check if a wgpu adapter supports features needed for RT.

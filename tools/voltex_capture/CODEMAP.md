@@ -6,7 +6,7 @@ Headless offscreen 렌더링 + PNG 캡처. 윈도우 없는 환경에서 *실제
 
 - surface 없는 wgpu device/queue 획득 (`HeadlessGpu`) — `compatible_surface: None` 으로 헤드리스에서 동작
 - 오프스크린 color(Rgba8UnormSrgb, COPY_SRC) + depth 타겟 (`OffscreenTarget`) + 256-byte row 정렬을 처리하는 CPU readback
-- PNG 인코더 (`encode_rgba8`) — `voltex_image::encode_rgba8` 재export. zlib stored block + CRC32/Adler32 (C1 감사 해소: capture의 중복 구현 제거, voltex_image로 단일화). `voltex_renderer::parse_png` 로 라운드트립 검증됨
+- PNG 인코더 (`encode_rgba8`) — `voltex_image::encode_rgba8` 재export. zlib stored block + CRC32/Adler32 (C1 감사 해소: capture의 중복 구현 제거, voltex_image로 단일화). `voltex_renderer::decode_png` 로 라운드트립 검증됨
 - 실제 렌더 경로로 데모 씬 렌더 (`scene::*`) — BasicRenderer 경로 (런타임과 동일) + 손으로 조립한 PBR 파이프라인 (`scene::raw_pbr::*`, create_pbr_pipeline 직접) + 에디터 GizmoRenderer/UiRenderer
 - 프레임이 명백히 깨졌는지 사람 없이 판정하는 통계 (`ImageStats`: black_fraction / distinct_colors / mean_luminance / looks_blank)
 

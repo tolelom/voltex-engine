@@ -14,6 +14,21 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ### Refactor
 
+- **가독성 정리 2차 (동작 변화 없음)**
+  - **엔진이 쓰지 않는 공개 코드를 `experimental`로**: 구현·테스트는 있지만 엔진 런타임·렌더러가 쓰지 않는 코드를
+    crate마다 `experimental` 모듈로 옮겼다. 옛 경로는 `#[deprecated]` 별칭(타입 alias·전달 함수·모듈 shim)으로 남겨
+    기존 코드는 경고만 받는다. renderer: `forward_pass`, `instancing`, `gbuffer_compress`, `light_volumes`, `stencil_opt`,
+    `light_probes`, `blas_update`, `rt_fallback`, `soft_rt_shadow`, `bilateral_bloom`, `bilateral_blur`, `half_res_ssgi`,
+    `temporal_accum`. ecs: `archetype`, `scheduler`, `dependency_scheduler`. audio: `async_loader`, `dynamic_groups`,
+    `audio_bus`, `effect_chain`, `reverb`, `occlusion`, `fade_curves`, `hrtf`. asset: `loader`. editor: `floating_panel`.
+    physics: `mesh_collider`. ai: `funnel_smooth`. 어디서도 참조하지 않던 `skinned_shader.wgsl`은 지웠다.
+    CONTRIBUTING·README·examples README·CODEMAP에서 이들을 엔진 기능처럼 설명하던 문장을 고쳤다.
+  - **튜플 반환을 이름 있는 구조체로**: `decode_png`/`decode_jpg` → `DecodedImage { width, height, rgba }`,
+    `generate_{cube,plane,quad,sphere}_mesh` → `MeshData { vertices, indices }`(+ `MeshData::upload`),
+    `PrimitiveMesh::mesh_data`. 옛 `parse_png`/`parse_jpg`/`generate_*`/`PrimitiveMesh::geometry`는 `#[deprecated]`.
+    저장소 안 사용처 약 50곳을 바꿨다.
+  - **주석**: 모듈 설명(`//!`)이 없던 파일 58개에 설명을 달고, SAFETY 주석이 없던 `unsafe` 블록 21곳(Linux 15, macOS 6)에
+    근거를 적었다. 렌더러 모듈 설명은 셰이더가 자리표시자인 패스(`rt_ao`, `rt_point_shadow`, `auto_exposure`)를 그렇다고 밝힌다.
 - **가독성 정리 (동작 변화 없음)**: 코드만 읽고 하는 일을 알 수 있도록 엔진·도구 전 crate의 이름과 구조를 정리했다.
   동작과 다른 이름·주석을 바로잡고(`effective_mass_along`이 역질량을 반환, 프레임 끝에 부르는 `begin_frame`,
   고친다는 뜻의 `validate_hierarchy`, 쓰지 않는 백엔드를 고른다고 적힌 오디오 주석 등), 복사돼 있던 코드를 헬퍼로
@@ -44,7 +59,7 @@ recent on top. v0.x entries are organised by Cycle (see
   - 확인: build·clippy(`-D warnings`)·`cargo test --workspace --tests`·doctest 통과, GPU 캡처 테스트(lavapipe) 통과,
     `capture` PNG 14장이 정리 전과 바이트 단위로 같음, `voltex_audio` Windows 대상 clippy 통과.
   - 남긴 것: 쓰는 곳이 없는 공개 코드(렌더러 실험 모듈 9개, ECS `Archetype`·`Scheduler`, 오디오 DSP·백엔드 등)는 지우지
-    않았다. 메시 생성기·이미지 디코더의 튜플 반환(`parse_png`는 `(pixels, w, h)`, `parse_jpg`는 `(w, h, pixels)`)도 그대로다.
+    않았다. 메시 생성기·이미지 디코더의 튜플 반환도 그대로다(아래 항목에서 구조체로 바꿨다).
 - **폴더 구성 `engine/`·`tools/`**: `crates/`를 엔진 crate 15개(`engine/`)와 엔진을 쓰는 도구(`tools/voltex_cli`,
   `tools/voltex_capture`)로 나눴다. 루트 `Cargo.toml`의 members를 엔진·도구·게임·예제 묶음으로 다시 적었다.
   `voltex build`가 만드는 래퍼 crate는 엔진 경로의 `engine/voltex_runtime`을 가리킨다. 저장소를 도는 테스트
@@ -93,6 +108,12 @@ recent on top. v0.x entries are organised by Cycle (see
   `capture` bin 결과 PNG 14장이 분할 전과 바이트 단위로 같음.
 
 ### Fix
+
+- **Lua 코루틴 use-after-free**: `create_coroutine`이 `lua_newthread`가 스택에 올린 스레드를 바로 pop해, 다음 GC에서
+  스레드가 해제된 뒤에도 `LuaCoroutine`이 그 포인터를 썼다(GC 뒤 resume 시 SIGSEGV). `luaL_ref`로 레지스트리에
+  붙잡고 Drop에서 `luaL_unref`한다. `LuaCoroutine<'lua>`가 만든 `LuaState`를 빌려 더 오래 살 수 없다(타입에 수명 추가).
+- **오디오 백엔드 shutdown 뒤 write**: `CoreAudioBackend`·`AlsaBackend`의 `write`가 `shutdown`이 null로 만든 포인터를
+  확인 없이 썼다. 이제 `WriteFailed`를 돌려준다.
 
 - **voltex_net 수신 루프 중단**: `NetSocket::recv_from`이 해석에 실패한 datagram에서 `None`을 돌려줘, 호출부의
   `while let` 루프가 그 프레임의 남은 패킷을 읽지 않았다. 실패한 datagram은 로그만 남기고 다음 것을 읽는다.

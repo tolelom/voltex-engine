@@ -1,5 +1,5 @@
 //! Baseline JPEG decoder. Supports SOF0 (sequential DCT, Huffman).
-//! Returns RGBA pixel data like parse_png.
+//! Returns RGBA pixel data like `decode_png`.
 //! Supports grayscale (1-component) and YCbCr (3-component) with
 //! chroma subsampling (4:4:4, 4:2:2, 4:2:0).
 
@@ -12,16 +12,17 @@ mod mcu;
 use decoder::decode_scan;
 use headers::{parse_dht, parse_dqt, parse_sof, HuffTable, JpegComponent};
 
+use crate::DecodedImage;
+
 /// Hard cap on either JPEG dimension we'll decode. Matches the typical GPU
 /// texture limit (`max_texture_dimension_2d = 16384`) and prevents adversarial
 /// SOF segments from triggering huge allocations.
 const JPG_MAX_DIMENSION: u32 = 16_384;
 
-/// Decode a baseline JPEG file from raw bytes.
+/// Decode a baseline JPEG file from raw bytes into packed RGBA8 pixels.
 ///
-/// Returns `(rgba_pixels, width, height)` with a packed RGBA8 buffer.
 /// Supports SOF0 grayscale and YCbCr with 4:4:4, 4:2:2, and 4:2:0 subsampling.
-pub fn parse_jpg(data: &[u8]) -> crate::Result<(Vec<u8>, u32, u32)> {
+pub fn decode_jpg(data: &[u8]) -> crate::Result<DecodedImage> {
     if data.len() < 2 || data[0] != 0xFF || data[1] != 0xD8 {
         return Err("Invalid JPEG: missing SOI marker".into());
     }
@@ -86,7 +87,7 @@ pub fn parse_jpg(data: &[u8]) -> crate::Result<(Vec<u8>, u32, u32)> {
                 for &[r, g, b] in rgb.as_chunks::<3>().0 {
                     rgba.extend_from_slice(&[r, g, b, 255]);
                 }
-                return Ok((rgba, w, h));
+                return Ok(DecodedImage { width: w, height: h, rgba });
             }
             0xC0 => {
                 // SOF0 — Baseline DCT
@@ -161,6 +162,13 @@ pub fn parse_jpg(data: &[u8]) -> crate::Result<(Vec<u8>, u32, u32)> {
     Err("No image data found (missing SOS)".into())
 }
 
+/// Old form of [`decode_jpg`] that returns an unnamed
+/// `(rgba_pixels, width, height)` tuple.
+#[deprecated(note = "use `decode_jpg`, which returns a named `DecodedImage`")]
+pub fn parse_jpg(data: &[u8]) -> crate::Result<(Vec<u8>, u32, u32)> {
+    decode_jpg(data).map(|img| (img.rgba, img.width, img.height))
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -175,18 +183,18 @@ mod tests {
     #[test]
     fn test_invalid_signature() {
         let data = [0u8; 10];
-        assert!(parse_jpg(&data).is_err());
+        assert!(decode_jpg(&data).is_err());
     }
 
     #[test]
     fn test_empty_data() {
-        assert!(parse_jpg(&[]).is_err());
+        assert!(decode_jpg(&[]).is_err());
     }
 
     #[test]
     fn test_soi_only() {
         let data = [0xFF, 0xD8];
-        assert!(parse_jpg(&data).is_err());
+        assert!(decode_jpg(&data).is_err());
     }
 
     #[test]
@@ -351,7 +359,7 @@ mod tests {
     #[test]
     fn test_grayscale_flat() {
         let jpg_data = build_minimal_jpeg_8x8();
-        let (rgba, w, h) = parse_jpg(&jpg_data).unwrap();
+        let DecodedImage { rgba, width: w, height: h } = decode_jpg(&jpg_data).unwrap();
         assert_eq!(w, 8);
         assert_eq!(h, 8);
         assert_eq!(rgba.len(), 8 * 8 * 4);
@@ -366,12 +374,12 @@ mod tests {
     #[test]
     fn test_invalid_marker() {
         let data = [0xFF, 0xD8, 0x00]; // SOI then garbage
-        assert!(parse_jpg(&data).is_err());
+        assert!(decode_jpg(&data).is_err());
     }
 
     // ── Panic-resistance fuzz tests ────────────────────────────────
     //
-    // parse_jpg must return Result on any input. JPEG parsers are
+    // decode_jpg must return Result on any input. JPEG parsers are
     // notoriously panic-prone (Huffman tables, RST markers, MCU
     // boundaries) — this catches index/slice/unwrap panics from
     // arbitrary input.
@@ -389,32 +397,32 @@ mod tests {
     }
 
     #[test]
-    fn fuzz_parse_jpg_no_panic_on_empty() {
-        let _ = parse_jpg(&[]);
+    fn fuzz_decode_jpg_no_panic_on_empty() {
+        let _ = decode_jpg(&[]);
     }
 
     #[test]
-    fn fuzz_parse_jpg_no_panic_on_soi_only() {
-        let _ = parse_jpg(&[0xFF, 0xD8]);
-        let _ = parse_jpg(&[0xFF]);
+    fn fuzz_decode_jpg_no_panic_on_soi_only() {
+        let _ = decode_jpg(&[0xFF, 0xD8]);
+        let _ = decode_jpg(&[0xFF]);
     }
 
     #[test]
-    fn fuzz_parse_jpg_no_panic_on_random_bytes() {
+    fn fuzz_decode_jpg_no_panic_on_random_bytes() {
         for seed in 1..=128u32 {
             for &len in &[0usize, 1, 2, 8, 64, 256, 1024] {
-                let _ = parse_jpg(&fuzz_bytes(seed, len));
+                let _ = decode_jpg(&fuzz_bytes(seed, len));
             }
         }
     }
 
     #[test]
-    fn fuzz_parse_jpg_no_panic_on_soi_random_tail() {
+    fn fuzz_decode_jpg_no_panic_on_soi_random_tail() {
         for seed in 1..=128u32 {
             for &tail_len in &[0usize, 1, 16, 64, 256, 1024] {
                 let mut data = vec![0xFF, 0xD8];
                 data.extend_from_slice(&fuzz_bytes(seed, tail_len));
-                let _ = parse_jpg(&data);
+                let _ = decode_jpg(&data);
             }
         }
     }

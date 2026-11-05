@@ -92,7 +92,7 @@ registry.register::<Health>();
 
 ### 시스템
 
-시스템은 `fn(&mut World)` 함수나 같은 모양의 클로저다. `RuntimeApp`을 쓰는 게임은 `RuntimeConfig::with_system_setup`에서 등록하고, 단독으로 돌릴 때는 `voltex_ecs::Scheduler`의 `add`, `run_all`을 쓴다.
+시스템은 `fn(&mut World)` 함수나 같은 모양의 클로저다. `RuntimeApp`을 쓰는 게임은 `RuntimeConfig::with_system_setup`에서 등록하고, 단독으로 돌릴 때는 시스템 함수를 원하는 순서로 직접 호출한다. (`voltex_ecs::experimental::scheduler::Scheduler`도 같은 일을 하지만 엔진은 쓰지 않는 실험 API다.)
 
 ### import
 

@@ -1,3 +1,5 @@
+//! Omnidirectional point-light shadows: `PointShadowMap` (depth cube map) and
+//! `point_shadow_view_matrices` for its six faces.
 #![allow(missing_docs)]
 
 use voltex_math::{Mat4, Vec3};

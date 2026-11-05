@@ -9,7 +9,7 @@ use voltex_math::{Vec3, Mat4};
 use voltex_platform::{VoltexWindow, WindowConfig, InputState, GameTimer};
 use voltex_renderer::{
     align_up, GpuContext, Camera, FpsController, CameraUniform, LightsUniform, LightData,
-    Mesh, GpuTexture, MaterialUniform, generate_sphere, create_pbr_pipeline,
+    Mesh, GpuTexture, MaterialUniform, generate_sphere_mesh, create_pbr_pipeline,
     ShadowMap, ShadowUniform,
     IblResources, pbr_full_texture_bind_group_layout, create_pbr_full_texture_bind_group,
 };
@@ -96,8 +96,7 @@ impl ApplicationHandler for IblDemoApp {
         let mat_aligned_size = align_up(std::mem::size_of::<MaterialUniform>() as u32, alignment);
 
         // Generate sphere mesh
-        let (vertices, indices) = generate_sphere(0.4, 32, 16);
-        let mesh = Mesh::new(&gpu.device, &vertices, &indices);
+        let mesh = generate_sphere_mesh(0.4, 32, 16).upload(&gpu.device);
 
         // Camera at (0, 0, 12) looking toward origin
         let aspect = gpu.config.width as f32 / gpu.config.height as f32;

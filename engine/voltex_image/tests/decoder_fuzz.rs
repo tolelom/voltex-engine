@@ -5,7 +5,7 @@
 
 use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::path::Path;
-use voltex_image::{deflate, parse_jpg, parse_png};
+use voltex_image::{decode_jpg, decode_png, deflate};
 
 struct XorShift(u32);
 impl XorShift {
@@ -75,8 +75,8 @@ fn fuzz(ext: &str, iterations: u32, decode: impl Fn(&[u8])) {
 #[test]
 fn png_decoder_never_panics_on_corrupted_files() {
     fuzz("png", 400, |b| {
-        if let Ok((rgba, w, h)) = parse_png(b) {
-            assert_eq!(rgba.len(), w as usize * h as usize * 4);
+        if let Ok(img) = decode_png(b) {
+            assert_eq!(img.rgba.len(), img.width as usize * img.height as usize * 4);
         }
     });
 }
@@ -84,8 +84,8 @@ fn png_decoder_never_panics_on_corrupted_files() {
 #[test]
 fn jpeg_decoder_never_panics_on_corrupted_files() {
     fuzz("jpg", 400, |b| {
-        if let Ok((rgba, w, h)) = parse_jpg(b) {
-            assert_eq!(rgba.len(), w as usize * h as usize * 4);
+        if let Ok(img) = decode_jpg(b) {
+            assert_eq!(img.rgba.len(), img.width as usize * img.height as usize * 4);
         }
     });
 }

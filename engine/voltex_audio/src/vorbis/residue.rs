@@ -1,7 +1,6 @@
-// ---------------------------------------------------------------------------
-// Residue (config + audio-packet decode)
-// ---------------------------------------------------------------------------
-//
+//! Vorbis residue: `decode_residue_config` parses the setup-header config and
+//! `decode_residue` decodes the per-channel residue vectors of an audio packet.
+
 // Vorbis spec § 8.6 residue type 2 (interleaved) uses indexed partition +
 // classification loops where the index addresses parallel arrays
 // (cascade[i], books[i][j], classifications[j]). Keep index loops.

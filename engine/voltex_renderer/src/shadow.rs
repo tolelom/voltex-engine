@@ -1,3 +1,6 @@
+//! Directional shadow map: `ShadowMap` (depth texture + comparison sampler) and the
+//! uniforms that use it — `ShadowUniform`, `ShadowPassUniform` and the
+//! `BasicRenderer`'s `ShadowMainUniform`.
 #![allow(missing_docs)]
 
 use bytemuck::{Pod, Zeroable};

@@ -3,7 +3,7 @@
 
 use voltex_ecs::{MaterialHandle, MeshHandle, Transform, World};
 use voltex_math::Vec3;
-use voltex_renderer::{generate_sphere, Camera, LightUniform, MaterialUniform, Mesh};
+use voltex_renderer::{generate_sphere_mesh, Camera, LightUniform, MaterialUniform};
 use voltex_renderer_ecs::{BasicRenderer, RenderAssets};
 
 use super::draw_and_read;
@@ -18,8 +18,7 @@ pub fn render_pbr_basic_renderer(gpu: &HeadlessGpu, width: u32, height: u32, pbr
     let mut renderer = BasicRenderer::new(&gpu.device, &gpu.queue, CAPTURE_FORMAT, 8);
     renderer.set_pbr_enabled(pbr);
     let mut assets = RenderAssets::new();
-    let (sphere_vertices, sphere_indices) = generate_sphere(0.8, 32, 16);
-    let mesh = assets.add_mesh(Mesh::new(&gpu.device, &sphere_vertices, &sphere_indices));
+    let mesh = assets.add_mesh(generate_sphere_mesh(0.8, 32, 16).upload(&gpu.device));
 
     let mut world = World::new();
     for (i, metallic) in [0.0f32, 0.5, 1.0].into_iter().enumerate() {
@@ -69,8 +68,7 @@ pub fn render_pbr_sphere_normalmap(
     let mut renderer = BasicRenderer::new(&gpu.device, &gpu.queue, CAPTURE_FORMAT, 8);
     renderer.set_pbr_enabled(true);
     let mut assets = RenderAssets::new();
-    let (sphere_vertices, sphere_indices) = generate_sphere(1.2, 48, 24);
-    let mesh = assets.add_mesh(Mesh::new(&gpu.device, &sphere_vertices, &sphere_indices));
+    let mesh = assets.add_mesh(generate_sphere_mesh(1.2, 48, 24).upload(&gpu.device));
     let mat = assets.add_material(MaterialUniform::with_params([0.7, 0.7, 0.7, 1.0], 0.1, 0.5));
 
     let mut world = World::new();
