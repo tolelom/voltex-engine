@@ -1,3 +1,6 @@
+//! glTF scene nodes, skins and animations: `parse_nodes` (TRS or decomposed matrix),
+//! `parse_skins` (joints + inverse bind matrices) and `parse_animations` (channels/samplers).
+
 use super::accessor::read_accessor_mat4;
 use super::component::read_accessor_floats;
 use super::types::{

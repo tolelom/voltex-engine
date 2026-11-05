@@ -1,3 +1,5 @@
+//! CPU generation of the split-sum IBL BRDF lookup table (`generate_brdf_lut`) via
+//! GGX importance sampling over Hammersley points.
 #![allow(missing_docs)]
 
 /// Van der Corput sequence via bit-reversal.

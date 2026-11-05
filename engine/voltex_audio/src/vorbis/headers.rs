@@ -1,7 +1,6 @@
-// ---------------------------------------------------------------------------
-// Vorbis headers (id + setup) and the per-frame Mapping/Mode tables they own.
-// ---------------------------------------------------------------------------
-//
+//! Vorbis identification and setup headers (`parse_id_header`, `parse_setup_header`)
+//! and the mapping / mode tables the setup header owns.
+
 // Vorbis spec § 4.2.4 references the channel index `ch` in equations for
 // mapping.mux[ch]. Keep the indexed loop for spec traceability.
 #![allow(clippy::needless_range_loop)]

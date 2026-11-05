@@ -1,3 +1,6 @@
+//! Bloom render pipelines: shared bind group layout plus the downsample
+//! (`fs_downsample`, overwrite) and upsample (`fs_upsample`, additive) pipelines.
+
 use crate::bloom::BloomUniform;
 use crate::fullscreen_quad::FullscreenVertex;
 use crate::hdr::HDR_FORMAT;

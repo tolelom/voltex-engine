@@ -1,3 +1,6 @@
+//! Forward render pipeline constructors: position-color (unlit),
+//! plain / colored mesh, skinned mesh and skinned shadow pipelines, plus the
+//! skinned bind group layouts.
 #![allow(missing_docs)]
 
 use crate::gpu::DEPTH_FORMAT;

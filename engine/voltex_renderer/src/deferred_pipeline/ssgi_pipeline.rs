@@ -1,3 +1,6 @@
+//! SSGI render pipeline: G-buffer input and SSGI data (uniform, kernel, noise)
+//! bind group layouts, and `create_ssgi_pipeline` (fullscreen, writes `SSGI_OUTPUT_FORMAT`).
+
 use crate::fullscreen_quad::FullscreenVertex;
 use crate::ssgi::{SsgiUniform, SSGI_OUTPUT_FORMAT};
 

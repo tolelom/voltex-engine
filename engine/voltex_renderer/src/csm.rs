@@ -1,3 +1,6 @@
+//! Cascaded shadow maps for the directional light: `CascadedShadowMap` (one depth
+//! texture per cascade, 2 cascades), `CsmUniform`, and `compute_cascade_matrices`,
+//! which fits each cascade's light matrix.
 #![allow(missing_docs)]
 
 use bytemuck::{Pod, Zeroable};

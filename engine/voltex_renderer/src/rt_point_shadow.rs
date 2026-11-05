@@ -1,3 +1,5 @@
+//! `RtPointShadow` point/spot shadow compute pass and its `RtPointShadowParams`.
+//! The shader currently writes 1.0 (unshadowed) as a placeholder.
 #![allow(missing_docs)]
 
 use bytemuck::{Pod, Zeroable};

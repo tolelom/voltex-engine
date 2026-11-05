@@ -1,6 +1,4 @@
-// ---------------------------------------------------------------------------
-// IDCT
-// ---------------------------------------------------------------------------
+//! 8x8 inverse DCT (`idct`) for JPEG blocks, plus the `ZIGZAG` coefficient order.
 
 /// Zig-zag order for 8x8 block
 pub(super) const ZIGZAG: [usize; 64] = [

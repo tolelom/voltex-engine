@@ -1,3 +1,5 @@
+//! Image-based lighting resources: `IblResources` holds the BRDF LUT texture and
+//! sampler, built on the CPU (`new`) or by a compute shader (`new_gpu`).
 #![allow(missing_docs)]
 
 use crate::brdf_lut::generate_brdf_lut;

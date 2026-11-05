@@ -1,11 +1,10 @@
+//! JPEG scan decoding: `decode_scan` parses the SOS header, Huffman-decodes and
+//! dequantizes each 8x8 block, runs the IDCT and assembles MCUs into the output image.
+
 use super::bit_reader::BitReader;
 use super::headers::{HuffTable, JpegComponent};
 use super::idct::idct;
 use super::mcu::assemble_mcu;
-
-// ---------------------------------------------------------------------------
-// Scan decoder
-// ---------------------------------------------------------------------------
 
 #[allow(clippy::too_many_arguments)]
 pub(super) fn decode_scan(

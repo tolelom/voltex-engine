@@ -1,3 +1,5 @@
+//! Depth-only shadow caster pipeline (`create_shadow_pipeline`) and its
+//! per-object `ShadowPassUniform` bind group layout.
 #![allow(missing_docs)]
 
 use crate::shadow::{ShadowPassUniform, SHADOW_FORMAT};

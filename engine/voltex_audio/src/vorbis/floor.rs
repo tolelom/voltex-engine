@@ -1,7 +1,6 @@
-// ---------------------------------------------------------------------------
-// Floor type 1 (config + audio-packet decode)
-// ---------------------------------------------------------------------------
-//
+//! Vorbis floor type 1: `decode_floor1_config` parses the setup-header config,
+//! `decode_floor1_packet` rebuilds the per-channel spectral envelope from an audio packet.
+
 // Vorbis spec § 7.2 uses indexed equations on the sorted x_list / y_list
 // arrays. Iterator translation obscures the spec equations — keep
 // index loops where the index is itself part of the equation.

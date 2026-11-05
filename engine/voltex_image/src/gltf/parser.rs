@@ -1,3 +1,6 @@
+//! glTF entry point `parse_gltf`: detects GLB vs. JSON glTF, splits the GLB
+//! JSON/BIN chunks or decodes base64 `data:` buffers, then hands off to mesh extraction.
+
 use super::accessor::extract_meshes;
 use super::types::GltfData;
 use crate::json_parser;

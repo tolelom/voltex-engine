@@ -1,3 +1,5 @@
+//! `RtAo` ambient occlusion compute pass and its `RtAoParams`. Despite the name it
+//! reads only G-buffer textures; the shader's occlusion test is still a placeholder.
 #![allow(missing_docs)]
 
 use bytemuck::{Pod, Zeroable};

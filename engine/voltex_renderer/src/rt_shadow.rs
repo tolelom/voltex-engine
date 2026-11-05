@@ -1,3 +1,6 @@
+//! Ray-traced directional shadow resources: `RtShadowResources` (R32Float output
+//! texture + `RtShadowUniform` buffer). The pipeline lives in
+//! `deferred_pipeline::rt_shadow_pipeline`.
 #![allow(missing_docs)]
 
 use bytemuck::{Pod, Zeroable};

@@ -1,3 +1,6 @@
+//! JPEG marker segment parsers and their data: quantization tables (`parse_dqt`),
+//! frame header (`parse_sof`, `JpegComponent`) and Huffman tables (`parse_dht`, `HuffTable`).
+
 // ---------------------------------------------------------------------------
 // Data structures
 // ---------------------------------------------------------------------------

@@ -1,3 +1,6 @@
+//! Tonemap render pipeline: bind group layout (HDR + bloom + `TonemapUniform`) and
+//! `create_tonemap_pipeline`, which writes the final image to the surface format.
+
 use crate::fullscreen_quad::FullscreenVertex;
 use crate::tonemap::TonemapUniform;
 

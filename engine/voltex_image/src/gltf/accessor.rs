@@ -1,3 +1,6 @@
+//! glTF accessor reading: `extract_meshes` walks the JSON meshes/primitives and
+//! reads vertex attributes and indices out of buffer views into `GltfData`.
+
 use super::material::extract_material;
 use super::node::{parse_animations, parse_nodes, parse_skins};
 use super::types::{GltfData, GltfMesh};

@@ -1,3 +1,7 @@
+//! Navmesh build steps 4-5: `NavMeshBuilder::triangulate` turns every walkable
+//! cell into a two-triangle quad and links neighbouring triangles into a `NavMesh`.
+//! Also holds the XZ point-in-triangle / height-interpolation helpers used by voxelization.
+
 use super::{NavMeshBuilder, RegionMap};
 use crate::navmesh::{barycentric_xz, NavMesh, NavTriangle};
 use voltex_math::Vec3;

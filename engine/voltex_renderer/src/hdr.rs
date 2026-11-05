@@ -1,3 +1,5 @@
+//! HDR render target (`HdrTarget`, `HDR_FORMAT` = Rgba16Float) written by the
+//! lighting pass and read by bloom / tonemapping.
 #![allow(missing_docs)]
 
 /// Texture format used for HDR render targets.

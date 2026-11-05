@@ -1,3 +1,5 @@
+//! Temporal anti-aliasing compute pass: `Taa` blends the current frame with history,
+//! using Halton-sequence sub-pixel jitter (`jitter_offset`).
 #![allow(missing_docs)]
 
 use bytemuck::{Pod, Zeroable};

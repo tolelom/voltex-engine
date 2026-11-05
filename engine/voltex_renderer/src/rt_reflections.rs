@@ -1,3 +1,5 @@
+//! `RtReflections` reflection compute pass and its `RtReflParams`. It ray-marches in
+//! world space against the G-buffer (no acceleration structure).
 #![allow(missing_docs)]
 
 use bytemuck::{Pod, Zeroable};

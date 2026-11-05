@@ -1,7 +1,6 @@
-// ---------------------------------------------------------------------------
-// MDCT (Modified Discrete Cosine Transform) — inverse + window
-// ---------------------------------------------------------------------------
-//
+//! Inverse MDCT (`imdct`) and the Vorbis power-sine window (`vorbis_window`) used
+//! to turn decoded spectra back into overlapping time-domain blocks.
+
 // IMDCT uses indices i,k in the cosine-table equation. Index loops mirror
 // the standard MDCT formulation — iterator translation would obscure
 // the closed-form summation.

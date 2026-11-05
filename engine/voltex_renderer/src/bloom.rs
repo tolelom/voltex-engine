@@ -1,3 +1,5 @@
+//! Bloom pass resources: `BloomResources` (HDR mip chain + `BloomUniform` buffer) and
+//! `mip_sizes`. The pipelines live in `deferred_pipeline::bloom_pipeline`.
 #![allow(missing_docs)]
 
 use crate::hdr::HDR_FORMAT;

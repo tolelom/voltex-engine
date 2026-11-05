@@ -1,3 +1,5 @@
+//! Camera motion blur compute pass: `MotionBlur` reprojects each pixel with the
+//! previous frame's view-projection (`MotionBlurParams`) and blurs along that velocity.
 #![allow(missing_docs)]
 
 use bytemuck::{Pod, Zeroable};

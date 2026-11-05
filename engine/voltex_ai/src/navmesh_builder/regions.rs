@@ -1,3 +1,6 @@
+//! Navmesh build step 3: `NavMeshBuilder::build_regions` flood-fills
+//! 4-connected walkable cells into numbered regions (a `RegionMap`).
+
 use super::{NavMeshBuilder, RegionMap, WalkableMap, FOUR_NEIGHBORS};
 
 impl NavMeshBuilder {
