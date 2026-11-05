@@ -11,7 +11,7 @@
 
 use crate::component_registry::ComponentRegistry;
 use crate::entity::Entity;
-use crate::hierarchy::{add_child, validate_hierarchy, Parent};
+use crate::hierarchy::{add_child, repair_hierarchy_cycles, Parent};
 use crate::transform::Transform;
 use crate::world::World;
 use std::collections::HashMap;
@@ -189,7 +189,7 @@ pub fn deserialize_scene_binary(
     // Defense-in-depth: scan for cycles a custom-registered Parent component
     // (deserialized via the ComponentRegistry path, bypassing `add_child`)
     // could have introduced. No-op for well-formed scenes.
-    let _ = validate_hierarchy(world);
+    let _ = repair_hierarchy_cycles(world);
 
     Ok(created)
 }

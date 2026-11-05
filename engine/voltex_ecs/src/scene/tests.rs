@@ -53,7 +53,7 @@ fn test_serialize_single_entity() {
     );
     world.add(e, Tag("sun".to_string()));
 
-    let output = serialize_scene(&world);
+    let output = serialize_scene_text(&world);
     assert!(output.contains("entity 0"), "should contain 'entity 0'");
     assert!(output.contains("transform"), "should contain 'transform'");
     assert!(output.contains("tag"), "should contain 'tag'");
@@ -70,7 +70,7 @@ fn test_serialize_with_parent() {
     world.add(child, Transform::new());
     add_child(&mut world, parent, child);
 
-    let output = serialize_scene(&world);
+    let output = serialize_scene_text(&world);
     assert!(
         output.contains("parent"),
         "should contain 'parent' for child entity"
@@ -107,10 +107,10 @@ fn test_roundtrip() {
     world1.add(planet, Tag("planet".to_string()));
     add_child(&mut world1, sun, planet);
 
-    let serialized = serialize_scene(&world1);
+    let serialized = serialize_scene_text(&world1);
 
     let mut world2 = World::new();
-    let entities = deserialize_scene(&mut world2, &serialized);
+    let entities = deserialize_scene_text(&mut world2, &serialized);
 
     assert_eq!(entities.len(), 2, "should have 2 entities");
 
@@ -187,7 +187,7 @@ entity 2
 "#;
 
     let mut world = World::new();
-    deserialize_scene(&mut world, source);
+    deserialize_scene_text(&mut world, source);
 
     let scene_roots = roots(&world);
     assert_eq!(scene_roots.len(), 2, "should have exactly 2 root entities");
@@ -342,7 +342,7 @@ fn deserialize_scene_caps_huge_entity_index() {
     // into the intermediate Vec. Now silently ignored above the cap.
     let source = "entity 4294967295\n  transform 0 0 0 | 0 0 0 | 1 1 1\n";
     let mut world = World::new();
-    let created = deserialize_scene(&mut world, source);
+    let created = deserialize_scene_text(&mut world, source);
     // Nothing got created — the entity declaration was above the cap.
     assert!(created.is_empty());
 }
@@ -358,7 +358,7 @@ entity 0
   parent 99
 "#;
     let mut world = World::new();
-    let created = deserialize_scene(&mut world, source);
+    let created = deserialize_scene_text(&mut world, source);
     assert_eq!(created.len(), 1);
     // No Parent component was attached because the index was out of range.
     assert!(world.get::<Parent>(created[0]).is_none());
@@ -375,7 +375,7 @@ entity 0
   parent 0
 "#;
     let mut world = World::new();
-    let created = deserialize_scene(&mut world, source);
+    let created = deserialize_scene_text(&mut world, source);
     assert_eq!(created.len(), 1);
     assert!(world.get::<Parent>(created[0]).is_none());
 }
@@ -389,7 +389,7 @@ fn deserialize_scene_at_cap_boundary_works() {
         MAX_SCENE_ENTITIES
     );
     let mut world = World::new();
-    let created = deserialize_scene(&mut world, &source);
+    let created = deserialize_scene_text(&mut world, &source);
     assert!(
         created.is_empty(),
         "entity at MAX_SCENE_ENTITIES must be rejected"

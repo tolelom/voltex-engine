@@ -4,8 +4,8 @@
 //! binary VSCN and the legacy text format.
 
 use voltex_ecs::{
-    add_child, deserialize_scene, deserialize_scene_binary, deserialize_scene_json,
-    serialize_scene, serialize_scene_binary, serialize_scene_json, ComponentRegistry, Parent, Tag,
+    add_child, deserialize_scene_text, deserialize_scene_binary, deserialize_scene_json,
+    serialize_scene_text, serialize_scene_binary, serialize_scene_json, ComponentRegistry, Parent, Tag,
     Transform, World,
 };
 use voltex_math::{Quat, Vec3};
@@ -134,9 +134,9 @@ fn binary_roundtrip_preserves_random_worlds() {
 fn text_roundtrip_preserves_random_worlds() {
     for seed in [1u32, 0xBEEF, 0x1234_5678, 99, 7] {
         let world = random_world(seed);
-        let text = serialize_scene(&world);
+        let text = serialize_scene_text(&world);
         let mut back = World::new();
-        deserialize_scene(&mut back, &text);
+        deserialize_scene_text(&mut back, &text);
         assert_eq!(structure(&back), structure(&world), "seed {seed:x}");
     }
 }

@@ -3,8 +3,8 @@
 
 use crate::component_registry::ComponentRegistry;
 use crate::entity::Entity;
-use crate::hierarchy::{add_child, validate_hierarchy, Parent};
-use crate::json::{self, JsonVal};
+use crate::hierarchy::{add_child, repair_hierarchy_cycles, Parent};
+use crate::json::{self, JsonValue};
 use crate::transform::Transform;
 use crate::world::World;
 use std::collections::HashMap;
@@ -97,7 +97,7 @@ fn parse_rotation(s: &str) -> Option<Quat> {
 /// registry-driven persistence of arbitrary components use
 /// [`serialize_scene_json`] / [`deserialize_scene_json`] or the binary
 /// [`serialize_scene_binary`](crate::serialize_scene_binary) path instead.
-pub fn serialize_scene(world: &World) -> String {
+pub fn serialize_scene_text(world: &World) -> String {
     // Collect all entities with Transform
     let entities_with_transform: Vec<(Entity, Transform)> =
         world.query::<Transform>().map(|(e, t)| (e, *t)).collect();
@@ -149,7 +149,7 @@ const MAX_SCENE_ENTITIES: usize = 1_000_000;
 /// Parse a .vscn string, create entities in the world, and return the created entities.
 ///
 /// Only `Transform`, `Parent`, and `Tag` are restored — see
-/// [`serialize_scene`] for why this text format is lossy for other
+/// [`serialize_scene_text`] for why this text format is lossy for other
 /// components, and which paths to use for lossless persistence.
 ///
 /// Robustness: entity indices and parent indices that exceed
@@ -157,7 +157,7 @@ const MAX_SCENE_ENTITIES: usize = 1_000_000;
 /// indices that reference an entity outside the created set are
 /// silently ignored. The resulting world is therefore always
 /// consistent, even on adversarial input.
-pub fn deserialize_scene(world: &mut World, source: &str) -> Vec<Entity> {
+pub fn deserialize_scene_text(world: &mut World, source: &str) -> Vec<Entity> {
     // Intermediate storage: local_index -> (transform, tag, parent_local_index)
     let mut local_transforms: Vec<Option<Transform>> = Vec::new();
     let mut local_tags: Vec<Option<String>> = Vec::new();
@@ -277,6 +277,18 @@ fn hex_digit(c: u8) -> crate::Result<u8> {
 
 // ── JSON scene serialization ────────────────────────────────────────
 
+/// Old name of [`serialize_scene_text`].
+#[deprecated(note = "use `serialize_scene_text`")]
+pub fn serialize_scene(world: &World) -> String {
+    serialize_scene_text(world)
+}
+
+/// Old name of [`deserialize_scene_text`].
+#[deprecated(note = "use `deserialize_scene_text`")]
+pub fn deserialize_scene(world: &mut World, source: &str) -> Vec<Entity> {
+    deserialize_scene_text(world, source)
+}
+
 /// Serialize all entities with a Transform to JSON format using the component registry.
 /// Format: {"version":1,"entities":[{"parent":null_or_idx,"components":{"name":"hex",...}}]}
 ///
@@ -304,31 +316,31 @@ pub fn serialize_scene_json(world: &World, registry: &ComponentRegistry) -> Stri
         // Parent index
         let parent_val = if let Some(parent_comp) = world.get::<Parent>(*entity) {
             if let Some(&idx) = entity_to_index.get(&parent_comp.0) {
-                JsonVal::Number(idx as f64)
+                JsonValue::Number(idx as f64)
             } else {
-                JsonVal::Null
+                JsonValue::Null
             }
         } else {
-            JsonVal::Null
+            JsonValue::Null
         };
 
         // Components
         let mut comp_pairs = Vec::new();
         for entry in registry.entries() {
             if let Some(data) = (entry.serialize)(world, *entity) {
-                comp_pairs.push((entry.name.clone(), JsonVal::Str(bytes_to_hex(&data))));
+                comp_pairs.push((entry.name.clone(), JsonValue::Str(bytes_to_hex(&data))));
             }
         }
 
-        entity_vals.push(JsonVal::Object(vec![
+        entity_vals.push(JsonValue::Object(vec![
             ("parent".into(), parent_val),
-            ("components".into(), JsonVal::Object(comp_pairs)),
+            ("components".into(), JsonValue::Object(comp_pairs)),
         ]));
     }
 
-    let root = JsonVal::Object(vec![
-        ("version".into(), JsonVal::Number(1.0)),
-        ("entities".into(), JsonVal::Array(entity_vals)),
+    let root = JsonValue::Object(vec![
+        ("version".into(), JsonValue::Number(1.0)),
+        ("entities".into(), JsonValue::Array(entity_vals)),
     ]);
 
     root.to_json_string()
@@ -394,7 +406,7 @@ pub(crate) fn deserialize_scene_json_with_cap(
 
         // Parse parent index
         let parent_idx = match entity_val.get("parent") {
-            Some(JsonVal::Number(n)) => Some(*n as usize),
+            Some(JsonValue::Number(n)) => Some(*n as usize),
             _ => None,
         };
         parent_indices.push(parent_idx);
@@ -428,7 +440,7 @@ pub(crate) fn deserialize_scene_json_with_cap(
     // Defense-in-depth: a user-registered Parent component would have been
     // written directly via the ComponentRegistry path above, bypassing
     // `add_child`'s cycle guard. Strip any cycles before returning.
-    let _ = validate_hierarchy(world);
+    let _ = repair_hierarchy_cycles(world);
 
     Ok(created)
 }

@@ -12,7 +12,7 @@
 //! - [`Parent`] / [`Children`] hierarchy helpers.
 //! - [`Scheduler`] / [`System`] + dependency-aware [`DependencyScheduler`].
 //! - [`Component`] trait + [`ComponentRegistry`] for typed serialization.
-//! - [`serialize_scene`] / [`deserialize_scene`] (`.vscn` text, Transform/
+//! - [`serialize_scene_text`] / [`deserialize_scene_text`] (`.vscn` text, Transform/
 //!   Parent/Tag only) and [`serialize_scene_json`] / [`deserialize_scene_json`]
 //!   (registry-driven, all components) +
 //!   [`serialize_scene_binary`] / [`deserialize_scene_binary`] (VSCN binary).
@@ -50,12 +50,16 @@ pub use entity::{Entity, EntityAllocator};
 pub use error::{EcsError, Result};
 pub use events::Events;
 pub use hierarchy::{
-    add_child, despawn_recursive, remove_child, roots, validate_hierarchy, Children, Parent,
+    add_child, despawn_recursive, remove_child, repair_hierarchy_cycles, roots, Children, Parent,
 };
+#[allow(deprecated)]
+pub use hierarchy::validate_hierarchy;
 pub use render_components::{Bounds, MaterialAsset, MaterialHandle, MeshAsset, MeshHandle};
 pub use scene::{
-    deserialize_scene, deserialize_scene_json, serialize_scene, serialize_scene_json, Tag,
+    deserialize_scene_json, deserialize_scene_text, serialize_scene_json, serialize_scene_text, Tag,
 };
+#[allow(deprecated)]
+pub use scene::{deserialize_scene, serialize_scene};
 pub use scheduler::{Scheduler, System};
 pub use script_component::ScriptComponent;
 pub use sparse_set::SparseSet;

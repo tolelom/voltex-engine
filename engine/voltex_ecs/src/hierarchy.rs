@@ -132,10 +132,10 @@ pub fn roots(world: &World) -> Vec<Entity> {
         .collect()
 }
 
-/// Maximum ancestor-walk depth tolerated by [`validate_hierarchy`]. Mirrors
+/// Maximum ancestor-walk depth tolerated by [`repair_hierarchy_cycles`]. Mirrors
 /// `MAX_HIERARCHY_DEPTH` used by transform propagation so a hierarchy that
-/// the validator accepts is one the propagator can also walk safely.
-const VALIDATION_MAX_DEPTH: usize = 1024;
+/// this pass leaves in place is one the propagator can also walk safely.
+const MAX_PARENT_CHAIN_DEPTH: usize = 1024;
 
 /// Scan every `Parent` edge for cycles or pathologically deep chains and
 /// break them by removing the offending entity's `Parent` component.
@@ -153,13 +153,13 @@ const VALIDATION_MAX_DEPTH: usize = 1024;
 /// entities whose `Parent` was stripped — callers can log them as a
 /// "scene was repaired" warning. After this call:
 /// - No entity has a `Parent` component that participates in a cycle.
-/// - No entity has a `Parent` chain deeper than [`VALIDATION_MAX_DEPTH`].
+/// - No entity has a `Parent` chain deeper than [`MAX_PARENT_CHAIN_DEPTH`].
 /// - The matching parent's `Children` list (if present) is also cleaned
 ///   so the bidirectional view stays consistent.
 ///
 /// Call this from scene deserializers after all `add_child` writes, or
 /// after any custom load path that bypasses [`add_child`].
-pub fn validate_hierarchy(world: &mut World) -> Vec<Entity> {
+pub fn repair_hierarchy_cycles(world: &mut World) -> Vec<Entity> {
     // Snapshot entities with a Parent. We may mutate Parent storage during
     // the walk, so we can't hold a borrow into it.
     let with_parent: Vec<Entity> = world.query::<Parent>().map(|(entity, _)| entity).collect();
@@ -179,7 +179,7 @@ pub fn validate_hierarchy(world: &mut World) -> Vec<Entity> {
 
         let mut current = start;
         let mut steps = 0usize;
-        let bad = loop {
+        let cycle_or_too_deep = loop {
             let next = match world.get::<Parent>(current) {
                 Some(p) => p.0,
                 None => break false, // reached a root — chain is clean
@@ -190,13 +190,13 @@ pub fn validate_hierarchy(world: &mut World) -> Vec<Entity> {
             }
             current = next;
             steps += 1;
-            if steps > VALIDATION_MAX_DEPTH {
+            if steps > MAX_PARENT_CHAIN_DEPTH {
                 // Chain too deep — treat as cycle / corruption.
                 break true;
             }
         };
 
-        if bad {
+        if cycle_or_too_deep {
             // Break the cycle by stripping `start`'s Parent and removing
             // it from the (immediate) parent's Children list. This is the
             // minimal incision that restores a DAG — we don't try to be
@@ -214,6 +214,12 @@ pub fn validate_hierarchy(world: &mut World) -> Vec<Entity> {
     }
 
     repaired
+}
+
+/// Old name of [`repair_hierarchy_cycles`].
+#[deprecated(note = "use `repair_hierarchy_cycles`")]
+pub fn validate_hierarchy(world: &mut World) -> Vec<Entity> {
+    repair_hierarchy_cycles(world)
 }
 
 #[cfg(test)]
@@ -466,10 +472,10 @@ mod tests {
     }
 
     #[test]
-    fn validate_hierarchy_breaks_raw_two_cycle() {
+    fn repair_hierarchy_cycles_breaks_raw_two_cycle() {
         // Bypass add_child entirely: write the cyclic Parent components
         // directly the way a registry-driven deserializer would for a
-        // user-registered Parent component. validate_hierarchy must repair.
+        // user-registered Parent component. repair_hierarchy_cycles must repair.
         let mut world = World::new();
         let a = world.spawn();
         let b = world.spawn();
@@ -477,7 +483,7 @@ mod tests {
         world.add(a, Parent(b));
         world.add(b, Parent(a));
 
-        let repaired = validate_hierarchy(&mut world);
+        let repaired = repair_hierarchy_cycles(&mut world);
         // Exactly one entity's Parent gets stripped (whichever the walk
         // hits first); the other survives as a root.
         assert_eq!(repaired.len(), 1, "exactly one edge must be broken");
@@ -489,7 +495,7 @@ mod tests {
     }
 
     #[test]
-    fn validate_hierarchy_keeps_clean_dag_intact() {
+    fn repair_hierarchy_cycles_keeps_clean_dag_intact() {
         let mut world = World::new();
         let root = world.spawn();
         let child = world.spawn();
@@ -497,7 +503,7 @@ mod tests {
         add_child(&mut world, root, child);
         add_child(&mut world, child, grandchild);
 
-        let repaired = validate_hierarchy(&mut world);
+        let repaired = repair_hierarchy_cycles(&mut world);
         assert!(repaired.is_empty(), "no repair needed on a clean DAG");
         // Edges preserved.
         assert_eq!(world.get::<Parent>(child).unwrap().0, root);
@@ -505,7 +511,7 @@ mod tests {
     }
 
     #[test]
-    fn validate_hierarchy_breaks_three_cycle_and_keeps_unrelated_dag() {
+    fn repair_hierarchy_cycles_breaks_three_cycle_and_keeps_unrelated_dag() {
         // A→B→C→A is a 3-cycle written raw. Plus an unrelated D→E chain.
         let mut world = World::new();
         let a = world.spawn();
@@ -518,7 +524,7 @@ mod tests {
         world.add(c, Parent(b)); // c's parent = b  → cycle a→c→b→a
         add_child(&mut world, d, e); // clean DAG e→d (e's parent = d)
 
-        let repaired = validate_hierarchy(&mut world);
+        let repaired = repair_hierarchy_cycles(&mut world);
         assert!(!repaired.is_empty(), "cycle in {{A,B,C}} must be repaired");
         // The unrelated DAG survives.
         assert_eq!(world.get::<Parent>(e).unwrap().0, d);
@@ -534,21 +540,21 @@ mod tests {
     }
 
     #[test]
-    fn validate_hierarchy_caps_pathologically_deep_chain() {
-        // A linear chain longer than VALIDATION_MAX_DEPTH is treated as
+    fn repair_hierarchy_cycles_caps_pathologically_deep_chain() {
+        // A linear chain longer than MAX_PARENT_CHAIN_DEPTH is treated as
         // corruption — we don't want propagate_transforms to ever see one.
         let mut world = World::new();
         let mut prev = world.spawn();
         let leaf = prev;
-        for _ in 0..(VALIDATION_MAX_DEPTH + 50) {
+        for _ in 0..(MAX_PARENT_CHAIN_DEPTH + 50) {
             let next = world.spawn();
             // Raw Parent write — add_child would also walk and bail, but we
             // want to land the chain unguarded.
             world.add(prev, Parent(next));
             prev = next;
         }
-        let repaired = validate_hierarchy(&mut world);
-        // The validator strips Parent from `leaf` (the first start whose
+        let repaired = repair_hierarchy_cycles(&mut world);
+        // The repair strips Parent from `leaf` (the first start whose
         // walk runs over the cap) — at minimum that one is repaired.
         assert!(repaired.contains(&leaf), "deep-chain leaf must be repaired");
     }
