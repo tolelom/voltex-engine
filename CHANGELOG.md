@@ -94,6 +94,16 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ### Fix
 
+- **voltex_net 수신 루프 중단**: `NetSocket::recv_from`이 해석에 실패한 datagram에서 `None`을 돌려줘, 호출부의
+  `while let` 루프가 그 프레임의 남은 패킷을 읽지 않았다. 실패한 datagram은 로그만 남기고 다음 것을 읽는다.
+- **voltex_net 64 KiB 넘는 패킷**: `Packet::to_bytes`가 payload 길이를 u16으로 잘라 깨진 패킷을 만들었다.
+  `try_to_bytes() -> Result`와 `MAX_PAYLOAD_LEN`을 추가하고 `NetSocket::send_to`가 이를 쓴다(너무 크면 에러).
+  `to_bytes`는 길이가 넘치면 패닉한다.
+- **스크립트 핫 리로드 미동작**: 런타임이 `file_watcher`에 경로를 등록하지 않아 Lua 파일을 고쳐도 다시 불러오지
+  않았다. 디스크에서 읽은 스크립트를 자동으로 감시한다(`ScriptInstancePool::take_paths_to_watch`). Vfs 시드 스크립트 제외.
+- **실패한 스크립트 재시도 안 됨**: `ScriptInstancePool::clear()`가 로드 실패 캐시를 비우지 않아 PlayStop 뒤에도
+  다시 시도하지 않았다. 이제 비우고, 감시 중인 실패 스크립트를 고치면 다음 프레임에 다시 불러온다.
+
 - **Linux·macOS 오디오 무음**: `AudioSystem` 오디오 스레드가 Windows가 아니면 명령만 받는 무음 루프를 돌아, 구현돼
   있던 ALSA·CoreAudio 백엔드가 쓰이지 않았다. 이제 `open_device_backend()`로 장치를 열어 한 버퍼씩 믹싱해 쓴다.
   장치가 없으면(헤드리스·CI) 전처럼 무음. ALSA `snd_pcm_writei`의 `size`를 헤더대로 `c_ulong`으로 고쳤다(F6a).
