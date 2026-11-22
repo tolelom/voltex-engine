@@ -248,10 +248,10 @@ mod tests {
         };
         let skel = Skeleton::from_skin(&skin, &nodes);
         let palette = skel.compute_palette();
-        for r in 0..4 {
-            for c in 0..4 {
+        for (c, column) in palette.matrices[0].iter().enumerate() {
+            for (r, &value) in column.iter().enumerate() {
                 let expect = if r == c { 1.0 } else { 0.0 };
-                assert!((palette.matrices[0][c][r] - expect).abs() < 1e-6);
+                assert!((value - expect).abs() < 1e-6);
             }
         }
     }
@@ -285,14 +285,13 @@ mod tests {
         };
         let skel = Skeleton::from_skin(&skin, &nodes);
         let palette = skel.compute_palette();
-        for bone in 0..2 {
-            for r in 0..4 {
-                for c in 0..4 {
+        for (bone, matrix) in palette.matrices[..2].iter().enumerate() {
+            for (c, column) in matrix.iter().enumerate() {
+                for (r, &value) in column.iter().enumerate() {
                     let expect = if r == c { 1.0 } else { 0.0 };
                     assert!(
-                        (palette.matrices[bone][c][r] - expect).abs() < 1e-5,
-                        "bone {bone} [{c}][{r}] = {} expected {expect}",
-                        palette.matrices[bone][c][r]
+                        (value - expect).abs() < 1e-5,
+                        "bone {bone} [{c}][{r}] = {value} expected {expect}",
                     );
                 }
             }

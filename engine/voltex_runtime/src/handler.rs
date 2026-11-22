@@ -204,7 +204,7 @@ impl ApplicationHandler for RuntimeHandler {
 }
 
 /// One frame. Each step is a helper below; the order matters (see the module
-/// doc and `docs/architecture.md` "한 프레임").
+/// doc and `ARCHITECTURE.md` "한 프레임").
 fn redraw(app: &mut RuntimeApp) {
     let dt = advance_frame_clock(app);
     update_fly_camera(app, dt);

@@ -126,8 +126,7 @@ pub fn cull_lights(frustum: &Frustum, lights: &LightsUniform) -> Vec<usize> {
     let count = lights.count as usize;
     let mut visible = Vec::with_capacity(count);
 
-    for i in 0..count {
-        let light = &lights.lights[i];
+    for (i, light) in lights.lights[..count].iter().enumerate() {
         if light.light_type == LIGHT_DIRECTIONAL {
             // Directional lights affect everything
             visible.push(i);
