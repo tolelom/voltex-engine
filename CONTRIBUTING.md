@@ -4,8 +4,7 @@
 
 ## 개발 환경
 
-- Rust stable과 clippy(`rustup component add clippy`)
-- Linux는 ALSA 헤더: `sudo apt-get install -y libasound2-dev`
+- README 「시작하기」의 준비(Rust stable, Linux ALSA 헤더)와 clippy(`rustup component add clippy`)
 - 선택 도구: cargo-llvm-cov(커버리지), cargo-about(의존 crate 라이선스 고지 생성, `cargo install --locked cargo-about --features cli`), cargo-deny(취약점·라이선스 검사, 설정은 `deny.toml`)
 - 파서 퍼징: [fuzz/README.md](fuzz/README.md)
 
@@ -28,7 +27,7 @@ GPU가 필요한 테스트는 `#[ignore]`로 빠져 있다. GPU가 있는 기기
 git config core.hooksPath scripts/hooks
 ```
 
-훅은 `scripts/hooks/`에 있고, 실제 검사는 `scripts/`의 스크립트가 한다.
+훅은 `scripts/hooks/`에 있고, 실제 검사는 `scripts/`의 스크립트가 한다. `scripts/`에는 CHANGELOG·버전 검사, 커버리지(`coverage.sh`), 라이선스 고지 생성 스크립트도 있다.
 
 - 커밋할 때: clippy와 `cargo test --workspace --lib`
 - push할 때: engine/, tools/, examples/, games/를 바꿨는데 CHANGELOG.md를 고치지 않았으면 막는다. aarch64 Linux 대상 clippy도 돈다(타깃이 없으면 건너뜀).
