@@ -74,7 +74,7 @@ fn main() -> voltex::runtime::RuntimeResult<()> {
 
 | 문서 | 내용 |
 |---|---|
-| `docs/architecture.md` | 저장소 폴더, crate 층, 한 프레임, 코드 읽는 순서 |
+| `ARCHITECTURE.md` | 저장소 폴더, crate 층, 한 프레임, 코드 읽는 순서 |
 | `engine/*/CODEMAP.md` | crate별 책임, 공개 API, 고칠 때 주의점 |
 | `docs/tutorial.md` | 빈 프로젝트에서 미니 게임까지 |
 | `docs/voltex-toml-reference.md` | `voltex.toml` 필드 |
