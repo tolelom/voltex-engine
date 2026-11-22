@@ -10,6 +10,10 @@
 | `tools/` | 엔진을 쓰는 도구. `voltex_cli`(게임 빌드), `voltex_capture`(렌더 결과 PNG 캡처) |
 | `games/` | 엔진으로 만든 게임. `survivor`, `depths`, `leap` |
 | `examples/` | 기능별 짧은 예제 |
+| `assets/` | 예제와 테스트가 같이 쓰는 에셋 |
+| `fuzz/` | 파서·역직렬화기 퍼징 대상 |
+| `scripts/` | 저장소 관리용 셸 스크립트. git 훅, CHANGELOG·버전 검사, 커버리지, 라이선스 고지 생성 |
+| `docs/` | 사용 문서. `docs/dev/`는 남은 할 일과 알려진 한계 |
 
 게임과 예제는 엔진을 `voltex` crate 하나로 가져다 쓴다. 엔진 crate는 게임이나 도구를 모른다.
 
