@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # voltex pre-push hook — enforce CHANGELOG entry for every push that touches code.
 #
-# Install: git config core.hooksPath scripts/hooks
+# Install: git config core.hooksPath .githooks
 # Bypass:  git push --no-verify
 #
 # Reads commit ranges from stdin (git's pre-push protocol). For each pushed ref,

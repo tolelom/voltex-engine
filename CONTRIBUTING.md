@@ -24,10 +24,10 @@ GPU가 필요한 테스트는 `#[ignore]`로 빠져 있습니다. GPU가 있는 
 ### git 훅
 
 ```bash
-git config core.hooksPath scripts/hooks
+git config core.hooksPath .githooks
 ```
 
-훅은 `scripts/hooks/`에 있고, 실제 검사는 `scripts/`의 스크립트가 합니다. `scripts/`에는 CHANGELOG·버전 검사, 커버리지(`coverage.sh`), 라이선스 고지 생성 스크립트도 있습니다.
+훅은 `.githooks/`에 있고, 실제 검사는 `scripts/`의 스크립트가 합니다. `scripts/`에는 CHANGELOG·버전 검사, 커버리지(`coverage.sh`), 라이선스 고지 생성 스크립트도 있습니다.
 
 - 커밋할 때: clippy와 `cargo test --workspace --lib`
 - push할 때: CHANGELOG 검사(engine/, tools/, examples/, games/를 바꿨는데 CHANGELOG.md를 고치지 않았으면 차단)와 aarch64 Linux 대상 clippy(타깃이 없으면 건너뜀)
