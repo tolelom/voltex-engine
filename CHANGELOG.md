@@ -169,9 +169,15 @@ recent on top. v0.x entries are organised by Cycle (see
   TrueType 폰트(`src/test_font.rs`)로 바꿨다. `ttf_fuzz`는 시스템 폰트가 없으면 건너뛰던 것을 이 폰트로 대신 돈다.
   voltex_cli `pick_executable` 테스트의 `\` 경로 리터럴을 OS 경로 조립으로 바꿨다. 확인(Ubuntu, Rust 1.99.1,
   `RUSTFLAGS=-D warnings`): build·clippy 경고 0, `test --workspace --lib` 1594 통과, `test -p voltex_cli` 72 통과.
+- **Rust 1.100 clippy `needless_range_loop`**: CI(stable, clippy 1.100)의 `cargo clippy --workspace --all-targets
+  -- -D warnings`가 범위 루프 인덱싱을 잡아 세 OS 모두 실패했다. voltex_math `mat4` 역행렬 테스트, voltex_renderer
+  `cull_lights`(`lights.lights[..count]`)와 `skeleton` 팔레트 테스트 2개를 `iter().enumerate()`로 바꿨다. 검사하는
+  값과 결과는 같다. `count`가 배열보다 크면 전처럼 패닉한다.
 
 ### Docs
 
+- **`redraw` doc 주석 경로**: `voltex_runtime/src/handler.rs`가 가리키던 `docs/architecture.md`를 옮겨진 위치인
+  루트 `ARCHITECTURE.md`로 고쳤다.
 - **작업 문서 `docs/dev/`로 이동**: `STATUS`·`DEFERRED`·`NEXT`·`AUDIT-BACKLOG`·`dogfood-friction`(2개)·
   `v1.0-pub-audit`·`v1.0-retrospective`를 옮기고 문서·코드 주석·스크립트의 경로를 갱신했다. `docs/` 바로 아래에는
   사용 문서(tutorial, voltex-toml-reference, build-matrix, release, visual)만 남는다.

@@ -501,15 +501,15 @@ mod tests {
         let vp = proj.mul_mat4(&view);
         let inv = vp.inverse().expect("invertible");
         let product = vp.mul_mat4(&inv);
-        for col in 0..4 {
-            for row in 0..4 {
+        for (col, column) in product.cols.iter().enumerate() {
+            for (row, &value) in column.iter().enumerate() {
                 let expected = if col == row { 1.0 } else { 0.0 };
                 assert!(
-                    (product.cols[col][row] - expected).abs() < 1e-3,
+                    (value - expected).abs() < 1e-3,
                     "[col {} row {}] = {}, expected {}",
                     col,
                     row,
-                    product.cols[col][row],
+                    value,
                     expected,
                 );
             }
