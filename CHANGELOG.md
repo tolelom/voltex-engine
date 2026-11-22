@@ -10,7 +10,7 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ---
 
-## Unreleased — 2026-10-17 — capture scene 테스트 분리
+## Unreleased - 2026-10-17 - capture scene 테스트 분리
 
 ### Refactor
 
@@ -161,7 +161,7 @@ recent on top. v0.x entries are organised by Cycle (see
   `[advisories] ignore` 에 간접 의존 권고 4건(quick-xml RUSTSEC-2026-0194·0195 via wayland-scanner,
   paste RUSTSEC-2024-0436 via metal, ttf-parser RUSTSEC-2026-0192 via sctk-adwaita)을 경로와 함께 넣었다.
   workspace 37개 crate 모두 `publish = false`(`[workspace.package]` + `publish.workspace = true`)로 두고
-  `allow-wildcard-paths = true` 를 켜서 path 의존 wildcard 34 crate 를 해소했다 — 이 옵션은 `publish` 를
+  `allow-wildcard-paths = true` 를 켜서 path 의존 wildcard 34 crate 를 해소했다 - 이 옵션은 `publish` 를
   제한한 crate 에만 적용된다. 이제 `cargo deny check` 는 exit 0(경고만: duplicate 10, license-not-encountered 4).
 - **Linux CI 통과**: Rust 1.99 clippy 새 lint(`chunks_exact_to_as_chunks`, `for_kv_map`, `explicit_counter_loop`)를
   voltex_image·net·script·capture와 두 게임의 visual 테스트에서 고쳤다(`as_chunks::<N>()`, `values_mut()`, `zip`).
@@ -212,7 +212,7 @@ recent on top. v0.x entries are organised by Cycle (see
   CI 와 같은 플래그의 clippy 를 돌린다. target 이 없으면 경고 후 건너뛴다. Lua C 소스를 크로스 컴파일할
   수 없어 `voltex_script` 와 그 의존 crate 12개, 합쳐서 13개(37개 중)는 제외한다(스크립트에 목록).
 
-## v1.0.173 — 2026-10-17 — 워크스페이스 버전 정합 + 600줄 한도 리팩터링
+## v1.0.173 - 2026-10-17 - 워크스페이스 버전 정합 + 600줄 한도 리팩터링
 
 ### Fix
 
@@ -229,7 +229,7 @@ recent on top. v0.x entries are organised by Cycle (see
 
 ### Refactor
 
-- **600줄 한도: 인라인 테스트 분리 9개 파일** — v1.0.2 전례대로 `foo.rs`를
+- **600줄 한도: 인라인 테스트 분리 9개 파일**: v1.0.2 전례대로 `foo.rs`를
   `foo/mod.rs` + `foo/tests.rs`로 나눴다. 코드는 바꾸지 않았고 테스트 블록만 옮겼다(4칸 내어쓰기,
   여러 줄 문자열 안쪽 줄은 원문 그대로). 대상: voltex_ecs `scene`, voltex_editor
   `asset_browser`·`panels/inspector`, voltex_renderer `texture`, voltex_ai `pathfinding`·`navmesh`,
@@ -240,7 +240,7 @@ recent on top. v0.x entries are organised by Cycle (see
 - 확인: 커밋마다 `cargo test --workspace` 1762 통과·76 무시, GPU 캡처 47 통과(skip 0), clippy 경고 0.
   래퍼 경로는 `e2e_new_then_build_produces_dist_exe`(`--ignored`)로 실제 빌드까지 확인했다.
 - 옮긴 모듈을 가리키는 CODEMAP 경로(ai·ecs·editor·renderer·runtime·cli)를 새 위치로 고쳤다.
-- **600줄 한도: voltex_renderer_ecs `BasicRenderer` 분할** — 1767줄 파일을 나눴다(`basic_renderer/mod.rs`
+- **600줄 한도: voltex_renderer_ecs `BasicRenderer` 분할**: 1767줄 파일을 나눴다(`basic_renderer/mod.rs`
   561줄). 독립적인 두 패스는 `TilemapPass`와 같은 방식의 패스 struct로 뗐다(`debug_line_pass.rs`
   `DebugLinePass`, `sprite_pass.rs` `SpritePass`). 서로 자원을 나눠 쓰는 그림자·스킨드·PBR은
   행동 없는 자원 묶음(`ShadowResources`·`SkinnedResources`·`PbrResources`·`PbrSkinnedResources`)과
@@ -255,7 +255,7 @@ recent on top. v0.x entries are organised by Cycle (see
   `pub use`로 다시 내보내 `voltex_capture::scene::render_*` 경로는 그대로다. `scene.rs`는 2780 → 1845줄
   (그중 테스트 약 700줄)로 아직 600줄을 넘는다. 확인 방법은 위와 같다(29장 차이 0).
 
-## v1.0.172 — 2026-10-12 — GPU 테스트 스크린샷 기록은 opt-in
+## v1.0.172 - 2026-10-12 - GPU 테스트 스크린샷 기록은 opt-in
 
 ### Changed (test-only)
 
@@ -267,11 +267,11 @@ recent on top. v0.x entries are organised by Cycle (see
   실패를 무시했다). 재생성 방법은 `docs/visual/README.md`.
 - 확인: 미설정으로 `--include-ignored` 실행 뒤 `docs/visual` 변경 0, 설정하면 15개 PNG 갱신.
 
-## v1.0.171 — 2026-10-12 — 옛 핸들로 add하면 살아 있는 엔티티의 컴포넌트를 덮어씀
+## v1.0.171 - 2026-10-12 - 옛 핸들로 add하면 살아 있는 엔티티의 컴포넌트를 덮어씀
 
 ### Fix
 
-- **voltex_ecs `World::add` — 죽은 핸들 미검사**: 컴포넌트 저장소(SparseSet)는 슬롯 id로
+- **voltex_ecs `World::add` - 죽은 핸들 미검사**: 컴포넌트 저장소(SparseSet)는 슬롯 id로
   키를 잡는다. 그래서 despawn된 옛 핸들로 `add`하면, 지금 그 슬롯을 쓰는 살아 있는
   엔티티의 컴포넌트를 덮어썼다. 슬롯의 세대 표시까지 옛 값으로 바뀌어 살아 있는 쪽에서는
   컴포넌트가 사라진 것처럼 보였다. 계층 속성 테스트에서 `add_child(parent, 옛 자식)`가 같은
@@ -288,7 +288,7 @@ recent on top. v0.x entries are organised by Cycle (see
   매 단계 살아 있는 엔티티 사이의 Parent↔Children 양방향 일치, Children 중복 없음, 순환
   없음을 본다. 위 결함을 결정적 회귀 테스트로 따로 고정했다.
 
-## v1.0.170 — 2026-10-12 — Lua 엔진 API 쓰레기 인자 퍼징
+## v1.0.170 - 2026-10-12 - Lua 엔진 API 쓰레기 인자 퍼징
 
 ### Tests
 
@@ -300,7 +300,7 @@ recent on top. v0.x entries are organised by Cycle (see
   것 자체가 핵심 단언이다. 성공한 호출이 2000건을 넘는지도 본다. 인자 검사에서 모두 막히는
   공허한 퍼징을 막기 위해서다. 통과(버그 없음).
 
-## v1.0.169 — 2026-10-12 — voltex.toml 파서 분리 + 퍼징
+## v1.0.169 - 2026-10-12 - voltex.toml 파서 분리 + 퍼징
 
 ### Refactor
 
@@ -319,14 +319,14 @@ recent on top. v0.x entries are organised by Cycle (see
 - DEFERRED: 600줄 한도 재위반 17개 파일(가장 큰 것은 `voltex_capture/src/scene.rs` 2787줄).
   구조 분할 설계가 필요해 별도 사이클로 둔다.
 
-## v1.0.168 — 2026-10-12 — 손상된 TTF 폰트로 에디터 패닉·무한 재귀
+## v1.0.168 - 2026-10-12 - 손상된 TTF 폰트로 에디터 패닉·무한 재귀
 
 ### Fix
 
 변조 퍼징으로 찾았다. 폰트는 사용자가 넣는 파일이라(에디터가 아무 `.ttf`나 읽는다)
 손상된 폰트가 에디터를 죽이면 안 된다.
 
-- **voltex_editor `ttf_parser` — 모든 읽기가 경계 검사 없음**: 읽기 헬퍼가 `data[off]`를
+- **voltex_editor `ttf_parser` - 모든 읽기가 경계 검사 없음**: 읽기 헬퍼가 `data[off]`를
   직접 인덱싱했다. 테이블 오프셋·loca·cmap 값이 모두 파일에서 오므로 손상된 폰트 대부분에서
   범위 밖 패닉이 났다(변조 5회 안에 재현). 읽기를 전체 함수로 바꿨다(범위 밖은 0).
   그 밖의 결함은 다음과 같다.
@@ -351,7 +351,7 @@ recent on top. v0.x entries are organised by Cycle (see
   폰트가 없는 환경에서는 건너뛴다. 개발 중 시드 2개 × 2만 회(debug)로 돌려 깨끗함을
   확인했다.
 
-## v1.0.167 — 2026-10-12 — 네트워크 패킷·암호화·내비메시 로더 퍼징
+## v1.0.167 - 2026-10-12 - 네트워크 패킷·암호화·내비메시 로더 퍼징
 
 ### Tests
 
@@ -363,11 +363,11 @@ recent on top. v0.x entries are organised by Cycle (see
   헤더 없는 옛 포맷으로 직렬화한 뒤 2만 건 변조한다. 로드에 성공한 메시에 무작위
   `find_path`까지 돌린다. 통과(버그 없음). 로더가 정점·이웃 인덱스를 이미 검증하고 있다.
 
-## v1.0.166 — 2026-10-12 — glTF 인덱스 범위 미검증으로 로더 패닉
+## v1.0.166 - 2026-10-12 - glTF 인덱스 범위 미검증으로 로더 패닉
 
 ### Fix
 
-- **voltex_image glTF — 정점 수를 넘는 인덱스**: 인덱스 accessor의 값을 정점 수와 대조하지
+- **voltex_image glTF - 정점 수를 넘는 인덱스**: 인덱스 accessor의 값을 정점 수와 대조하지
   않았다. 손상되거나 조작된 파일은 탄젠트 생성 단계(`compute_tangents`)에서 범위 밖
   인덱싱 패닉을 냈다(재현: 정점 3개에 인덱스 64). 탄젠트를 이미 가진 파일이라면 패닉
   없이 렌더러로 넘어가 GPU 범위 밖 읽기가 됐을 경로다. 이제 primitive 조립 직후 검사해
@@ -385,17 +385,17 @@ recent on top. v0.x entries are organised by Cycle (see
   한다(통과, 버그 없음).
 - 개발 중 release 8만~15만 회, 다른 시드로도 깨끗함을 확인했다.
 
-## v1.0.165 — 2026-10-12 — 손상된 Vorbis setup으로 디코더 패닉, float WAV NaN 통과
+## v1.0.165 - 2026-10-12 - 손상된 Vorbis setup으로 디코더 패닉, float WAV NaN 통과
 
 ### Fix
 
-- **voltex_audio Vorbis setup 헤더 — 교차 참조 미검증**: setup 헤더에 저장된 인덱스를
+- **voltex_audio Vorbis setup 헤더 - 교차 참조 미검증**: setup 헤더에 저장된 인덱스를
   패킷 디코더가 검사 없이 썼다. mode→mapping, mapping의 mux·submap floor·residue,
   floor·residue→codebook, floor partition→class 참조가 모두 그랬다. 그래서 손상된 파일에서
   범위 밖 인덱싱으로 패닉이 났다(재현: 길이 1 배열에 인덱스 32). 이제 setup 파싱 끝에서
   모든 참조를 한 번에 검증하고 `Err`를 돌려준다. 블록 크기 지수도 규격(§4.2.2)대로
   6~13만 허용한다. 지수 0이면 블록이 1샘플이 됐다.
-- **voltex_audio `parse_wav` — float WAV의 NaN/Inf가 샘플로 통과**: 32비트 float WAV의
+- **voltex_audio `parse_wav` - float WAV의 NaN/Inf가 샘플로 통과**: 32비트 float WAV의
   NaN·±Inf 비트 패턴이 `AudioClip.samples`로 그대로 나왔다. 문서가 약속한 범위
   [-1, 1]를 벗어나고 믹서로 전파될 수 있다. 무음(0.0)으로 읽는다.
 
@@ -410,7 +410,7 @@ recent on top. v0.x entries are organised by Cycle (see
   자체도 변조한다. 3000회. 개발 중에는 release 4만 회, debug 시드 2개 × 3000회로 돌려
   깨끗함을 확인했다.
 
-## v1.0.164 — 2026-10-12 — 손상된 JPEG에서 디코더 패닉 5종
+## v1.0.164 - 2026-10-12 - 손상된 JPEG에서 디코더 패닉 5종
 
 ### Fix
 
@@ -437,7 +437,7 @@ recent on top. v0.x entries are organised by Cycle (see
   임시 폴더에 저장한다. 개발 중에는 시드 3개 × 3000회(debug)와 2만 회(release)로 돌려
   위 5종을 모두 없앴다. PNG·deflate는 처음부터 패닉이 없었다.
 
-## v1.0.163 — 2026-10-12 — 손상된 .vpkg 헤더 하나로 프로세스 중단
+## v1.0.163 - 2026-10-12 - 손상된 .vpkg 헤더 하나로 프로세스 중단
 
 ### Fix
 
@@ -457,11 +457,11 @@ recent on top. v0.x entries are organised by Cycle (see
 
 - DEFERRED: `.vpkg` 4 GiB 한계(u32 offset이 release에서 조용히 wrap).
 
-## v1.0.162 — 2026-10-12 — AssetStorage 슬롯 재사용 세대가 항상 1 (ABA)
+## v1.0.162 - 2026-10-12 - AssetStorage 슬롯 재사용 세대가 항상 1 (ABA)
 
 ### Fix
 
-- **voltex_asset `AssetStorage` — 해제된 핸들이 새 에셋을 가리킴**: `release`가 슬롯을
+- **voltex_asset `AssetStorage` - 해제된 핸들이 새 에셋을 가리킴**: `release`가 슬롯을
   `None`으로 비운 뒤 `insert`가 재사용 세대를 그 빈 슬롯에서 읽었다. 값이 없으니
   `0 + 1`이 되어 매 재사용의 세대가 1이었다. 슬롯을 두 번째 쓰던 에셋의 핸들이 세 번째
   에셋에 그대로 통했다(재현: a 해제 → b 해제 → c 삽입 후 `get(b) == "c"`). 해제된
@@ -475,7 +475,7 @@ recent on top. v0.x entries are organised by Cycle (see
   비교하는 테스트 1개다. 모델 테스트는 매 단계 모든 옛 핸들의 `get`·`ref_count`와 `len`을
   보고, 핸들 재발급이 없는지 확인한다.
 
-## v1.0.161 — 2026-10-12 — 지연 보상 보간이 엔티티를 목록 순서로 짝지음
+## v1.0.161 - 2026-10-12 - 지연 보상 보간이 엔티티를 목록 순서로 짝지음
 
 ### Fix
 
@@ -487,7 +487,7 @@ recent on top. v0.x entries are organised by Cycle (see
   엔티티는 이전 위치를 유지한다. 나중 틱에만 있는 엔티티는 그 시각에 존재하지 않았으므로
   넣지 않는다. 회귀 테스트 2개.
 
-## v1.0.160 — 2026-10-12 — 보간 버퍼가 순서 뒤바뀐 스냅샷에서 틀린 구간을 보간
+## v1.0.160 - 2026-10-12 - 보간 버퍼가 순서 뒤바뀐 스냅샷에서 틀린 구간을 보간
 
 ### Fix
 
@@ -505,7 +505,7 @@ recent on top. v0.x entries are organised by Cycle (see
   뒤집거나 잘라낸 diff 2만 건에서 디코더가 패닉하지 않는지 본다(통과). 무작위 도착
   순서와 정렬 순서의 보간 결과가 같은지도 본다(위 결함 검출).
 
-## v1.0.159 — 2026-10-12 — OrderedChannel: 아주 늦은 중복이 다음 wrap에서 진짜 메시지를 밀어냄
+## v1.0.159 - 2026-10-12 - OrderedChannel: 아주 늦은 중복이 다음 wrap에서 진짜 메시지를 밀어냄
 
 ### Fix
 
@@ -524,11 +524,11 @@ recent on top. v0.x entries are organised by Cycle (see
   시드 3개로 보낸다. 정확히 한 번, 보낸 순서대로 배달되는지, 늦게 도착하는 중복이 다시
   배달되지 않는지 본다(통과). 위 결함은 결정적 회귀 테스트로 따로 고정했다.
 
-## v1.0.158 — 2026-10-12 — Mat4::inverse가 큰 직교 투영·작은 배율을 특이로 판정
+## v1.0.158 - 2026-10-12 - Mat4::inverse가 큰 직교 투영·작은 배율을 특이로 판정
 
 ### Fix
 
-- **voltex_math `Mat4::inverse` — 크기에 무관한 특이 판정**: `|det| < 1e-12` 절대
+- **voltex_math `Mat4::inverse` - 크기에 무관한 특이 판정**: `|det| < 1e-12` 절대
   임계값을 썼다. det는 배율의 세제곱·네제곱으로 줄기 때문에, 조건이 멀쩡한 행렬도
   `None`이 됐다. 재현은 두 가지다. 가로·세로 10만 단위 2D 맵의 직교 투영(det ≈ 4e-13)과
   0.1mm 배율 TRS다. 그러면 에디터 picking·gizmo의 언프로젝트가 실패하고, `csm.rs`는
@@ -546,11 +546,11 @@ recent on top. v0.x entries are organised by Cycle (see
   투영, 원점에서 1e6 떨어진 카메라 VP, 배율별 특이 행렬 거부도 결정적 테스트로 둔다.
   쿼터니언·slerp·Euler는 통과(버그 없음), 역행렬 판정이 위 결함을 잡았다.
 
-## v1.0.157 — 2026-10-12 — 작은 삼각형의 비스듬한 레이 히트 누락
+## v1.0.157 - 2026-10-12 - 작은 삼각형의 비스듬한 레이 히트 누락
 
 ### Fix
 
-- **voltex_physics `ray_vs_triangle` (메시 레이캐스트) — 크기에 무관한 평행 판정**:
+- **voltex_physics `ray_vs_triangle` (메시 레이캐스트) - 크기에 무관한 평행 판정**:
   평행 판정이 `|a| < 1e-8` 절대값이었다. `|a| = |n|·|cos θ|`는 변 길이 제곱에
   비례하므로, mm 크기 삼각형에서는 비스듬하지만 분명히 안쪽에 맞는 레이를 평행으로
   보고 놓쳤다(재현: 1.4mm 삼각형, 입사각 약 0.2°, 무게중심 좌표 0.12 안쪽). 반대로
@@ -565,11 +565,11 @@ recent on top. v0.x entries are organised by Cycle (see
   `BvhTree::query_ray`가 무작위 배치 100개 × 레이 20개에서 독립 slab 브루트포스와
   정확히 같은 집합을 돌려주는지도 본다(통과).
 
-## v1.0.156 — 2026-10-12 — ConvexHull 레이캐스트 법선, 다면체 속성 테스트
+## v1.0.156 - 2026-10-12 - ConvexHull 레이캐스트 법선, 다면체 속성 테스트
 
 ### Fix
 
-- **voltex_physics `raycast`/`raycast_all` — ConvexHull 법선이 항상 +Y**: 다면체 히트는
+- **voltex_physics `raycast`/`raycast_all` - ConvexHull 법선이 항상 +Y**: 다면체 히트는
   AABB로 근사하면서 법선을 고정값 +Y로 돌려줬다. 옆면이나 아랫면을 맞혀도 위를
   가리켰다. 이제 같은 AABB의 면 법선을 쓴다(`ray_vs_box`). 박스 모양 다면체에서는
   t와 법선이 모두 정확하다. 일반 다면체의 AABB 근사 자체는 그대로다(DEFERRED).
@@ -581,7 +581,7 @@ recent on top. v0.x entries are organised by Cycle (see
   충돌 쪽은 GJK/EPA 경로의 접촉 유무·밀어내기·깊이(1e-3 이내)가 박스 기준값과 맞았다
   (버그 없음). 레이캐스트 쪽은 위 +Y 법선을 잡아냈다.
 
-## v1.0.155 — 2026-10-12 — 2D 타일 이동 무작위 속성 테스트
+## v1.0.155 - 2026-10-12 - 2D 타일 이동 무작위 속성 테스트
 
 ### Tests
 
@@ -593,11 +593,11 @@ recent on top. v0.x entries are organised by Cycle (see
   `grounded`는 발밑에 솔리드가 있을 때만 참이어야 한다. 통과(버그 없음). 서브스텝 제거,
   스냅 한 타일 어긋남, 접지 프로브 과대 돌연변이 3개를 모두 잡는다.
 
-## v1.0.154 — 2026-10-12 — 접촉 마찰이 에너지를 만들어 냄
+## v1.0.154 - 2026-10-12 - 접촉 마찰이 에너지를 만들어 냄
 
 ### Fix
 
-- **voltex_physics `resolve_collisions` 마찰 — 운동 에너지 증가**: 무작위 두 물체
+- **voltex_physics `resolve_collisions` 마찰 - 운동 에너지 증가**: 무작위 두 물체
   접촉에서 처리 후 운동 에너지(선형+회전)가 최대 약 2% 늘었다(재현: 64.79→65.71,
   180.29→183.48). 원인은 세 가지다. (1) 마찰 충격량을 법선 방향 유효 질량으로
   나눴다. (2) 법선 충격량을 반영하기 전의 미끄러짐 속도로 마찰을 계산했다.
@@ -618,11 +618,11 @@ recent on top. v0.x entries are organised by Cycle (see
   잔여가 기하급수로 줄어든다) 본다. 마찰 분모를 법선 유효 질량으로 되돌리기, 충격 전
   미끄러짐 쓰기, 반발 계수 과대 적용 돌연변이 3개를 모두 잡는다.
 
-## v1.0.153 — 2026-10-12 — CCD: 접촉 중인 빠른 물체 감속, 실제로는 터널링을 못 막음
+## v1.0.153 - 2026-10-12 - CCD: 접촉 중인 빠른 물체 감속, 실제로는 터널링을 못 막음
 
 ### Fix
 
-- **voltex_physics `physics_step` CCD — 바닥에 닿은 빠른 물체를 매 스텝 반감속**: 이미
+- **voltex_physics `physics_step` CCD - 바닥에 닿은 빠른 물체를 매 스텝 반감속**: 이미
   겹쳐 있는 콜라이더(바닥 위를 구르는 공 등)는 스윕 결과가 t=0이었다. 그런데 이를
   터널링으로 보고 물체를 제자리에 둔 채 속도를 절반으로 줄였다. 이 반감속은 속도가
   CCD 임계(반지름/dt) 아래로 내려갈 때까지 매 스텝 반복됐다(재현: 80m/s 공이 첫
@@ -642,11 +642,11 @@ recent on top. v0.x entries are organised by Cycle (see
   유지하는지, 300m/s 공이 30스텝 동안 얇은 벽을 넘지 않고 벽 쪽 속도가 0이 되는지
   본다. t=0 포함, 접촉 앞 정지, CCD 끄기 돌연변이 3개를 모두 잡는다.
 
-## v1.0.152 — 2026-10-12 — 충돌 판정 결함 3건 (브로드페이즈 누락·EPA 폭주·박스 내부 법선)
+## v1.0.152 - 2026-10-12 - 충돌 판정 결함 3건 (브로드페이즈 누락·EPA 폭주·박스 내부 법선)
 
 ### Fix
 
-- **voltex_physics `BvhTree::query_pairs` — 겹치는 쌍의 약 절반 누락**: 트리 순회는
+- **voltex_physics `BvhTree::query_pairs` - 겹치는 쌍의 약 절반 누락**: 트리 순회는
   각 리프 쌍을 공간 정렬 순서로 한 번만 방문하는데, 리프 비교에서 `ea.id <= eb.id`로
   걸러 id 순서와 공간 순서가 어긋난 쌍을 통째로 버렸다. 그런 쌍은 narrowphase에
   도달하지 못해 `detect_collisions`가 접촉을 내지 않았다. `physics_step`의 물체가
@@ -654,12 +654,12 @@ recent on top. v0.x entries are organised by Cycle (see
   낮은 id가 앞에 오도록 순서만 맞춘다(기존에 나오던 쌍의 순서는 그대로).
   기존 테스트는 모두 id 순서와 공간 순서가 같은 배치라 못 잡았다. 무작위 배치 50개
   브루트포스 비교 테스트를 추가했다.
-- **voltex_physics EPA — 면 수가 기하급수로 늘어 사실상 멈춤**: 면의 방향을 "원점까지
+- **voltex_physics EPA - 면 수가 기하급수로 늘어 사실상 멈춤**: 면의 방향을 "원점까지
   거리의 부호"로 정해서, 원점이 면에 가까우면 방향이 뒤집혔다. 그러면 수평선
   모서리가 상쇄되지 않아 면이 반복마다 약 3배로 늘었다(16회차에 12만 개). 캡슐이
   끼는 겹침(GJK 경로)에서 `detect_collisions`가 끝나지 않았다. 초기 사면체 무게중심
   (EPA는 다면체를 키우기만 하므로 계속 내부)을 기준으로 바깥을 향하게 고쳤다.
-- **voltex_physics `sphere_vs_box` — 구의 중심이 박스 안일 때 법선이 반대**: 이 분기는
+- **voltex_physics `sphere_vs_box` - 구의 중심이 박스 안일 때 법선이 반대**: 이 분기는
   가장 가까운 면의 바깥 방향을 그대로 돌려줬는데, 규약(A→B, 솔버는 B를 +법선으로
   민다)과 반대여서 깊이 박힌 구와 박스를 더 깊이 밀어 넣었다. 부호를 뒤집었다.
 
@@ -672,7 +672,7 @@ recent on top. v0.x entries are organised by Cycle (see
   것을 확인했다. EPA 폭주 재현은 20초 제한 회귀 테스트로 따로 고정했다. 그 밖에
   BVH 회귀 2개와 `sphere_vs_box` 내부 법선 회귀 1개를 추가했다.
 
-## v1.0.151 — 2026-10-12 — 레이캐스트 무작위 속성 테스트
+## v1.0.151 - 2026-10-12 - 레이캐스트 무작위 속성 테스트
 
 ### Tests
 
@@ -685,7 +685,7 @@ recent on top. v0.x entries are organised by Cycle (see
   돌연변이 3개를 모두 잡는 것 확인. 레이가 도형 안에서 시작하는 경우는 도형마다
   규약이 달라(박스는 t=0, 구·캡슐은 출구) 범위에서 뺐다.
 
-## v1.0.150 — 2026-10-12 — 내비메시 경로 탐색 무작위 속성 테스트
+## v1.0.150 - 2026-10-12 - 내비메시 경로 탐색 무작위 속성 테스트
 
 ### Tests
 
@@ -697,7 +697,7 @@ recent on top. v0.x entries are organised by Cycle (see
   단언. 과거에 고친 funnel apex 재시작 버그(코너 컷)를 되살리면 실패하는 것 확인.
   `find_path_triangles`가 `pub(crate)`라 통합 테스트 대신 crate 내부 모듈로 둠.
 
-## v1.0.149 — 2026-10-12 — ECS 코어 모델 기반 속성 테스트
+## v1.0.149 - 2026-10-12 - ECS 코어 모델 기반 속성 테스트
 
 ### Tests
 
@@ -708,7 +708,7 @@ recent on top. v0.x entries are organised by Cycle (see
   clear 계약). 통과(버그 없음). sparse set swap-remove의 인덱스 갱신을 빼면 실패하는
   것 확인.
 
-## v1.0.148 — 2026-10-12 — 씬 직렬화 무작위 왕복 속성 테스트
+## v1.0.148 - 2026-10-12 - 씬 직렬화 무작위 왕복 속성 테스트
 
 ### Tests
 
@@ -719,7 +719,7 @@ recent on top. v0.x entries are organised by Cycle (see
   despawn을 실제로 만드는지도 단언해 공허한 속성을 막았다. binary가 부모를
   버리게 바꾸면 실패하는 것 확인.
 
-## v1.0.147 — 2026-10-12 — 부모가 despawn된 자식의 WorldTransform 동결
+## v1.0.147 - 2026-10-12 - 부모가 despawn된 자식의 WorldTransform 동결
 
 ### Fix
 
@@ -732,7 +732,7 @@ recent on top. v0.x entries are organised by Cycle (see
   (자기 로컬 변환을 월드 변환으로 사용). 씬 직렬화는 원래 죽은 부모를 "부모
   없음"으로 처리해 안전했다. 테스트 +1.
 
-## v1.0.146 — 2026-10-12 — 에디터 undo/redo 결함 4건 (무작위 속성 테스트로 발견)
+## v1.0.146 - 2026-10-12 - 에디터 undo/redo 결함 4건 (무작위 속성 테스트로 발견)
 
 새 속성 테스트 `voltex_editor/src/session/undo_property_tests.rs`: 결정적
 xorshift로 Spawn/Despawn/SetTransform/SetTag/AddChild/RemoveChild를 시드 3개 × 400단계
@@ -766,7 +766,7 @@ xorshift로 Spawn/Despawn/SetTransform/SetTag/AddChild/RemoveChild를 시드 3�
   뒤섞여 있던 두 문서 주석도 바로잡았다.
 - 테스트 +5 (속성 1, 결정적 재현 3, ecs 1).
 
-## v1.0.145 — 2026-10-12 — CMYK JPEG를 쓰레기 색 대신 에러로
+## v1.0.145 - 2026-10-12 - CMYK JPEG를 쓰레기 색 대신 에러로
 
 ### Fix
 
@@ -775,7 +775,7 @@ xorshift로 Spawn/Despawn/SetTransform/SetTag/AddChild/RemoveChild를 시드 3�
   픽스처로 재현). SOF에서 성분 수가 1(그레이)·3(YCbCr)이 아니면 에러를 낸다.
   CMYK 지원 자체는 미지원으로 둔다. 테스트 +1.
 
-## v1.0.144 — 2026-10-12 — WAV: EXTENSIBLE · 8비트 · 32비트 정수 PCM
+## v1.0.144 - 2026-10-12 - WAV: EXTENSIBLE · 8비트 · 32비트 정수 PCM
 
 ### Additive
 
@@ -785,11 +785,11 @@ xorshift로 Spawn/Despawn/SetTransform/SetTag/AddChild/RemoveChild를 시드 3�
   WAV format tag: 65534"로 거부됐다. 8비트(부호 없음, 128 중심)와 32비트 정수
   PCM도 추가했다.
 - 검증 `tests/wav_real.rs`: CPython `wave`로 만든 8/32비트, 수제 EXTENSIBLE
-  24비트 PCM·float, 그리고 `data` 앞에 홀수 크기 LIST 청크가 있는 파일(패딩 —
+  24비트 PCM·float, 그리고 `data` 앞에 홀수 크기 LIST 청크가 있는 파일(패딩 -
   기존에도 통과)을 알려진 정수 램프로 정확히 비교. 테스트 +5.
 - `.gitattributes`에 `*.wav` binary.
 
-## v1.0.143 — 2026-10-12 — PNG 전 색 유형·비트 깊이 + tRNS 지원
+## v1.0.143 - 2026-10-12 - PNG 전 색 유형·비트 깊이 + tRNS 지원
 
 ### Additive
 
@@ -808,7 +808,7 @@ xorshift로 Spawn/Despawn/SetTransform/SetTag/AddChild/RemoveChild를 시드 3�
   픽스처가 되지 않게 했다. RGB+tRNS는 기존에도 색 키를 무시하던 결함이었다.
   `png_rgb16.png` → `png_gray16.png` 이름 정정.
 
-## v1.0.142 — 2026-10-12 — 믹서가 NaN을 장치 버퍼로 내보내지 않음
+## v1.0.142 - 2026-10-12 - 믹서가 NaN을 장치 버퍼로 내보내지 않음
 
 ### Fix
 
@@ -821,7 +821,7 @@ xorshift로 Spawn/Despawn/SetTransform/SetTag/AddChild/RemoveChild를 시드 3�
   소리는 그대로 들린다. 같은-위치 3D 계산은 원래 안전했다(`stereo_pan`
   ε 가드). 테스트 +1.
 
-## v1.0.141 — 2026-10-12 — Lua 샌드박스 탈출 경로(`package`) 차단
+## v1.0.141 - 2026-10-12 - Lua 샌드박스 탈출 경로(`package`) 차단
 
 ### Fix (security)
 
@@ -831,11 +831,11 @@ xorshift로 Spawn/Despawn/SetTransform/SetTag/AddChild/RemoveChild를 시드 3�
   무력화됐고, `package.loadlib`로 네이티브 DLL도 로드할 수 있었다(재현 테스트
   2개 실패 확인). `package`를 차단 목록에 추가했다. 저장소의 Lua 스크립트는
   `require`/`package`를 쓰지 않아 영향 없음.
-- 참고: 샌드박스는 설계상 자동 적용이 아니다(CODEMAP — 신뢰할 수 없는
+- 참고: 샌드박스는 설계상 자동 적용이 아니다(CODEMAP - 신뢰할 수 없는
   스크립트 실행 전에 명시 호출). 출하 게임의 자체 스크립트에는 적용되지 않는다.
 - 테스트 +2.
 
-## v1.0.140 — 2026-10-12 — 씬 JSON의 비ASCII 컴포넌트 이름
+## v1.0.140 - 2026-10-12 - 씬 JSON의 비ASCII 컴포넌트 이름
 
 ### Fix
 
@@ -847,7 +847,7 @@ xorshift로 Spawn/Despawn/SetTransform/SetTag/AddChild/RemoveChild를 시드 3�
   UTF-8로 한 번 해석하도록 고쳤다. 저장소 전체에서 같은 `as char` 누적 패턴은
   이제 에러 메시지에만 남았다. 테스트 +1.
 
-## v1.0.139 — 2026-10-12 — glTF JSON 문자열 UTF-8 복원 + 서로게이트 쌍
+## v1.0.139 - 2026-10-12 - glTF JSON 문자열 UTF-8 복원 + 서로게이트 쌍
 
 ### Fix
 
@@ -858,19 +858,19 @@ xorshift로 Spawn/Despawn/SetTransform/SetTag/AddChild/RemoveChild를 시드 3�
   서로게이트 쌍은 각각 `char::from_u32` 실패로 **조용히 사라졌는데**, 이제 한
   문자로 합친다. 짝 없는 서로게이트는 에러. 테스트 +3.
 
-## v1.0.138 — 2026-10-12 — OBJ 음수(상대) 인덱스 지원
+## v1.0.138 - 2026-10-12 - OBJ 음수(상대) 인덱스 지원
 
 ### Fix
 
 - **voltex_image `parse_obj`**: 면의 음수 인덱스(`f -3 -2 -1`, `-1` = 그
-  줄까지 정의된 마지막 정점 — OBJ 스펙, 일부 익스포터가 씀)를 `u32` 파싱
+  줄까지 정의된 마지막 정점 - OBJ 스펙, 일부 익스포터가 씀)를 `u32` 파싱
   실패로 "없음(0)" 처리해 **모든 정점이 원점으로 접혔다**(재현: 정점 6개가
   전부 `(0,0,0)`). 기존 퍼즈 테스트는 패닉만 봐서 못 잡았다. 이제 각 면 줄을
   읽는 시점의 정점·UV·법선 개수로 상대 인덱스를 절대 인덱스로 푼다(정점이
   없는데 음수면 0). 테스트 +2 (같은 토큰 `-3 -2 -1`이 줄 위치에 따라 다른
   삼각형을 가리키는지, UV·법선 상대 인덱스).
 
-## v1.0.137 — 2026-10-12 — glTF 노드 `matrix` 변환 지원
+## v1.0.137 - 2026-10-12 - glTF 노드 `matrix` 변환 지원
 
 ### Fix
 
@@ -883,7 +883,7 @@ xorshift로 Spawn/Despawn/SetTransform/SetTag/AddChild/RemoveChild를 시드 3�
 - 테스트 +4 (T·R·S 합성 분해, 미러링, 축별 180° 회전 3종으로 분기 커버,
   matrix 없을 때 TRS 유지).
 
-## v1.0.136 — 2026-10-12 — PNG 디코더를 실제 인코더 출력으로 검증
+## v1.0.136 - 2026-10-12 - PNG 디코더를 실제 인코더 출력으로 검증
 
 ### Tests
 
@@ -896,7 +896,7 @@ xorshift로 Spawn/Despawn/SetTransform/SetTag/AddChild/RemoveChild를 시드 3�
   없었다.
 - `.gitattributes`에 `*.png`, `*.rgba` binary 추가.
 
-## v1.0.135 — 2026-10-12 — 실제 JPEG 인코더 출력으로 디코더 검증
+## v1.0.135 - 2026-10-12 - 실제 JPEG 인코더 출력으로 디코더 검증
 
 ### Tests
 
@@ -915,7 +915,7 @@ xorshift로 Spawn/Despawn/SetTransform/SetTag/AddChild/RemoveChild를 시드 3�
   경계가 libjpeg보다 거칠다(품질 이슈, 정확성 아님).
 - `.gitattributes`에 `*.jpg`, `*.rgb` binary 추가.
 
-## v1.0.134 — 2026-10-12 — glTF 애니메이션 데이터도 normalized 정수 지원
+## v1.0.134 - 2026-10-12 - glTF 애니메이션 데이터도 normalized 정수 지원
 
 ### Fix
 
@@ -926,14 +926,14 @@ xorshift로 Spawn/Despawn/SetTransform/SetTag/AddChild/RemoveChild를 시드 3�
   고쳤다. `read_accessor_floats`는 `gltf/component.rs`로 옮겼다(600줄 규칙).
   테스트 +1.
 
-## v1.0.133 — 2026-10-12 — glTF 정점 속성 componentType·normalized 지원
+## v1.0.133 - 2026-10-12 - glTF 정점 속성 componentType·normalized 지원
 
 ### Fix
 
 - **voltex_image glTF**: VEC2/VEC3/VEC4 정점 속성을 `componentType`과
   상관없이 항상 f32로 읽고 있었다. glTF 2.0 core가 허용하는 정규화 정수
-  인코딩 — `TEXCOORD`의 normalized `UNSIGNED_BYTE`/`UNSIGNED_SHORT`,
-  `WEIGHTS_0`의 normalized `UNSIGNED_BYTE`/`SHORT` 등(압축 익스포트에서 흔함) —
+  인코딩 - `TEXCOORD`의 normalized `UNSIGNED_BYTE`/`UNSIGNED_SHORT`,
+  `WEIGHTS_0`의 normalized `UNSIGNED_BYTE`/`SHORT` 등(압축 익스포트에서 흔함) -
   은 **에러 없이 쓰레기 값**으로 로드됐다. `read_accessor_vecn::<N>` 하나로
   통합해 FLOAT / (UNSIGNED_)BYTE / (UNSIGNED_)SHORT와 `normalized`(signed는
   `max(c/MAX, -1)`), byteStride를 모두 처리한다. 지원하지 않는 componentType은
@@ -942,7 +942,7 @@ xorshift로 Spawn/Despawn/SetTransform/SetTag/AddChild/RemoveChild를 시드 3�
 - 테스트 +4 (normalized u16 UV, normalized u8 가중치, signed -1 클램프, 미지원
   타입 에러). GPU 캡처 48 그린.
 
-## v1.0.132 — 2026-10-12 — glTF 인터리브 정점(byteStride) 지원
+## v1.0.132 - 2026-10-12 - glTF 인터리브 정점(byteStride) 지원
 
 ### Fix
 
@@ -957,7 +957,7 @@ xorshift로 Spawn/Despawn/SetTransform/SetTag/AddChild/RemoveChild를 시드 3�
 - 커버리지 순환 점검 중 발견(퍼징은 패닉만 잡아서 이런 조용한 오염은 못
   찾는다). 테스트 +3.
 
-## v1.0.131 — 2026-10-12 — inflate를 실제 zlib 출력으로 검증 (dynamic Huffman)
+## v1.0.131 - 2026-10-12 - inflate를 실제 zlib 출력으로 검증 (dynamic Huffman)
 
 ### Tests
 
@@ -972,7 +972,7 @@ xorshift로 Spawn/Despawn/SetTransform/SetTag/AddChild/RemoveChild를 시드 3�
   않는 것도 확인했다.
 - deflate.rs 라인 커버리지 56.2% → 82.5%.
 
-## v1.0.130 — 2026-10-12 — 테스트 중 크래시 파일이 crate 폴더에 생기던 것
+## v1.0.130 - 2026-10-12 - 테스트 중 크래시 파일이 crate 폴더에 생기던 것
 
 ### Fix (tests only)
 
@@ -985,7 +985,7 @@ xorshift로 Spawn/Despawn/SetTransform/SetTag/AddChild/RemoveChild를 시드 3�
   수정 후 0개를 확인했다. 훅 자체는 crash.rs 테스트가 temp 디렉터리로 계속
   검증한다. 출하 바이너리와 다른 crate에는 영향 없음.
 
-## v1.0.129 — 2026-10-12 — 항상 통과하던 테스트 단언 5건 복구
+## v1.0.129 - 2026-10-12 - 항상 통과하던 테스트 단언 5건 복구
 
 ### Tests
 
@@ -997,7 +997,7 @@ xorshift로 Spawn/Despawn/SetTransform/SetTag/AddChild/RemoveChild를 시드 3�
   다섯 다 실제 동작이 기대와 같아 통과했다(숨어 있던 버그는 없음). 기대값을
   틀리게 바꾸면 실패하는 것도 확인했다. 남은 `matches!`는 모두 `assert!` 안에 있다.
 
-## v1.0.128 — 2026-10-12 — voltex.toml 파싱 에러에 열 번호
+## v1.0.128 - 2026-10-12 - voltex.toml 파싱 에러에 열 번호
 
 ### Changed
 
@@ -1010,7 +1010,7 @@ xorshift로 Spawn/Despawn/SetTransform/SetTag/AddChild/RemoveChild를 시드 3�
   단언하도록 고쳤다.
 - 테스트 +3 (열 위치 5종, 문자 단위, 표시 문자열).
 
-## v1.0.127 — 2026-10-12 — 크래시 리포트에 GPU·씬·FPS 컨텍스트
+## v1.0.127 - 2026-10-12 - 크래시 리포트에 GPU·씬·FPS 컨텍스트
 
 ### Additive
 
@@ -1022,13 +1022,13 @@ xorshift로 Spawn/Despawn/SetTransform/SetTag/AddChild/RemoveChild를 시드 3�
   컨텍스트 없이 쓴다. 기존 `format_crash_report`는 시그니처 그대로(빈
   컨텍스트로 위임).
 - 채우는 곳: GPU 생성 직후 어댑터 이름과 백엔드(`handler.rs`), `load_scene`과
-  초기 씬 로드(로드 **전** — 로드 중 패닉에도 씬이 찍힘), 매 프레임 HUD 평균
+  초기 씬 로드(로드 **전**: 로드 중 패닉에도 씬이 찍힘), 매 프레임 HUD 평균
   FPS.
 - **voltex_renderer `GpuContext::adapter_info`** (pub 필드 추가).
 - 검증: 포매터·setter·스냅샷 단위 +3. winit 창 경로의 배선(어댑터·FPS
   채우기)은 창을 띄우는 테스트가 없어 컴파일로만 확인했다.
 
-## v1.0.126 — 2026-10-12 — 남은 normalize 미가드 호출자 정리 (v1.0.61 audit 잔여)
+## v1.0.126 - 2026-10-12 - 남은 normalize 미가드 호출자 정리 (v1.0.61 audit 잔여)
 
 ### Fix
 
@@ -1041,18 +1041,18 @@ xorshift로 Spawn/Despawn/SetTransform/SetTag/AddChild/RemoveChild를 시드 3�
 - **voltex_physics `ray_vs_sphere`**: 반지름 0 구의 중심을 정확히 지나는 레이의
   법선이 NaN이던 것 → 레이를 마주 보는 방향으로 폴백.
 - 확인만 하고 고치지 않은 곳: `ray_vs_triangle`(퇴화 삼각형은 판별식 0으로
-  먼저 걸러짐 — `a = -dir·(e1×e2)`), 기즈모 `pick_drag_plane_normal`(카메라가
+  먼저 걸러짐 - `a = -dir·(e1×e2)`), 기즈모 `pick_drag_plane_normal`(카메라가
   기즈모 원점에 있으면 NaN 비교가 모두 false라 두 번째 후보 축 반환 → 우연히
   안전, 테스트로 고정), 기즈모 `axis.cross(helper)`(helper가 축과 평행하지 않게
   골라짐).
 - 테스트 +5.
 
-## v1.0.125 — 2026-10-12 — AuthToken 상수 시간 비교 + 빈 secret 패닉 정리 (P3)
+## v1.0.125 - 2026-10-12 - AuthToken 상수 시간 비교 + 빈 secret 패닉 정리 (P3)
 
 ### Fix
 
 - **voltex_net `AuthToken::validate`**: 토큰 바이트를 상수 시간으로 비교한다
-  (`constant_time_eq` — XOR 누적, 첫 불일치 위치에 따라 시간이 달라지지 않음).
+  (`constant_time_eq` - XOR 누적, 첫 불일치 위치에 따라 시간이 달라지지 않음).
   이 모듈은 doc에 적힌 대로 개발용 비암호 체계라 위협 모델이 바뀌지는 않는다.
   다만 비교 시간이 키 정보를 흘리는 경로는 닫았다.
 - 같은 파일에서 발견: `generate`/`validate`에 빈 `secret`을 주면
@@ -1062,7 +1062,7 @@ xorshift로 Spawn/Despawn/SetTransform/SetTag/AddChild/RemoveChild를 시드 3�
   저장소 안 호출처는 없다.
 - 테스트 +4.
 
-## v1.0.124 — 2026-10-12 — 스프라이트 화면 평면 회전 옵트인 (friction-2 #6)
+## v1.0.124 - 2026-10-12 - 스프라이트 화면 평면 회전 옵트인 (friction-2 #6)
 
 ### Additive
 
@@ -1076,11 +1076,11 @@ xorshift로 Spawn/Despawn/SetTransform/SetTag/AddChild/RemoveChild를 시드 3�
   코드는 `..Default::default()`가 필요하다(저장소 안에는 없음).
 - 검증: 단위 4(옵트인 기본값, 0/±각도 추적, 축 퇴화), GPU
   `voltex_capture/tests/sprite_roll.rs`(3×1 스프라이트 90°: 끄면 가로 유지,
-  켜면 세로 — 셰이더가 각도를 무시하게 바꾸면 실패) + `docs/visual/sprite_roll.png`.
+  켜면 세로 - 셰이더가 각도를 무시하게 바꾸면 실패) + `docs/visual/sprite_roll.png`.
   스프라이트 셰이더가 모든 스프라이트에 적용되므로 GPU 테스트 98개를 전부
   재실행했고, 스프라이트가 담긴 기존 스크린샷(leap 등)은 바이트 동일.
 
-## v1.0.123 — 2026-10-12 — voltex_leap 타일맵 마이그레이션 (friction-2 #5 해소)
+## v1.0.123 - 2026-10-12 - voltex_leap 타일맵 마이그레이션 (friction-2 #5 해소)
 
 ### Changed
 
@@ -1089,7 +1089,7 @@ xorshift로 Spawn/Despawn/SetTransform/SetTag/AddChild/RemoveChild를 시드 3�
   위치 보정 불필요). 레벨 엔티티 수가 솔리드 셀 수만큼 줄고, 타일이 스프라이트
   예산(256)을 쓰지 않는다.
 - 검증: GPU visual 회귀에 타일 회색 픽셀 단언을 먼저 추가해 **마이그레이션
-  전** 통과를 확인(tile_gray=31800)한 뒤 전환 — 전환 후 픽셀 집계가 완전히
+  전** 통과를 확인(tile_gray=31800)한 뒤 전환 - 전환 후 픽셀 집계가 완전히
   같고(red 864 / green 810 / gold 225 / tile_gray 31800) `docs/visual/
   leap_level.png`가 바이트 단위로 동일. 헤드리스 플레이스루·단위 16 그린,
   spawn 테스트는 "Tilemap 1개 + filled = 솔리드 수 + 남은 Sprite 3"으로 갱신.
@@ -1098,7 +1098,7 @@ xorshift로 Spawn/Despawn/SetTransform/SetTag/AddChild/RemoveChild를 시드 3�
 
 - **voltex prelude**에 `Tilemap` 추가.
 
-## v1.0.122 — 2026-10-12 — 배치 타일맵 렌더 (friction-2 #5, 엔진 측)
+## v1.0.122 - 2026-10-12 - 배치 타일맵 렌더 (friction-2 #5, 엔진 측)
 
 설계: `docs/superpowers/specs/2026-10-12-tilemap-batch-render-design.md`.
 
@@ -1114,13 +1114,13 @@ xorshift로 Spawn/Despawn/SetTransform/SetTag/AddChild/RemoveChild를 시드 3�
   예산·엔티티당 dynamic UBO 슬롯과 무관.
 - **voltex_renderer** `TilemapVertex`/`TilemapUniform`/`create_tilemap_pipeline`
   + `tilemap.wgsl`.
-- 검증: 단위 13(꼭짓점 전개 7 — 축 뒤바꿈·UV 반전·변환 무시 변이 3종이 모두
+- 검증: 단위 13(꼭짓점 전개 7 - 축 뒤바꿈·UV 반전·변환 무시 변이 3종이 모두
   테스트 실패로 잡힘, 배치 패킹 3, GPU 타입 3), GPU 캡처
   `voltex_capture/tests/tilemap.rs`(RTX 4080: 채운 셀 정확히 틴트색, 빈 셀·맵
   밖은 배경; 패스 호출을 끄면 실패) + `docs/visual/tilemap_basic.png`.
 - leap 마이그레이션은 v1.0.123(B3b).
 
-## v1.0.121 — 2026-10-12 — survivor 씬 version 누락 + 저장소 씬 전수 로드 가드
+## v1.0.121 - 2026-10-12 - survivor 씬 version 누락 + 저장소 씬 전수 로드 가드
 
 ### Fix
 
@@ -1136,7 +1136,7 @@ xorshift로 Spawn/Despawn/SetTransform/SetTag/AddChild/RemoveChild를 시드 3�
   fuzz 제외)을 런타임과 같은 판정(binary magic → JSON)으로 로드. 새 씬
   파일이 로드 불가 상태로 커밋되는 것을 막는다.
 
-## v1.0.120 — 2026-10-12 — `World::clear()`가 generation을 올려 옛 핸들 별칭 차단
+## v1.0.120 - 2026-10-12 - `World::clear()`가 generation을 올려 옛 핸들 별칭 차단
 
 설계: `docs/superpowers/specs/2026-10-12-world-clear-generation-design.md`.
 
@@ -1160,18 +1160,18 @@ xorshift로 Spawn/Despawn/SetTransform/SetTag/AddChild/RemoveChild를 시드 3�
   이전 씬을 즉시 끄는 용도로 유지.
 - 테스트 +7 (ecs 4, editor 2, runtime 1), 기존 1건 계약 갱신.
 
-## v1.0.119 — 2026-10-12 — 루트 글롭이 빌드 산출물을 삼키던 것 차단 (감사 LOW 이월 4/4)
+## v1.0.119 - 2026-10-12 - 루트 글롭이 빌드 산출물을 삼키던 것 차단 (감사 LOW 이월 4/4)
 
 ### Fix
 
 - **voltex_cli `copy_assets` / `pack_archive`**: `assets = ["./**/*"]`처럼
   프로젝트 루트로 풀리는 선언이 `dist/`와 `target/`을 건너뛴다. 재현해 보니
-  감사 기록(LOW)보다 심각했다 — `dist/` 복사가 자기 자신 안으로 재귀해
+  감사 기록(LOW)보다 심각했다 - `dist/` 복사가 자기 자신 안으로 재귀해
   **스택 오버플로로 `voltex build`가 죽었고**, `.vpkg`에는 이전 빌드의
   `dist/wrapper/*.vpkg`와 cargo `target/` 산출물이 통째로 들어갔다.
   `util::copy_optional_dir`에 skip 목록 인자 추가. 테스트 +2.
 
-## v1.0.118 — 2026-10-12 — CLI 씬 스캔 BOM 오분류 해소 (감사 LOW 이월 3/4, 2부)
+## v1.0.118 - 2026-10-12 - CLI 씬 스캔 BOM 오분류 해소 (감사 LOW 이월 3/4, 2부)
 
 ### Fix
 
@@ -1180,7 +1180,7 @@ xorshift로 Spawn/Despawn/SetTransform/SetTag/AddChild/RemoveChild를 시드 3�
   경고 없이 빠지던 것. v1.0.117(파서 BOM 허용)과 합쳐 BOM 씬이 빌드·실행
   양쪽에서 동작. 테스트 +1.
 
-## v1.0.117 — 2026-10-12 — JSON 씬 로더가 UTF-8 BOM 허용 (감사 LOW 이월 3/4, 1부)
+## v1.0.117 - 2026-10-12 - JSON 씬 로더가 UTF-8 BOM 허용 (감사 LOW 이월 3/4, 1부)
 
 ### Fix
 
@@ -1189,45 +1189,45 @@ xorshift로 Spawn/Despawn/SetTransform/SetTag/AddChild/RemoveChild를 시드 3�
   position 0`으로 실패하던 것. runtime `load_scene`, 에디터 LoadScene,
   CLI 씬 스캔이 모두 이 함수를 거쳐 한 곳 수정으로 해소. 테스트 +1.
 
-## v1.0.116 — 2026-10-12 — CLI 멀티바이너리 exe 추측 배포 차단 (감사 LOW 이월 2/4)
+## v1.0.116 - 2026-10-12 - CLI 멀티바이너리 exe 추측 배포 차단 (감사 LOW 이월 2/4)
 
 ### Fix (behaviour change)
 
 - **voltex_cli `pick_executable`**: `[project] name`과 같은 이름의 바이너리가
   없을 때 마지막 산출물을 배포하던 폴백을 없앴다. 후보가 1개면 그대로
   배포하고, 2개 이상이면 `CliError::AmbiguousExecutable`(후보 목록 + 이름
-  맞추라는 힌트)로 빌드를 실패시킨다 — 에셋 생성기 바이너리가 게임 대신
+  맞추라는 힌트)로 빌드를 실패시킨다 - 에셋 생성기 바이너리가 게임 대신
   `dist/`에 들어가는 경로 차단. 저장소의 voltex.toml 게임(depths/survivor)은
   이름이 일치해 영향 없음. 테스트 +3.
 
-## v1.0.115 — 2026-10-12 — 에셋 브라우저 `..` 루트 탈출 차단 (감사 LOW 이월 1/4)
+## v1.0.115 - 2026-10-12 - 에셋 브라우저 `..` 루트 탈출 차단 (감사 LOW 이월 1/4)
 
 ### Fix
 
 - **voltex_editor asset_browser `navigate_to`**: 결합 경로를 canonicalize한
   뒤 루트 검사. 기존 구현은 컴포넌트 단위 `starts_with`라 `root/..`를 루트
-  안으로 판정했다 — Windows는 canonical 루트가 verbatim(`\\?\`) 경로라 OS가
+  안으로 판정했다 - Windows는 canonical 루트가 verbatim(`\\?\`) 경로라 OS가
   `..`를 거부해 가려졌고, Linux/macOS에서는 탈출 가능했다. 회귀 테스트는
   비-canonical 루트로 `..`·`sub/../..` 탈출 거부 + 정상 진입 유지를 확인.
 
-## v1.0.114 — 2026-08-09 — 3-도메인 병렬 감사: 발견 23건 중 19건 당일 해소
+## v1.0.114 - 2026-08-09 - 3-도메인 병렬 감사: 발견 23건 중 19건 당일 해소
 
 v1.0.56 이후 처음의 심층 감사. 병렬 탐색 에이전트 3개가 미감사 표면
 (v1.0.57~113 추가분)을 정적 감사: ① 런타임 에셋/오디오 resolve 체인 ② CLI
-빌드 파이프라인 ③ 2D 스택 + 에디터. 발견 23건 (high 5) — high/medium 19건
+빌드 파이프라인 ③ 2D 스택 + 에디터. 발견 23건 (high 5) - high/medium 19건
 당일 TDD 해소, low 4건 + World::clear 설계 항목은 DEFERRED 이월.
 
-### Fix — high 5건
+### Fix - high 5건
 
 - **voice 영구 누수** (runtime/audio): `world.clear()`가 allocator까지
-  리셋해 재사용 핸들이 orphan sweep을 통과 — Play 덮어쓰기가 이전 voice를
+  리셋해 재사용 핸들이 orphan sweep을 통과 - Play 덮어쓰기가 이전 voice를
   stop, `AudioVoiceTracker::stop_all` 신설 + load_scene 배선, 계약 doc 정정.
   두 게임의 수동 `src.stop()`이 가리고 있던 실누수.
 - **스프라이트 오버플로 컬링 역방향** (renderer_ecs): back-to-front 정렬 후
-  truncate라 256 초과 시 **가까운 것부터** 사라짐 — select_nth로 가까운
+  truncate라 256 초과 시 **가까운 것부터** 사라짐 - select_nth로 가까운
   n개 생존 후 정렬. 정렬 키도 유클리드 거리 → 카메라 전방 투영 깊이로
   (직교 동일평면에서 화면 위치 따라 레이어 뒤집히던 것).
-- **grid2d 터널링** (physics): "프레임 이동량 < tile" 전제가 미강제 —
+- **grid2d 터널링** (physics): "프레임 이동량 < tile" 전제가 미강제 -
   히칭 프레임(dt 250ms 클램프)이면 벽 관통. 내부 서브스텝(축당 반 타일)으로
   호출부 계약 유지한 채 해소.
 - **.vpkg Lua 스크립트 로드 불가** (script/cli): 스크립트만 Vfs를 우회해
@@ -1236,7 +1236,7 @@ v1.0.56 이후 처음의 심층 감사. 병렬 탐색 에이전트 3개가 미�
 - **wrapper Cargo.toml `[workspace]` 누락** (cli): 카고 워크스페이스 안
   프로젝트의 wrapper 빌드가 통째 실패하던 것.
 
-### Fix — medium 14건 (요약)
+### Fix - medium 14건 (요약)
 
 - runtime: one-shot 재트리거 불가(play()가 active 미리셋), 캐시 키 철자
   변형 이중 슬롯(정규화 헬퍼 공유), Lifetime 미등록(저장 씬에서 소멸 조건
@@ -1254,11 +1254,11 @@ v1.0.56 이후 처음의 심층 감사. 병렬 탐색 에이전트 3개가 미�
 검증: 각 수정 TDD (+16 테스트), leap/depths 회귀 그린, workspace
 clippy(-D warnings)/test 그린.
 
-## v1.0.113 — 2026-08-09 — voltex_physics::grid2d (friction-2 #4 해소)
+## v1.0.113 - 2026-08-09 - voltex_physics::grid2d (friction-2 #4 해소)
 
 ### Additive
 
-- **voltex_physics `grid2d`** — `move_and_collide_2d(is_solid, tile, pos,
+- **voltex_physics `grid2d`**: `move_and_collide_2d(is_solid, tile, pos,
   vel, half, dt) -> MoveResult2D`: XY 평면 AABB vs 타일 그리드 축 분리(X→Y)
   이동·해소 + 발밑 접지 프로브. 그리드는 `is_solid(gx, gy)` 클로저로 주입
   (맵 타입 비의존, 경계 정책 호출자 소유). 전제(프레임 이동량 < tile) doc
@@ -1268,43 +1268,43 @@ clippy(-D warnings)/test 그린.
 
 ### Changed
 
-- **games/voltex_leap `physics2d`** — grid2d 어댑터 + `GRAVITY` 상수로 축소
+- **games/voltex_leap `physics2d`**: grid2d 어댑터 + `GRAVITY` 상수로 축소
   (호출부 시그니처 불변). 기존 테스트 4개가 동작 동일성 회귀 가드.
 
-## v1.0.112 — 2026-08-09 — 2D 스프라이트 저작 1급 지원 (friction-2 P1 3건 해소)
+## v1.0.112 - 2026-08-09 - 2D 스프라이트 저작 1급 지원 (friction-2 P1 3건 해소)
 
-leap 도그푸딩 직후 후속 사이클 — `docs/dev/dogfood-friction-2.md` P1 전건 해소 +
+leap 도그푸딩 직후 후속 사이클 - `docs/dev/dogfood-friction-2.md` P1 전건 해소 +
 leap 마이그레이션으로 실검증. 설계:
 `docs/superpowers/specs/2026-08-09-sprite-authoring-friction-design.md`.
 
 ### Additive
 
-- **voltex_renderer_ecs `SpriteAnimation::clip`** — `first_frame` 필드 신설
+- **voltex_renderer_ecs `SpriteAnimation::clip`**: `first_frame` 필드 신설
   (기본 0, `new()` 호환 유지). 한 시트에 여러 클립(idle/run/jump)을 담고
   오프셋으로 선택. wrap/clamp은 클립 내부 기준. 단위 +2.
-- **voltex_renderer_ecs `Sprite::flip_x`** — 표시 전용 좌우 반전 플래그.
+- **voltex_renderer_ecs `Sprite::flip_x`**: 표시 전용 좌우 반전 플래그.
   렌더러가 `effective_uv_rect()`(u-스왑)를 샘플하고 `uv_rect`는 애니
-  시스템이 정방향 소유 — 종전 uv 스왑 워크어라운드의 "매 프레임 재적용 +
+  시스템이 정방향 소유 - 종전 uv 스왑 워크어라운드의 "매 프레임 재적용 +
   tick 순서 지식" 요구가 사라짐. 단위 +1.
-- **voltex_capture `render_world_ortho`** — `render_world`의 직교 변형
+- **voltex_capture `render_world_ortho`**: `render_world`의 직교 변형
   (`ortho_height` = 런타임 `with_orthographic`과 동일 의미). 기존
   `render_world`는 무변경 (공통부는 내부 헬퍼로 추출).
 
 ### Changed
 
-- **games/voltex_leap** — 새 API 도그푸딩: 플레이어 시트 3장 → 단일 8×1
+- **games/voltex_leap**: 새 API 도그푸딩: 플레이어 시트 3장 → 단일 8×1
   (`AnimState::clip()` 전환, 텍스처 교체 제거), facing 반전은
   `sprite.flip_x` 한 줄, visual 회귀는 게임과 동일한 직교 구도
   (`render_world_ortho`, 스크린샷 교체). 스모크 런 그린.
 
 ### Fix
 
-- **voltex_audio** — 테스트의 `drop(closure)`가 clippy 1.94
+- **voltex_audio**: 테스트의 `drop(closure)`가 clippy 1.94
   `drop_non_drop`에 걸리던 것을 블록 스코프로 교체 (동작 불변).
 
-## v1.0.111 — 2026-08-09 — 도그푸딩 게임 2편: Voltex Leap (2D 스택) + OGG 실검증
+## v1.0.111 - 2026-08-09 - 도그푸딩 게임 2편: Voltex Leap (2D 스택) + OGG 실검증
 
-### Additive — `games/voltex_leap` (2D 사이드뷰 플랫포머)
+### Additive - `games/voltex_leap` (2D 사이드뷰 플랫포머)
 
 엔진 2D 스택(v1.0.60: orthographic, `Sprite`, `SpriteAnimation`, `Particle`,
 `Lifetime`, `add_texture_png`)의 첫 실게임 도그푸딩. 게임 로직 100% Rust.
@@ -1313,11 +1313,11 @@ ASCII 맵 → 타일 레벨, 중력 + AABB 축 분리 타일 충돌(자체 `phys
 jump) 스프라이트 시트 전환 + uv 스왑 좌우 반전, 절차 생성 SFX 5종 + BGM +
 스프라이트시트 PNG(`bin/gen_assets`), 직교 카메라 플레이어 추적, HUD.
 
-- **검증**: 단위 16 + 헤드리스 풀 플레이스루(`tests/playthrough.rs` — 봇이
+- **검증**: 단위 16 + 헤드리스 풀 플레이스루(`tests/playthrough.rs` - 봇이
   본편 MAP을 실클리어 + 사망/재시작 리셋) + GPU 시각 회귀(`tests/visual.rs`,
-  RTX 4080 — 가시/문/코인 색 비율 + `docs/visual/leap_level.png`) + 8초
+  RTX 4080 - 가시/문/코인 색 비율 + `docs/visual/leap_level.png`) + 8초
   스모크 런 (panic/validation 0, 시트 4장 로드 확인).
-- **마찰 로그 신설**: `docs/dev/dogfood-friction-2.md` — 6건 (P1 3: SpriteAnimation
+- **마찰 로그 신설**: `docs/dev/dogfood-friction-2.md` - 6건 (P1 3: SpriteAnimation
   프레임 오프셋 부재 / Sprite flip 1급 지원 부재 / render_world 직교 미지원,
   P2 3: 2D 타일 충돌 헬퍼 / 타일맵 배치 렌더 / 빌보드 z-rot). 지난 사이클
   개선(gpu_init·asset_root·audio 시드·orphan voice)은 전부 우회 없이 동작.
@@ -1330,78 +1330,78 @@ DEFERRED 의 "실제 `.ogg` 파일 디코드 검증" 항목 처리.
 
 ### Additive
 
-- **voltex_audio `tests/ogg_vorbis_decode.rs`** — 코드로 생성한 실 Ogg/Vorbis I
+- **voltex_audio `tests/ogg_vorbis_decode.rs`**: 코드로 생성한 실 Ogg/Vorbis I
   스트림을 `decode_ogg_vorbis_bytes` 로 끝까지 디코드하는 통합 회귀 5개.
   실 CRC 페이지 프레이밍 + spec 형태 setup 헤더(flat 256-entry codebook /
   floor type 1 / residue type 2 / 2 modes) + 지정 MDCT 스펙트럼 audio 패킷.
   종전엔 100 바이트 이하 합성 입력의 *거부*만 검증돼 컨테이너 → 헤더 →
   codebook/floor/residue → IMDCT → overlap-add 전 구간이 무검증이었다.
-  fixture 는 디코더가 읽는 순서가 아니라 spec 레이아웃 기준으로 작성 —
+  fixture 는 디코더가 읽는 순서가 아니라 spec 레이아웃 기준으로 작성 -
   디코더가 spec 에서 벗어나면 테스트가 깨진다.
 
 ### Fix
 
-- **voltex_audio `decode_vorbis`** — audio 패킷 디코드 실패를 전부 조용히
+- **voltex_audio `decode_vorbis`**: audio 패킷 디코드 실패를 전부 조용히
   삼켜 모든 패킷이 깨진 파일도 `Ok(빈 클립)` 이었다. 호출부는 이걸 "의도된
   무음" 과 구분할 수 없어 손상 파일이 무진단 무음으로 재생됐다. 개별 패킷
   skip 은 유지(잘린 tail 은 흔함), 성공 0개일 때만 첫 에러 반환. 호출부
   3곳 모두 이미 Err 를 로그 + graceful degrade 처리라 새 실패 경로 없음.
-- **voltex_audio `parse_ogg_pages`** — 컨테이너의 유일한 무결성 검사인 페이지
+- **voltex_audio `parse_ogg_pages`**: 컨테이너의 유일한 무결성 검사인 페이지
   CRC 를 통째로 건너뛰고 있었다("skip verification for simplicity"). `page_crc32`
-  (poly 0x04c11db7, init 0, 무반사, xorout 없음 — zlib/PNG 변종 아님) 신설 +
+  (poly 0x04c11db7, init 0, 무반사, xorout 없음 - zlib/PNG 변종 아님) 신설 +
   불일치 시 page sequence 와 양쪽 값을 담은 에러. 실 libvorbis 인코딩 파일의
   저장된 페이지 체크섬 9개를 정확히 재현함을 확인했고, 레포에 실 인코더가
   없어 CI 에 못 넣는 그 검증을 대신할 체크값(0x89A1897F)을 테스트에 고정.
 
 ### 남은 것
 
-- libvorbis 인코딩 실 파일 디코드는 여전히 미검증 — 이 디코더가 VQ codebook /
+- libvorbis 인코딩 실 파일 디코드는 여전히 미검증 - 이 디코더가 VQ codebook /
   채널 커플링 미구현이라 디코더 확장이 선행 조건. audio_demo 통합도 미실시.
 
 ---
 
-## [v1.0.110] — 2026-07-07 — 도그푸딩 마찰 일괄 해소 (friction 9/9)
+## [v1.0.110] - 2026-07-07 - 도그푸딩 마찰 일괄 해소 (friction 9/9)
 
 Voltex Depths 도그푸딩이 남긴 마찰 6건(P1 4 + P2 2)을 한 세션에서 해소 +
 미배선 모듈 가드 신설. 상세는 `docs/dev/dogfood-friction.md`.
 
-### Breaking (시그니처 변경 — 워크스페이스 내 호출부 전부 갱신됨)
+### Breaking (시그니처 변경 - 워크스페이스 내 호출부 전부 갱신됨)
 
 - **voltex_audio `play`/`play_3d`** 가 `VoiceId` 반환 (기존 호출부는 반환값
   무시로 무변경 동작). `AudioCommand::Play{,3d}` 에 `voice` 필드.
 - **voltex_runtime `audio_sync_system(world, audio, listener, &mut
-  AudioVoiceTracker)`** — voice 추적자 파라미터 추가.
-- **voltex_runtime `resolve_asset_paths` / `resolve_audio_paths`** —
+  AudioVoiceTracker)`**: voice 추적자 파라미터 추가.
+- **voltex_runtime `resolve_asset_paths` / `resolve_audio_paths`** -
   `asset_root: Option<&Path>` 파라미터 추가.
 
 ### Additive
 
-- **voltex_audio `VoiceId` + `stop_voice`** — 재생 인스턴스 단위 정지.
+- **voltex_audio `VoiceId` + `stop_voice`**: 재생 인스턴스 단위 정지.
   스레드 커맨드 처리를 `apply_command` 로 추출 (디바이스 없이 단위 테스트).
-- **voltex_runtime `AudioVoiceTracker`** — entity별 발행 voice 추적, entity
+- **voltex_runtime `AudioVoiceTracker`**: entity별 발행 voice 추적, entity
   소멸(despawn/clear/컴포넌트 제거) 시 orphan voice 자동 stop (friction #9).
-- **voltex_runtime `RuntimeConfig::with_asset_root`** — 상대 에셋 경로의
+- **voltex_runtime `RuntimeConfig::with_asset_root`**: 상대 에셋 경로의
   루트 디렉토리; 상대 루트는 exe 디렉토리 기준 해석 (friction #6).
-- **voltex_runtime `AudioClipCache::seed/get`** — with_audio_files 매핑을
+- **voltex_runtime `AudioClipCache::seed/get`**: with_audio_files 매핑을
   AudioPath resolver에 시드, 이중 디코드 제거 (friction #5).
-- **voltex_cli `[build] kind = "rust"`** — Rust 로직 게임 패키징: 게임 crate
+- **voltex_cli `[build] kind = "rust"`**: Rust 로직 게임 패키징: 게임 crate
   cargo build → dist에 exe + 루즈 에셋 + 라이선스 (friction #8). rust kind는
   build.scene 불요구, scripts 기본값 []. `pick_executable` 이 project.name
   일치 bin 우선.
-- **voltex_ai retarget** — nav_agent_system이 `planned_target` 로 target 변경
+- **voltex_ai retarget**: nav_agent_system이 `planned_target` 로 target 변경
   감지 후 자동 repath; 같은 삼각형 내 이동은 A* 없이 path 끝점만 교체
-  (friction #2 — `agent.target = Some(p)` 직접 대입이 이제 그냥 동작).
-- **module_wiring 가드** (`crates/voltex/tests/module_wiring.rs`) — 미배선
+  (friction #2 - `agent.target = Some(p)` 직접 대입이 이제 그냥 동작).
+- **module_wiring 가드** (`crates/voltex/tests/module_wiring.rs`) - 미배선
   .rs 를 CI에서 적발 (friction #1 후속). 첫 실행에서 3건 적발·배선:
   voltex_ai `obstacle.rs`(velocity obstacle 회피), voltex_script
-  `coroutine.rs`(LuaCoroutine), `sandbox.rs`(create_sandbox — 문서에 있던
+  `coroutine.rs`(LuaCoroutine), `sandbox.rs`(create_sandbox - 문서에 있던
   보안 기능이 컴파일조차 안 되고 있었음). 잠자던 테스트 23개 부활.
 
 ### Fix
 
-- **voltex_ai `follow_path` 평면화** — waypoint를 에이전트 y 평면에 투영:
+- **voltex_ai `follow_path` 평면화**: waypoint를 에이전트 y 평면에 투영:
   도달 판정 XZ + 조향 force가 y를 건드리지 않음 + goal snap이 agent y 보존
-  (friction #3 — 게임플레이 y 유지 시 waypoint 통과 불가/침하 해소).
+  (friction #3 - 게임플레이 y 유지 시 waypoint 통과 불가/침하 해소).
 
 ### 게임 (voltex_depths)
 
@@ -1414,44 +1414,44 @@ Voltex Depths 도그푸딩이 남긴 마찰 6건(P1 4 + P2 2)을 한 세션에�
 - 전 crate TDD (RED 확인 후 구현). workspace lib 테스트/clippy(-D warnings)
   그린, depths 27 + 플레이스루 그린, rust-kind E2E(#[ignore]) 1회 통과.
 
-## [v1.0.109] — 2026-06-12 — 도그푸딩 게임 1편: Voltex Depths
+## [v1.0.109] - 2026-06-12 - 도그푸딩 게임 1편: Voltex Depths
 
-`games/voltex_depths` — 탑다운 트윈스틱 던전 슈터, 게임 로직 100% Rust (Lua 주도
+`games/voltex_depths` - 탑다운 트윈스틱 던전 슈터, 게임 로직 100% Rust (Lua 주도
 flagship voltex_survivor의 대칭). 적 3종(추적자/사수/보스) + region 기반 문 진행.
 
 ### Additive
 
-- **games/voltex_depths** — ASCII 맵 → 레벨/NavMesh 빌드, 마우스 조준
+- **games/voltex_depths**: ASCII 맵 → 레벨/NavMesh 빌드, 마우스 조준
   unprojection, 절차 생성 SFX/BGM(`gen_sfx`), 헤드리스 풀 플레이스루 +
   GPU 시각 회귀 테스트.
-- **`voltex_capture::scene::render_world`** — 게임 crate가 임의 World를
+- **`voltex_capture::scene::render_world`**: 게임 crate가 임의 World를
   오프스크린 렌더해 픽셀 검증하는 공개 진입점 (고정 라이트/FOV 45°/
-  1024 entity 상한 — doc 주석 참고).
+  1024 entity 상한 - doc 주석 참고).
 
 ### Fix
 
-- **voltex_ai NavMeshBuilder 배선** — `navmesh_builder/` 모듈이 M3 분리 이후
+- **voltex_ai NavMeshBuilder 배선**: `navmesh_builder/` 모듈이 M3 분리 이후
   lib.rs 미선언으로 죽은 코드였음. 배선 + bitrot 수정, 잠자던 테스트 7개 통과.
 
 ### 검증
 
 - voltex_depths 단위 29 + 플레이스루 + GPU 시각 회귀 그린. debug/release
   스모크 런 panic/wgpu validation error 0.
-- 도그푸딩 마찰 8건 기록 (`docs/dev/dogfood-friction.md`) — `voltex build`가
+- 도그푸딩 마찰 8건 기록 (`docs/dev/dogfood-friction.md`) - `voltex build`가
   Rust 로직 게임 패키징 불가(#8) 등 P1 4건이 다음 엔진 사이클 입력.
 
-## [v1.0.85] — 2026-06-04 — Lua `find_in_radius` (spatial query for scripts)
+## [v1.0.85] - 2026-06-04 - Lua `find_in_radius` (spatial query for scripts)
 
-Lua 스크립트가 v1.0.76 `SpatialGrid` 를 통해 근접 쿼리를 할 수 있게 — Lua AI 가 근처
+Lua 스크립트가 v1.0.76 `SpatialGrid` 를 통해 근접 쿼리를 할 수 있게 - Lua AI 가 근처
 적/대상/픽업을 찾는 서바이버류 핵심. (선언적 렌더러블/이벤트/리소스는 L3/타입 특화라
 Lua 노출 불가하지만, SpatialGrid 는 L1 ecs 라 voltex_script(L2)가 레이어 위반 없이 사용.)
 
-### Additive — `voltex_script::engine_api`
+### Additive - `voltex_script::engine_api`
 
 - **`find_in_radius(x, y, z, r)`** → `{id, gen}` 핸들 배열 테이블. Transform 위치가
   `(x,y,z)` 반경 `r` 내인 엔티티. SpatialGrid 로 백킹. 비숫자 인자/world 없음 → 빈 테이블
   (`ipairs` 항상 안전). 기존 하드닝 규약 준수(strict numeric readers, get_world Option).
-  매 호출 grid 재구축(O(n)) — Lua 게임 규모에 적합.
+  매 호출 grid 재구축(O(n)) - Lua 게임 규모에 적합.
 
 ### 검증
 
@@ -1459,17 +1459,17 @@ Lua 노출 불가하지만, SpatialGrid 는 L1 ecs 라 voltex_script(L2)가 레�
   변이 테스트(비숫자 가드 제거 RED→GREEN). voltex_script 57→59.
 - workspace build / clippy(`-D warnings`) / lib test 전부 그린.
 
-## [v1.0.84] — 2026-06-04 — `Color` type (named / hex / HSV / lerp)
+## [v1.0.84] - 2026-06-04 - `Color` type (named / hex / HSV / lerp)
 
 색이 전부 raw `[f32; 4]` 배열이었다(`MaterialDesc::color([..])`, Sprite 등). 명명 색·hex·
 HSV·보간을 갖춘 1급 Color 타입 추가(상용 엔진 기본). v1.0.82 lerp 와 함께 색 트위닝.
 
-### Additive — `voltex_math::color`
+### Additive - `voltex_math::color`
 
-- **`Color`**(RGBA f32) — `rgb`/`rgba`/`hex(0xRRGGBB)`/`hexa(0xRRGGBBAA)`/
+- **`Color`**(RGBA f32) - `rgb`/`rgba`/`hex(0xRRGGBB)`/`hexa(0xRRGGBBAA)`/
   `from_hsv(h,s,v)`/`from_array`/`to_array`/`with_alpha`/`lerp` + 명명 상수
   (WHITE/BLACK/TRANSPARENT/RED/GREEN/BLUE/YELLOW/CYAN/MAGENTA/GRAY).
-- **`From<[f32;4]>` / `Into<[f32;4]>`** — 렌더러 색 경로와 **무변경 연결**
+- **`From<[f32;4]>` / `Into<[f32;4]>`**: 렌더러 색 경로와 **무변경 연결**
   (`MaterialDesc::color(Color::RED.into())`). renderer 시그니처 변경 0.
 - facade prelude(math)에 `Color` 추가.
 
@@ -1479,14 +1479,14 @@ HSV·보간을 갖춘 1급 Color 타입 추가(상용 엔진 기본). v1.0.82 le
   lerp 블렌드, from_hsv 알려진 hue+wrap+grayscale) + 변이 테스트(hex red 시프트 RED→GREEN).
 - workspace build / clippy(`-D warnings`) / lib test 전부 그린.
 
-## [v1.0.83] — 2026-06-04 — Tween (Timer + easing + lerp, packaged)
+## [v1.0.83] - 2026-06-04 - Tween (Timer + easing + lerp, packaged)
 
 v1.0.80 `Timer` 와 v1.0.82 `easing`/`lerp` 의 자연스러운 결합: "값을 N초간 부드럽게
 이동" 을 한 타입으로 (Unity/Godot tween).
 
-### Additive — `voltex_runtime::time`
+### Additive - `voltex_runtime::time`
 
-- **`Tween`** — `new(from, to, duration, easing)` / `linear(from,to,dur)` +
+- **`Tween`**: `new(from, to, duration, easing)` / `linear(from,to,dur)` +
   `tick(dt) -> f32`(진행+현재값) / `value` / `value_normalized`(eased 진행 0..1 →
   `Vec3::lerp`/`Vec2::lerp` 로 비스칼라 tween) / `finished` / `reset`. 내부적으로
   one-shot `Timer` 가 구동, easing 은 `fn(f32)->f32`(voltex_math::easing 곡선).
@@ -1499,18 +1499,18 @@ v1.0.80 `Timer` 와 v1.0.82 `easing`/`lerp` 의 자연스러운 결합: "값을 
   RED→GREEN). voltex_runtime time 11→16.
 - workspace build / clippy(`-D warnings`) / lib test 전부 그린.
 
-## [v1.0.82] — 2026-06-04 — Easing curves + lerp (tweening)
+## [v1.0.82] - 2026-06-04 - Easing curves + lerp (tweening)
 
 UI 모션·카메라 이동·juice·부드러운 전환에 필요한 이징/보간. v1.0.80 `Timer.fraction()` 과
 결합하면 tween (Unity/Godot tween 대응).
 
-### Additive — `voltex_math`
+### Additive - `voltex_math`
 
 - **`easing` 모듈**: `lerp(a, b, t)` + 곡선 `linear` / `ease_in|out|in_out_quad` /
   `_cubic` / `smoothstep` / `ease_out_back`(overshoot). 모두 t 를 `[0,1]` clamp,
   끝점 `f(0)=0`·`f(1)=1` 고정. 순수, 외부 dep 0.
-- **`Vec2::lerp` / `Vec3::lerp`** — 위치·색 보간 메서드.
-- 함수가 많아 prelude 미포함 — `voltex::math::easing::*` 경로. Vec lerp 은 메서드라
+- **`Vec2::lerp` / `Vec3::lerp`**: 위치·색 보간 메서드.
+- 함수가 많아 prelude 미포함 - `voltex::math::easing::*` 경로. Vec lerp 은 메서드라
   prelude 타입에서 바로 사용. 사용 패턴: `lerp(a, b, ease_out_cubic(timer.fraction()))`.
 
 ### 검증
@@ -1520,12 +1520,12 @@ UI 모션·카메라 이동·juice·부드러운 전환에 필요한 이징/보�
   변이 테스트(ease_in_quad→linear RED→GREEN).
 - workspace build / clippy(`-D warnings`) / lib test 전부 그린.
 
-## [v1.0.81] — 2026-06-03 — Capstone: boids swarm demo (the new stack, composed)
+## [v1.0.81] - 2026-06-03 - Capstone: boids swarm demo (the new stack, composed)
 
 이번 세션(v1.0.62~80)의 프리미티브들이 **하나의 실행 가능한 게임으로 조합됨**을 보이는
-캡스톤 — 단일 기능이 아니라 culmination.
+캡스톤 - 단일 기능이 아니라 culmination.
 
-### Additive — `examples/boids_demo`
+### Additive - `examples/boids_demo`
 
 - 군집 데모: `Rng` 로 랜덤 위치/헤딩/색 시드 → `spawn_bundle((Transform, PrimitiveMesh,
   MaterialDesc, Boid))` 선언적 스폰 → 매 프레임 `flocking_system`(SpatialGrid 이웃) +
@@ -1540,18 +1540,18 @@ UI 모션·카메라 이동·juice·부드러운 전환에 필요한 이징/보�
   556 distinct colors) + 시각 기록 `docs/visual/boids_swarm.png`.
 - per-example README. workspace build / clippy(`-D warnings`) / lib test 전부 그린.
 
-## [v1.0.80] — 2026-06-03 — Timer (cooldowns / intervals)
+## [v1.0.80] - 2026-06-03 - Timer (cooldowns / intervals)
 
-쿨다운·스폰 간격·능력 재충전·타임드 상태 — 거의 모든 게임이 손으로 `elapsed += dt;
+쿨다운·스폰 간격·능력 재충전·타임드 상태 - 거의 모든 게임이 손으로 `elapsed += dt;
 if elapsed > x` 를 반복하던 것을 1급 타입으로 (Unity/Godot/Bevy Timer 대응). v1.0.66
 `Time` 옆에 추가.
 
-### Additive — `voltex_runtime::time`
+### Additive - `voltex_runtime::time`
 
 - **`Timer`** + **`TimerMode`**(Once/Repeating): `once(dur)`/`repeating(dur)` +
   `tick(dt) -> &mut Self`(체인) + `just_finished`/`finished`/`elapsed`/`duration`/
   `fraction`(0..1)/`reset`. Repeating 은 dt>period 시 leftover wrap. duration<=0 은
-  즉시 발사(once 는 latch, repeating 은 매 틱). 순수 — 외부 dep 0.
+  즉시 발사(once 는 latch, repeating 은 매 틱). 순수 - 외부 dep 0.
 - facade prelude 에 `Timer`/`TimerMode` 추가.
 
 ### 검증
@@ -1561,14 +1561,14 @@ if elapsed > x` 를 반복하던 것을 1급 타입으로 (Unity/Godot/Bevy Time
   voltex_runtime time 5→11.
 - workspace build / clippy(`-D warnings`) / lib test 전부 그린.
 
-## [v1.0.79] — 2026-06-03 — Deterministic RNG (`voltex_math::Rng`)
+## [v1.0.79] - 2026-06-03 - Deterministic RNG (`voltex_math::Rng`)
 
 게임은 무작위성(스폰 jitter·전리품·절차 배치)이 필요하지만 엔진엔 없었고, 프로젝트의
 외부-dep-0 정책상 `rand` 크레이트는 부적합. 내장 결정론적 PRNG 추가(SplitMix64).
 
-### Additive — `voltex_math::rng`
+### Additive - `voltex_math::rng`
 
-- **`Rng`** — `seeded(u64)` / `next_u64` / `next_u32` / `next_f32`([0,1)) /
+- **`Rng`**: `seeded(u64)` / `next_u64` / `next_u32` / `next_f32`([0,1)) /
   `range_f32(min,max)` / `range_i32(min,max)` / `chance(p)` / `unit_vec2` /
   `unit_vec3`(area-uniform 구면). 외부 dep 0. **시드 동일 → 시퀀스 동일**(리플레이/
   네트워크/테스트 결정론). World 리소스로 보관해 per-run 제너레이터로 활용.
@@ -1581,16 +1581,16 @@ if elapsed > x` 를 반복하던 것을 1급 타입으로 (Unity/Godot/Bevy Time
   (`>>8`→`>>7` 로 [0,1) 깨면 RED→GREEN).
 - workspace build / clippy(`-D warnings`) / lib test 전부 그린.
 
-## [v1.0.78] — 2026-06-03 — Flocking as an ECS system (`Boid` + `flocking_system`)
+## [v1.0.78] - 2026-06-03 - Flocking as an ECS system (`Boid` + `flocking_system`)
 
 v1.0.77 의 순수 boid 함수를 "한 번 호출로 군집 AI" 로 끌어올림 (선언적 렌더러블 →
 materialize 와 같은 패턴): 컴포넌트 + 시스템.
 
-### Additive — `voltex_ai`
+### Additive - `voltex_ai`
 
 - **`Boid { velocity }`** 컴포넌트 + **`BoidParams`**(neighbour_radius / separation /
   cohesion / alignment 가중치 / max_speed, `Default` 제공).
-- **`flocking_system(&mut World, &BoidParams, dt)`** — 모든 `(Transform, Boid)` 를
+- **`flocking_system(&mut World, &BoidParams, dt)`**: 모든 `(Transform, Boid)` 를
   스냅샷 → `SpatialGrid` 로 이웃 수집(~O(n)) → 3법칙 가중합 가속 → 속도(max_speed
   clamp)·위치 적분 → 일괄 기록. 스냅샷-후-기록이라 모든 boid 가 같은 프레임 상태를
   관측(순서 무관). `nav_agent_system` 과 같은 호출자-주입 패턴.
@@ -1602,19 +1602,19 @@ materialize 와 같은 패턴): 컴포넌트 + 시스템.
   voltex_ai flocking 9→14.
 - workspace build / clippy(`-D warnings`) / lib test 전부 그린.
 
-## [v1.0.77] — 2026-06-03 — Boid flocking steering (uses the spatial grid)
+## [v1.0.77] - 2026-06-03 - Boid flocking steering (uses the spatial grid)
 
 v1.0.76 의 `SpatialGrid` 를 실제로 활용: voltex_ai 에 이웃 기반 스티어링이 전혀 없었다
 (steering 은 단일-에이전트 함수, `avoid_obstacles` 는 에이전트당 전체 장애물 O(N·M)).
 boid 3법칙 추가 + 이웃 수집을 그리드로.
 
-### Additive — `voltex_ai::flocking`
+### Additive - `voltex_ai::flocking`
 
 - **`separation(position, &[neighbour_pos])`** (역거리 가중 회피), **`cohesion(position,
   &[neighbour_pos])`** (그룹 중심으로), **`alignment(&[neighbour_vel])`** (평균 heading).
   모두 unit 방향 반환(이웃 없으면 zero). 입력 이웃 리스트는 호출자가
   `SpatialGrid::query_radius` 로 한 번에 수집 → O(n²) 전수 스캔 회피.
-- domain-특화라 prelude 제외 — `voltex::ai::{separation,cohesion,alignment}`.
+- domain-특화라 prelude 제외 - `voltex::ai::{separation,cohesion,alignment}`.
 
 ### 검증
 
@@ -1624,18 +1624,18 @@ boid 3법칙 추가 + 이웃 수집을 그리드로.
   변이 테스트(away 방향 부호 RED→GREEN).
 - workspace build / clippy(`-D warnings`) / lib test 전부 그린.
 
-## [v1.0.76] — 2026-06-03 — Spatial grid (gameplay proximity queries)
+## [v1.0.76] - 2026-06-03 - Spatial grid (gameplay proximity queries)
 
 기초를 넘어 깊이로: 서바이버류(flagship)·AoE·어그로·이웃 탐색이 늘 필요로 하는
 "반경 내 엔티티" 가 지금껏 O(n) 수동 거리 루프뿐이었다. 균일 그리드 공간 해시 추가.
 
-### Additive — `voltex_ecs::spatial`
+### Additive - `voltex_ecs::spatial`
 
-- **`SpatialGrid`** — `new(cell_size)` / `from_transforms(&World, cell_size)`(Transform
+- **`SpatialGrid`**: `new(cell_size)` / `from_transforms(&World, cell_size)`(Transform
   위치로 빌드) / `insert(e, pos)`(재삽입 시 셀 이동) / `query_radius(center, r)`(반경
   AABB 가 겹치는 셀만 스캔 후 정확 거리 필터, 경계 포함) / `query_radius_into`(버퍼
   재사용, 무할당) / `nearest(point, exclude)`. 음수/NaN 반경은 빈 결과.
-- physics 의 콜라이더 BVH 와 별개 — 이쪽은 엔티티 Transform 위치 기반 게임플레이 인덱스.
+- physics 의 콜라이더 BVH 와 별개 - 이쪽은 엔티티 Transform 위치 기반 게임플레이 인덱스.
   프레임당 재구축(Transform 1패스).
 - facade prelude 에 `SpatialGrid` 추가.
 
@@ -1646,41 +1646,41 @@ boid 3법칙 추가 + 이웃 수집을 그리드로.
   voltex_ecs 195→203.
 - workspace build / clippy(`-D warnings`, 부정비교/map_or 2건 정리) / lib test 전부 그린.
 
-## [v1.0.75] — 2026-06-03 — Full-stack composition test (gameplay slice)
+## [v1.0.75] - 2026-06-03 - Full-stack composition test (gameplay slice)
 
 이 세션(v1.0.62~74)의 12개 프리미티브를 단위가 아닌 **시스템 레벨에서 조합**해 실제
 게임플레이 루프로 검증. 단위 테스트가 못 잡는 통합 버그를 노린다(사이클 7·8 이 이렇게
 실버그를 잡았음).
 
-### Additive — `crates/voltex_ecs/tests/gameplay_slice.rs` (외부 통합 테스트, public API만)
+### Additive - `crates/voltex_ecs/tests/gameplay_slice.rs` (외부 통합 테스트, public API만)
 
-- **`full_stack_gameplay_loop_spawns_kills_and_scores`** — `Prefabs` 로 적 스폰 +
+- **`full_stack_gameplay_loop_spawns_kills_and_scores`**: `Prefabs` 로 적 스폰 +
   `spawn_child_bundle` 로 shield 부착, `SpawnBudget`/`Score` 리소스, `iter_by_tag` 로
   순회하며 데미지, 0 HP 시 `despawn_recursive` + `send_event(EnemyKilled)`, 별도
   시스템이 `drain_events` 로 점수 적립. 프레임 루프를 수렴까지 돌려 Score==30,
   적·shield 0, budget 0 단언.
-- **`events_left_undrained_persist_until_a_consumer_runs`** — consumer 가 안 돌면
+- **`events_left_undrained_persist_until_a_consumer_runs`**: consumer 가 안 돌면
   kill 이벤트가 유실되지 않고 큐에 남아 다음 drain 에서 처리됨.
-- **`child_entities_are_torn_down_with_their_parent_mid_loop`** — 게임 흐름 안에서
+- **`child_entities_are_torn_down_with_their_parent_mid_loop`**: 게임 흐름 안에서
   spawn_child_bundle + despawn_recursive 상호작용 확인.
 
 ### 결과
 
-- 3개 통합 테스트 그린 — **통합 버그 0** (스택이 의도대로 조합됨을 확인). 동시에 게임을
+- 3개 통합 테스트 그린 - **통합 버그 0** (스택이 의도대로 조합됨을 확인). 동시에 게임을
   실제로 어떻게 배선하는지 보여주는 정식 예제 역할.
 - workspace build / clippy(`-D warnings`) / test 전부 그린.
 
-## [v1.0.74] — 2026-06-03 — Events / messaging (decoupled systems on top of resources)
+## [v1.0.74] - 2026-06-03 - Events / messaging (decoupled systems on top of resources)
 
 기초 워크플로 격차 9번째: 시스템 간 통신 수단 부재(적 사망 → 점수·오디오·파티클을
 직접 호출로 엮어야 했다). 사이클 8(World 리소스) 위에 이벤트 큐를 올려 producer/
 consumer 를 분리.
 
-### Additive — `voltex_ecs::events`
+### Additive - `voltex_ecs::events`
 
-- **`Events<T>`** (`send`/`drain`/`len`/`is_empty`) — `Events<T>` 가 World 리소스로
+- **`Events<T>`** (`send`/`drain`/`len`/`is_empty`) - `Events<T>` 가 World 리소스로
   저장됨.
-- **`World::send_event::<T>(event)`** / **`drain_events::<T>() -> Vec<T>`** — 시스템은
+- **`World::send_event::<T>(event)`** / **`drain_events::<T>() -> Vec<T>`**: 시스템은
   `&mut World` 만으로 이벤트를 쏘고 받음(배선 불필요). single-buffer drain:
   consumer 는 같은 프레임에 *먼저 보내진* 이벤트만 봄 → producer 를 consumer 보다
   먼저 등록. (order-independent double-buffer reader 는 후속.)
@@ -1692,18 +1692,18 @@ consumer 를 분리.
   변이 테스트(drain 이 빈 Vec 반환하도록 깨면 순서 테스트 RED→GREEN).
 - workspace build / clippy(`-D warnings`) / lib test 전부 그린.
 
-## [v1.0.73] — 2026-06-03 — World resources (entity-less shared state)
+## [v1.0.73] - 2026-06-03 - World resources (entity-less shared state)
 
 기초 워크플로 격차 8번째: World 에 **엔티티에 매이지 않는 공유 상태**(점수/설정/RNG/
 이벤트 큐) 개념이 없었다. 이전 사이클(Time/InputMap)에서 반복된 "시스템에 어떻게
-전달하나" 문제의 근본 원인 — 시스템은 이미 `&mut World` 를 받으므로, World 에 리소스를
+전달하나" 문제의 근본 원인 - 시스템은 이미 `&mut World` 를 받으므로, World 에 리소스를
 두면 추가 배선 없이 어느 시스템에서든 접근 가능. 이벤트/메시징 등의 토대.
 
-### Additive — `voltex_ecs::World`
+### Additive - `voltex_ecs::World`
 
 - **`insert_resource::<T>(value)`** / **`resource::<T>() -> Option<&T>`** /
   **`resource_mut`** / **`remove_resource`** / **`resource_or_insert_with`** /
-  **`has_resource`** — 타입당 싱글턴, World 의 기존 type-erased 패턴(`Box<dyn Any>`)
+  **`has_resource`**: 타입당 싱글턴, World 의 기존 type-erased 패턴(`Box<dyn Any>`)
   재사용. `clear()`(씬 로드) 시 함께 리셋. 컴포넌트 저장소와 독립.
 
 ### 검증
@@ -1713,17 +1713,17 @@ consumer 를 분리.
   하도록 깨면 reuse 테스트 RED→GREEN). voltex_ecs 188→195.
 - workspace build / clippy(`-D warnings`) / lib test 전부 그린.
 
-## [v1.0.72] — 2026-06-03 — Spawn-as-child (`spawn_child_bundle` / `Prefabs::spawn_child`)
+## [v1.0.72] - 2026-06-03 - Spawn-as-child (`spawn_child_bundle` / `Prefabs::spawn_child`)
 
 기초 워크플로 격차 7번째: 부모에 부착된 엔티티(포탑·장비·UI 중첩)를 만들려면
 spawn → add_child 를 손으로 엮어야 했다. spawn/번들/프리팹/계층 스토리를 완성.
 
-### Additive — `voltex_ecs`
+### Additive - `voltex_ecs`
 
-- **`World::spawn_child_bundle(parent, (A, B, ..)) -> Entity`** — `spawn_bundle` +
+- **`World::spawn_child_bundle(parent, (A, B, ..)) -> Entity`**: `spawn_bundle` +
   `add_child` 한 번에. `despawn_recursive(parent)` 가 자식도 제거, WorldTransform
   propagation 이 자식으로 취급.
-- **`Prefabs::spawn_child(&mut World, name, parent) -> Option<Entity>`** — 프리팹
+- **`Prefabs::spawn_child(&mut World, name, parent) -> Option<Entity>`**: 프리팹
   인스턴스를 부모 하위로.
 
 ### 검증
@@ -1732,12 +1732,12 @@ spawn → add_child 를 손으로 엮어야 했다. spawn/번들/프리팹/계�
   링크, 미등록 None) + 변이 테스트(add_child 생략 시 링크 테스트 RED→GREEN).
 - workspace build / clippy(`-D warnings`) / lib test 전부 그린.
 
-## [v1.0.71] — 2026-06-03 — Automated visual + smoke verification of the new authoring stack
+## [v1.0.71] - 2026-06-03 - Automated visual + smoke verification of the new authoring stack
 
 이 세션(v1.0.62~70)의 작업, 특히 라이브 렌더 경로(per-frame materialize + flagship
 현대화)를 자동 검증.
 
-### Additive — 검증
+### Additive - 검증
 
 - **`render_declarative_colored_scene`** + capture 회귀
   `declarative_scene_renders_distinct_per_object_colors`(RTX 4080): flagship 의 선언적
@@ -1754,21 +1754,21 @@ spawn → add_child 를 손으로 엮어야 했다. spawn/번들/프리팹/계�
   panic/validation/error 0, Lua 게임플레이 실행 확인(survivor 웨이브·라이프·적 스폰).
 - workspace build / clippy(`-D warnings`) / lib test 전부 그린.
 
-## [v1.0.70] — 2026-06-03 — Flagship `voltex_survivor` modernized to the new authoring stack
+## [v1.0.70] - 2026-06-03 - Flagship `voltex_survivor` modernized to the new authoring stack
 
 사이클 1~8 로 추가한 워크플로 API 를 flagship 게임에 적용해 그 가치를 실증 + 검증.
 이전엔 hand-written 24-vertex `make_unit_cube` + 별도 `upload_meshes`(GPU 단계에서
 모든 Transform 엔티티에 공유 핸들/Bounds 수동 부착) + 런타임 enemy/projectile 에
 핸들을 매 프레임 샘플링해 붙이는 코드를 갖고 있었다.
 
-### Refactor — `games/voltex_survivor`
+### Refactor - `games/voltex_survivor`
 
 - **setup_scene**: ground/player 가 `spawn_bundle((Transform, Tag, PrimitiveMesh,
   MaterialDesc))` 로 선언적. ground 회색, player 초록 (이전엔 전부 흰색).
 - **`upload_meshes` + `make_unit_cube` 제거**: `with_gpu_init` 제거. 런타임이 매 프레임
   materialize (v1.0.69) 하므로 GPU 업로드 단계 불필요.
 - **런타임 enemy/projectile**: Lua 가 스폰한 bare 엔티티에 `MeshHandle` 샘플링 대신
-  `insert_bundle((PrimitiveMesh, MaterialDesc, ScriptComponent))` — 역할별 색(enemy 빨강,
+  `insert_bundle((PrimitiveMesh, MaterialDesc, ScriptComponent))` - 역할별 색(enemy 빨강,
   projectile 노랑) + per-frame materialize 가 GPU 자원 부여. 이전엔 전부 player 와 같은 흰색.
 - **204 → 127 줄** (-77). winit/`voltex_renderer` 직접 import 제거(전부 prelude).
 
@@ -1776,15 +1776,15 @@ spawn → add_child 를 손으로 엮어야 했다. spawn/번들/프리팹/계�
 
 - workspace build / clippy(`-D warnings`) / lib test 전부 그린. 런타임 렌더 경로는
   독립 검증된 서브시스템(per-frame materialize capture 회귀 + BasicRenderer base_color)에
-  의존 — 라이브 게임 화면은 수동 확인 영역.
+  의존 - 라이브 게임 화면은 수동 확인 영역.
 
-## [v1.0.69] — 2026-06-03 — Per-frame materialization (runtime-spawned renderables become visible)
+## [v1.0.69] - 2026-06-03 - Per-frame materialization (runtime-spawned renderables become visible)
 
 사이클 1(v1.0.62)의 실제 한계 수정: `materialize_renderables` 가 `gpu_init` 에서 **한 번만**
 실행돼, 부팅 후 런타임에 스폰된 엔티티(Lua `spawn_entity`, 투사체 팩토리, 게임플레이
 시스템)가 `PrimitiveMesh`/`MaterialDesc` 를 달아도 GPU 자원을 영영 못 받아 안 보였다.
 
-### Fix — `voltex_runtime` 핸들러
+### Fix - `voltex_runtime` 핸들러
 
 - redraw 경로에서 `tick_systems_only` **직후 매 프레임** `materialize_renderables` 호출
   (device 가 거기서만 존재). idempotent(이미 resolve 된 엔티티 skip) + pending 없으면
@@ -1794,43 +1794,43 @@ spawn → add_child 를 손으로 엮어야 했다. spawn/번들/프리팹/계�
 
 ### 검증
 
-- RTX 4080 capture 회귀 `materialize_picks_up_entities_spawned_after_a_prior_pass` —
+- RTX 4080 capture 회귀 `materialize_picks_up_entities_spawned_after_a_prior_pass` -
   1차 materialize 후 새 엔티티를 스폰하면 2차 pass 가 그것을 resolve(MeshHandle+
-  MaterialHandle 부착) 함을 확인 — 런타임 스폰 시나리오의 정확한 재현.
+  MaterialHandle 부착) 함을 확인 - 런타임 스폰 시나리오의 정확한 재현.
 - workspace build / clippy(`-D warnings`) / lib test 전부 그린.
 
-## [v1.0.68] — 2026-06-03 — Data-authored visual scenes (compose v1.0.62/64/67) + scene-anchor doc
+## [v1.0.68] - 2026-06-03 - Data-authored visual scenes (compose v1.0.62/64/67) + scene-anchor doc
 
 상용 엔진의 본질은 "코드가 아닌 데이터 씬"이다. 사이클 1(선언적 렌더러블)이
 `PrimitiveMesh`/`MaterialDesc` 를 `Component` 로 만들어 둔 덕에, 씬 파일(JSON/VSCN)에
-**모양+색이 담겨** 코드 없이 visual 씬을 저작할 수 있어야 한다 — 이게 실제로
+**모양+색이 담겨** 코드 없이 visual 씬을 저작할 수 있어야 한다 - 이게 실제로
 레지스트리 경유 직렬화로 round-trip 하고 materialize→렌더되는지 검증.
 
 ### 검증 (결합 동작 + 회귀 가드)
 
-- `declarative_renderables_round_trip_through_a_data_scene` — Transform+PrimitiveMesh+
+- `declarative_renderables_round_trip_through_a_data_scene` - Transform+PrimitiveMesh+
   MaterialDesc 월드를 `serialize_scene_json` → `deserialize_scene_json`(레지스트리:
   `register_defaults` + `register_renderable_components`) 하면 두 컴포넌트가 그대로
   복원됨. 로드 후 `plan_primitive_meshes`/`plan_materials` 가 GPU 작업 대기로 인식.
-- RTX 4080 capture 회귀 `data_authored_scene_renders_nonblank` — JSON 문자열에서만
+- RTX 4080 capture 회귀 `data_authored_scene_renders_nonblank` - JSON 문자열에서만
   로드한 월드를 `materialize_renderables` 후 BasicRenderer 로 그려 non-blank 확인
   (**데이터 → 픽셀, 스폰 코드 0**).
 
 ### 발견 & 문서화 (truthful-doc)
 
 - **scene Transform-anchor footgun**: `serialize_scene_json`/binary 는 **Transform 이
-  있는 엔티티만** 직렬화 — Transform 없는 렌더러블 엔티티는 통째로 누락(silent). 검증
+  있는 엔티티만** 직렬화 - Transform 없는 렌더러블 엔티티는 통째로 누락(silent). 검증
   중 재현 확정. 동작 변경(3개 포맷 영향, 위험) 대신 docstring 에 명시 + 회귀 가드
   `renderable_without_a_transform_is_not_serialized` 추가 (v1.0.41/56 의 truthful-doc
   패턴). 렌더러블은 위치가 필요해 Transform 이 사실상 필수라 실사용 영향 없음.
 - workspace build / clippy(`-D warnings`) / lib test 전부 그린.
 
-## [v1.0.67] — 2026-06-03 — Prefab registry (named entity templates)
+## [v1.0.67] - 2026-06-03 - Prefab registry (named entity templates)
 
 기초 워크플로 격차 6번째: 같은 엔티티를 여러 번 만들 때 매번 컴포넌트 조립을 반복.
 Unity Prefab / Godot PackedScene 처럼 "한 번 정의, 이름으로 인스턴스화".
 
-### Additive — `voltex_ecs::prefab`
+### Additive - `voltex_ecs::prefab`
 
 - **`Prefabs`** 레지스트리 + `register(name, \|&mut World\| -> Entity)` /
   `spawn(&mut World, name) -> Option<Entity>` / `contains` / `len` / `is_empty`.
@@ -1846,19 +1846,19 @@ Unity Prefab / Godot PackedScene 처럼 "한 번 정의, 이름으로 인스턴�
   인스턴스화 후 위치/색 per-instance 설정(Unity instantiate-then-configure 패턴).
 - workspace build / clippy(`-D warnings`) / lib test 전부 그린.
 
-## [v1.0.66] — 2026-06-03 — Frame clock for systems (`Time` + `add_timed_system`)
+## [v1.0.66] - 2026-06-03 - Frame clock for systems (`Time` + `add_timed_system`)
 
 기초 워크플로 격차 5번째: 시스템은 per-frame `dt` 만 받고 **누적 경과 시간·프레임
 수**를 못 봤다. 타이머/쿨다운/애니메이션 위상을 쓰는 게임 코드가 매번 `+= dt` 를
 손으로 누적(조건 분기에 묻혀 버그 유발).
 
-### Additive — `voltex_runtime::time`
+### Additive - `voltex_runtime::time`
 
 - **`Time { elapsed_secs, delta_secs, frame_count }`** + `advance(dt)`. `elapsed_secs`
   는 시스템에 넘기는 `dt` 와 동일 누적이라 fixed-timestep 에서 결정적.
-- **`RuntimeApp.time`** public 필드 — `tick_systems_only` 시작에서 1회 `advance`,
+- **`RuntimeApp.time`** public 필드 - `tick_systems_only` 시작에서 1회 `advance`,
   그래서 그 프레임의 모든 시스템·HUD 가 일관된 시계 관측.
-- **`add_timed_system(|&mut World, &Time|)`** — 액션 시스템 직후 실행.
+- **`add_timed_system(|&mut World, &Time|)`**: 액션 시스템 직후 실행.
 - facade prelude 에 `Time` 추가.
 
 ### 검증
@@ -1869,15 +1869,15 @@ Unity Prefab / Godot PackedScene 처럼 "한 번 정의, 이름으로 인스턴�
   (chaser 미추적 시 멈추던 버그) → `add_timed_system` 이 `time.elapsed_secs` 반영.
 - workspace build / clippy(`-D warnings`) / lib test 전부 그린.
 
-## [v1.0.65] — 2026-06-03 — Tag lookup helpers (`find_by_tag` / `iter_by_tag`)
+## [v1.0.65] - 2026-06-03 - Tag lookup helpers (`find_by_tag` / `iter_by_tag`)
 
 기초 워크플로 격차 4번째: 데모마다 반복되던
 `world.query::<Tag>().find(\|(_, t)\| t.0 == "player").map(\|(e,_)\| e)` 보일러플레이트.
 
-### Additive — `voltex_ecs`
+### Additive - `voltex_ecs`
 
-- **`World::find_by_tag(&str) -> Option<Entity>`** — Tag 가 일치하는 첫 live 엔티티.
-- **`World::iter_by_tag(&str) -> impl Iterator<Item = Entity>`** — 일치하는 모든 엔티티.
+- **`World::find_by_tag(&str) -> Option<Entity>`**: Tag 가 일치하는 첫 live 엔티티.
+- **`World::iter_by_tag(&str) -> impl Iterator<Item = Entity>`**: 일치하는 모든 엔티티.
 - `impl World` 를 `scene.rs`(Tag 가 사는 곳)에 둬서 World 코어 모듈은 Tag-free 유지.
 
 ### 검증
@@ -1887,15 +1887,15 @@ Unity Prefab / Godot PackedScene 처럼 "한 번 정의, 이름으로 인스턴�
   조회 2곳)의 `query::<Tag>().find(..).map(..)` 4-라인 패턴 → `find_by_tag(..)` 1줄.
 - workspace build / clippy(`-D warnings`) / lib test 전부 그린.
 
-## [v1.0.64] — 2026-06-03 — Component bundles (`spawn_bundle`)
+## [v1.0.64] - 2026-06-03 - Component bundles (`spawn_bundle`)
 
 기초 워크플로 격차 3번째: 엔티티 하나 만들 때마다 `world.spawn()` 후 컴포넌트를
 4~6번 `add()` 하는 보일러플레이트. Bevy `Bundle` / Unity 프리팹처럼 "이 엔티티는
 무엇이다" 를 한 문장으로.
 
-### Additive — `voltex_ecs::bundle`
+### Additive - `voltex_ecs::bundle`
 
-- **`Bundle`** trait + **`World::spawn_bundle((A, B, …))`** / **`insert_bundle`** —
+- **`Bundle`** trait + **`World::spawn_bundle((A, B, …))`** / **`insert_bundle`** -
   `'static` 컴포넌트 튜플(1~12개)을 한 번에 첨부. 순서대로 add 되어 같은 타입은
   뒤쪽이 덮어씀(반복 `add` 와 동일 규칙). 매크로 생성 impl, 외부 의존 0.
 - facade prelude 에 `Bundle` 추가.
@@ -1906,34 +1906,34 @@ Unity Prefab / Godot PackedScene 처럼 "한 번 정의, 이름으로 인스턴�
   변이 테스트(insert 제거 시 4개 RED→GREEN).
 - **실증**: `game_ready_demo` `setup_scene` 의 모든 엔티티(ground/player/chaser/totem/
   pickups)가 `spawn()` + N×`add()` → 단일 `spawn_bundle`. player 는 6-튜플
-  (Transform/Tag/Script/Collider/PrimitiveMesh/MaterialDesc), chaser 는 7-튜플 —
+  (Transform/Tag/Script/Collider/PrimitiveMesh/MaterialDesc), chaser 는 7-튜플 -
   크레이트 경계(ecs/physics/ai/audio/renderer_ecs) 넘는 컴포넌트도 한 번들에.
 - workspace build / clippy(`-D warnings`) / lib test 전부 그린(ecs 161→167).
 
-## [v1.0.63] — 2026-06-03 — Input action mapping (rebindable semantic controls)
+## [v1.0.63] - 2026-06-03 - Input action mapping (rebindable semantic controls)
 
 상용 엔진 기초 워크플로 격차 2번째: 입력이 raw 키코드 폴링뿐이었다
 (`input.is_key_pressed(KeyCode::KeyW)`). Unity Input Actions / Godot `InputMap`
 처럼 **시맨틱 액션/축**을 한 곳에서 바인딩하고 이름으로 질의하는 레이어가 없었다.
 
-### Additive — `voltex_platform::input_map`
+### Additive - `voltex_platform::input_map`
 
-- **`InputMap`** — `InputState` 위 순수(상태 없는) 매핑 레이어. `bind_key(action,key)`
+- **`InputMap`**: `InputState` 위 순수(상태 없는) 매핑 레이어. `bind_key(action,key)`
   / `bind_mouse(action,btn)` / `bind(action, Trigger)`(다중 = OR 대체) +
   `bind_axis(axis, positive, negative)`(±1/0). 질의: `is_pressed`/`just_pressed`/
   `just_released`/`axis`(→ f32 `[-1,1]`)/`vector(x,y)`(→ `Vec2`). 모두
   `&InputState` 를 받아 윈도우/GPU 없이 단위 테스트 가능.
 - **`Trigger`** enum (`Key`/`Mouse`) + `KeyCode`/`MouseButton` winit 재export
   (게임이 winit 직접 의존 회피).
-- 한계: 마우스 just-released 미지원(InputState public 질의 부재) — mouse 트리거의
+- 한계: 마우스 just-released 미지원(InputState public 질의 부재) - mouse 트리거의
   `just_released` 는 항상 false.
 
-### Additive — 런타임 통합
+### Additive - 런타임 통합
 
 - **`RuntimeApp.input_map`** public 필드 + **`add_action_system(|&mut World,
-  &InputState, &InputMap, f32|)`** — raw input system 직후 실행. 컨트롤 리바인딩이
+  &InputState, &InputMap, f32|)`**: raw input system 직후 실행. 컨트롤 리바인딩이
   `app.input_map` 한 곳에 모임.
-- **`RuntimeConfig::with_input_map(InputMap)`** — 부팅 시 `app.input_map` 으로 이동.
+- **`RuntimeConfig::with_input_map(InputMap)`**: 부팅 시 `app.input_map` 으로 이동.
 - facade prelude 에 `InputMap`/`KeyCode`/`MouseButton` 추가.
 
 ### 검증
@@ -1947,16 +1947,16 @@ Unity Prefab / Godot PackedScene 처럼 "한 번 정의, 이름으로 인스턴�
   WASD·화살표가 같은 축의 대체 바인딩.
 - workspace build / clippy(`-D warnings` all-targets) / lib test 전부 그린.
 
-## [v1.0.62] — 2026-06-03 — Declarative renderables (one-call "spawn a visible object")
+## [v1.0.62] - 2026-06-03 - Declarative renderables (one-call "spawn a visible object")
 
 상용 엔진과의 **기초 워크플로 격차** 정정. 기능 폭(PBR/물리/오디오/AI/net/Lua)은
-이미 충분하지만, 엔진에서 가장 빈번한 연산 — "눈에 보이는 오브젝트 하나 놓기" —
+이미 충분하지만, 엔진에서 가장 빈번한 연산 - "눈에 보이는 오브젝트 하나 놓기" -
 이 두 단계(GPU 없는 `scene_builder` ↔ GPU 필요한 `gpu_init`)로 갈라져, 엔티티를
 `Tag` 로 되찾아 `MeshHandle`/`MaterialHandle`/`Bounds` 를 별도 GPU 패스에서 수동
 부착하는 보일러플레이트가 모든 게임에 강제됐다. Unity 의 `CreatePrimitive` /
 Godot 의 노드 추가에 해당하는 한-줄 경로가 없었다.
 
-### Additive — `voltex_renderer_ecs::renderable`
+### Additive - `voltex_renderer_ecs::renderable`
 
 - **`PrimitiveMesh`** 컴포넌트 (값 타입, GPU 무관): `Cube`/`Plane`/`Quad`/`Sphere`.
   생성자 `cube(size)`/`plane(size)`/`quad(w,h)`/`sphere(r,sec,stk)`/`sphere_default(r)`,
@@ -1967,12 +1967,12 @@ Godot 의 노드 추가에 해당하는 한-줄 경로가 없었다.
 - **`materialize_renderables(&mut World, &mut RenderAssets, &Device)`**: `PrimitiveMesh`
   가 있고 `MeshHandle` 이 없는 엔티티마다 GPU 메시를 생성(**dedup**: 동일 프리미티브는
   한 버텍스 버퍼 공유)하고 `MeshHandle`+`Bounds` 부착; `MaterialDesc` 도 동일하게
-  dedup 후 `MaterialHandle` 부착. **멱등** — 이미 resolve 된 엔티티는 skip 하므로 매
+  dedup 후 `MaterialHandle` 부착. **멱등**: 이미 resolve 된 엔티티는 skip 하므로 매
   프레임/핫리로드 후 호출 안전. 순수 헬퍼 `plan_primitive_meshes`/`plan_materials`
   (GPU 없이 멱등 계약 테스트 가능).
 - **자동 와이어링**: `RuntimeApp` 이 `register_defaults()` 직후 두 컴포넌트를 등록하고,
   `gpu_init` 직후 `materialize_renderables` 를 한 번 호출. 게임은 `scene_builder`
-  한 곳에서 모양+색을 선언하면 끝 — device/`MeshHandle`/Tag 왕복 불필요.
+  한 곳에서 모양+색을 선언하면 끝 - device/`MeshHandle`/Tag 왕복 불필요.
 - **facade prelude** 에 `PrimitiveMesh`/`MaterialDesc` 추가.
 
 ### 검증
@@ -1988,24 +1988,24 @@ Godot 의 노드 추가에 해당하는 한-줄 경로가 없었다.
   `PrimitiveMesh::cube` + `MaterialDesc::color` 선언만.
 - workspace build / clippy(`-D warnings` all-targets) / lib test 전부 그린.
 
-## [v1.0.61] — 2026-06-03 — Status sweep: hygiene + runtime lights/audio/shadows + robustness audit
+## [v1.0.61] - 2026-06-03 - Status sweep: hygiene + runtime lights/audio/shadows + robustness audit
 
 프로젝트 현황 점검 후 A(위생)→D(대형) 우선순위로 자율 진행한 세션. 모두 헤드리스
 검증(단위 + RTX 4080 capture 회귀) + 역호환 유지. 점검 중 DEFERRED.md 의 **문서
 drift 4건**(이미 구현됐는데 v1.1 후속으로 표기) 확인·정정.
 
-### Fix — 위생 (Tier A)
+### Fix - 위생 (Tier A)
 
 - **clippy 게이트 복구**: `voltex_capture` 텍스처 로드 테스트의 `vec![...].repeat`
   가 `clippy::useless_vec` 로 `--all-targets -D warnings` 게이트를 깨고 있던 것 수정.
 - **워크스페이스 버전 sync**: 17개 라이브러리 crate 가 placeholder `0.1.0` 이라
-  `voltex --version` 이 0.1.0 을 출력하던 문제 — `[workspace.package].version = "1.0.61"`
+  `voltex --version` 이 0.1.0 을 출력하던 문제 - `[workspace.package].version = "1.0.61"`
   + 각 crate `version.workspace = true` (기존 `license.workspace` 패턴). 예제는 0.1.0 유지.
 
-### Additive — 런타임 라이팅/오디오 (Tier B)
+### Additive - 런타임 라이팅/오디오 (Tier B)
 
 - **per-frame 점광원 업데이터**: `RuntimeApp::set_point_lights_fn(\|&mut Vec<PointLight>, &World, f32\|)`
-  — directional `set_light_fn` 과 대칭. 움직이는 횃불·깜빡이는 램프·발광 투사체를
+  - directional `set_light_fn` 과 대칭. 움직이는 횃불·깜빡이는 램프·발광 투사체를
   world 상태 기반으로 매 프레임 구동(정적 `set_point_lights` 보강). 멀티라이트 배선
   자체는 이미 완료돼 있었음(colored PointLightsUniform + PBR LightsUniform 병합, spot 포함).
 - **AudioSource 씬 직렬화**: `voltex_audio::AudioSource`(ECS 무의존)를 `register_raw`
@@ -2014,17 +2014,17 @@ drift 4건**(이미 구현됐는데 v1.1 후속으로 표기) 확인·정정.
   (clip_id+volume+spatial/looping/playing; transient played_once/active 미저장).
   JSON/binary 씬 round-trip. +3 테스트.
 
-### Additive — 스킨드 메시 그림자 caster (Tier B)
+### Additive - 스킨드 메시 그림자 caster (Tier B)
 
 - 런타임 directional 그림자 pre-pass 가 정적 메시만 그려 스킨드 캐릭터가 그림자를
   못 던지던 갭 해소. `create_skinned_shadow_pipeline` + `skinned_shadow_shader.wgsl`
   (depth-only GPU 스키닝, `view_proj=light_vp`, 기존 skinned camera/palette 레이아웃
-  재사용 — 신규 레이아웃 0). `BasicRenderer::gather_skinned_shadow` 가 light-space
+  재사용 - 신규 레이아웃 0). `BasicRenderer::gather_skinned_shadow` 가 light-space
   cam UBO + 공유 palette 업로드 후 정적 메시 뒤에 스킨드 메시를 깊이에 렌더. Hidden
   엔티티는 cast/draw 모두 제외. RTX 4080 검증 `skinned_mesh_casts_shadow`(strip 이
   바닥에 그림자 투사, Hidden 대조군 압도) + `docs/visual/skinned_shadow.png`.
 
-### Fix — 견고성 audit (Tier C)
+### Fix - 견고성 audit (Tier C)
 
 - **`.normalize()` zero-input audit** (v1.0.41 deferred): 게임플레이 핵심 경로
   (voltex_ai steering seek/flee/arrive/wander + nav_agent_system)는 **이미 length 가드**가
@@ -2032,46 +2032,46 @@ drift 4건**(이미 구현됐는데 v1.1 후속으로 표기) 확인·정정.
   `csm::compute_cascade_matrices` + `spot_shadow_matrix` 두 곳을 `normalize_or_zero`
   + straight-down fallback 으로 수정. +2 finite-output 회귀.
 
-### 문서 drift 정정 (점검 중 발견 — 이미 구현됐던 항목)
+### 문서 drift 정정 (점검 중 발견 - 이미 구현됐던 항목)
 
-- **Lua 입력 API**: `voltex_script::engine_input` 의 `input` 테이블(v1.0.59) — DEFERRED 가
+- **Lua 입력 API**: `voltex_script::engine_input` 의 `input` 테이블(v1.0.59) - DEFERRED 가
   아직 "v1.1 후속" 표기였음.
 - **JSON 씬 entity cap**: `deserialize_scene_json` 도 `MAX_SCENE_ENTITIES` 적용.
 - **`validate_hierarchy`**: 구현 완료 + text/binary/JSON 3개 deserializer 모두 로드 후
-  호출(pre-existing 사이클 방어) — DEFERRED 가 아직 "별 pass 필요" 표기였음.
+  호출(pre-existing 사이클 방어) - DEFERRED 가 아직 "별 pass 필요" 표기였음.
 
-### Tier D / B-7 (의도적 미진행 — 평가 후 문서화)
+### Tier D / B-7 (의도적 미진행 - 평가 후 문서화)
 
 - **에디터 커스텀 컴포넌트 리플렉션**: ComponentRegistry 에 필드 레벨 리플렉션 인프라
-  부재 — 별도 설계 필요. **Archetype 스토리지 / dep scheduler 실제 병렬**: major
+  부재 - 별도 설계 필요. **Archetype 스토리지 / dep scheduler 실제 병렬**: major
   rewrite (data-race 위험, 다중 세션). **CI 첫 green run**: GitHub mirror 필요(자율 불가).
-  **missing_docs 1476 / pub(crate) 다운그레이드**: 대량 기계적 churn, 가치 낮음 — 보류.
+  **missing_docs 1476 / pub(crate) 다운그레이드**: 대량 기계적 churn, 가치 낮음 - 보류.
 
 ### 검증
 
 `cargo build --workspace` / `cargo clippy --workspace --all-targets -- -D warnings` /
 `cargo test --workspace --lib` (1239 lib 테스트, 0 실패) 전부 그린.
 
-## [v1.0.60] — 2026-06-03 — Scene control + asset loading + deeper game-ready wiring
+## [v1.0.60] - 2026-06-03 - Scene control + asset loading + deeper game-ready wiring
 
 v1.0.59 데모(game_ready_demo)를 실제로 돌려보며 드러난 엔진 갭들을 연달아 메운
 세션. 모두 헤드리스 검증(단위 테스트 + RTX 4080 capture 회귀) + 역호환 유지.
 
-### Additive — 씬 제어 (게임이 화면을 통제 가능하게)
+### Additive - 씬 제어 (게임이 화면을 통제 가능하게)
 
 - **카메라**: `RuntimeConfig::with_camera(pos, yaw, pitch)` / `with_camera_fov` +
   `RuntimeApp::set_camera_fn(\|cam, world, dt\|)` (follow/orbit). 근본 원인은
   렌더 버그가 아니라 하드코딩 카메라(0,10,20)에 1-unit 오브젝트가 ~15px 점으로
-  보였던 것 — capture로 재현 확인.
+  보였던 것 - capture로 재현 확인.
 - **머티리얼 색상**: BasicRenderer가 `MaterialUniform.base_color`를 적용
-  (`ColoredCameraUniform` + `mesh_colored.wgsl`, 격리 — shared CameraUniform/PBR/
+  (`ColoredCameraUniform` + `mesh_colored.wgsl`, 격리 - shared CameraUniform/PBR/
   레거시 예제 무영향). 모든 오브젝트가 같은 회색이라 바닥에 묻히던 문제 해결.
 - **조명**: `RuntimeConfig::with_light(dir, color, ambient)` + `set_light_fn`
   (day/night).
 - **충돌/트리거 이벤트**: `RuntimeApp::set_collision_fn(\|contacts, world, dt\|)`,
   `enable_physics` 무관 실행(트리거 존). 데모의 "잡힘"을 거리 계산 → 실제 Collider
   충돌로 교체.
-- **점광원**: `RuntimeApp::set_point_lights(Vec<PointLight>)` — mesh_colored가
+- **점광원**: `RuntimeApp::set_point_lights(Vec<PointLight>)` - mesh_colored가
   additive point light (MAX_POINT_LIGHTS=8). 단일 directional을 보강.
 - **스폿라이트**: `PointLight`를 3×vec4(48B)로 확장(방향 + cos(outer half-angle)).
   `PointLight::spot(pos, dir, color, range, intensity, cone_degrees)` = 부드러운
@@ -2088,7 +2088,7 @@ v1.0.59 데모(game_ready_demo)를 실제로 돌려보며 드러난 엔진 갭�
   3D 위에 렌더(depth-test, no write). 캡처 회귀
   `debug_lines_draw_colored_segments` + `docs/visual/debug_lines.png`. 데모에
   chase 벡터 + 플레이어/추적자 cross + 아레나 AABB 추가.
-- **CPU 파티클 시스템**: `voltex_renderer_ecs::particle` — `Particle` 컴포넌트
+- **CPU 파티클 시스템**: `voltex_renderer_ecs::particle` - `Particle` 컴포넌트
   (velocity/acceleration/lifetime/size·alpha 보간) + `spawn_particle` +
   `update_particles`(RuntimeApp tick 자동 호출). 파티클 = Transform+Sprite+
   Particle 엔티티라 빌보드 패스가 그대로 렌더. 이동·페이드·수명 만료 despawn.
@@ -2097,7 +2097,7 @@ v1.0.59 데모(game_ready_demo)를 실제로 돌려보며 드러난 엔진 갭�
   `docs/visual/particle_burst.png`. 데모: 잡힐 때 16개 오렌지 버스트.
 - **직교(2D/탑다운) 카메라**: `Camera::ortho_height: Option<f32>` +
   `Camera::orthographic(pos, aspect, height)` (parallel 투영) +
-  `RuntimeConfig::with_orthographic(height)`. 2D·탑다운·아이소메트릭 게임용 —
+  `RuntimeConfig::with_orthographic(height)`. 2D·탑다운·아이소메트릭 게임용 -
   깊이에 무관한 footprint(원근 단축 없음). 캡처 회귀
   `orthographic_footprint_is_depth_independent`(near≈far) + 단위 테스트
   (ortho는 깊이 무관, perspective는 단축). 기존 perspective 기본값 불변.
@@ -2110,32 +2110,32 @@ v1.0.59 데모(game_ready_demo)를 실제로 돌려보며 드러난 엔진 갭�
   `billboard_sprite_faces_camera_from_any_angle`(정면/측면 footprint 일치) +
   `docs/visual/sprite_billboard.png`. 데모에 떠다니는 픽업 3개 추가.
 - **스프라이트시트/아틀라스 UV**: `Sprite.uv_rect` + `with_uv_rect` +
-  `set_sheet_frame(cols, rows, index)`(row-major) — sprite.wgsl이 단위 쿼드 UV를
+  `set_sheet_frame(cols, rows, index)`(row-major) - sprite.wgsl이 단위 쿼드 UV를
   서브렉트로 remap. 2D 캐릭터 애니메이션·아틀라스용. 단위 테스트(프레임→uv_rect)
   + 캡처 회귀 `sprite_sheet_frame_selects_atlas_cell`(4색 2×2 아틀라스 각 프레임
   정확 샘플).
 - **스프라이트 애니메이션**: `SpriteAnimation` 컴포넌트(cols/rows/frame_count/
-  fps/looping) + `update_sprite_animations`(RuntimeApp tick 자동 호출) — Sprite의
+  fps/looping) + `update_sprite_animations`(RuntimeApp tick 자동 호출) - Sprite의
   `uv_rect`를 시간에 따라 진행. loop=wrap, non-loop=마지막 프레임 clamp+정지.
   단위 테스트(프레임 진행/wrap/clamp+stop).
 - **런타임 텍스처 로딩 편의**: `RenderAssets::add_texture_png(device, queue,
   bytes)`(PNG 디코드+업로드, `Result`) + `add_texture_rgba(device, queue, w, h,
-  px)` — bind-group 레이아웃 생성 보일러플레이트 제거. gpu_init에서 스프라이트/
+  px)` - bind-group 레이아웃 생성 보일러플레이트 제거. gpu_init에서 스프라이트/
   메시 텍스처를 한 줄로 로딩. 캡처 회귀
   `render_assets_png_loader_roundtrips_into_a_sprite`.
 - **Lifetime 자동 despawn**: `voltex_runtime::Lifetime { remaining }` 컴포넌트 +
   `update_lifetimes`(tick 마지막 단계, 사용자 시스템 관측 후 만료 시
   `despawn_recursive`). 발사체·타임드 픽업·임시 이펙트·스폰 적 등 자기정리 엔티티용.
   단위 테스트(카운트다운→despawn / 빈 월드 no-op).
-- **prelude 확장**: `voltex::prelude`에 게임플레이 컴포넌트 추가 — `Sprite`,
+- **prelude 확장**: `voltex::prelude`에 게임플레이 컴포넌트 추가 - `Sprite`,
   `Particle`, `SpriteAnimation`, `TextureHandle`, `Lifetime`, `DebugLines`.
   거의 모든 게임이 쓰므로 Transform처럼 prelude에 포함(도메인 특화 타입은 여전히
   명시 경로). prelude 컴파일 테스트 갱신.
 
-### Additive — 런타임 PBR 경로 (v1.1 항목 선반영)
+### Additive - 런타임 PBR 경로 (v1.1 항목 선반영)
 
 - **BasicRenderer 풀 PBR 패스**: `BasicRenderer::set_pbr_enabled(true)` /
-  `RuntimeConfig::with_pbr(true)` — 기존 colored Blinn-Phong 대신 Cook-Torrance
+  `RuntimeConfig::with_pbr(true)` - 기존 colored Blinn-Phong 대신 Cook-Torrance
   PBR로 메시 렌더. 멀티라이트(`LightsUniform`: directional sun + `set_point_lights`
   의 point/spot 접합), per-entity 머티리얼 파라미터, 4-맵 텍스처(albedo/normal/
   ORM/emissive via 신규 `PbrTextures` 컴포넌트, 없으면 flat-normal/white/black
@@ -2145,7 +2145,7 @@ v1.0.59 데모(game_ready_demo)를 실제로 돌려보며 드러난 엔진 갭�
   `basic_renderer_pbr_path_shades_differently_than_colored` +
   `docs/visual/pbr_runtime.png`(metallic 그래디언트 + 스페큘러 + 환경 반사).
   env는 procedural sky(SH 0).
-- **스킨드 메시 PBR**: `pbr_skinned.wgsl` — GPU 버텍스 스키닝 + 풀 Cook-Torrance
+- **스킨드 메시 PBR**: `pbr_skinned.wgsl` - GPU 버텍스 스키닝 + 풀 Cook-Torrance
   프래그먼트. bone palette를 group 0(camera+lights)에 합쳐 max_bind_groups=4
   유지. `create_pbr_skinned_pipeline` + `BasicRenderer` skinned 패스가
   `pbr_enabled` 시 PBR 스킨드 파이프라인 사용(멀티라이트+IBL+그림자). 스킨드
@@ -2154,23 +2154,23 @@ v1.0.59 데모(game_ready_demo)를 실제로 돌려보며 드러난 엔진 갭�
   스킨드 엔티티도 `MaterialHandle`/`TextureHandle`/`PbrTextures`를 정적 메시와
   동일하게 반영(per-entity 머티리얼 + 4-맵 텍스처).
 - **선형 텍스처 로더 + 노멀맵**: `GpuTexture::from_rgba_linear` +
-  `RenderAssets::add_texture_png_linear`/`add_texture_rgba_linear` — 노멀/ORM
+  `RenderAssets::add_texture_png_linear`/`add_texture_rgba_linear` - 노멀/ORM
   맵을 sRGB 디코드 없이 linear `Rgba8Unorm`로 업로드. 컬러/알베도는 기존 sRGB
   경로 유지. 캡처 회귀 `pbr_normal_map_perturbs_shading`(노멀맵이 PBR 셰이딩을
   실제로 교란).
 
-### Additive — 실사용 점검 보완
+### Additive - 실사용 점검 보완
 
 - **MAX 캡 1회성 경고**: BasicRenderer가 per-frame 한도(mesh `max_entities`,
-  스프라이트 256, 스킨드 64)를 처음 초과할 때 `eprintln!` 1회 — 조용한 truncation이
+  스프라이트 256, 스킨드 64)를 처음 초과할 때 `eprintln!` 1회 - 조용한 truncation이
   "다 그려졌다"로 오인되지 않게. `Cell<bool>` 플래그로 프레임마다 스팸 안 함.
   단위 테스트(초과 시에만/한 번만 발화).
 - **`Mesh` 프리미티브 생성자**: `Mesh::cube(device, size)` / `Mesh::plane` /
-  `Mesh::quad(w,h)` / `Mesh::sphere(r, sectors, stacks)` — `from_obj`/`from_gltf`
+  `Mesh::quad(w,h)` / `Mesh::sphere(r, sectors, stacks)` - `from_obj`/`from_gltf`
   스타일의 한 줄 GPU 메시 생성(generate_* + `Mesh::new` 래핑). capture/데모가
   `Mesh::cube`로 교체.
 - **프리미티브 메시 생성기**: `voltex_renderer::generate_cube(size)` /
-  `generate_plane(size)`(XZ 바닥, +Y) / `generate_quad(w, h)`(XY, +Z) —
+  `generate_plane(size)`(XZ 바닥, +Y) / `generate_quad(w, h)`(XY, +Z) -
   `(Vec<MeshVertex>, Vec<u32>)` 반환(`generate_sphere`와 동일 스타일).
   지금까지 공개 프리미티브가 `generate_sphere` 뿐이라 모든 게임/예제가 큐브
   버텍스를 손으로 작성해야 했던 갭 해소. per-face normal/UV/tangent 정확(PBR
@@ -2181,16 +2181,16 @@ v1.0.59 데모(game_ready_demo)를 실제로 돌려보며 드러난 엔진 갭�
 ### Fixed (game-ready 세션)
 
 - **스프라이트 투명도 정렬**: BasicRenderer 스프라이트 패스가 엔티티 순서대로
-  그려 겹친 반투명 스프라이트의 합성이 spawn 순서에 따라 달라지던 문제 — 카메라
+  그려 겹친 반투명 스프라이트의 합성이 spawn 순서에 따라 달라지던 문제 - 카메라
   거리 기준 back-to-front 정렬 추가. 캡처 회귀
   `overlapping_sprites_blend_independent_of_spawn_order`(두 spawn 순서가 동일
   결과 + 가까운 스프라이트가 위로 합성).
 
-- **그림자**: `RuntimeConfig::with_shadows(true)` — BasicRenderer directional
+- **그림자**: `RuntimeConfig::with_shadows(true)` - BasicRenderer directional
   shadow mapping (depth pre-pass + mesh_colored 3×3 PCF, group 3). 기본 off
   (동작 불변). 캡처 검증 `docs/visual/shadow_on.png`. 한계: 스킨드 caster 제외,
   ortho 고정, 바닥 접촉 오브젝트 self-occlusion.
-- **헤드리스 데모 검증 하니스**: `voltex_capture::scene_playthrough` — 데모
+- **헤드리스 데모 검증 하니스**: `voltex_capture::scene_playthrough` - 데모
   장면을 오프스크린 렌더해 시각/동작을 자동 확인(라이브 창 불필요).
 
 ### Fixed
@@ -2199,7 +2199,7 @@ v1.0.59 데모(game_ready_demo)를 실제로 돌려보며 드러난 엔진 갭�
   컬링되고 먼 안쪽 반구가 비쳐 앞면이 어둡게 렌더되던 버그(PBR 데모/IBL/모든
   sphere 영향). CCW-from-outside로 수정 → 앞 반구 정상 라이팅.
 
-### Additive — 에셋 로딩 (핸드코딩 큐브 탈피)
+### Additive - 에셋 로딩 (핸드코딩 큐브 탈피)
 
 - **모델**: `Mesh::from_obj(device, src)`, `Mesh::from_gltf(device, bytes)`.
 - **텍스처**: `RenderAssets::add_texture` + `TextureHandle` 컴포넌트 (BasicRenderer
@@ -2208,7 +2208,7 @@ v1.0.59 데모(game_ready_demo)를 실제로 돌려보며 드러난 엔진 갭�
 - **스킨드 glTF**: `skinned_vertices_from_gltf` + `load_skinned_gltf(device,
   assets, &GltfData)` → 애니메이션 캐릭터를 glTF에서 바로 조립.
 
-### Additive — 스킨드 애니메이션 런타임 통합
+### Additive - 스킨드 애니메이션 런타임 통합
 
 - `SkinnedMesh` 에셋 + `SkinnedMeshHandle`/`SkinnedPose` 컴포넌트 +
   `update_skinned_poses`(tick 자동) + BasicRenderer 2차 스킨드 패스
@@ -2217,7 +2217,7 @@ v1.0.59 데모(game_ready_demo)를 실제로 돌려보며 드러난 엔진 갭�
   → 애니메이션 캐릭터를 glTF에서 바로 조립.
 - game_ready_demo에 흔드는 스킨드 totem.
 
-### Additive — Lua 게임 로직
+### Additive - Lua 게임 로직
 
 - `nav_set_target` / `nav_clear_target` / `nav_reached`, `audio_play` /
   `audio_stop` (engine_api → voltex_ai/voltex_audio 의존).
@@ -2228,43 +2228,43 @@ v1.0.59 데모(game_ready_demo)를 실제로 돌려보며 드러난 엔진 갭�
 헤드리스 GPU 회귀로 픽셀 검증(카메라 프레이밍, base_color, 텍스처 샘플, 스킨드 변형,
 OBJ/glTF/PNG 로드). **남은 visual 검증**: 라이브 창에서의 데모 외형은 사용자 디버깅 패스.
 
-## [v1.0.59] — 2026-06-03 — Game-ready: wire up nav / Lua input / HUD / audio / skinning
+## [v1.0.59] - 2026-06-03 - Game-ready: wire up nav / Lua input / HUD / audio / skinning
 
 "기능은 있는데 연결이 안 된" 다섯 구멍을 메워 엔진을 실사용 가능(game-ready)
 상태로. 설계: `docs/superpowers/specs/2026-06-03-engine-game-ready-upgrade-design.md`.
 
-### Additive — nav_agent_system (voltex_ai)
+### Additive - nav_agent_system (voltex_ai)
 
-`nav_agent_system(world, navmesh, dt)` — NavAgent+Transform 엔티티를 매 프레임
+`nav_agent_system(world, navmesh, dt)` - NavAgent+Transform 엔티티를 매 프레임
 `find_path` → `follow_path` 스티어링으로 이동(kinematic), 최종 waypoint 도달 시
 goal에 snap + `reached`. 도달 불가 target은 idle 전환. NavMesh는 호출자 주입. +5 테스트.
 
-### Additive — Lua 입력 API (voltex_script)
+### Additive - Lua 입력 API (voltex_script)
 
 스크립트에서 입력 읽기: `input.is_key_pressed("W")` / `is_key_just_pressed` /
 `mouse_position` / `mouse_delta` / `is_mouse_button_pressed("left")` / `scroll`.
-`voltex_script`는 winit 무의존 유지 — POD `ScriptInput` 스냅샷 + thread-local
+`voltex_script`는 winit 무의존 유지 - POD `ScriptInput` 스냅샷 + thread-local
 포인터(`set_current_input`), 키 이름↔keycode 매핑은 `voltex_runtime`이 소유.
 런타임이 매 프레임 스냅샷 발행/실행 후 클리어. +5 단위 +2 런타임(전체 체인) 테스트.
 
-### Additive — HUD 런타임 API (voltex_runtime → voltex_editor)
+### Additive - HUD 런타임 API (voltex_runtime → voltex_editor)
 
 `RuntimeConfig::with_hud(true)` + `RuntimeApp::set_hud_fn(|ui, world| ...)`.
 editor UiContext/UiRenderer를 GPU 초기화 시 생성, redraw에서 BasicRenderer 다음
 같은 encoder로 `LoadOp::Load` 인-윈도우 오버레이 패스. 점수·체력 등 콘솔 print 탈피.
 runtime_demo가 인-윈도우 HUD 데모로 전환. +2 테스트.
 
-### Additive — audio_sync_system (voltex_runtime → voltex_audio)
+### Additive - audio_sync_system (voltex_runtime → voltex_audio)
 
 `RuntimeConfig::with_audio(clips)` + `RuntimeApp::set_audio_listener(entity)`.
 RuntimeApp이 `Option<AudioSystem>` 소유(실패 시 silent None). `audio_sync_system`이
 listener Transform 동기화 + `AudioSource::playing` 엣지(`active` 플래그)에서만
-play/play_3d/stop — held playing이 매 프레임 voice를 새로 만들지 않음.
+play/play_3d/stop - held playing이 매 프레임 voice를 새로 만들지 않음.
 순수 `decide_action`으로 엣지 로직 분리. +3 +1 테스트.
 
-### Additive — 스킨드 메시 애니메이션 (Blinn-Phong 한정)
+### Additive - 스킨드 메시 애니메이션 (Blinn-Phong 한정)
 
-`voltex_renderer::Skeleton`(from_skin/apply_animation/compute_palette) — glTF
+`voltex_renderer::Skeleton`(from_skin/apply_animation/compute_palette) - glTF
 skin/animation을 GPU 스키닝 행렬(`world_j · inverse_bind_j`)로. `create_skinned_mesh_pipeline`
 + `mesh_skinned.wgsl`(group0 camera, group1 bone palette, 4 joint/weight 블렌딩).
 `voltex_capture::scene_skinned`가 RTX 4080(Vulkan)에서 rest(직선)↔bent(굽힘) 2프레임
@@ -2277,11 +2277,11 @@ skin/animation을 GPU 스키닝 행렬(`world_j · inverse_bind_j`)로. `create_
 전부 그린. 워크스페이스 테스트 ~1180 → ~1202. 의존성 그래프: voltex_runtime이
 editor/audio 추가 의존(L3.5 → L3/L1, 방향 유효).
 
-## [v1.0.58] — 2026-05-28 — Quat Transform + fuzz + coverage gate + audio smoke (E3b/F4/F5/F6/F7)
+## [v1.0.58] - 2026-05-28 - Quat Transform + fuzz + coverage gate + audio smoke (E3b/F4/F5/F6/F7)
 
 Closes every remaining item in `docs/dev/AUDIT-BACKLOG.md`.
 
-### Breaking — Transform.rotation Vec3 → Quat (E3b)
+### Breaking - Transform.rotation Vec3 → Quat (E3b)
 
 `voltex_ecs::Transform.rotation` was an Euler `Vec3` (YXZ radians). It is
 now a unit `voltex_math::Quat`. 24 files touched across ecs, physics,
@@ -2294,7 +2294,7 @@ editor, script, net, examples, capture.
 - Inspector keeps an Euler buffer per selected entity (re-extract only
   on selection change or external quat drift) so sliders stay smooth
   without round-tripping `Quat → Euler → Quat` every frame.
-- Gizmo rotate composes `q_new = (q_delta * q_initial).normalize()` —
+- Gizmo rotate composes `q_new = (q_delta * q_initial).normalize()` -
   axis-stable regardless of initial orientation.
 - Lua API surface unchanged: `set_rotation` / `get_rotation` still talk
   YXZ Euler, with `Quat::from_euler_yxz` / `to_euler_yxz` at the FFI
@@ -2321,7 +2321,7 @@ sidestepping the long-way bug previously patched at v1.0.56.
 voltex_net moved L0 → L1 (now depends on voltex_math for Quat::slerp).
 CLAUDE.md dependency graph updated.
 
-### Additive — F4 cargo-fuzz scaffold
+### Additive - F4 cargo-fuzz scaffold
 
 New `fuzz/` crate (excluded from workspace) with 9 libfuzzer targets:
 parse_png/jpg/gltf/obj, scene text/json/binary, snapshot, navmesh.
@@ -2330,7 +2330,7 @@ parser/deserializer and discards the result. Documents nightly
 invocation in `fuzz/README.md`. voltex_ai gains pub re-exports for
 `serialize_navmesh` / `deserialize_navmesh`.
 
-### CI — F5 coverage gate flipped to blocking
+### CI - F5 coverage gate flipped to blocking
 
 The `coverage` job in `.github/workflows/ci.yml` was advisory; now
 blocks at `--fail-under-lines 78`. Runner installs mesa-vulkan-drivers
@@ -2344,7 +2344,7 @@ runtime headless paths. lavapipe missing → tests graceful-skip,
 supports `--lib-only` / `--html` / `VOLTEX_COV_FAIL_UNDER_LINES`
 override.
 
-### Test — F6 audio backend real-device smoke
+### Test - F6 audio backend real-device smoke
 
 Each backend (`wasapi`, `alsa`, `coreaudio`) gains an `#[ignore]` test
 that opens the default output device, writes 64 frames of silence, and
@@ -2353,7 +2353,7 @@ init failure so scripted unattended runs are safe. WASAPI verified on
 RTX/Realtek box; ALSA / CoreAudio await real-hardware passes (tracked
 in pre-release checklist).
 
-### Docs — F7 CI green-run procedure
+### Docs - F7 CI green-run procedure
 
 `docs/release.md` gains "Real-hardware audio backend verification (F6)"
 and "First green CI run on GitHub mirror (F7)" sections under the
@@ -2364,11 +2364,11 @@ pinned; `git push github master` workflow documented.
 
 `cargo build --workspace` clean, `cargo clippy --workspace --all-targets
 -- -D warnings` clean, `cargo test --workspace --lib` 1158 tests passing
-(↑ from 1157 — new WASAPI smoke test runs on this Windows host).
+(↑ from 1157 - new WASAPI smoke test runs on this Windows host).
 
 ---
 
-## [v1.0.57] — 2026-05-28 — voltex_image crate split (E1 + C1 audit items)
+## [v1.0.57] - 2026-05-28 - voltex_image crate split (E1 + C1 audit items)
 
 **Refactor / Additive**. New L0 crate `voltex_image` extracts all GPU-agnostic asset
 codecs from `voltex_renderer`, resolving audit items E1 (God-crate reduction) and C1
@@ -2380,13 +2380,13 @@ codecs from `voltex_renderer`, resolving audit items E1 (God-crate reduction) an
 - glTF 2.0/GLB parser (`parse_gltf`, `GltfData`/`GltfMesh`/`GltfMaterial`)
 - OBJ parser (`obj` module), JSON parser (`json_parser` module)
 - `MeshVertex` POD struct (`bytemuck::Pod + Zeroable`)
-- CRC32/Adler32 (`checksum` module — crate-private)
+- CRC32/Adler32 (`checksum` module - crate-private)
 
 ### What stays in `voltex_renderer`
-- `MESH_VERTEX_LAYOUT` (`VertexBufferLayout` for `MeshVertex`) — renderer/vertex.rs free const;
+- `MESH_VERTEX_LAYOUT` (`VertexBufferLayout` for `MeshVertex`) - renderer/vertex.rs free const;
   orphan rule prevents defining it in voltex_image
 - `pub use voltex_image::{parse_png, parse_jpg, parse_gltf, MeshVertex, ...}` back-compat
-  re-exports — existing code using `voltex_renderer::parse_png` continues to compile
+  re-exports - existing code using `voltex_renderer::parse_png` continues to compile
 
 ### Other changes
 - `voltex_capture`: duplicate CRC32/Adler32 removed; uses `voltex_image::encode_rgba8` (C1)
@@ -2394,12 +2394,12 @@ codecs from `voltex_renderer`, resolving audit items E1 (God-crate reduction) an
 - 91 tests migrated to voltex_image; workspace total remains green
 
 ### Follow-up
-- F9: `#![allow(missing_docs)]` suppressions in moved decoder files — to be resolved
+- F9: `#![allow(missing_docs)]` suppressions in moved decoder files - to be resolved
   incrementally with doc comments (low risk, tracked in AUDIT-BACKLOG)
 
 ---
 
-## [v1.0.54] — 2026-05-22 — Sphere generator degenerate-input clamp
+## [v1.0.54] - 2026-05-22 - Sphere generator degenerate-input clamp
 
 **Fix**. `voltex_renderer::sphere::generate_sphere(radius, sectors, stacks)` divided by zero on multiple paths when called with degenerate inputs:
 
@@ -2414,7 +2414,7 @@ A `generate_sphere(0.0, 0, 0)` call produced a NaN-filled vertex buffer that the
 
 Inputs are now clamped to sensible minimums up front:
 
-- `sectors.max(3)`, `stacks.max(2)` — minimum geometry for a closed mesh.
+- `sectors.max(3)`, `stacks.max(2)` - minimum geometry for a closed mesh.
 - `radius` validated as finite and > `f32::MIN_POSITIVE`, otherwise clamped.
 
 ### Tests
@@ -2426,15 +2426,15 @@ Inputs are now clamped to sensible minimums up front:
 
 ### Verification
 
-- `cargo build --workspace` — clean.
-- `cargo clippy --workspace --all-targets -- -D warnings` — 0 warnings.
-- `cargo test --workspace --lib` — every crate green.
+- `cargo build --workspace` - clean.
+- `cargo clippy --workspace --all-targets -- -D warnings` - 0 warnings.
+- `cargo test --workspace --lib` - every crate green.
 
 ---
 
-## [v1.0.53] — 2026-05-22 — `Camera::right` NaN at pitch ±90°
+## [v1.0.53] - 2026-05-22 - `Camera::right` NaN at pitch ±90°
 
-**Fix**. `voltex_renderer::Camera::right()` computed `forward × Vec3::Y` and called `.normalize()`. When `pitch` is exactly `±π/2`, `forward` is parallel to `Vec3::Y`, the cross product collapses to (sub-normal multiples of) zero, and `normalize()` produces NaN — silently contaminating the view matrix and every subsequent transform.
+**Fix**. `voltex_renderer::Camera::right()` computed `forward × Vec3::Y` and called `.normalize()`. When `pitch` is exactly `±π/2`, `forward` is parallel to `Vec3::Y`, the cross product collapses to (sub-normal multiples of) zero, and `normalize()` produces NaN - silently contaminating the view matrix and every subsequent transform.
 
 `FpsController::process_mouse` clamps `pitch` to ±89° to avoid the degeneracy, but `Camera.pitch` is a public field. User code (level scripts, cutscene controllers) that sets the field directly used to leak NaN through every camera matrix.
 
@@ -2451,19 +2451,19 @@ Inputs are now clamped to sensible minimums up front:
 
 ### Verification
 
-- `cargo build --workspace` — clean.
-- `cargo clippy --workspace --all-targets -- -D warnings` — 0 warnings.
-- `cargo test --workspace --lib` — every crate green.
+- `cargo build --workspace` - clean.
+- `cargo clippy --workspace --all-targets -- -D warnings` - 0 warnings.
+- `cargo test --workspace --lib` - every crate green.
 
 ---
 
-## [v1.0.52] — 2026-05-22 — GameTimer hz=0 panic + alpha div-by-zero
+## [v1.0.52] - 2026-05-22 - GameTimer hz=0 panic + alpha div-by-zero
 
 **Fix**. Two `voltex_platform::GameTimer` footguns:
 
 ### Fixed
 
-- **`GameTimer::new(0)` panic.** `Duration::from_secs_f64(1.0 / 0.0)` evaluates `1.0 / 0.0 = inf`, which `from_secs_f64` rejects with a panic. `new` now clamps `fixed_hz` to `1..=100_000` — 0 becomes 1 Hz, and absurdly high rates that would round `fixed_dt` to 0 ns (turning `should_fixed_update` into an infinite loop) clamp to 100 kHz.
+- **`GameTimer::new(0)` panic.** `Duration::from_secs_f64(1.0 / 0.0)` evaluates `1.0 / 0.0 = inf`, which `from_secs_f64` rejects with a panic. `new` now clamps `fixed_hz` to `1..=100_000` - 0 becomes 1 Hz, and absurdly high rates that would round `fixed_dt` to 0 ns (turning `should_fixed_update` into an infinite loop) clamp to 100 kHz.
 - **`alpha()` div-by-zero defence.** If a future regression bypassed the `new()` clamp and `fixed_dt` ended up zero, `alpha()` would divide by zero and produce `inf`, contaminating the renderer's interpolation. Now returns `0.0` when `fixed_dt <= 0`.
 
 ### Tests
@@ -2476,17 +2476,17 @@ Inputs are now clamped to sensible minimums up front:
 
 ### Verification
 
-- `cargo build --workspace` — clean.
-- `cargo clippy --workspace --all-targets -- -D warnings` — 0 warnings.
-- `cargo test --workspace --lib` — every crate green.
+- `cargo build --workspace` - clean.
+- `cargo clippy --workspace --all-targets -- -D warnings` - 0 warnings.
+- `cargo test --workspace --lib` - every crate green.
 
 ### Notes
 
-Cumulative for v1.0.40 – v1.0.52: 13 cycles, ~60 regression tests covering NaN propagation, parser overflow, deserialiser size caps, hierarchy integrity, OOB validation, undo/redo correctness, audio safety, Lua FFI safety, animation NaN paths, propagation cycles, encryption u64 overflow + NaN-time bypass, input first-frame warp, and now timer hz clamping.
+Cumulative for v1.0.40 - v1.0.52: 13 cycles, ~60 regression tests covering NaN propagation, parser overflow, deserialiser size caps, hierarchy integrity, OOB validation, undo/redo correctness, audio safety, Lua FFI safety, animation NaN paths, propagation cycles, encryption u64 overflow + NaN-time bypass, input first-frame warp, and now timer hz clamping.
 
 ---
 
-## [v1.0.51] — 2026-05-22 — Input first-mouse-move warp fix
+## [v1.0.51] - 2026-05-22 - Input first-mouse-move warp fix
 
 **Fix**. `voltex_platform::input::InputState::process_mouse_move` produced a huge delta on the very first event because `mouse_position` starts at `(0, 0)`. A cursor entering the window at `(500, 300)` registered as a `(500, 300)` mouse delta, which the FPS / orbit cameras then applied as a snap.
 
@@ -2496,20 +2496,20 @@ Cumulative for v1.0.40 – v1.0.52: 13 cycles, ~60 regression tests covering NaN
 
 ### Tests
 
-`voltex_platform` 3 → 5 (+2). This crate had no `input` tests before — now exercised:
+`voltex_platform` 3 → 5 (+2). This crate had no `input` tests before - now exercised:
 
 - `voltex_platform::input::tests::first_mouse_move_produces_zero_delta`
 - `voltex_platform::input::tests::begin_frame_clears_delta_but_keeps_mouse_seen`
 
 ### Verification
 
-- `cargo build --workspace` — clean.
-- `cargo clippy --workspace --all-targets -- -D warnings` — 0 warnings.
-- `cargo test --workspace --lib` — every crate green.
+- `cargo build --workspace` - clean.
+- `cargo clippy --workspace --all-targets -- -D warnings` - 0 warnings.
+- `cargo test --workspace --lib` - every crate green.
 
 ---
 
-## [v1.0.50] — 2026-05-22 — PacketCipher u64 overflow + AuthToken NaN-time bypass
+## [v1.0.50] - 2026-05-22 - PacketCipher u64 overflow + AuthToken NaN-time bypass
 
 **Fix**. Two `voltex_net::encryption` bugs reachable from adversarial input:
 
@@ -2517,7 +2517,7 @@ Cumulative for v1.0.40 – v1.0.52: 13 cycles, ~60 regression tests covering NaN
 
 - **`PacketCipher::decrypt` u64 overflow on `seq = u64::MAX`.** An attacker can craft a packet whose 8-byte sequence header is `[0xFF; 8]`. The decrypt accepted it (since `seq < recv_counter` is false for any reasonable counter) and then ran `self.recv_counter = seq + 1`, which:
   - in debug builds panicked with arithmetic overflow,
-  - in release wrapped to `0`, after which every legitimate subsequent packet was flagged as a replay — a permanent DoS.
+  - in release wrapped to `0`, after which every legitimate subsequent packet was flagged as a replay - a permanent DoS.
   Now `saturating_add(1)`: the counter pins at `u64::MAX` and the cipher remains live for whatever packets are still in flight.
 - **`AuthToken::validate` NaN-time bypass.** `if current_time > self.expires_at { return false; }` relied on the comparison returning `true` for expired tokens. NaN comparisons always return `false`, so a NaN `current_time` (e.g. uninitialised float, propagated NaN from upstream math) silently passed the expiry check. Now any non-finite `current_time` or `expires_at` is rejected up front.
 
@@ -2530,9 +2530,9 @@ Cumulative for v1.0.40 – v1.0.52: 13 cycles, ~60 regression tests covering NaN
 
 ### Verification
 
-- `cargo build --workspace` — clean.
-- `cargo clippy --workspace --all-targets -- -D warnings` — 0 warnings.
-- `cargo test --workspace --lib` — every crate green.
+- `cargo build --workspace` - clean.
+- `cargo clippy --workspace --all-targets -- -D warnings` - 0 warnings.
+- `cargo test --workspace --lib` - every crate green.
 
 ### Notes
 
@@ -2540,26 +2540,26 @@ Cumulative for v1.0.40 – v1.0.52: 13 cycles, ~60 regression tests covering NaN
 
 ---
 
-## [v1.0.49] — 2026-05-22 — propagate_transforms cycle / depth-limit
+## [v1.0.49] - 2026-05-22 - propagate_transforms cycle / depth-limit
 
 **Fix**. The `add_child` cycle guard introduced in v1.0.42 only catches cycles created *after* it landed. A scene file loaded via raw `world.add(_, Children(_))` / `world.add(_, Parent(_))` calls bypasses `add_child` entirely, and `propagate_transforms` then recurses through the cycle until the stack overflows.
 
 ### Fixed
 
-- **`voltex_ecs::world_transform::propagate_transforms`** now accepts a `depth` argument and bails out at `MAX_HIERARCHY_DEPTH = 1024`. Realistic scene hierarchies are 5–10 levels deep, so the cap is large enough to never reject a legitimate tree but small enough to fail fast on a malformed one.
+- **`voltex_ecs::world_transform::propagate_transforms`** now accepts a `depth` argument and bails out at `MAX_HIERARCHY_DEPTH = 1024`. Realistic scene hierarchies are 5-10 levels deep, so the cap is large enough to never reject a legitimate tree but small enough to fail fast on a malformed one.
 
 ### Tests
 
 `voltex_ecs` 144 → 146 (+2):
 
-- `voltex_ecs::world_transform::tests::propagate_transforms_does_not_overflow_on_raw_cycle` — explicit A↔B Parent/Children cycle.
-- `voltex_ecs::world_transform::tests::propagate_transforms_handles_long_acyclic_chain` — 256-deep legitimate chain, sanity check that the cap doesn't trigger on real hierarchies.
+- `voltex_ecs::world_transform::tests::propagate_transforms_does_not_overflow_on_raw_cycle` - explicit A↔B Parent/Children cycle.
+- `voltex_ecs::world_transform::tests::propagate_transforms_handles_long_acyclic_chain` - 256-deep legitimate chain, sanity check that the cap doesn't trigger on real hierarchies.
 
 ### Verification
 
-- `cargo build --workspace` — clean.
-- `cargo clippy --workspace --all-targets -- -D warnings` — 0 warnings.
-- `cargo test --workspace --lib` — every crate green.
+- `cargo build --workspace` - clean.
+- `cargo clippy --workspace --all-targets -- -D warnings` - 0 warnings.
+- `cargo test --workspace --lib` - every crate green.
 
 ### Notes
 
@@ -2567,14 +2567,14 @@ GJK / EPA narrow-phase audited in this round; existing length / cross-product gu
 
 ---
 
-## [v1.0.48] — 2026-05-22 — Animation system zero-duration / OOB keyframe / quat slerp NaN
+## [v1.0.48] - 2026-05-22 - Animation system zero-duration / OOB keyframe / quat slerp NaN
 
 **Fix**. Three latent NaN / panic paths in `voltex_renderer/src/animation.rs`:
 
 ### Fixed
 
 - **`AnimationPlayer::update` zero-duration NaN.** A zero-duration animation in `looping=true` mode hit `current_time %= 0.0`. For f32 this produces NaN (not a panic, but every downstream `sample_channel` call then misbehaved silently). Now: `duration <= 0` clamps `current_time` to 0 and stops the player.
-- **`extract_keyframe` slice OOB panic.** A malformed glTF where `values.len() < times.len() * stride` panicked at `values[start..end]` whenever `start > values.len()`. The previous `end.min(values.len())` clamp didn't help — slice indexing panics if `start > len` regardless of `end`. `start >= values.len()` now early-returns a path-appropriate default (translation/scale = 0, rotation = identity quaternion).
+- **`extract_keyframe` slice OOB panic.** A malformed glTF where `values.len() < times.len() * stride` panicked at `values[start..end]` whenever `start > values.len()`. The previous `end.min(values.len())` clamp didn't help - slice indexing panics if `start > len` regardless of `end`. `start >= values.len()` now early-returns a path-appropriate default (translation/scale = 0, rotation = identity quaternion).
 - **`Quat::slerp` `acos(> 1.0)` NaN.** Even for genuinely unit quaternions, the dot product accumulated in f32 can sit at `1.0000001` etc. `theta = dot.acos()` then returned NaN, contaminating the whole interpolation. Added `dot = dot.clamp(-1.0, 1.0)` before branching. The existing `dot > 0.9995` LERP fast-path covers the *near-1* case, but the clamp is needed for the rarer `dot > 1.0` (overshoot) and `dot < -1.0` (after the sign-flip branch) edges.
 
 ### Tests
@@ -2587,13 +2587,13 @@ GJK / EPA narrow-phase audited in this round; existing length / cross-product gu
 
 ### Verification
 
-- `cargo build --workspace` — clean.
-- `cargo clippy --workspace --all-targets -- -D warnings` — 0 warnings.
-- `cargo test --workspace --lib` — every crate green.
+- `cargo build --workspace` - clean.
+- `cargo clippy --workspace --all-targets -- -D warnings` - 0 warnings.
+- `cargo test --workspace --lib` - every crate green.
 
 ---
 
-## [v1.0.47] — 2026-05-22 — Lua FFI null-deref + type-confusion guards
+## [v1.0.47] - 2026-05-22 - Lua FFI null-deref + type-confusion guards
 
 **Fix**. The Lua engine_api FFI surface had three latent safety bugs reachable from arbitrary script code:
 
@@ -2606,7 +2606,7 @@ GJK / EPA narrow-phase audited in this round; existing length / cross-product gu
   &mut *ptr   // UB if ptr is null
   ```
   triggered any time the `__voltex_world` global was missing or not a light userdata. Reachable when a script ran before `register_engine_api`, or when a misbehaving script did `__voltex_world = nil`. `get_world` now returns `Option<&mut World>`; every one of the 17 FFI entry points uses `let Some(world) = get_world(L) else { return 0 }` to skip cleanly.
-- **Non-numeric entity handles silently mutated entity (0, 0).** `lua_tonumberx` writes its `isnum` output, but the previous code passed the same `isnum` variable to every coercion and never checked it. A call like `set_position("a", "b", 1, 2, 3)` would coerce the strings to `0` and silently mutate entity (0, 0) — typically the world's first entity. New `read_handle_strict` / `read_handle_strict_at` helpers reject non-numeric handle args with a silent no-op.
+- **Non-numeric entity handles silently mutated entity (0, 0).** `lua_tonumberx` writes its `isnum` output, but the previous code passed the same `isnum` variable to every coercion and never checked it. A call like `set_position("a", "b", 1, 2, 3)` would coerce the strings to `0` and silently mutate entity (0, 0) - typically the world's first entity. New `read_handle_strict` / `read_handle_strict_at` helpers reject non-numeric handle args with a silent no-op.
 - **Non-numeric coordinates silently coerced to 0.** Same `isnum` bug for the x/y/z coordinate args of `set_position` / `set_rotation` / `set_scale`. Each coordinate now has its own `isnum_x` / `isnum_y` / `isnum_z`; any failure causes the call to no-op.
 
 ### Tests
@@ -2619,17 +2619,17 @@ GJK / EPA narrow-phase audited in this round; existing length / cross-product gu
 
 ### Verification
 
-- `cargo build --workspace` — clean.
-- `cargo clippy --workspace --all-targets -- -D warnings` — 0 warnings.
-- `cargo test --workspace --lib` — every crate green.
+- `cargo build --workspace` - clean.
+- `cargo clippy --workspace --all-targets -- -D warnings` - 0 warnings.
+- `cargo test --workspace --lib` - every crate green.
 
 ### Notes
 
-Cumulative for the v1.0.40 – v1.0.47 robustness pass: 8 cycles, ~50 regression tests covering NaN propagation/source, parser overflow, deserialiser size caps, hierarchy integrity, OOB index validation, editor undo/redo correctness, audio mixer safety, and now FFI safety. Workspace test count ~1056 → ~1095.
+Cumulative for the v1.0.40 - v1.0.47 robustness pass: 8 cycles, ~50 regression tests covering NaN propagation/source, parser overflow, deserialiser size caps, hierarchy integrity, OOB index validation, editor undo/redo correctness, audio mixer safety, and now FFI safety. Workspace test count ~1056 → ~1095.
 
 ---
 
-## [v1.0.46] — 2026-05-22 — Editor redo-Spawn leak + audio mixer OOB defence + runtime resize cleanup
+## [v1.0.46] - 2026-05-22 - Editor redo-Spawn leak + audio mixer OOB defence + runtime resize cleanup
 
 **Fix**. Three small bugs surfaced via audit of editor command flow, audio mixer, and runtime event handler.
 
@@ -2648,13 +2648,13 @@ Cumulative for the v1.0.40 – v1.0.47 robustness pass: 8 cycles, ~50 regression
 
 ### Verification
 
-- `cargo build --workspace` — clean.
-- `cargo clippy --workspace --all-targets -- -D warnings` — 0 warnings.
-- `cargo test --workspace --lib` — every crate green.
+- `cargo build --workspace` - clean.
+- `cargo clippy --workspace --all-targets -- -D warnings` - 0 warnings.
+- `cargo test --workspace --lib` - every crate green.
 
 ---
 
-## [v1.0.45] — 2026-05-22 — glTF accessor count cap + attribute length consistency
+## [v1.0.45] - 2026-05-22 - glTF accessor count cap + attribute length consistency
 
 **Fix**. Two classes of bug in `voltex_renderer/src/gltf/accessor.rs`:
 
@@ -2673,17 +2673,17 @@ Cumulative for the v1.0.40 – v1.0.47 robustness pass: 8 cycles, ~50 regression
 
 ### Verification
 
-- `cargo build --workspace` — clean.
-- `cargo clippy --workspace --all-targets -- -D warnings` — 0 warnings.
-- `cargo test --workspace --lib` — every crate green.
+- `cargo build --workspace` - clean.
+- `cargo clippy --workspace --all-targets -- -D warnings` - 0 warnings.
+- `cargo test --workspace --lib` - every crate green.
 
 ### Notes
 
-The OBJ parser is unaffected — it already uses `.get()` everywhere instead of direct indexing and produces a default value on missing data, so a malformed `f` line never panics. JSON-parser-level size limits remain v1.1.
+The OBJ parser is unaffected - it already uses `.get()` everywhere instead of direct indexing and produces a default value on missing data, so a malformed `f` line never panics. JSON-parser-level size limits remain v1.1.
 
 ---
 
-## [v1.0.44] — 2026-05-22 — Navmesh deserializer adversarial input hardening
+## [v1.0.44] - 2026-05-22 - Navmesh deserializer adversarial input hardening
 
 **Fix**. Same pattern as v1.0.43 applied to the VNAV navmesh format. Both deserializer entry points (`NavMesh::deserialize` and the free function `deserialize_navmesh`) trusted unbounded counts and allowed triangles to reference vertex/triangle indices outside their declared ranges.
 
@@ -2706,17 +2706,17 @@ The validations are done at deserialise time, so downstream consumers can use in
 
 ### Verification
 
-- `cargo build --workspace` — clean.
-- `cargo clippy --workspace --all-targets -- -D warnings` — 0 warnings.
-- `cargo test --workspace --lib` — every crate green.
+- `cargo build --workspace` - clean.
+- `cargo clippy --workspace --all-targets -- -D warnings` - 0 warnings.
+- `cargo test --workspace --lib` - every crate green.
 
 ### Notes
 
-Cumulative for the v1.0.40 – v1.0.44 robustness pass: 5 cycles, +34 regression tests covering NaN propagation, NaN-source math primitives, image parser overflow, snapshot/scene/navmesh deserialiser size caps, hierarchy cycle/self-parent/reparent integrity, and out-of-range index validation. Workspace tests went from ~1056 to ~1090.
+Cumulative for the v1.0.40 - v1.0.44 robustness pass: 5 cycles, +34 regression tests covering NaN propagation, NaN-source math primitives, image parser overflow, snapshot/scene/navmesh deserialiser size caps, hierarchy cycle/self-parent/reparent integrity, and out-of-range index validation. Workspace tests went from ~1056 to ~1090.
 
 ---
 
-## [v1.0.43] — 2026-05-22 — Scene deserializer adversarial input hardening
+## [v1.0.43] - 2026-05-22 - Scene deserializer adversarial input hardening
 
 **Fix**. Two scene deserializers (text `.vscn` and binary `VSCN`) trusted unbounded counts from input data, allowing OOM / panic from malicious or corrupted files.
 
@@ -2741,17 +2741,17 @@ Cumulative for the v1.0.40 – v1.0.44 robustness pass: 5 cycles, +34 regression
 
 ### Verification
 
-- `cargo build --workspace` — clean.
-- `cargo clippy --workspace --all-targets -- -D warnings` — 0 warnings.
-- `cargo test --workspace --lib` — every crate green.
+- `cargo build --workspace` - clean.
+- `cargo clippy --workspace --all-targets -- -D warnings` - 0 warnings.
+- `cargo test --workspace --lib` - every crate green.
 
 ### Notes
 
-The JSON deserializer (`deserialize_scene_json`) does not need a separate cap because `entities_arr.len()` reflects the already-parsed JSON array — the JSON parser is the first line of defence. Adding a limit to the JSON parser itself is queued for v1.1.
+The JSON deserializer (`deserialize_scene_json`) does not need a separate cap because `entities_arr.len()` reflects the already-parsed JSON array - the JSON parser is the first line of defence. Adding a limit to the JSON parser itself is queued for v1.1.
 
 ---
 
-## [v1.0.42] — 2026-05-22 — Hierarchy cycle / self-parent / reparent integrity
+## [v1.0.42] - 2026-05-22 - Hierarchy cycle / self-parent / reparent integrity
 
 **Fix**. `voltex_ecs::hierarchy::add_child` silently allowed three classes of integrity violation that caused unbounded-recursion stack overflow inside `despawn_recursive`:
 
@@ -2769,13 +2769,13 @@ The JSON deserializer (`deserialize_scene_json`) does not need a separate cap be
 - `voltex_ecs::hierarchy::tests::add_child_rejects_simple_cycle`
 - `voltex_ecs::hierarchy::tests::add_child_rejects_deeper_cycle`
 - `voltex_ecs::hierarchy::tests::add_child_reparents_cleanly`
-- `voltex_ecs::hierarchy::tests::despawn_recursive_terminates_on_clean_hierarchy` — 256-deep chain sanity check
+- `voltex_ecs::hierarchy::tests::despawn_recursive_terminates_on_clean_hierarchy` - 256-deep chain sanity check
 
 ### Verification
 
-- `cargo build --workspace` — clean.
-- `cargo clippy --workspace --all-targets -- -D warnings` — 0 warnings.
-- `cargo test --workspace --lib` — every crate green.
+- `cargo build --workspace` - clean.
+- `cargo clippy --workspace --all-targets -- -D warnings` - 0 warnings.
+- `cargo test --workspace --lib` - every crate green.
 
 ### Notes
 
@@ -2783,24 +2783,24 @@ Cycles introduced via direct `world.add(child, Parent(parent))` (e.g. by a corru
 
 ---
 
-## [v1.0.41] — 2026-05-22 — NaN-source hardening (math) + snapshot deserialiser cap
+## [v1.0.41] - 2026-05-22 - NaN-source hardening (math) + snapshot deserialiser cap
 
 **Fix + additive**. v1.0.40 protected sort comparators from incoming NaN. v1.0.41 attacks NaN at the source: the math primitives that *produce* NaN when called with zero vectors, plus the docstrings that mis-claim those calls panic.
 
 ### Fixed
 
-- **`Vec3::normalize` / `Vec2::normalize` docstrings.** Old text claimed "Panics if the input is the zero vector (division by zero)". Rust `f32 / 0.0` does not panic — it produces NaN (when numerator is also 0) or `±inf`. The new docstring spells out the actual behaviour and points at the new safe variant.
-- **`Ray::new` docstring.** Same correction. `Ray::new(_, Vec3::ZERO)` did not panic — it stored a NaN direction.
+- **`Vec3::normalize` / `Vec2::normalize` docstrings.** Old text claimed "Panics if the input is the zero vector (division by zero)". Rust `f32 / 0.0` does not panic - it produces NaN (when numerator is also 0) or `±inf`. The new docstring spells out the actual behaviour and points at the new safe variant.
+- **`Ray::new` docstring.** Same correction. `Ray::new(_, Vec3::ZERO)` did not panic - it stored a NaN direction.
 - **`Mat4::look_at` docstring.** Documents that `eye == target`, or `up` collinear with the view direction, produces a NaN matrix (no panic).
 - **`voltex_net::snapshot::deserialize_snapshot` entity-count handling.** Adversarial header with `count = u32::MAX` used to overflow `count * ENTITY_SIZE` on 32-bit `usize` and force a multi-GB `Vec::with_capacity` allocation on 64-bit. Added a `MAX_SNAPSHOT_ENTITIES = 1_000_000` ceiling and converted the size arithmetic to `checked_mul` / `checked_add`.
 
 ### Added
 
-- `Vec3::normalize_or_zero(self) -> Vec3` — returns `Vec3::ZERO` when `length²` is below `f32::MIN_POSITIVE`, otherwise behaves like `normalize`.
-- `Vec2::normalize_or_zero(self) -> Vec2` — same pattern.
-- `Ray::try_new(origin, direction) -> Option<Ray>` — `None` when `direction` is zero or sub-normal; preferred constructor when `direction` is computed from user / untrusted data.
+- `Vec3::normalize_or_zero(self) -> Vec3` - returns `Vec3::ZERO` when `length²` is below `f32::MIN_POSITIVE`, otherwise behaves like `normalize`.
+- `Vec2::normalize_or_zero(self) -> Vec2` - same pattern.
+- `Ray::try_new(origin, direction) -> Option<Ray>` - `None` when `direction` is zero or sub-normal; preferred constructor when `direction` is computed from user / untrusted data.
 
-These additions are purely additive — no existing call signatures changed.
+These additions are purely additive - no existing call signatures changed.
 
 ### Tests
 
@@ -2820,9 +2820,9 @@ These additions are purely additive — no existing call signatures changed.
 
 ### Verification
 
-- `cargo build --workspace` — clean.
-- `cargo clippy --workspace --all-targets -- -D warnings` — 0 warnings.
-- `cargo test --workspace --lib` — every crate green.
+- `cargo build --workspace` - clean.
+- `cargo clippy --workspace --all-targets -- -D warnings` - 0 warnings.
+- `cargo test --workspace --lib` - every crate green.
 
 ### Notes
 
@@ -2830,24 +2830,24 @@ The ~30 existing `.normalize()` callsites (steering, gizmo, picking, csm, frustu
 
 ---
 
-## [v1.0.40] — 2026-05-22 — NaN-safe sort comparators + parser size hardening
+## [v1.0.40] - 2026-05-22 - NaN-safe sort comparators + parser size hardening
 
 **Fix**. P0 robustness pass surfaced via static audit of `partial_cmp(...).unwrap()` callsites and arithmetic-overflow paths in the image parsers. Both classes of bug are reachable from user data (NaN positions in components, adversarial image headers) but had no test coverage.
 
 ### Fixed
 
 - **NaN-safe sort comparators in 6 production callsites.** `partial_cmp(...).unwrap()` panics when one side is `NaN`. Replaced with `.unwrap_or(std::cmp::Ordering::Equal)` (defensive ordering: NaN sorts as equal-to-self):
-  - `voltex_physics/src/bvh.rs:62` — BVH build sorts entries by AABB center on the longest axis. A `Transform` with NaN position (or a manually-built mesh AABB with NaN bounds) panicked here.
-  - `voltex_physics/src/bvh.rs:150` — `BvhTree::query_ray` sorts hits by ray-distance. NaN-bounded AABBs could yield NaN intermediate t.
-  - `voltex_physics/src/raycast.rs:142` — `raycast_all` sorts hits by distance.
-  - `voltex_physics/src/mesh_collider.rs:75` — `ray_vs_mesh_all` sorts hits by distance. Degenerate triangles (Möller–Trumbore on NaN-vertex triangle) produced NaN t.
-  - `voltex_editor/src/rasterizer.rs:124` — TTF glyph scanline-fill sorts edge intersections by x.
-  - `voltex_renderer/src/light_probes.rs:43` — `LightProbeGrid::nearest` minimum search by squared distance.
+  - `voltex_physics/src/bvh.rs:62` - BVH build sorts entries by AABB center on the longest axis. A `Transform` with NaN position (or a manually-built mesh AABB with NaN bounds) panicked here.
+  - `voltex_physics/src/bvh.rs:150` - `BvhTree::query_ray` sorts hits by ray-distance. NaN-bounded AABBs could yield NaN intermediate t.
+  - `voltex_physics/src/raycast.rs:142` - `raycast_all` sorts hits by distance.
+  - `voltex_physics/src/mesh_collider.rs:75` - `ray_vs_mesh_all` sorts hits by distance. Degenerate triangles (Möller-Trumbore on NaN-vertex triangle) produced NaN t.
+  - `voltex_editor/src/rasterizer.rs:124` - TTF glyph scanline-fill sorts edge intersections by x.
+  - `voltex_renderer/src/light_probes.rs:43` - `LightProbeGrid::nearest` minimum search by squared distance.
 
 - **Parser size-overflow / huge-allocation guards (BMP, PNG, JPG).** Adversarial headers declaring extreme dimensions used to either overflow the `width * height * channels` size computation or trigger multi-GB allocations:
-  - `voltex_renderer/src/texture.rs::parse_bmp` — zero-dimension reject, `BMP_MAX_DIMENSION = 16_384` cap, `checked_mul` on row size + total size.
-  - `voltex_renderer/src/png.rs::parse_png` — zero-dimension reject, `PNG_MAX_DIMENSION = 16_384` cap, `checked_mul` on stride + expected size + RGBA-convert capacity.
-  - `voltex_renderer/src/jpg/mod.rs::parse_jpg` — zero-dimension reject after SOF0, `JPG_MAX_DIMENSION = 16_384` cap, `checked_mul` on the RGB→RGBA capacity computation. (JPEG u16 dimensions cap at 65 535 inherently but `65535² × 4 ≈ 17 GB` still abused capacity allocation.)
+  - `voltex_renderer/src/texture.rs::parse_bmp` - zero-dimension reject, `BMP_MAX_DIMENSION = 16_384` cap, `checked_mul` on row size + total size.
+  - `voltex_renderer/src/png.rs::parse_png` - zero-dimension reject, `PNG_MAX_DIMENSION = 16_384` cap, `checked_mul` on stride + expected size + RGBA-convert capacity.
+  - `voltex_renderer/src/jpg/mod.rs::parse_jpg` - zero-dimension reject after SOF0, `JPG_MAX_DIMENSION = 16_384` cap, `checked_mul` on the RGB→RGBA capacity computation. (JPEG u16 dimensions cap at 65 535 inherently but `65535² × 4 ≈ 17 GB` still abused capacity allocation.)
 
 The `16_384` cap matches the `max_texture_dimension_2d` of the wgpu default downlevel limits, so anything larger could not become a GPU texture anyway.
 
@@ -2866,9 +2866,9 @@ The `16_384` cap matches the `max_texture_dimension_2d` of the wgpu default down
 
 ### Verification
 
-- `cargo build --workspace` — clean.
-- `cargo clippy --workspace --all-targets -- -D warnings` — 0 warnings.
-- `cargo test --workspace --lib` — every crate green. `voltex_physics` 106 → 110 (+4), `voltex_renderer` 217 → 223 (+6).
+- `cargo build --workspace` - clean.
+- `cargo clippy --workspace --all-targets -- -D warnings` - 0 warnings.
+- `cargo test --workspace --lib` - every crate green. `voltex_physics` 106 → 110 (+4), `voltex_renderer` 217 → 223 (+6).
 
 ### Notes
 
@@ -2876,24 +2876,24 @@ This batch is static-audit-driven. Fuzz-based coverage expansion (libfuzzer / ca
 
 ---
 
-## [v1.0.39] — 2026-05-21 — README polish (status badge + service-readiness bullets)
+## [v1.0.39] - 2026-05-21 - README polish (status badge + service-readiness bullets)
 
-P2. README's status badge was frozen at v1.0.20 and the Features list did not advertise the operational tooling that landed in v1.0.29–v1.0.34.
+P2. README's status badge was frozen at v1.0.20 and the Features list did not advertise the operational tooling that landed in v1.0.29-v1.0.34.
 
 ### Updated
 
 - `README.md` status badge: `v1.0.20` → `v1.0.38`.
 - `README.md` Features section: added two new bullets summarising the CI/release pipeline + runtime ergonomics work:
-  - **CI / 릴리스** — cargo-deny + cargo-about + cargo-semver-checks + changelog enforcement + nightly E2E + tag-driven 3-OS release artifact pipeline.
-  - **Runtime ergonomics** — RuntimeApp 4-line main, HUD primitive, panic hook → crash log, structured log.
+  - **CI / 릴리스**: cargo-deny + cargo-about + cargo-semver-checks + changelog enforcement + nightly E2E + tag-driven 3-OS release artifact pipeline.
+  - **Runtime ergonomics**: RuntimeApp 4-line main, HUD primitive, panic hook → crash log, structured log.
 
 ### Notes
 
-Closes the 10-hour service-readiness push (v1.0.21–v1.0.39, 19 cycles). Workspace state: every crate has `#![warn(missing_docs)]` or `#![allow]` with rationale; every CI gate present (build/clippy/test/license/deny/semver/changelog/e2e); full release pipeline; full hook coverage; per-example READMEs.
+Closes the 10-hour service-readiness push (v1.0.21-v1.0.39, 19 cycles). Workspace state: every crate has `#![warn(missing_docs)]` or `#![allow]` with rationale; every CI gate present (build/clippy/test/license/deny/semver/changelog/e2e); full release pipeline; full hook coverage; per-example READMEs.
 
 ---
 
-## [v1.0.38] — 2026-05-21 — Per-example READMEs
+## [v1.0.38] - 2026-05-21 - Per-example READMEs
 
 P2 service-readiness item. v1.0.15 added `examples/README.md` as a catalog, but each example still pointed at module header comments for actual detail. v1.0.38 adds a focused README to each of the 14 examples + the archived `survivor_game`.
 
@@ -2910,20 +2910,20 @@ Per-example `README.md` files with consistent sections (what it demonstrates / r
 
 ### Notes
 
-The runtime_demo README documents the HUD wiring added in v1.0.32 — title bar shows `"voltex_runtime: solar system | N planets, M moons | XX fps"`.
+The runtime_demo README documents the HUD wiring added in v1.0.32 - title bar shows `"voltex_runtime: solar system | N planets, M moons | XX fps"`.
 
 ---
 
-## [v1.0.37] — 2026-05-21 — `voltex_renderer` 100% documented (→ 0 `missing_docs`)
+## [v1.0.37] - 2026-05-21 - `voltex_renderer` 100% documented (→ 0 `missing_docs`)
 
-Thirteenth and last crate in the workspace `missing_docs` sweep. Largest crate in the workspace — ~80 source files, 513 initial warnings.
+Thirteenth and last crate in the workspace `missing_docs` sweep. Largest crate in the workspace - ~80 source files, 513 initial warnings.
 
 ### Approach
 
 Same pattern as `voltex_editor` (v1.0.36): document the user-facing API surface (named in lib.rs re-exports), allow on internal-detail modules with inline rationale. Renderer specifically:
 
 - **Documented in full**: `RendererError`, `GpuContext` + `DEPTH_FORMAT`, `Vertex`, `MeshVertex`, `Mesh`, `Camera` + 4 methods + `FpsController` + `process_movement`/`process_mouse`, `MaterialUniform` + builders + bind_group_layout, `BmpImage` fields.
-- **Allowed-with-rationale (40+ modules)**: every pipeline/parser/shader-uniform module — `deflate`, `png`, `jpg`, `json_parser`, `gltf`, `obj`, `progressive_jpeg`, `pipeline`, `shadow*`, `csm`, `point_shadow`, `spot_shadow`, `brdf_lut`, `ibl`, `gbuffer*`, `fullscreen_quad`, `deferred_pipeline`, `ssgi`, `rt_*`, `hdr`, `bloom`, `tonemap`, `forward_pass`, `auto_exposure`, `instancing`, `bilateral_blur`, `temporal_accum`, `taa`, `ssr`, `motion_blur`, `dof`, `pbr_pipeline`, `frustum`, `stencil_opt`, `half_res_ssgi`, `bilateral_bloom`, `soft_rt_shadow`, `blas_update`, `rt_fallback`, `light_probes`, `light_volumes`, `skinned_vertex`, `animation`, `texture`, `light`, `sphere` (latter three are user-facing types but had too many GPU-uniform internals to doc field-by-field — the entry types still appear with crate-level narrative).
+- **Allowed-with-rationale (40+ modules)**: every pipeline/parser/shader-uniform module - `deflate`, `png`, `jpg`, `json_parser`, `gltf`, `obj`, `progressive_jpeg`, `pipeline`, `shadow*`, `csm`, `point_shadow`, `spot_shadow`, `brdf_lut`, `ibl`, `gbuffer*`, `fullscreen_quad`, `deferred_pipeline`, `ssgi`, `rt_*`, `hdr`, `bloom`, `tonemap`, `forward_pass`, `auto_exposure`, `instancing`, `bilateral_blur`, `temporal_accum`, `taa`, `ssr`, `motion_blur`, `dof`, `pbr_pipeline`, `frustum`, `stencil_opt`, `half_res_ssgi`, `bilateral_bloom`, `soft_rt_shadow`, `blas_update`, `rt_fallback`, `light_probes`, `light_volumes`, `skinned_vertex`, `animation`, `texture`, `light`, `sphere` (latter three are user-facing types but had too many GPU-uniform internals to doc field-by-field - the entry types still appear with crate-level narrative).
 
 ### Crate-level
 
@@ -2931,17 +2931,17 @@ Same pattern as `voltex_editor` (v1.0.36): document the user-facing API surface 
 
 ### Verified
 
-- `cargo build -p voltex_renderer` — zero `missing_docs` warnings (was 513).
-- `cargo test -p voltex_renderer --lib` — 217 passed (no regression).
-- `cargo clippy --workspace --all-targets -- -D warnings` — clean.
+- `cargo build -p voltex_renderer` - zero `missing_docs` warnings (was 513).
+- `cargo test -p voltex_renderer --lib` - 217 passed (no regression).
+- `cargo clippy --workspace --all-targets -- -D warnings` - clean.
 
-### Notes — Part 2 deferred
+### Notes - Part 2 deferred
 
 Originally planned as a 2-part split (v1.0.37 core, v1.0.38 PBR/lights/shadows/post-process). After the editor cycle's allow-with-rationale precedent it became clear that splitting the renderer the same way provides the same outcome in one cycle: zero warnings, public entry types still narratively documented, internal pipeline/shader-uniform churn doesn't pollute the warning list. v1.0.38 is left available for future per-module deepening when individual rendering subsystems stabilise enough to be worth field-by-field documentation.
 
 ---
 
-## [v1.0.36] — 2026-05-21 — `voltex_editor` 100% documented (→ 0 `missing_docs`)
+## [v1.0.36] - 2026-05-21 - `voltex_editor` 100% documented (→ 0 `missing_docs`)
 
 Twelfth crate in the workspace `missing_docs` sweep. Largest of the renderer-side trio: ~25 source files, IMGUI + dock + TTF + viewport + gizmo + sessions.
 
@@ -2967,12 +2967,12 @@ These are GPU pipeline state, parser internals, and immediate-mode UI scratch bu
 
 ### Verified
 
-- `cargo build -p voltex_editor` — zero `missing_docs` warnings (was 259).
-- `cargo test -p voltex_editor --lib` — 169 passed (no regression).
+- `cargo build -p voltex_editor` - zero `missing_docs` warnings (was 259).
+- `cargo test -p voltex_editor --lib` - 169 passed (no regression).
 
 ---
 
-## [v1.0.35] — 2026-05-21 — `voltex_renderer_ecs` 100% documented (→ 0 `missing_docs`)
+## [v1.0.35] - 2026-05-21 - `voltex_renderer_ecs` 100% documented (→ 0 `missing_docs`)
 
 Eleventh crate in the workspace `missing_docs` sweep. Smallest of the renderer-side trio: 4 source files, ECS↔renderer bridge.
 
@@ -2987,21 +2987,21 @@ Eleventh crate in the workspace `missing_docs` sweep. Smallest of the renderer-s
 
 ### Verified
 
-- `cargo build -p voltex_renderer_ecs` — zero `missing_docs` warnings.
-- `cargo test -p voltex_renderer_ecs --lib` — 7 passed (no regression).
+- `cargo build -p voltex_renderer_ecs` - zero `missing_docs` warnings.
+- `cargo test -p voltex_renderer_ecs --lib` - 7 passed (no regression).
 
 ---
 
-## [v1.0.34] — 2026-05-21 — Release artifact automation
+## [v1.0.34] - 2026-05-21 - Release artifact automation
 
-P1 service-readiness item. Until now the only way to ship a release was a manual `cargo build` + zip dance — exactly the kind of step that drifts (LICENSE missing, wrong target triple, forgot a platform). Pushing a `v*` tag now produces a published GitHub Release with platform-specific archives.
+P1 service-readiness item. Until now the only way to ship a release was a manual `cargo build` + zip dance - exactly the kind of step that drifts (LICENSE missing, wrong target triple, forgot a platform). Pushing a `v*` tag now produces a published GitHub Release with platform-specific archives.
 
 ### Added
 
-- `.github/workflows/release.yml` — new workflow with two jobs:
+- `.github/workflows/release.yml` - new workflow with two jobs:
   - `build`: 3-platform matrix (`ubuntu-latest`, `windows-latest`, `macos-latest`) building `voltex_cli` for `x86_64-unknown-linux-gnu`, `x86_64-pc-windows-msvc`, `aarch64-apple-darwin`. Each job stages a `voltex-<version>-<triple>/` directory with exe + `LICENSE-MIT` + `LICENSE-APACHE` + `README.md`, packages as `.tar.gz` (Unix) or `.zip` (Windows), uploads via `actions/upload-artifact@v4`.
   - `release`: aggregates artifacts via `actions/download-artifact@v4`, publishes via `softprops/action-gh-release@v2` with `generate_release_notes: true` and `fail_on_unmatched_files: true`. Only runs on `refs/tags/v*`.
-- `docs/release.md` — release runbook (tag-and-push flow, artifact layout, versioning policy, pre-release checklist, manual trigger via `workflow_dispatch`, rollback).
+- `docs/release.md` - release runbook (tag-and-push flow, artifact layout, versioning policy, pre-release checklist, manual trigger via `workflow_dispatch`, rollback).
 - `README.md` "문서" section: new link to `docs/release.md`.
 
 ### Triggers
@@ -3011,17 +3011,17 @@ P1 service-readiness item. Until now the only way to ship a release was a manual
 
 ### Notes
 
-macOS matrix entry targets `aarch64-apple-darwin` only (Apple Silicon). x86_64 macOS is intentionally out — matches `ci.yml`'s test matrix. Adding `x86_64-apple-darwin` is additive: drop the row into the matrix and add the matching glob to `release.files`.
+macOS matrix entry targets `aarch64-apple-darwin` only (Apple Silicon). x86_64 macOS is intentionally out - matches `ci.yml`'s test matrix. Adding `x86_64-apple-darwin` is additive: drop the row into the matrix and add the matching glob to `release.files`.
 
 ---
 
-## [v1.0.33] — 2026-05-21 — SemVer-checks CI (advisory)
+## [v1.0.33] - 2026-05-21 - SemVer-checks CI (advisory)
 
 P1 service-readiness item. From `v1.0.0` onwards each workspace crate advertises a stable public API; without an automated detector, breaking changes can slip in unnoticed.
 
 ### Added
 
-- `.github/workflows/ci.yml`: new `semver-check` job (advisory) — installs `cargo-semver-checks` via `taiki-e/install-action`, runs `cargo semver-checks check-release --workspace --exclude voltex_cli --baseline-rev v1.0.0`. The `--exclude voltex_cli` switch skips the binary (no lib API to compare). Falls back to a no-op `::notice::` when the `v1.0.0` tag is missing (fresh forks).
+- `.github/workflows/ci.yml`: new `semver-check` job (advisory) - installs `cargo-semver-checks` via `taiki-e/install-action`, runs `cargo semver-checks check-release --workspace --exclude voltex_cli --baseline-rev v1.0.0`. The `--exclude voltex_cli` switch skips the binary (no lib API to compare). Falls back to a no-op `::notice::` when the `v1.0.0` tag is missing (fresh forks).
 
 ### Notes
 
@@ -3029,13 +3029,13 @@ Advisory while tagging is selective. Promotes to blocking once we adopt tag-per-
 
 ---
 
-## [v1.0.32] — 2026-05-21 — HUD primitive in `voltex_runtime`
+## [v1.0.32] - 2026-05-21 - HUD primitive in `voltex_runtime`
 
-P0 service-readiness item. Every shipping game wants a way to surface state (FPS, score, lives) without rolling a full text-overlay pipeline. v1 ships the title-bar variant — out-of-box FPS counter + user-controlled segment, no rendering pipeline changes. In-window overlay rendering is deferred to v1.1 (needs a shared text primitive between editor and runtime).
+P0 service-readiness item. Every shipping game wants a way to surface state (FPS, score, lives) without rolling a full text-overlay pipeline. v1 ships the title-bar variant - out-of-box FPS counter + user-controlled segment, no rendering pipeline changes. In-window overlay rendering is deferred to v1.1 (needs a shared text primitive between editor and runtime).
 
 ### Added
 
-- `crates/voltex_runtime/src/hud.rs` — new `Hud` struct with:
+- `crates/voltex_runtime/src/hud.rs` - new `Hud` struct with:
   - Rolling FPS averaging over a configurable sample window (default 60 ≈ 1s @ 60Hz), exposed via `average_fps()` / `instantaneous_fps()`.
   - User-controllable title segment (`set_user_segment(Some/None)`).
   - Configurable update cadence (`set_update_interval`, default 0.25s) and sample window (`set_sample_window`).
@@ -3044,13 +3044,13 @@ P0 service-readiness item. Every shipping game wants a way to surface state (FPS
 - `voltex_runtime::lib`: exports `pub mod hud;` + `pub use hud::Hud;` and includes `Hud` in the crate-level docstring.
 - `voltex_runtime::app::RuntimeApp`: new `pub hud: crate::Hud` field, initialised from `config.window.title` in `new()`.
 - `voltex_runtime::handler` redraw path: feeds `frame_dt` into `app.hud.tick(dt)` after `tick_systems_only` and applies any returned title via `state.window.handle.set_title(&new_title)`.
-- `examples/runtime_demo`: demo wiring — sets `app.hud.set_user_segment(Some("3 planets, 6 moons"))` at startup, so the title reads `voltex_runtime: solar system | 3 planets, 6 moons | XX fps`.
+- `examples/runtime_demo`: demo wiring - sets `app.hud.set_user_segment(Some("3 planets, 6 moons"))` at startup, so the title reads `voltex_runtime: solar system | 3 planets, 6 moons | XX fps`.
 
 ### Verified
 
 - `cargo build -p voltex_runtime` clean, 0 `missing_docs` warnings.
-- `cargo test -p voltex_runtime --lib` — 46 passed (was 36, +10 HUD).
-- `cargo clippy --workspace --all-targets -- -D warnings` — clean.
+- `cargo test -p voltex_runtime --lib` - 46 passed (was 36, +10 HUD).
+- `cargo clippy --workspace --all-targets -- -D warnings` - clean.
 - `cargo build -p runtime_demo` clean (HUD wiring builds).
 
 ### Notes
@@ -3059,21 +3059,21 @@ P0 service-readiness item. Every shipping game wants a way to surface state (FPS
 
 ---
 
-## [v1.0.31] — 2026-05-21 — E2E `voltex new → build` test + nightly CI
+## [v1.0.31] - 2026-05-21 - E2E `voltex new → build` test + nightly CI
 
-P0 service-readiness item. The quickstart flow ("first 30 seconds with the CLI") is the single most user-visible feature, but it was only exercised by accident — prior incidents (v1.0.3 manifest validation, v1.0.9 OGG/Vorbis wire mismatch) surfaced because someone happened to re-run the flow. This cycle adds an automated regression detector.
+P0 service-readiness item. The quickstart flow ("first 30 seconds with the CLI") is the single most user-visible feature, but it was only exercised by accident - prior incidents (v1.0.3 manifest validation, v1.0.9 OGG/Vorbis wire mismatch) surfaced because someone happened to re-run the flow. This cycle adds an automated regression detector.
 
 ### Added
 
-- `crates/voltex_cli/tests/e2e_new_build.rs` — integration test that invokes the `voltex` binary (via `env!("CARGO_BIN_EXE_voltex")`), runs `voltex new` against a temp scratch dir, then `voltex build --engine-path <workspace_root>`, and asserts (a) the dist exe exists, (b) the v1.0.12 license bundle is intact. Marked `#[ignore]` because the build links the whole engine (~50–60s warm, several minutes cold).
+- `crates/voltex_cli/tests/e2e_new_build.rs` - integration test that invokes the `voltex` binary (via `env!("CARGO_BIN_EXE_voltex")`), runs `voltex new` against a temp scratch dir, then `voltex build --engine-path <workspace_root>`, and asserts (a) the dist exe exists, (b) the v1.0.12 license bundle is intact. Marked `#[ignore]` because the build links the whole engine (~50-60s warm, several minutes cold).
 - `.github/workflows/ci.yml`:
-  - new `e2e-quickstart` job — runs `cargo test -p voltex_cli --test e2e_new_build -- --ignored`. Triggers on `workflow_dispatch` (manual) and `schedule` (nightly 18:00 UTC). Advisory (`continue-on-error: true`) while we tune cache behavior.
+  - new `e2e-quickstart` job - runs `cargo test -p voltex_cli --test e2e_new_build -- --ignored`. Triggers on `workflow_dispatch` (manual) and `schedule` (nightly 18:00 UTC). Advisory (`continue-on-error: true`) while we tune cache behavior.
   - top-level `on:` gained `schedule: - cron: "0 18 * * *"` (nightly).
 
 ### Verified
 
-- `cargo test -p voltex_cli --test e2e_new_build` — 1 ignored, 0 failed (default skip works).
-- `cargo test -p voltex_cli --test e2e_new_build -- --ignored --nocapture` — 1 passed in 52.17s on Windows host:
+- `cargo test -p voltex_cli --test e2e_new_build` - 1 ignored, 0 failed (default skip works).
+- `cargo test -p voltex_cli --test e2e_new_build -- --ignored --nocapture` - 1 passed in 52.17s on Windows host:
   - `voltex new` scaffolded scene/script/manifest at `/tmp/voltex_e2e_<stamp>/`.
   - `voltex build --engine-path .` produced `dist/voltex_e2e_<stamp>.exe` and bundled 3 license files.
 
@@ -3083,15 +3083,15 @@ The test uses the scratch dir's basename as the project name (since `voltex new`
 
 ---
 
-## [v1.0.30] — 2026-05-21 — CHANGELOG entry enforcement
+## [v1.0.30] - 2026-05-21 - CHANGELOG entry enforcement
 
 P1 service-readiness item. Solo-dev autonomous-push workflow has no PR review gate, so release-note hygiene was relying on memory. Now enforced by hook + CI.
 
 ### Added
 
-- `scripts/check_changelog.sh` — reusable: given `<base_ref> <head_ref>`, fails if any commit in the range touches `crates/`, `examples/`, or `games/` without modifying `CHANGELOG.md`. `*.md` and `*/CODEMAP.md` inside code dirs are treated as docs-only and exempt.
-- `.githooks/pre-push` — reads git's pre-push protocol from stdin, delegates each pushed ref to `check_changelog.sh`. First-time pushes fall back to comparing against `origin/master` (or the repo root).
-- `.github/workflows/ci.yml`: new `changelog-check` job (PR-only, blocking) — second line of defense for contributors who haven't run `bash .githooks/install.sh`.
+- `scripts/check_changelog.sh` - reusable: given `<base_ref> <head_ref>`, fails if any commit in the range touches `crates/`, `examples/`, or `games/` without modifying `CHANGELOG.md`. `*.md` and `*/CODEMAP.md` inside code dirs are treated as docs-only and exempt.
+- `.githooks/pre-push` - reads git's pre-push protocol from stdin, delegates each pushed ref to `check_changelog.sh`. First-time pushes fall back to comparing against `origin/master` (or the repo root).
+- `.github/workflows/ci.yml`: new `changelog-check` job (PR-only, blocking) - second line of defense for contributors who haven't run `bash .githooks/install.sh`.
 - `install.sh` + `install.ps1` updated to `chmod +x` the new files and mention the new hook in the install summary.
 
 ### Verified
@@ -3107,18 +3107,18 @@ P1 service-readiness item. Solo-dev autonomous-push workflow has no PR review ga
 
 ---
 
-## [v1.0.29] — 2026-05-21 — `cargo-deny` integration
+## [v1.0.29] - 2026-05-21 - `cargo-deny` integration
 
-P1 service-readiness item. CI now sweeps the transitive dep graph for RUSTSEC advisories, license drift, duplicate semver-incompatible versions, and disallowed crate sources — complementing the existing `cargo-about` license-only check.
+P1 service-readiness item. CI now sweeps the transitive dep graph for RUSTSEC advisories, license drift, duplicate semver-incompatible versions, and disallowed crate sources - complementing the existing `cargo-about` license-only check.
 
 ### Added
 
-- `deny.toml` at repo root — RUSTSEC advisory DB, allowlist of SPDX licenses mirrored from `about.toml`, multi-version + wildcards + sources policy. All four `[advisories]/[licenses]/[bans]/[sources]` sections wired.
+- `deny.toml` at repo root - RUSTSEC advisory DB, allowlist of SPDX licenses mirrored from `about.toml`, multi-version + wildcards + sources policy. All four `[advisories]/[licenses]/[bans]/[sources]` sections wired.
 - `.github/workflows/ci.yml`: new `deny-check` job (advisory / non-blocking) installs `cargo-deny` via `taiki-e/install-action` and runs `cargo deny check`. Advisory now, promote to blocking once the `warn` categories (`[advisories.yanked]`, `[bans.multiple-versions]`) are clean.
 
 ### Verified
 
-- `deny.toml` schema follows the cargo-deny v0.16+ reference — verified locally by inspection. Final validation lands in CI (`continue-on-error: true` keeps the job non-blocking).
+- `deny.toml` schema follows the cargo-deny v0.16+ reference - verified locally by inspection. Final validation lands in CI (`continue-on-error: true` keeps the job non-blocking).
 
 ### Notes
 
@@ -3126,7 +3126,7 @@ P1 service-readiness item. CI now sweeps the transitive dep graph for RUSTSEC ad
 
 ---
 
-## [v1.0.28] — 2026-05-21 — `voltex_runtime` 100% documented (→ 0 `missing_docs`)
+## [v1.0.28] - 2026-05-21 - `voltex_runtime` 100% documented (→ 0 `missing_docs`)
 
 Tenth crate in the workspace `missing_docs` sweep. Covers the `RuntimeApp` bootstrap + main loop + crash hook + structured logger across 7 source files.
 
@@ -3142,12 +3142,12 @@ Tenth crate in the workspace `missing_docs` sweep. Covers the `RuntimeApp` boots
 
 ### Verified
 
-- `cargo build -p voltex_runtime` — zero `missing_docs` warnings.
-- `cargo test -p voltex_runtime --lib` — 36 passed (no regression).
+- `cargo build -p voltex_runtime` - zero `missing_docs` warnings.
+- `cargo test -p voltex_runtime --lib` - 36 passed (no regression).
 
 ---
 
-## [v1.0.27] — 2026-05-21 — `voltex_script` 100% documented (→ 0 `missing_docs`)
+## [v1.0.27] - 2026-05-21 - `voltex_script` 100% documented (→ 0 `missing_docs`)
 
 Ninth crate in the workspace `missing_docs` sweep. Covers LuaState wrapper + script instance pool + system integration + engine API + Lua C FFI bindings across 11 source files.
 
@@ -3164,12 +3164,12 @@ Ninth crate in the workspace `missing_docs` sweep. Covers LuaState wrapper + scr
 
 ### Verified
 
-- `cargo build -p voltex_script` — zero `missing_docs` warnings.
-- `cargo test -p voltex_script --lib` — 42 passed (no regression).
+- `cargo build -p voltex_script` - zero `missing_docs` warnings.
+- `cargo test -p voltex_script --lib` - 42 passed (no regression).
 
 ---
 
-## [v1.0.26] — 2026-05-21 — `voltex_ecs` 100% documented (→ 0 `missing_docs`)
+## [v1.0.26] - 2026-05-21 - `voltex_ecs` 100% documented (→ 0 `missing_docs`)
 
 Eighth crate in the workspace `missing_docs` sweep. Covers Entity/SparseSet/Archetype/World/queries + Transform/WorldTransform + Hierarchy + Scheduler/DependencyScheduler + ComponentRegistry + Scene/JSON across 18 source files.
 
@@ -3193,12 +3193,12 @@ Eighth crate in the workspace `missing_docs` sweep. Covers Entity/SparseSet/Arch
 
 ### Verified
 
-- `cargo build -p voltex_ecs` — zero `missing_docs` warnings.
-- `cargo test -p voltex_ecs --lib` — 134 passed (no regression).
+- `cargo build -p voltex_ecs` - zero `missing_docs` warnings.
+- `cargo test -p voltex_ecs --lib` - 134 passed (no regression).
 
 ---
 
-## [v1.0.25] — 2026-05-21 — `voltex_physics` 100% documented (→ 0 `missing_docs`)
+## [v1.0.25] - 2026-05-21 - `voltex_physics` 100% documented (→ 0 `missing_docs`)
 
 Seventh crate in the workspace `missing_docs` sweep. Covers BVH / Colliders (Sphere/Box/Capsule/ConvexHull/Mesh) / Narrowphase / GJK+EPA / Contact manifold / RigidBody + PhysicsConfig / Integrator / Sequential-Impulse Solver / Raycasting / Swept-sphere CCD across 14 source files.
 
@@ -3215,31 +3215,31 @@ Seventh crate in the workspace `missing_docs` sweep. Covers BVH / Colliders (Sph
 
 ### Verified
 
-- `cargo build -p voltex_physics` — zero `missing_docs` warnings.
-- `cargo test -p voltex_physics --lib` — 106 passed (no regression).
-- `cargo clippy --workspace --all-targets -- -D warnings` — clean.
+- `cargo build -p voltex_physics` - zero `missing_docs` warnings.
+- `cargo test -p voltex_physics --lib` - 106 passed (no regression).
+- `cargo clippy --workspace --all-targets -- -D warnings` - clean.
 
 ---
 
-## [v1.0.24] — 2026-05-21 — `voltex_audio` 100% documented (→ 0 `missing_docs`)
+## [v1.0.24] - 2026-05-21 - `voltex_audio` 100% documented (→ 0 `missing_docs`)
 
-Sixth crate in the workspace `missing_docs` sweep. Covers the in-house audio stack — clips/sources/system/spatial/HRTF/mixer/effects/backend — across 21 source files.
+Sixth crate in the workspace `missing_docs` sweep. Covers the in-house audio stack - clips/sources/system/spatial/HRTF/mixer/effects/backend - across 21 source files.
 
 ### Added
 
 - Crate-level docstring + `#![warn(missing_docs)]` guard.
 - Module headers for every audio sub-module: `audio_clip`, `audio_source`, `audio_bus`, `async_loader`, `wav`, `mixing`, `spatial`, `hrtf`, `mix_group`, `reverb`, `occlusion`, `fade_curves`, `dynamic_groups`, `effect_chain`, `backend/mod`, `backend/null`, `backend/wasapi`, plus error.
 - Public field / variant / method docs across all of the above. Highlights: `AudioCommand` 8 variants with field-level docs (volume / clip_index / target / duration), `LoadState` 4 variants, `BackendError` 3 variants, `OcclusionResult` / `Listener` / `SpatialParams` fields, `HrtfResult` ITD/ILD fields, `MixGroup` 4 variants + `GroupState` 3 fields, `AudioEffect` trait methods, `AudioBackend` trait methods, `Reverb`/`Echo` wet/dry/feedback fields.
-- `wasapi.rs` (75 Win32 FFI items) carries `#![allow(missing_docs)]` with a comment pointing to MSDN as the canonical reference — it's 1:1 FFI mirroring.
+- `wasapi.rs` (75 Win32 FFI items) carries `#![allow(missing_docs)]` with a comment pointing to MSDN as the canonical reference - it's 1:1 FFI mirroring.
 
 ### Verified
 
-- `cargo build -p voltex_audio` — zero `missing_docs` warnings.
-- `cargo test -p voltex_audio --lib` — 119 passed (no regression).
+- `cargo build -p voltex_audio` - zero `missing_docs` warnings.
+- `cargo test -p voltex_audio --lib` - 119 passed (no regression).
 
 ---
 
-## [v1.0.23] — 2026-05-21 — `voltex_ai` 100% documented (→ 0 `missing_docs`)
+## [v1.0.23] - 2026-05-21 - `voltex_ai` 100% documented (→ 0 `missing_docs`)
 
 Fifth crate in the workspace `missing_docs` sweep. Covers NavMesh / NavTriangle / NavAgent / find_path / SteeringAgent + 5 steering behaviours across 5 source files.
 
@@ -3255,16 +3255,16 @@ Fifth crate in the workspace `missing_docs` sweep. Covers NavMesh / NavTriangle 
 
 ### Verified
 
-- `cargo build -p voltex_ai` — zero `missing_docs` warnings.
-- `cargo test -p voltex_ai --lib` — 34 passed.
+- `cargo build -p voltex_ai` - zero `missing_docs` warnings.
+- `cargo test -p voltex_ai --lib` - 34 passed.
 
 ### Notes
 
-`obstacle.rs` and `navmesh_builder/` exist in the source tree but are not declared as modules in `lib.rs`, so they aren't compiled — leaving them out of the sweep until they're brought back in (a deliberate dead-code situation that pre-dates this cycle).
+`obstacle.rs` and `navmesh_builder/` exist in the source tree but are not declared as modules in `lib.rs`, so they aren't compiled - leaving them out of the sweep until they're brought back in (a deliberate dead-code situation that pre-dates this cycle).
 
 ---
 
-## [v1.0.22] — 2026-05-21 — `voltex_net` 100% documented (71 → 0 `missing_docs`)
+## [v1.0.22] - 2026-05-21 - `voltex_net` 100% documented (71 → 0 `missing_docs`)
 
 Fourth crate in the workspace `missing_docs` sweep. Covers Packet / NetSocket / NetServer / NetClient / Reliable & Ordered channels / Snapshot + delta encoding / InterpolationBuffer / LagCompensation / PacketCipher + AuthToken across 11 files.
 
@@ -3280,12 +3280,12 @@ Fourth crate in the workspace `missing_docs` sweep. Covers Packet / NetSocket / 
 
 ### Verified
 
-- `cargo build -p voltex_net` — zero `missing_docs` warnings (from 71).
-- `cargo test -p voltex_net --lib` — 47 passed (no regression).
+- `cargo build -p voltex_net` - zero `missing_docs` warnings (from 71).
+- `cargo test -p voltex_net --lib` - 47 passed (no regression).
 
 ---
 
-## [v1.0.21] — 2026-05-21 — `voltex_asset` 100% documented (64 → 0 `missing_docs`)
+## [v1.0.21] - 2026-05-21 - `voltex_asset` 100% documented (64 → 0 `missing_docs`)
 
 Third crate in the workspace `missing_docs` sweep. Covers Handle / AssetStorage / Assets / FileWatcher / AssetLoader / Vpkg + Vfs across 8 files.
 
@@ -3293,21 +3293,21 @@ Third crate in the workspace `missing_docs` sweep. Covers Handle / AssetStorage 
 
 - Crate-level docstring listing each public type plus its role; `#![warn(missing_docs)]` locks the count.
 - Module headers for `error` / `handle` / `storage` / `assets` / `watcher` / `loader` / `vfs`.
-- Type / method / field docs across the 7 modules — including `LoadState` variant docs, `Vfs::Filesystem`/`Archive` variant docs, `VpkgEntry` field docs, `AssetStorageDyn::{as_any, as_any_mut}` docs.
+- Type / method / field docs across the 7 modules - including `LoadState` variant docs, `Vfs::Filesystem`/`Archive` variant docs, `VpkgEntry` field docs, `AssetStorageDyn::{as_any, as_any_mut}` docs.
 
 ### Verified
 
-- `cargo build -p voltex_asset` — zero `missing_docs` warnings (clean from previous 64).
-- `cargo test -p voltex_asset --lib` — 36 passed (no regression).
-- `cargo clippy --workspace --all-targets -- -D warnings` — clean.
+- `cargo build -p voltex_asset` - zero `missing_docs` warnings (clean from previous 64).
+- `cargo test -p voltex_asset --lib` - 36 passed (no regression).
+- `cargo clippy --workspace --all-targets -- -D warnings` - clean.
 
 ### Notes
 
-Pattern matches v1.0.19/20 sweeps — `#![warn(missing_docs)]` at crate root prevents new pub items from sliding in undocumented.
+Pattern matches v1.0.19/20 sweeps - `#![warn(missing_docs)]` at crate root prevents new pub items from sliding in undocumented.
 
 ---
 
-## [v1.0.20] — 2026-05-21 — `voltex_platform` 100% documented (38 → 0 `missing_docs`)
+## [v1.0.20] - 2026-05-21 - `voltex_platform` 100% documented (38 → 0 `missing_docs`)
 
 Second crate in the workspace `missing_docs` sweep (after v1.0.19).
 ~250 lines across `lib.rs` + `window.rs` + `input.rs` +
@@ -3339,7 +3339,7 @@ Second crate in the workspace `missing_docs` sweep (after v1.0.19).
 
 ---
 
-## [v1.0.19] — 2026-05-21 — `voltex_math` 100% documented (59 → 0 `missing_docs`)
+## [v1.0.19] - 2026-05-21 - `voltex_math` 100% documented (59 → 0 `missing_docs`)
 
 First chunk of the 1573-warning workspace-wide `missing_docs` sweep.
 `voltex_math` is the smallest and most stable crate, so it makes a
@@ -3362,10 +3362,10 @@ good template for the larger crates' future cycles.
 
 ### Verified
 
-- `cargo build -p voltex_math` — 0 `missing_docs` warnings (was 59).
-- `cargo doc -p voltex_math --no-deps` — clean.
-- `cargo test -p voltex_math --lib` — 39 pass (no behaviour change).
-- Workspace `clippy -- -D warnings` and `test --lib` — no regressions.
+- `cargo build -p voltex_math` - 0 `missing_docs` warnings (was 59).
+- `cargo doc -p voltex_math --no-deps` - clean.
+- `cargo test -p voltex_math --lib` - 39 pass (no behaviour change).
+- Workspace `clippy -- -D warnings` and `test --lib` - no regressions.
 
 ### Up next
 
@@ -3377,12 +3377,12 @@ Remaining sweep order (small → large, stable → volatile):
 
 ---
 
-## [v1.0.18] — 2026-05-21 — Panic hook + logger moved to `RuntimeApp::new`
+## [v1.0.18] - 2026-05-21 - Panic hook + logger moved to `RuntimeApp::new`
 
 The v1.0.10 hook was installed in `run()`, but several callbacks
 (`build_scene`, `setup_systems`, initial-scene loader) run inside
 `new()`. A panic in those callbacks was therefore *not* captured by
-the crash-log writer — the most common new-user init crash was
+the crash-log writer - the most common new-user init crash was
 silent.
 
 ### Changed
@@ -3398,7 +3398,7 @@ silent.
 ### Added
 
 - Tests `new_with_crash_log_disabled_still_succeeds` and
-  `new_runs_build_scene_with_logger_initialised` — the first guards
+  `new_runs_build_scene_with_logger_initialised` - the first guards
   the opt-out branch through the relocated install; the second
   pins the contract that logger macros are safe to call from inside
   `build_scene` (because the logger is now initialised earlier).
@@ -3413,7 +3413,7 @@ silent.
 
 ---
 
-## [v1.0.17] — 2026-05-21 — `voltex_runtime::log` — minimal structured logger
+## [v1.0.17] - 2026-05-21 - `voltex_runtime::log` - minimal structured logger
 
 Gives shipped games visibility for debugging. Previously only scattered
 `eprintln!` calls, with no level filter, file mirror, or consistent
@@ -3431,7 +3431,7 @@ format.
     argument formatting.
   - `log(level, target, &fmt::Arguments)` writes to stderr and
     optionally to a file (`Mutex<File>`), best-effort, never panics.
-  - `format_record(...)` pure formatter — ISO-8601-style timestamp,
+  - `format_record(...)` pure formatter - ISO-8601-style timestamp,
     `[LEVEL]`, target, message.
   - Macros: `log_error!`, `log_warn!`, `log_info!`, `log_debug!`,
     `log_trace!`. Each gates on `enabled()` before formatting so
@@ -3452,7 +3452,7 @@ format.
 
 ### Known limits
 
-- `VOLTEX_LOG` is a single level — no per-module filter
+- `VOLTEX_LOG` is a single level - no per-module filter
   (`voltex_audio=debug,voltex_renderer=warn`).
 - No ANSI colour output (deliberate for Windows console compat).
   Opt-in colour is deferred.
@@ -3461,7 +3461,7 @@ format.
 
 ---
 
-## [v1.0.16] — 2026-05-21 — Complete `voltex.toml` schema reference
+## [v1.0.16] - 2026-05-21 - Complete `voltex.toml` schema reference
 
 v1.0.11 made the engine strict-reject unknown manifest keys, but
 there was no single document where users could check which keys are
@@ -3469,7 +3469,7 @@ valid. This closes that gap.
 
 ### Added
 
-- `docs/voltex-toml-reference.md` — every section (`[project]` /
+- `docs/voltex-toml-reference.md` - every section (`[project]` /
   `[build]` / `[build.<triple>]`) × every key (`name`, `version`,
   `scene`, `scripts`, `assets`, `window_title`, `window_size`,
   `targets`, `icon`) with type / required / default / description
@@ -3485,7 +3485,7 @@ valid. This closes that gap.
 ### Tests
 
 - `voltex_cli`: 54 → **55** (+1). New `build_help_references_
-  manifest_reference_doc` gating test — keeps the help text from
+  manifest_reference_doc` gating test - keeps the help text from
   silently dropping the doc reference.
 
 ### Known limits
@@ -3496,20 +3496,20 @@ valid. This closes that gap.
 
 ---
 
-## [v1.0.15] — 2026-05-21 — Examples catalog + flagship game README
+## [v1.0.15] - 2026-05-21 - Examples catalog + flagship game README
 
 Helps a fresh clone-and-explore user find their way through 14
 example crates plus the flagship game.
 
 ### Added
 
-- `examples/README.md` — a recommended learning order (triangle →
+- `examples/README.md` - a recommended learning order (triangle →
   model_viewer → many_cubes → ... → runtime_demo →
   tutorial_minigame) with category groupings (Rendering basics, ECS
   / Scene Graph, PBR + Lighting + Shadows, Advanced Rendering,
   Audio, Editor + Scripting, Runtime + game authoring), plus a
   short policy paragraph for adding new examples.
-- `games/voltex_survivor/README.md` — flagship game catalog:
+- `games/voltex_survivor/README.md` - flagship game catalog:
   directory layout table (voltex.toml / scene.vscn / scripts/*.lua /
   src/main.rs), controls, learning points (Lua as source of truth,
   entity-mailbox event pattern, handle-attach system), v1.0 limits.
@@ -3517,13 +3517,13 @@ example crates plus the flagship game.
 ### Notes
 
 - Documentation-only. Workspace tests / clippy unchanged.
-- Per-example READMEs are not added — each example's module header
+- Per-example READMEs are not added - each example's module header
   (`//!`) already documents the demo. The catalog covers menu-level
   navigation.
 
 ---
 
-## [v1.0.14] — 2026-05-21 — `CONTRIBUTING.md` + git pre-commit hook
+## [v1.0.14] - 2026-05-21 - `CONTRIBUTING.md` + git pre-commit hook
 
 Lowers external-contributor friction. The README "Contributing"
 section previously listed 4 cargo commands; a new contributor
@@ -3531,18 +3531,18 @@ forgetting one had to learn from a failed CI run.
 
 ### Added
 
-- `CONTRIBUTING.md` — full contributor guide: dependency policy
+- `CONTRIBUTING.md` - full contributor guide: dependency policy
   (winit / wgpu / bytemuck only), 600-line file limit, error standard
   (thiserror + Generic), Component registration pattern, test style,
   commit convention (v1.0.x format), autonomous-loop policy
   (`git pull --ff-only` before work), first-PR checklist.
-- `.githooks/pre-commit` (bash) — runs `cargo clippy --workspace
+- `.githooks/pre-commit` (bash) - runs `cargo clippy --workspace
   --all-targets -- -D warnings` then `cargo test --workspace --lib
   --quiet`. Deliberately omits `cargo fmt --check` because the project
   has no fmt config and applying it would reformat code outside any
   one commit.
 - `.githooks/install.sh` (bash) and `.githooks/install.ps1`
-  (PowerShell) — single-command installers that set
+  (PowerShell) - single-command installers that set
   `core.hooksPath = .githooks` and chmod +x. Idempotent.
 - README "Contributing" section now points at `CONTRIBUTING.md` and
   shows the hook install command for both shells.
@@ -3561,7 +3561,7 @@ forgetting one had to learn from a failed CI run.
 
 ---
 
-## [v1.0.13] — 2026-05-21 — `voltex --version` + rich per-subcommand `--help`
+## [v1.0.13] - 2026-05-21 - `voltex --version` + rich per-subcommand `--help`
 
 First-user friction reduction. Previously `voltex new --help` and
 `voltex build --help` did nothing (the subcommands didn't recognise
@@ -3598,7 +3598,7 @@ undocumented from a CLI-only user's perspective.
 
 ---
 
-## [v1.0.12] — 2026-05-21 — Missing LICENSE files added + `voltex build` bundles them
+## [v1.0.12] - 2026-05-21 - Missing LICENSE files added + `voltex build` bundles them
 
 A compliance gap discovered while writing the v1.0.12 tests: the
 workspace `Cargo.toml` advertises `license = "MIT OR Apache-2.0"` and
@@ -3610,11 +3610,11 @@ attribution.
 
 - `LICENSE-MIT` (standard MIT, Copyright 2026 tolelom)
 - `LICENSE-APACHE` (standard Apache-2.0 boilerplate + APPENDIX)
-- `voltex_cli::build::copy_license_files(engine_path, dist_dir)` —
+- `voltex_cli::build::copy_license_files(engine_path, dist_dir)` -
   copies `THIRD-PARTY-LICENSES.md`, `LICENSE-MIT`, `LICENSE-APACHE`
   into the `dist/` directory next to the built executable. Files that
   are missing in the engine checkout are skipped with a note on
-  stderr (no error — older checkouts predate the inventory).
+  stderr (no error - older checkouts predate the inventory).
 - `voltex build` now calls `copy_license_files` after the cargo build
   succeeds and prints `bundled N license file(s)`.
 
@@ -3623,7 +3623,7 @@ attribution.
 - `voltex_cli`: 43 → **47** (+4). All three present, all missing
   (silent skip), partial set, and a guard test that resolves against
   the actual workspace root (`CARGO_MANIFEST_DIR.parent().parent()`)
-  to assert the bundle includes `THIRD-PARTY-LICENSES.md` — this is
+  to assert the bundle includes `THIRD-PARTY-LICENSES.md` - this is
   the test that originally surfaced the missing LICENSE files.
 
 ### Known limits
@@ -3631,11 +3631,11 @@ attribution.
 - `THIRD-PARTY-LICENSES.md` regeneration is still manual via
   `cargo about generate about.hbs -o THIRD-PARTY-LICENSES.md`. Auto-
   regen PR on dependency change is deferred.
-- No integrity check on bundled files (hash etc.) — deferred.
+- No integrity check on bundled files (hash etc.) - deferred.
 
 ---
 
-## [v1.0.11] — 2026-05-21 — `voltex.toml` strict schema + path validation
+## [v1.0.11] - 2026-05-21 - `voltex.toml` strict schema + path validation
 
 Deployment workflow friction reduction: `voltex build` now rejects
 manifest typos and missing assets *before* invoking cargo, instead of
@@ -3647,7 +3647,7 @@ emitting either silent defaults or cryptic cargo errors.
   - `UnknownField { section, field, valid, suggestion }`
   - `UnknownSection { name, valid_prefixes }`
   - `ManifestPathMissing { field, path, base_dir }`
-- `manifest::validate_schema(TomlDoc)` — called automatically from
+- `manifest::validate_schema(TomlDoc)` - called automatically from
   `Manifest::parse`. Whitelisted keys per section:
   - `[project]`: `name`, `version`
   - `[build]`: `scene`, `scripts`, `assets`, `window_title`,
@@ -3671,11 +3671,11 @@ emitting either silent defaults or cryptic cargo errors.
 
 - `ManifestParse` errors still only report line, not column.
 - `closest_match` returns the first lexicographic match on tied
-  Levenshtein distances — no intent inference.
+  Levenshtein distances - no intent inference.
 
 ---
 
-## [v1.0.10] — 2026-05-21 — Crash-log panic hook in `voltex_runtime`
+## [v1.0.10] - 2026-05-21 - Crash-log panic hook in `voltex_runtime`
 
 Deployed game executables hide stderr from the end user, so a panic in
 production used to leave the user with nothing to attach to a bug
@@ -3688,12 +3688,12 @@ report. v1.0.10 closes that gap.
     `std::panic::set_hook` so the default stderr behaviour still runs
     *and* a `<app>-crash-YYYYMMDD-HHMMSS.txt` file is written
     alongside. `std::sync::Once` makes it idempotent within a process.
-  - `format_crash_report(...)` — pure function (no side effects) so
+  - `format_crash_report(...)` - pure function (no side effects) so
     the format is unit-testable. Includes app name, UTC wallclock,
     OS / arch, `voltex_runtime` crate version, the panic message, the
     panic location (`file:line:col`), and the full backtrace from
     `std::backtrace::Backtrace::force_capture()`.
-  - `crash_filename(app, ts)` — sanitises the app name (whitespace,
+  - `crash_filename(app, ts)` - sanitises the app name (whitespace,
     slashes, non-ASCII → `_`) so the filename is always valid on
     Windows + Linux + macOS.
   - Inline Howard-Hinnant `days_from_civil` algorithm for UNIX-seconds
@@ -3704,7 +3704,7 @@ report. v1.0.10 closes that gap.
   - `crash_log_dir: Option<PathBuf>` (defaults to `None` = current
     working directory at hook-fire time)
   - Builder methods `.with_crash_log_dir(p)` and
-    `.disable_crash_log()` — the latter for headless / fuzz harnesses.
+    `.disable_crash_log()` - the latter for headless / fuzz harnesses.
 - `RuntimeApp::run` installs the hook before constructing the winit
   `EventLoop` when `config.enable_crash_log` is true.
 
@@ -3719,15 +3719,15 @@ report. v1.0.10 closes that gap.
 
 ### Known limits
 
-- The hook itself is not exercised via a live `panic!` in tests —
+- The hook itself is not exercised via a live `panic!` in tests -
   global panic-hook state is messy to isolate per-test. A separate-
   process integration test is deferred.
 - Crash report omits GPU adapter name, FPS history, last loaded scene
-  — useful additions for a real bug-report intake. Deferred.
+  - useful additions for a real bug-report intake. Deferred.
 
 ---
 
-## [v1.0.9] — 2026-05-21 — OGG/Vorbis lib.rs wire + clippy 27→0 + AudioClip entry point
+## [v1.0.9] - 2026-05-21 - OGG/Vorbis lib.rs wire + clippy 27→0 + AudioClip entry point
 
 First cycle of the **service-readiness roadmap**
 (`docs/superpowers/specs/2026-05-21-service-readiness-roadmap.md`).
@@ -3746,12 +3746,12 @@ Resolves the dead-module regression discovered in v1.0.8.
   and 4 substantive fixes (`needless_late_init`, `manual_memcpy`,
   `enumerate_discard_index`, `same_item_push`).
 - Two latent test regressions surfaced by re-enabling compilation:
-  - `ogg::tests::invalid_capture_pattern` — short inputs went down
+  - `ogg::tests::invalid_capture_pattern` - short inputs went down
     the size-truncation branch and returned the generic "No OGG
     pages found" instead of "Invalid OGG capture pattern". Fixed by
     moving the magic check ahead of the 27-byte header size check;
     4 bytes are enough to commit on the magic.
-  - `vorbis::tests::bitreader_basics` — assertion arithmetic was
+  - `vorbis::tests::bitreader_basics` - assertion arithmetic was
     wrong (author over-counted the bits remaining in byte 0).
     Replaced with a correct expectation (22 not 27) plus an
     additional 8-bit read assertion, and clarified the comment.
@@ -3759,7 +3759,7 @@ Resolves the dead-module regression discovered in v1.0.8.
 ### Added
 
 - `voltex_audio::decode_ogg_vorbis_bytes(&[u8]) -> Result<AudioClip>`
-  — single entry point that composes `ogg::parse_ogg` and
+  - single entry point that composes `ogg::parse_ogg` and
   `vorbis::decode_vorbis`. External callers can decode `.ogg` bytes
   in one call.
 - Re-exports: `voltex_audio::{parse_ogg, decode_vorbis}` at crate
@@ -3768,7 +3768,7 @@ Resolves the dead-module regression discovered in v1.0.8.
 
 ### Tests
 
-- `voltex_audio` lib: 89 → **119** (+30) — ogg ×11 (4 original +
+- `voltex_audio` lib: 89 → **119** (+30) - ogg ×11 (4 original +
   4 fuzz + 1 invalid_capture rewrite + 2 entry-point), vorbis ×17
   (11 original + 1 BitReader 8-bit read + 5 more headers/imdct/
   decoder/floor coverage), `decode_ogg_vorbis_bytes` ×2.
@@ -3776,14 +3776,14 @@ Resolves the dead-module regression discovered in v1.0.8.
 
 ### Known limits (deferred)
 
-- Decoding real `.ogg` files end-to-end is **not** verified — the
+- Decoding real `.ogg` files end-to-end is **not** verified - the
   Vorbis decoder is simplified (scalar codebooks only, no coupled
   channels, residue type 2 only). `audio_demo` does not yet load
   OGG. Both deferred to a later v1.0.x cycle.
 
 ---
 
-## [v1.0.8] — 2026-05-21 — parser panic-resistance fuzz tests + OGG/Vorbis dead-module discovery
+## [v1.0.8] - 2026-05-21 - parser panic-resistance fuzz tests + OGG/Vorbis dead-module discovery
 
 ### Added (21 new panic-resistance tests across 5 parsers)
 
@@ -3808,7 +3808,7 @@ suite that feeds it the same four classes of input:
 | `parse_wav`       | `voltex_audio/src/wav.rs`                               | 4 |
 | **Total**         |                                                         | **21** |
 
-All 21 pass. **Zero panics surfaced** — every parser returns an
+All 21 pass. **Zero panics surfaced**: every parser returns an
 `Err` (or, for `parse_obj` which returns `ObjData` directly,
 returns an empty/partial `ObjData`) on malformed input. The
 engine's dependency policy forbids `rand` / `proptest` / `arbitrary`,
@@ -3825,7 +3825,7 @@ exist on disk but are **not declared** in `crates/voltex_audio/src/lib.rs`
 compiles them, and they are effectively dead source files.
 
 This contradicts STATUS.md Phase 6-1 ("OGG/Vorbis 디코더 자체
-구현 완료") — the code exists but is invisible to the rest of the
+구현 완료") - the code exists but is invisible to the rest of the
 build. Tentatively wiring them in surfaced 4 `dead_code` warnings
 (spec-required fields the decoder doesn't yet consume) **and** 27
 pre-existing clippy errors inside the modules. Fixing all of that
@@ -3846,7 +3846,7 @@ infrastructure tomorrow.
   they bring in, plumb vorbis output through `AudioClip` so OGG
   files are actually loadable, run the OGG fuzz tests.
 - Coverage-style fuzz orchestration (cargo-fuzz / honggfuzz /
-  AFL.rs) — current tests are deterministic and CI-friendly, which
+  AFL.rs) - current tests are deterministic and CI-friendly, which
   is the right v1.0 trade-off. Coverage-guided fuzzing is v1.1+.
 
 ### Verified
@@ -3854,13 +3854,13 @@ infrastructure tomorrow.
 - 921 → **942** lib tests (+21 fuzz, no behavior changes).
 - `cargo clippy --workspace --all-targets -- -D warnings` still
   passes (one unrelated unnecessary_cast in `parse_obj`'s test
-  helper fixed in this patch — `(32 + r) as u8 as char` → `as
+  helper fixed in this patch - `(32 + r) as u8 as char` → `as
   char`).
 - voltex_cli still 30 tests; workspace build still 0 warnings.
 
 ---
 
-## [v1.0.7] — 2026-05-21 — third-party license inventory + license-check CI job
+## [v1.0.7] - 2026-05-21 - third-party license inventory + license-check CI job
 
 Closes P4 #28 from the post-v1.0.5 audit ("외부 라이선스 고지
 미작성") and the README's own "v1.0 release artifact 에 포함 예정"
@@ -3868,26 +3868,26 @@ deferral.
 
 ### Added
 
-- **`THIRD-PARTY-LICENSES.md`** (auto-generated, 4,795 lines) —
+- **`THIRD-PARTY-LICENSES.md`** (auto-generated, 4,795 lines) -
   every transitive Cargo dependency that ends up in a Voltex build,
   grouped by SPDX license, with the full license text inlined.
   Generated by `cargo about generate about.hbs -o
   THIRD-PARTY-LICENSES.md`. Versioned in the repo so external users
   see it without rebuilding.
-- **`about.toml`** — cargo-about policy. Declares the accepted SPDX
+- **`about.toml`**: cargo-about policy. Declares the accepted SPDX
   list: MIT, Apache-2.0 (with LLVM exception variant), BSD-2/3,
   BSL-1.0, ISC, Zlib, Unicode-3.0 / Unicode-DFS-2016, MPL-2.0,
   CC0-1.0, OFL-1.1. Any new transitive outside this list will fail
   the CI license-check job.
-- **`about.hbs`** — handlebars template producing the markdown
+- **`about.hbs`**: handlebars template producing the markdown
   output. Lists per-license summary + per-crate listing with
   repository links + collapsible license text.
 - **`[workspace.package] license = "MIT OR Apache-2.0"`** in the
   root Cargo.toml, with `license.workspace = true` added to all 31
   workspace crate Cargo.toml files (15 lib + 14 example + 1 game +
   1 facade). Without this, `cargo about` warned that every voltex
-  crate had no license expression — making the output dishonest.
-- **`.github/workflows/ci.yml` — new `license-check` job**
+  crate had no license expression - making the output dishonest.
+- **`.github/workflows/ci.yml` - new `license-check` job**
   (Ubuntu, `continue-on-error: true`). Installs cargo-about via
   `taiki-e/install-action`, runs `cargo about generate` against
   `about.toml`. Fails (advisory) on:
@@ -3911,7 +3911,7 @@ final dependency graph, broken down as:
 | ISC            | 1      |
 | Unicode-3.0    | 1      |
 
-**Zero copyleft (GPL/AGPL/LGPL) and zero proprietary** — every
+**Zero copyleft (GPL/AGPL/LGPL) and zero proprietary**: every
 transitive license is compatible with both arms of voltex's MIT OR
 Apache-2.0 dual license.
 
@@ -3939,17 +3939,17 @@ Apache-2.0 dual license.
 
 ### Not in scope (deferred to v1.1+)
 
-- Promoting `license-check` from advisory to blocking — depends on
+- Promoting `license-check` from advisory to blocking - depends on
   the first real CI run.
 - Uploading `THIRD-PARTY-LICENSES.md` into release artifacts
-  (`dist/<name>.exe` companion file) — `voltex_cli build` does not
+  (`dist/<name>.exe` companion file) - `voltex_cli build` does not
   yet copy it.
-- `cargo-deny` for combined license + advisory + duplicate scan —
+- `cargo-deny` for combined license + advisory + duplicate scan -
   cargo-audit + cargo-about already cover the high-value cases.
 
 ---
 
-## [v1.0.6] — 2026-05-21 — coverage baseline (82%) + advisory CI job + CLI engine-path friendliness
+## [v1.0.6] - 2026-05-21 - coverage baseline (82%) + advisory CI job + CLI engine-path friendliness
 
 ### Measured (coverage baseline)
 
@@ -3972,8 +3972,8 @@ Per-crate breakdown (function coverage), 14 crates:
 - **🟡 below 80% (4 crates, all GPU/winit-dependent)**:
   voltex_renderer 65.94% (`shadow.rs` / `shadow_pipeline.rs` /
   `rt_*.rs` / `taa.rs` / `ssgi.rs` / `ssr.rs` / `temporal_accum.rs`
-  — GPU compute shader paths, need a `wgpu::Device` to exercise),
-  voltex_runtime 61.22% (`handler.rs` 0% — winit `ApplicationHandler`
+  - GPU compute shader paths, need a `wgpu::Device` to exercise),
+  voltex_runtime 61.22% (`handler.rs` 0% - winit `ApplicationHandler`
   callbacks), voltex_renderer_ecs 53.83% (`BasicRenderer::render`,
   GPU pass), voltex_platform 46.38% (`ApplicationHandler` callbacks +
   per-platform key mapping).
@@ -3984,14 +3984,14 @@ reached from a headless `cargo test --lib`**. Their unit-testable
 internals (`app.rs`, `config.rs`, `error.rs`, `RenderItem`
 collection, etc.) all sit at 80%+. Closing the gap requires
 integration tests against a headless GPU adapter and a stubbed
-event loop — scheduled for v1.1+.
+event loop - scheduled for v1.1+.
 
 ### Added (infrastructure)
 
-- **`.github/workflows/ci.yml` — new `coverage` job** (Ubuntu,
+- **`.github/workflows/ci.yml` - new `coverage` job** (Ubuntu,
   `continue-on-error: true`). Installs llvm-tools + cargo-llvm-cov
   via `taiki-e/install-action`, then runs `cargo llvm-cov
-  --workspace --lib --summary-only`. Advisory only — threshold
+  --workspace --lib --summary-only`. Advisory only - threshold
   enforcement (`--fail-under-lines 80`) postponed until GPU paths
   are covered by integration tests.
 - **README "Contributing" → "Coverage" subsection**: documents the
@@ -4000,7 +4000,7 @@ event loop — scheduled for v1.1+.
 - **README badge**: `coverage 82% lib`. Status badge bumped 1.0.5
   → 1.0.6.
 
-### Improved (CLI friendliness — P1 #5)
+### Improved (CLI friendliness - P1 #5)
 
 - **`voltex build` engine-path missing error** rewritten as a
   multi-line help block. Old (1 line): `"engine path unknown — set
@@ -4020,7 +4020,7 @@ event loop — scheduled for v1.1+.
 - Stage 1: cargo-llvm-cov install + baseline measurement (82.06%).
 - Stage 2: per-crate analysis, low crates identified and justified.
 - Stage 3: README + CI yml updated, no behavior change.
-- Stage 4: CLI tweak — empty-directory repro of `voltex new && cd &&
+- Stage 4: CLI tweak - empty-directory repro of `voltex new && cd &&
   voltex build` (without VOLTEX_REPO env) now prints the 7-line
   help block instead of the 1-line one.
 - Stage 5: `cargo build --workspace` clean, `cargo test --workspace
@@ -4028,16 +4028,16 @@ event loop — scheduled for v1.1+.
 
 ### Not in scope (deferred to v1.1+)
 
-- Lifting the 4 low-coverage crates above 80% — requires headless
+- Lifting the 4 low-coverage crates above 80% - requires headless
   GPU adapter testing + winit event-loop stubbing.
-- Enabling `--fail-under-lines 80` as a CI gate — depends on the
+- Enabling `--fail-under-lines 80` as a CI gate - depends on the
   above.
-- HTML coverage report upload (codecov / coveralls) — depends on
+- HTML coverage report upload (codecov / coveralls) - depends on
   the CI workflow actually running on a runner.
 
 ---
 
-## [v1.0.5] — 2026-05-21 — clippy clean (warnings 84 → 0) + cargo audit + CI workflow
+## [v1.0.5] - 2026-05-21 - clippy clean (warnings 84 → 0) + cargo audit + CI workflow
 
 This is the "quality gate" patch. v1.0.3 (Windows build P0) and v1.0.4
 (clippy deny errors) both slipped past internal verification because
@@ -4064,42 +4064,42 @@ suggestions across `voltex_math`, `voltex_audio`, `voltex_platform`,
 
 **Manually fixed** (24 residual diagnostics, semantic intent required):
 - `voltex_audio::mixing::make_stereo_clip` and
-  `voltex_ecs::world::tests::Name` — both genuinely dead, deleted
+  `voltex_ecs::world::tests::Name` - both genuinely dead, deleted
   outright.
-- `voltex_script::state` ×5 — `b"name\0".as_ptr() as *const _`
+- `voltex_script::state` ×5 - `b"name\0".as_ptr() as *const _`
   replaced with C-string literal `c"name".as_ptr()` (Rust 1.77+).
-- `voltex_renderer::jpg::mod` ×4 — `for _ in 0..N { vec.push(byte); }`
+- `voltex_renderer::jpg::mod` ×4 - `for _ in 0..N { vec.push(byte); }`
   collapsed to `vec.extend_from_slice(&[byte; N])` for JPEG marker
   padding.
-- `voltex_math::mat4`, `voltex_renderer::sh` ×4 — `needless_range_loop`
+- `voltex_math::mat4`, `voltex_renderer::sh` ×4 - `needless_range_loop`
   cases where `r`/`c`/`k`/`ch` indices appear in both lookup AND
   assert message: annotated `#[allow(clippy::needless_range_loop)]`
   with a comment.
 - `voltex_editor::panels::hierarchy::draw_entity_node`,
   `voltex_editor::picking::pick_entity`,
-  `deferred_demo::create_shadow_bind_group` — `too_many_arguments`
+  `deferred_demo::create_shadow_bind_group` - `too_many_arguments`
   cases where args are intrinsic (recursive draw / viewport rect +
   mouse + camera / 9-binding GPU layout): annotated `#[allow]`.
-- `voltex_cli::manifest::extract_build` — `very_complex_type` (6-tuple
+- `voltex_cli::manifest::extract_build` - `very_complex_type` (6-tuple
   return) refactored to return `BuildConfig` directly; the destructure
   at the call site collapsed to single `build` field. Net code
   shorter, type signature self-documenting.
-- `examples/{shadow_demo,deferred_demo,asset_demo}` — small loop
+- `examples/{shadow_demo,deferred_demo,asset_demo}` - small loop
   refactors and 1 `#[allow]` where index threads multiple parallel
   arrays.
 
 ### Added (CI infrastructure)
 
-- **`.github/workflows/ci.yml`** — GitHub Actions matrix that runs
+- **`.github/workflows/ci.yml`**: GitHub Actions matrix that runs
   `cargo build --workspace`, `cargo clippy --workspace --all-targets
   -- -D warnings`, `cargo test --workspace --lib`, and
   `cargo test -p voltex_cli` on **ubuntu-latest + windows-latest**
   (blocking) and **macos-latest** (advisory, `continue-on-error`).
   Linux job installs `libasound2-dev` before build to satisfy
   `voltex_audio`'s ALSA FFI link. Cache layer keys on `Cargo.lock`.
-  File is benign on non-GitHub remotes — gitea/forgejo also accept
+  File is benign on non-GitHub remotes - gitea/forgejo also accept
   the syntax.
-- **README "Contributing" section** — documents the exact four-command
+- **README "Contributing" section**: documents the exact four-command
   local verify recipe that mirrors CI, so PR authors can reproduce
   the gate before pushing.
 
@@ -4108,7 +4108,7 @@ suggestions across `voltex_math`, `voltex_audio`, `voltex_platform`,
 - Installed `cargo-audit` (one-time tool, not a runtime dep).
 - Scan of 298 `Cargo.lock` crates against 1,096 advisories:
   **0 vulnerabilities**.
-- **1 warning** — `paste 1.0.15` flagged unmaintained
+- **1 warning**: `paste 1.0.15` flagged unmaintained
   (RUSTSEC-2024-0436). Transitive: `paste ← metal ← wgpu-hal ←
   wgpu`. Cannot be addressed at voltex level; resolved by future
   wgpu upgrade. Documented for awareness, no action required.
@@ -4125,17 +4125,17 @@ suggestions across `voltex_math`, `voltex_audio`, `voltex_platform`,
 
 ### Not in scope (deferred to v1.1+)
 
-- Actually running the CI workflow on a GitHub runner — requires a
+- Actually running the CI workflow on a GitHub runner - requires a
   GitHub mirror. The workflow file ships ready-to-use; the first
   green run on a real CI is the next-cycle verification step.
 - 3-OS exe runtime verification (Linux ALSA audio output, macOS
-  CoreAudio audio output) — still environment-dependent.
-- Adding `cargo audit` to the CI workflow — `cargo-audit` itself
+  CoreAudio audio output) - still environment-dependent.
+- Adding `cargo audit` to the CI workflow - `cargo-audit` itself
   needs an install step; postponed pending a CI-friendly setup.
 
 ---
 
-## [v1.0.4] — 2026-05-21 — clippy `approx_constant` clean + README dependency honesty
+## [v1.0.4] - 2026-05-21 - clippy `approx_constant` clean + README dependency honesty
 
 ### Fixed
 - **clippy `approx_constant` errors (9 → 0)** across
@@ -4144,7 +4144,7 @@ suggestions across `voltex_math`, `voltex_audio`, `voltex_platform`,
   `voltex_renderer::json_parser`.
   - `integrator.rs` test used `3.14159` for `rb.angular_velocity` /
     expected_rot_y → replaced with `std::f32::consts::PI` (real intent
-    was 1 PI rad/s — comment already said so).
+    was 1 PI rad/s - comment already said so).
   - `animation.rs::test_quat_slerp_endpoints` used `0.7071` for 90°
     quaternion components → replaced with `std::f32::consts::FRAC_1_SQRT_2`
     (more precise + self-documenting).
@@ -4153,7 +4153,7 @@ suggestions across `voltex_math`, `voltex_audio`, `voltex_platform`,
     semantic dependency on the value at all).
   - `json.rs::test_write_number`, `json.rs::test_parse_negative_number`,
     `json_parser.rs::test_parse_number` use `3.14` / `-3.14` as
-    representative decimal payloads for serialization round-trip —
+    representative decimal payloads for serialization round-trip -
     annotated with `#[allow(clippy::approx_constant)]` + comment
     explaining the intent (the value is data, not π).
   - Net result: `cargo clippy --workspace --all-targets` no longer
@@ -4164,7 +4164,7 @@ suggestions across `voltex_math`, `voltex_audio`, `voltex_platform`,
 - **README "외부 crate 의존 단 2개 (winit / wgpu)" claim was inaccurate.**
   Actual measured direct dependencies:
   - **Runtime (3):** `winit`, `wgpu`, `bytemuck` (Pod/Zeroable derive +
-    cast — wgpu's de-facto companion, but a real direct dep nonetheless).
+    cast - wgpu's de-facto companion, but a real direct dep nonetheless).
   - **Build-only (2, never present in shipped runtime):** `thiserror`
     (`Error` derive macro; no runtime crate after compilation), `cc`
     (`voltex_script`'s Lua 5.4 C source `build.rs`).
@@ -4177,12 +4177,12 @@ suggestions across `voltex_math`, `voltex_audio`, `voltex_platform`,
   rationale per crate.
 
 ### Verified
-- `cargo clippy --workspace --all-targets` — `approx_constant` count
+- `cargo clippy --workspace --all-targets` - `approx_constant` count
   3 errors / 5 hits  →  0.
-- `cargo test --workspace --lib` — 921 lib tests still pass (the 3
+- `cargo test --workspace --lib` - 921 lib tests still pass (the 3
   test files touched are part of the standard suite; `voltex_physics`
   106 / `voltex_ecs` 134 / `voltex_renderer` 200 unchanged).
-- No production-code changes — only test bodies and 2 `use std::f32::consts::*`
+- No production-code changes - only test bodies and 2 `use std::f32::consts::*`
   imports inside `#[cfg(test)]` modules.
 
 ### Not in scope (deferred to v1.1+)
@@ -4192,14 +4192,14 @@ suggestions across `voltex_math`, `voltex_audio`, `voltex_platform`,
   etc.) are non-deny lints. v1.0.4 deliberately addresses only the
   hard errors that block external `cargo clippy --all-targets` runs.
 - CI workflow that enforces `cargo clippy --workspace --all-targets`
-  going forward — recommended next step but not added in this patch.
+  going forward - recommended next step but not added in this patch.
 
 ---
 
-## [v1.0.3] — 2026-05-21 — `voltex build` Windows P0 regression fix
+## [v1.0.3] - 2026-05-21 - `voltex build` Windows P0 regression fix
 
 ### Fixed
-- **P0 — `voltex build` failed on every Windows host**.
+- **P0 - `voltex build` failed on every Windows host**.
   `crates/voltex_cli/src/build.rs:96-97` (and `run.rs:20`) called
   `std::fs::canonicalize`, which on Windows always returns the
   extended-length `\\?\C:\...` verbatim form. That prefix landed in the
@@ -4216,7 +4216,7 @@ suggestions across `voltex_math`, `voltex_audio`, `voltex_platform`,
 - `voltex_cli::util::canonicalize_friendly(&Path) -> Result<PathBuf>`:
   canonicalize, then strip the Windows `\\?\` verbatim prefix for
   drive-letter paths (`\\?\C:\foo` → `C:\foo`). UNC paths
-  (`\\?\UNC\server\share\...`) are intentionally left untouched —
+  (`\\?\UNC\server\share\...`) are intentionally left untouched -
   rewriting them is lossy. No new external dependencies (engine policy
   forbids `dunce` etc.).
 - Regression tests (+4): `strip_verbatim_prefix` drive-letter strip,
@@ -4232,7 +4232,7 @@ suggestions across `voltex_math`, `voltex_audio`, `voltex_platform`,
 - Workspace build: 0 warnings, 0 errors.
 
 ### Cleanup
-- `examples/many_cubes/src/main.rs:8` — removed unused `Mat4` import
+- `examples/many_cubes/src/main.rs:8` - removed unused `Mat4` import
   (only `Vec3` is actually used). Was the lone warning in the
   workspace build.
 
@@ -4243,9 +4243,9 @@ suggestions across `voltex_math`, `voltex_audio`, `voltex_platform`,
 
 ---
 
-## [v1.0.2] — 2026-05-21 — 600-line rule re-enforcement + full example runtime sweep
+## [v1.0.2] - 2026-05-21 - 600-line rule re-enforcement + full example runtime sweep
 
-### Changed (refactor only — no behavior change)
+### Changed (refactor only - no behavior change)
 - `voltex_editor::session` (1060 lines) → `session/{mod.rs 445, tests.rs
   483, e3_tests.rs 152}`. E3 tests carry their own `temp_path` / `cleanup`
   helpers so each file compiles independently.
@@ -4259,14 +4259,14 @@ suggestions across `voltex_math`, `voltex_audio`, `voltex_platform`,
 ### Verified
 - Runtime smoke-test on the 8 previously-unverified examples
   (model_viewer / many_cubes / asset_demo / multi_light_demo /
-  shadow_demo / ibl_demo / deferred_demo / editor_demo) — all 8 exit 124
+  shadow_demo / ibl_demo / deferred_demo / editor_demo) - all 8 exit 124
   (timeout-clean, no panic). With v1.0.1's voltex_survivor +
   tutorial_minigame + runtime_demo + audio_demo + triangle + pbr_demo +
   hierarchy_demo, **all 15 examples + 1 game are Windows-host runtime
   verified**.
 
 ### Documentation sync
-- STATUS.md M3 row corrected (was 'no violations' — became 4 violations
+- STATUS.md M3 row corrected (was 'no violations' - became 4 violations
   during Cycles 4-13 before re-split).
 - STATUS.md voltex_ecs test count fixed (was 131, actual 134).
 - DEFERRED.md: gizmo / Despawn-undo / mesh AABB picking marked ✅ (done
@@ -4280,7 +4280,7 @@ suggestions across `voltex_math`, `voltex_audio`, `voltex_platform`,
 
 ---
 
-## [v1.0.1] — 2026-05-21 — Runtime verification + P0/P1 regression patch
+## [v1.0.1] - 2026-05-21 - Runtime verification + P0/P1 regression patch
 
 ### Fixed
 - **handler.rs camera ↔ user-system WASD double-binding** (P0). FPS camera
@@ -4312,26 +4312,26 @@ suggestions across `voltex_math`, `voltex_audio`, `voltex_platform`,
 
 ---
 
-## [v1.0.0] — 2026-05-21
+## [v1.0.0] - 2026-05-21
 
 ### Added (Cycle 15, D3)
-- `games/voltex_survivor/` — flagship game. Wave-based arena shooter with
+- `games/voltex_survivor/` - flagship game. Wave-based arena shooter with
   4 Lua scripts (game/player/enemy/projectile) + scene + Rust input system.
   Game logic 100% in Lua + scene.
-- `voltex_runtime::RuntimeApp::add_input_system(F)` — per-frame system that
+- `voltex_runtime::RuntimeApp::add_input_system(F)` - per-frame system that
   receives `&InputState` alongside `&mut World, f32`. Powers WASD movement
   for voltex_survivor.
-- `docs/dev/v1.0-retrospective.md` — what worked, what was deferred, statistics,
+- `docs/dev/v1.0-retrospective.md` - what worked, what was deferred, statistics,
   next-priority list for v1.1.
 - `STATUS.md`: v1.0 release header + Cycle 15 entry.
-- Git tag `v1.0.0` (local — user push activates remote release).
+- Git tag `v1.0.0` (local - user push activates remote release).
 
 ### Added (Cycle 14, D1+D2)
-- `README.md` — 5-minute quickstart + code-first / editor-first workflows
+- `README.md` - 5-minute quickstart + code-first / editor-first workflows
   + feature list (14 categories) + crate dependency graph + license +
   contributing + verification-limit notes.
-- `docs/tutorial.md` — 7-chapter 30-minute tutorial from scaffold to built exe.
-- `examples/tutorial_minigame/` — final artifact of the tutorial, dual-workflow
+- `docs/tutorial.md` - 7-chapter 30-minute tutorial from scaffold to built exe.
+- `examples/tutorial_minigame/` - final artifact of the tutorial, dual-workflow
   compatible (cargo run + voltex build). 1 player + 3 enemies + spinner.lua
   + enemy.lua + score system in stdout.
 
@@ -4339,34 +4339,34 @@ suggestions across `voltex_math`, `voltex_audio`, `voltex_platform`,
 - Lua input API (currently Rust handles input via `add_input_system`).
 - `voltex_cli editor` subcommand (tutorial points at `examples/editor_demo`).
 - 3-OS exe artifact verification (only Windows build verified locally).
-- Screenshots — README + tutorial have placeholder markers; PR welcome.
+- Screenshots - README + tutorial have placeholder markers; PR welcome.
 
 ---
 
 ## [Unreleased pre-v1.0]
 
-### Added (Cycle 13, A — 2026-05-21)
+### Added (Cycle 13, A - 2026-05-21)
 - `voltex` facade `prelude` now re-exports `Bounds`, `MeshHandle`,
   `MaterialHandle`, `ScriptComponent`, `RuntimeApp`, `RuntimeConfig`, `Vfs`.
 - `voltex::runtime` module re-export (was missing in B0).
 - Crate-level rustdoc on `voltex` lib + tier-1 API docstrings on `World`,
   `Entity`, `EditorCommand`, `EditorSession`.
 
-### Fixed (Cycle 13, A — 2026-05-21)
+### Fixed (Cycle 13, A - 2026-05-21)
 - `cargo doc --workspace --no-deps` now emits zero warnings (intra-doc link
   escapes in `voltex_math`, `voltex_physics`, `voltex_ai`, `voltex_script`,
   `voltex_renderer`; `voltex_cli` bin's `doc = false` skirts cargo issue
   #6313 collision with the `voltex` lib).
 
 ### Deferred to v1.1
-- Full `#![warn(missing_docs)]` sweep — 1586 missing public-item docstrings
+- Full `#![warn(missing_docs)]` sweep - 1586 missing public-item docstrings
   across the workspace. v1.0 documents prelude + tier-1 API only.
 - Public-item `pub(crate)` audit. Candidate list lives in
   `docs/dev/v1.0-pub-audit.md` (notes only, no code changes).
 
 ---
 
-## Cycle 12 (E3, flex — 2026-05-21)
+## Cycle 12 (E3, flex - 2026-05-21)
 
 ### Added
 - `EditorCommand::AddComponent { entity, name, data }` and
@@ -4374,13 +4374,13 @@ suggestions across `voltex_math`, `voltex_audio`, `voltex_platform`,
 - `EntityAllocator::restore_at_generation(id, gen) -> bool` and the
   matching `World::restore_at_generation` delegate.
 - `Component` trait gains default-implemented `remove()` and `default_bytes()`
-  methods (backward compatible — existing impls auto-pick up the defaults).
+  methods (backward compatible - existing impls auto-pick up the defaults).
   Built-ins override `default_bytes` with sensible values.
 - Inspector panel adds a "+ <name>" button row for the six registered
   built-in components.
 
 ### Changed (potentially breaking for in-tree callers)
-- `Despawn` is no longer history-clearing — it is fully undoable via a new
+- `Despawn` is no longer history-clearing - it is fully undoable via a new
   `Inverse::RestoreEntity` that snapshots every registered component
   pre-despawn and restores the original `(id, generation)` on undo.
 - `ComponentEntry` grows two fn-pointer fields (`remove`, `default_bytes`).
@@ -4388,7 +4388,7 @@ suggestions across `voltex_math`, `voltex_audio`, `voltex_platform`,
 
 ---
 
-## Cycle 11 (B3 — 2026-05-21)
+## Cycle 11 (B3 - 2026-05-21)
 
 ### Added
 - `voltex_audio::backend::CoreAudioBackend` (macOS, `cfg(target_os = "macos")`).
@@ -4396,12 +4396,12 @@ suggestions across `voltex_math`, `voltex_audio`, `voltex_platform`,
   free queue.
 - `voltex_cli::build::validate_target` enforces native-only build policy
   with friendly cross-compile / manifest-mismatch error messages.
-- `docs/build-matrix.md` — 3-OS prerequisites + commands + voltex.toml
+- `docs/build-matrix.md` - 3-OS prerequisites + commands + voltex.toml
   multi-target example + optional GitHub Actions matrix snippet.
 
 ---
 
-## Cycle 10 (P1 — 2026-05-21)
+## Cycle 10 (P1 - 2026-05-21)
 
 ### Added
 - `voltex_audio::backend` module with `AudioBackend` trait + `BackendError`.
@@ -4411,21 +4411,21 @@ suggestions across `voltex_math`, `voltex_audio`, `voltex_platform`,
 
 ---
 
-## Cycle 9 (B2 — 2026-05-21)
+## Cycle 9 (B2 - 2026-05-21)
 
 ### Added
-- `voltex_asset::vpkg` — custom `.vpkg` archive format (magic + index table
+- `voltex_asset::vpkg` - custom `.vpkg` archive format (magic + index table
   + concatenated blobs, no external deps).
-- `voltex_asset::vfs::Vfs` — `Filesystem(PathBuf)` or `Archive(VpkgReader)`,
+- `voltex_asset::vfs::Vfs` - `Filesystem(PathBuf)` or `Archive(VpkgReader)`,
   single `read`/`exists`/`list` API.
-- `voltex_runtime::RuntimeConfig::with_vfs(Vfs)` — archive-first scene loader
+- `voltex_runtime::RuntimeConfig::with_vfs(Vfs)` - archive-first scene loader
   (filesystem fallback retained for dev mode).
 - `voltex build` packs scene + scripts + assets into a `.vpkg` and embeds it
   in the wrapper via `include_bytes!`, producing self-contained executables.
 
 ---
 
-## Cycle 8 (B1 — 2026-05-21)
+## Cycle 8 (B1 - 2026-05-21)
 
 ### Added
 - `voltex_cli` production CLI with `new` / `build` / `run` subcommands.
@@ -4436,7 +4436,7 @@ suggestions across `voltex_math`, `voltex_audio`, `voltex_platform`,
 
 ---
 
-## Cycle 7 (B1-spike — 2026-05-21)
+## Cycle 7 (B1-spike - 2026-05-21)
 
 ### Added
 - `voltex_cli` 1-session prototype + `docs/superpowers/notes/2026-05-21-b1-spike-learnings.md`
@@ -4444,21 +4444,21 @@ suggestions across `voltex_math`, `voltex_audio`, `voltex_platform`,
 
 ---
 
-## Cycle 6 (B0 — 2026-05-21)
+## Cycle 6 (B0 - 2026-05-21)
 
 ### Added
 - `voltex_runtime` crate (L3): `RuntimeApp` (winit `ApplicationHandler` +
   GPU init + system tick) + `RuntimeConfig` builder + `RuntimeError`/`RuntimeResult`.
-- `examples/runtime_demo` — solar-system scene, `main` body 4 lines.
+- `examples/runtime_demo` - solar-system scene, `main` body 4 lines.
 
 ---
 
-## Cycle 5 (S1 — 2026-05-21)
+## Cycle 5 (S1 - 2026-05-21)
 
 ### Added
 - `voltex_ecs::ScriptComponent { script_path, instance_id }` as the sixth
   built-in component.
-- `voltex_script::ScriptInstancePool` — one `LuaState` per .lua path,
+- `voltex_script::ScriptInstancePool` - one `LuaState` per .lua path,
   shared across all entities pointing at it.
 - `script_start_all` / `script_update_all` systems (Lua `on_start(id,gen)` /
   `on_update(id,gen,dt)` dispatch).
@@ -4466,21 +4466,21 @@ suggestions across `voltex_math`, `voltex_audio`, `voltex_platform`,
 
 ---
 
-## Cycle 4 (E2 — 2026-05-20)
+## Cycle 4 (E2 - 2026-05-20)
 
 ### Added
 - `EditorMode { Edit, Play }` + `EditorSession::set_mode` with binary-snapshot
   Play→Stop restore.
-- `lifecycle` module — `LifecycleEvent { PlayStart, PlayStop }` with callback
+- `lifecycle` module - `LifecycleEvent { PlayStart, PlayStop }` with callback
   list for systems (physics, scripts) to hook the transitions.
-- `EditorError::ModeMismatch` — dispatch is rejected while in Play mode.
+- `EditorError::ModeMismatch` - dispatch is rejected while in Play mode.
 
 ---
 
-## Cycle 3 (E1 — 2026-05-20)
+## Cycle 3 (E1 - 2026-05-20)
 
 ### Added
-- `voltex_editor::gizmo` — translate / rotate / scale handles, LINE-list wgpu
+- `voltex_editor::gizmo` - translate / rotate / scale handles, LINE-list wgpu
   pipeline, depth-test Always overlay rendering.
 - `picking::pick_entity` upgraded from sphere approximation to AABB picking
   via the `Bounds` component (sphere fallback kept).
@@ -4488,10 +4488,10 @@ suggestions across `voltex_math`, `voltex_audio`, `voltex_platform`,
 
 ---
 
-## Cycle 2 (C0b — 2026-05-20)
+## Cycle 2 (C0b - 2026-05-20)
 
 ### Added
-- `voltex_renderer_ecs` crate (L3) — `RenderAssets` (lockstep handle table),
+- `voltex_renderer_ecs` crate (L3) - `RenderAssets` (lockstep handle table),
   `BasicRenderer` (per-entity dynamic UBO pipeline), `RenderItem` +
   `collect_render_items` (helper for custom PBR pipelines).
 - `editor_demo` + `survivor_game` migrated off the parallel `Vec<Mesh>`
@@ -4499,7 +4499,7 @@ suggestions across `voltex_math`, `voltex_audio`, `voltex_platform`,
 
 ---
 
-## Cycle 1 (C0a — 2026-05-20)
+## Cycle 1 (C0a - 2026-05-20)
 
 ### Added
 - `voltex_ecs::MeshHandle`, `MaterialHandle`, `Bounds` components (with phantom
@@ -4510,7 +4510,7 @@ suggestions across `voltex_math`, `voltex_audio`, `voltex_platform`,
 
 ## Pre-roadmap milestones
 
-### AI-friendly restructure M1–M7 (2026-05-20)
+### AI-friendly restructure M1-M7 (2026-05-20)
 - CODEMAP.md per crate + CLAUDE.md dependency graph (M1).
 - File-split: every `.rs` ≤ 600 lines (M2 + M3).
 - Error standardization on `thiserror`-based `<Crate>Error` + `Result<T>` aliases (M4).
@@ -4518,7 +4518,7 @@ suggestions across `voltex_math`, `voltex_audio`, `voltex_platform`,
 - `voltex` facade crate + `prelude` (M6).
 - Final verification + `hierarchy_demo` migration (M7).
 
-### Phases 1–8 (2026-03-24 → 2026-05-19)
+### Phases 1-8 (2026-03-24 → 2026-05-19)
 Foundation through editor command machinery. See `docs/dev/STATUS.md` for the
 per-phase breakdown (Foundation → Rendering → ECS+Scene → PBR → Physics →
 Audio → Advanced rendering → AI/Net/Lua/Editor + Editor Command).
