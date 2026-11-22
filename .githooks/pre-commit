@@ -9,7 +9,7 @@
 # project does not enforce a fmt config; running it would reformat lots
 # of existing code outside the scope of any single commit.
 
-set -e
+set -eo pipefail
 
 GREEN='\033[0;32m'
 RED='\033[0;31m'
